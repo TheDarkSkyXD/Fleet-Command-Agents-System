@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Builder Spawn & File Tree Picker)
+
+#### Feature #34: Spawn builder agent - PASSING
+- Already fully implemented: spawn dialog has builder capability button defaulting to sonnet model
+- Builder shows blue badge, file scope input, model auto-switches on capability change
+- Agent spawns via node-pty with builder capability stored in SQLite sessions table
+- Verified all code compiles and builds cleanly
+
+#### Feature #49: File scope assignment per builder (visual tree picker) - PASSING
+- Created FileTreePicker component (src/renderer/components/FileTreePicker.tsx)
+- Visual file tree with checkboxes for selecting files/folders
+- Search/filter input to find files quickly
+- Expand/collapse directories, auto-expands first level
+- Indeterminate checkbox state for partially selected directories
+- Selecting a directory selects all children recursively
+- Added project:file-tree IPC handler that recursively reads project directory (max 4 depth)
+- Ignores common dirs: node_modules, .git, dist, build, .cache, etc.
+- Integrated into spawn dialog with toggle button (Browse files / Use text input)
+- Selected paths combined into comma-separated file_scope string
+- Tree loads from active project path via projectStore
+
+#### Files Created/Modified
+- NEW: src/renderer/components/FileTreePicker.tsx - Visual file tree picker with checkboxes
+- MODIFIED: src/main/ipc/handlers.ts - Added project:file-tree IPC handler
+- MODIFIED: src/preload/index.ts - Added projectFileTree bridge method
+- MODIFIED: src/shared/types/index.ts - Added FileTreeNode interface + projectFileTree API type
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Integrated FileTreePicker into spawn dialog
+
+#### Current Status
+- 79/366 features passing (added #34 and #49 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Layout & Resizable Panels)
 
 #### Feature #8: Main content area renders correctly - PASSING
