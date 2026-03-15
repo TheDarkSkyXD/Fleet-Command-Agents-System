@@ -3141,3 +3141,33 @@
 - 201/366 features passing (added #186 and #198 this session)
 - All code passes Biome lint (only pre-existing noArrayIndexKey warning) and Vite build
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Watchdog Tier 1 AI Triage & Tier 2 Monitor Patrol)
+
+#### Feature #194: Watchdog Tier 1 AI failure triage - PASSING
+- Added triageAgentError() method to WatchdogService
+- Uses Claude CLI (--print mode) to analyze last N lines of agent output
+- Classifies errors as retry (transient), terminate (fatal), or extend (ambiguous)
+- Default 30s triage timeout with fallback to 'extend' on timeout
+- JSON and text fallback response parsing
+- Configurable line count (10-200) and timeout (5s-120s)
+- Records triage events in database, broadcasts results to renderer
+
+#### Feature #195: Watchdog Tier 2 monitor agent patrol - PASSING
+- Added startPatrol/stopPatrol/runPatrol methods for continuous sentinel monitoring
+- Generates PatrolHealthReport for each active agent
+- Anomaly detection: dead PID, stopped PTY, high escalation, empty output, long stalls
+- Maintains patrol history (last 50 results)
+- Configurable patrol interval (default 60s)
+- Records anomaly events in database, broadcasts patrol results to renderer
+
+#### Files Modified
+- MODIFIED: src/main/services/watchdogService.ts - Tier 1 triage and Tier 2 patrol methods
+- MODIFIED: src/main/ipc/handlers.ts - 8 new IPC handlers for triage and patrol
+- MODIFIED: src/preload/index.ts - 10 new bridge methods
+- MODIFIED: src/shared/types/index.ts - TriageResult, PatrolResult, PatrolStatus types
+
+#### Current Status
+- 211/366 features passing (added #194 and #195 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
