@@ -8428,6 +8428,139 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // ── Emit Rendered Prompt to File ──────────────────────────────
+  ipcMain.handle(
+    'prompt:emit',
+    async (
+      _event,
+      promptId: string,
+      options?: { variables?: Record<string, string>; outputPath?: string },
+    ) => {
+      try {
+        if (!promptId || typeof promptId !== 'string') {
+          return { data: null, error: 'Prompt ID is required' };
+        }
+
+        // Get the target prompt
+        const prompt = loggedPrepare('SELECT * FROM prompts WHERE id = ?').get(promptId) as {
+          id: string;
+          name: string;
+          content: string;
+          type: string;
+          parent_id: string | null;
+          version: number;
+          is_active: number;
+          tags: string | null;
+          description: string | null;
+        } | undefined;
+
+        if (!prompt) {
+          return { data: null, error: `Prompt not found: ${promptId}` };
+        }
+
+        // Resolve inheritance chain (root → ... → self)
+        const allPrompts = loggedPrepare('SELECT * FROM prompts').all() as Array<typeof prompt>;
+        const chain: Array<{ id: string; name: string; type: string; content: string }> = [];
+        const visited = new Set<string>();
+        let current = prompt;
+
+        while (current) {
+          if (visited.has(current.id)) break;
+          visited.add(current.id);
+          chain.unshift({
+            id: current.id,
+            name: current.name,
+            type: current.type,
+            content: current.content,
+          });
+          const parentId = current.parent_id;
+          current = parentId ? allPrompts.find((p) => p.id === parentId) : undefined;
+        }
+
+        // Merge content from inheritance chain
+        let rendered =
+          chain.length <= 1
+            ? chain[0]?.content || ''
+            : chain.map((link) => link.content).join('\n\n---\n\n');
+
+        // Resolve template variables if provided
+        const templateVarPattern = /(\{\{[\w.]+\}\}|\$\{[\w.]+\}|\{[\w.]+\})/g;
+        const unresolvedVars: string[] = [];
+
+        if (options?.variables && Object.keys(options.variables).length > 0) {
+          rendered = rendered.replace(templateVarPattern, (match) => {
+            // Extract variable name from {{var}}, ${var}, or {var}
+            const varName = match.replace(/^\{\{|\}\}$|^\$\{|\}$|^\{|\}$/g, '');
+            if (options.variables && varName in options.variables) {
+              return options.variables[varName];
+            }
+            unresolvedVars.push(match);
+            return match;
+          });
+        } else {
+          // Collect unresolved variables even without substitution
+          const matches = rendered.match(templateVarPattern);
+          if (matches) {
+            unresolvedVars.push(...new Set(matches));
+          }
+        }
+
+        // Show save dialog or use provided path
+        let filePath = options?.outputPath;
+
+        if (!filePath) {
+          const { dialog } = require('electron');
+          const safeName = prompt.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+          const result = await dialog.showSaveDialog({
+            title: 'Emit Rendered Prompt',
+            defaultPath: `${safeName}.prompt.md`,
+            filters: [
+              { name: 'Markdown Files', extensions: ['md'] },
+              { name: 'Text Files', extensions: ['txt'] },
+              { name: 'All Files', extensions: ['*'] },
+            ],
+          });
+
+          if (result.canceled || !result.filePath) {
+            return { data: null, error: null }; // User cancelled
+          }
+          filePath = result.filePath;
+        }
+
+        // Write the rendered prompt to file
+        const fs = require('node:fs');
+        const path = require('node:path');
+
+        // Ensure parent directory exists
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        fs.writeFileSync(filePath, rendered, 'utf-8');
+
+        log.info(
+          `[IPC] prompt:emit - Emitted rendered prompt "${prompt.name}" (${chain.length} level(s)) to ${filePath}`,
+        );
+
+        return {
+          data: {
+            filePath,
+            promptName: prompt.name,
+            inheritanceLevels: chain.length,
+            variablesResolved: options?.variables ? Object.keys(options.variables).length : 0,
+            unresolvedVariables: unresolvedVars,
+            contentLength: rendered.length,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('prompt:emit failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
   // ─── Quality Gates ──────────────────────────────────────
 
   ipcMain.handle('qualityGate:list', (_event, projectId: string) => {

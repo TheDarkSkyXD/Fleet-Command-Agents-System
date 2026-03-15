@@ -501,6 +501,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   promptDelete: (id: string) => ipcRenderer.invoke('prompt:delete', id),
   promptVersionList: (promptId: string) => ipcRenderer.invoke('prompt:version-list', promptId),
   promptVersionGet: (id: string) => ipcRenderer.invoke('prompt:version-get', id),
+  promptEmit: (
+    promptId: string,
+    options?: { variables?: Record<string, string>; outputPath?: string },
+  ) => ipcRenderer.invoke('prompt:emit', promptId, options),
 
   // Guard Rules
   guardRuleGet: (role: string) => ipcRenderer.invoke('guardRule:get', role),

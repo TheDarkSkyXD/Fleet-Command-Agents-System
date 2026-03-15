@@ -1490,6 +1490,20 @@ export interface ElectronAPI {
     promptId: string,
   ) => Promise<{ data: PromptVersion[] | null; error: string | null }>;
   promptVersionGet: (id: string) => Promise<{ data: PromptVersion | null; error: string | null }>;
+  promptEmit: (
+    promptId: string,
+    options?: { variables?: Record<string, string>; outputPath?: string },
+  ) => Promise<{
+    data: {
+      filePath: string;
+      promptName: string;
+      inheritanceLevels: number;
+      variablesResolved: number;
+      unresolvedVariables: string[];
+      contentLength: number;
+    } | null;
+    error: string | null;
+  }>;
 
   // Guard Rules
   guardRuleGet: (role: string) => Promise<{

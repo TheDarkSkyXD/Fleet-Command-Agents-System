@@ -3,6 +3,7 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiClock,
+  FiDownload,
   FiEdit2,
   FiEye,
   FiFile,
@@ -829,6 +830,7 @@ function PromptDetail({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [compareVersions, setCompareVersions] = useState<PromptVersion[] | null>(null);
+  const [emitting, setEmitting] = useState(false);
 
   // Track edit form dirty state for beforeunload warning
   const isEditDirty = useMemo(
@@ -900,6 +902,34 @@ function PromptDetail({
     }
   };
 
+  const handleEmit = async () => {
+    setEmitting(true);
+    try {
+      const result = await window.electronAPI.promptEmit(prompt.id);
+      if (result.error) {
+        toast.error(`Failed to emit: ${result.error}`);
+        return;
+      }
+      if (result.data) {
+        const info = result.data;
+        let msg = `Emitted "${info.promptName}" to file`;
+        if (info.inheritanceLevels > 1) {
+          msg += ` (${info.inheritanceLevels} levels merged)`;
+        }
+        if (info.unresolvedVariables.length > 0) {
+          msg += ` — ${info.unresolvedVariables.length} unresolved variable(s)`;
+        }
+        toast.success(msg);
+      }
+      // null data with no error means user cancelled
+    } catch (err) {
+      console.error('Failed to emit prompt:', err);
+      toast.error('Failed to emit prompt');
+    } finally {
+      setEmitting(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -948,6 +978,22 @@ function PromptDetail({
           >
             <FiEye size={14} />
             Preview
+          </button>
+
+          <button
+            type="button"
+            onClick={handleEmit}
+            disabled={emitting}
+            className="flex items-center gap-1.5 rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+            data-testid="emit-prompt-btn"
+            aria-label="Emit rendered prompt to file"
+          >
+            {emitting ? (
+              <FiLoader size={14} className="animate-spin" />
+            ) : (
+              <FiDownload size={14} />
+            )}
+            {emitting ? 'Emitting...' : 'Emit to File'}
           </button>
 
           <button
