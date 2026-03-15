@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { ipcMain } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
@@ -291,6 +291,121 @@ export function registerIpcHandlers(): void {
         | Record<string, unknown>
         | undefined;
       log.info(`[IPC] agent:stop - stopped pty process and updated session: ${agentId}`);
+
+      // Quality gate enforcement for builder agents
+      if (session?.capability === 'builder') {
+        try {
+          const activeProject = loggedPrepare(
+            'SELECT id, path FROM projects WHERE is_active = 1 LIMIT 1',
+          ).get() as { id: string; path: string } | undefined;
+          if (activeProject) {
+            const enabledGates = loggedPrepare(
+              'SELECT COUNT(*) as cnt FROM quality_gates WHERE project_id = ? AND enabled = 1',
+            ).get(activeProject.id) as { cnt: number };
+            if (enabledGates.cnt > 0) {
+              log.info(
+                `[QualityGate] Running ${enabledGates.cnt} quality gates for builder ${session.agent_name}`,
+              );
+              const gates = loggedPrepare(
+                'SELECT * FROM quality_gates WHERE project_id = ? AND enabled = 1 ORDER BY sort_order ASC',
+              ).all(activeProject.id) as Array<{
+                id: string;
+                gate_type: string;
+                name: string;
+                command: string;
+              }>;
+              let allPassed = true;
+              for (const gate of gates) {
+                const resultId = `qgr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const startTime = Date.now();
+                try {
+                  const { exitCode, stdout, stderr } = await new Promise<{
+                    exitCode: number;
+                    stdout: string;
+                    stderr: string;
+                  }>((resolve) => {
+                    exec(
+                      gate.command,
+                      {
+                        cwd: activeProject.path,
+                        timeout: 120000,
+                        maxBuffer: 1024 * 1024,
+                      },
+                      (error, stdout, stderr) => {
+                        resolve({
+                          exitCode: error?.code ?? 0,
+                          stdout: stdout?.slice(0, 10000) || '',
+                          stderr: stderr?.slice(0, 10000) || '',
+                        });
+                      },
+                    );
+                  });
+                  const durationMs = Date.now() - startTime;
+                  const status = exitCode === 0 ? 'passed' : 'failed';
+                  if (status === 'failed') allPassed = false;
+                  loggedPrepare(
+                    'INSERT INTO quality_gate_results (id, gate_id, agent_name, session_id, project_id, gate_type, gate_name, command, status, exit_code, stdout, stderr, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  ).run(
+                    resultId,
+                    gate.id,
+                    (session.agent_name as string) || null,
+                    agentId,
+                    activeProject.id,
+                    gate.gate_type,
+                    gate.name,
+                    gate.command,
+                    status,
+                    exitCode,
+                    stdout,
+                    stderr,
+                    durationMs,
+                  );
+                  log.info(
+                    `[QualityGate] ${gate.name}: ${status} (exit ${exitCode}, ${durationMs}ms)`,
+                  );
+                } catch (execErr) {
+                  const durationMs = Date.now() - startTime;
+                  allPassed = false;
+                  loggedPrepare(
+                    'INSERT INTO quality_gate_results (id, gate_id, agent_name, session_id, project_id, gate_type, gate_name, command, status, exit_code, stdout, stderr, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  ).run(
+                    resultId,
+                    gate.id,
+                    (session.agent_name as string) || null,
+                    agentId,
+                    activeProject.id,
+                    gate.gate_type,
+                    gate.name,
+                    gate.command,
+                    'error',
+                    -1,
+                    '',
+                    String(execErr),
+                    durationMs,
+                  );
+                }
+              }
+              if (!allPassed) {
+                const failedNames = gates.map((g) => g.name).join(', ');
+                const mailId = `msg_qg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                loggedPrepare(
+                  "INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority) VALUES (?, 'system', ?, ?, ?, 'error', 'high')",
+                ).run(
+                  mailId,
+                  (session.agent_name as string) || agentId,
+                  'Quality Gates Failed',
+                  `Builder quality gates failed. Please review and fix: ${failedNames}`,
+                );
+                log.warn(`[QualityGate] Builder ${session.agent_name} failed quality gates`);
+              } else {
+                log.info(`[QualityGate] Builder ${session.agent_name} passed all quality gates`);
+              }
+            }
+          }
+        } catch (gateErr) {
+          log.warn('[QualityGate] Failed to run quality gates on agent stop:', gateErr);
+        }
+      }
 
       // Record session_end event
       recordEvent({
@@ -4204,6 +4319,217 @@ export function registerIpcHandlers(): void {
         return { data: true, error: null };
       } catch (err) {
         return { data: false, error: String(err) };
+      }
+    },
+  );
+
+  // ─── Quality Gate Execution ─────────────────────────────
+
+  ipcMain.handle(
+    'qualityGate:run',
+    async (
+      _event,
+      projectId: string,
+      options?: { agent_name?: string; session_id?: string; cwd?: string },
+    ) => {
+      try {
+        const db = getDatabase();
+        const gates = db
+          .prepare(
+            'SELECT * FROM quality_gates WHERE project_id = ? AND enabled = 1 ORDER BY sort_order ASC',
+          )
+          .all(projectId) as Array<{
+          id: string;
+          gate_type: string;
+          name: string;
+          command: string;
+        }>;
+
+        if (gates.length === 0) {
+          return {
+            data: {
+              all_passed: true,
+              results: [],
+              agent_name: options?.agent_name || null,
+              session_id: options?.session_id || null,
+              project_id: projectId,
+            },
+            error: null,
+          };
+        }
+
+        // Determine working directory from project or options
+        let cwd = options?.cwd;
+        if (!cwd) {
+          const project = db.prepare('SELECT path FROM projects WHERE id = ?').get(projectId) as
+            | { path: string }
+            | undefined;
+          if (project) {
+            cwd = project.path;
+          }
+        }
+
+        const results: Array<Record<string, unknown>> = [];
+        let allPassed = true;
+
+        for (const gate of gates) {
+          const resultId = `qgr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const startTime = Date.now();
+
+          try {
+            const { exitCode, stdout, stderr } = await new Promise<{
+              exitCode: number;
+              stdout: string;
+              stderr: string;
+            }>((resolve) => {
+              exec(
+                gate.command,
+                {
+                  cwd: cwd || undefined,
+                  timeout: 120000,
+                  maxBuffer: 1024 * 1024,
+                },
+                (error, stdout, stderr) => {
+                  resolve({
+                    exitCode: error?.code ?? 0,
+                    stdout: stdout?.slice(0, 10000) || '',
+                    stderr: stderr?.slice(0, 10000) || '',
+                  });
+                },
+              );
+            });
+
+            const durationMs = Date.now() - startTime;
+            const status = exitCode === 0 ? 'passed' : 'failed';
+            if (status === 'failed') allPassed = false;
+
+            db.prepare(
+              'INSERT INTO quality_gate_results (id, gate_id, agent_name, session_id, project_id, gate_type, gate_name, command, status, exit_code, stdout, stderr, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            ).run(
+              resultId,
+              gate.id,
+              options?.agent_name || null,
+              options?.session_id || null,
+              projectId,
+              gate.gate_type,
+              gate.name,
+              gate.command,
+              status,
+              exitCode,
+              stdout,
+              stderr,
+              durationMs,
+            );
+
+            const row = db.prepare('SELECT * FROM quality_gate_results WHERE id = ?').get(resultId);
+            results.push(row as Record<string, unknown>);
+          } catch (execErr) {
+            const durationMs = Date.now() - startTime;
+            allPassed = false;
+
+            db.prepare(
+              'INSERT INTO quality_gate_results (id, gate_id, agent_name, session_id, project_id, gate_type, gate_name, command, status, exit_code, stdout, stderr, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            ).run(
+              resultId,
+              gate.id,
+              options?.agent_name || null,
+              options?.session_id || null,
+              projectId,
+              gate.gate_type,
+              gate.name,
+              gate.command,
+              'error',
+              -1,
+              '',
+              String(execErr),
+              durationMs,
+            );
+
+            const row = db.prepare('SELECT * FROM quality_gate_results WHERE id = ?').get(resultId);
+            results.push(row as Record<string, unknown>);
+          }
+        }
+
+        // If gates failed for a builder agent, send notification via mail
+        if (!allPassed && options?.agent_name) {
+          try {
+            const failedGates = results
+              .filter((r) => r.status !== 'passed')
+              .map((r) => r.gate_name)
+              .join(', ');
+            const mailId = `msg_qg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            db.prepare(
+              "INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority) VALUES (?, 'system', ?, ?, ?, 'error', 'high')",
+            ).run(
+              mailId,
+              options.agent_name,
+              'Quality Gates Failed',
+              `Quality gates failed: ${failedGates}. Please fix the issues and try again.`,
+            );
+            log.info(
+              `[QualityGate] Notified agent ${options.agent_name} about failed gates: ${failedGates}`,
+            );
+          } catch (mailErr) {
+            log.warn('[QualityGate] Failed to send gate failure notification:', mailErr);
+          }
+        }
+
+        log.info(
+          `[QualityGate] Ran ${gates.length} gates for project ${projectId}: ${allPassed ? 'ALL PASSED' : 'SOME FAILED'}`,
+        );
+
+        return {
+          data: {
+            all_passed: allPassed,
+            results,
+            agent_name: options?.agent_name || null,
+            session_id: options?.session_id || null,
+            project_id: projectId,
+          },
+          error: null,
+        };
+      } catch (err) {
+        return { data: null, error: String(err) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'qualityGate:results',
+    (
+      _event,
+      filters?: {
+        project_id?: string;
+        agent_name?: string;
+        session_id?: string;
+        limit?: number;
+      },
+    ) => {
+      try {
+        const db = getDatabase();
+        let query = 'SELECT * FROM quality_gate_results WHERE 1=1';
+        const params: unknown[] = [];
+        if (filters?.project_id) {
+          query += ' AND project_id = ?';
+          params.push(filters.project_id);
+        }
+        if (filters?.agent_name) {
+          query += ' AND agent_name = ?';
+          params.push(filters.agent_name);
+        }
+        if (filters?.session_id) {
+          query += ' AND session_id = ?';
+          params.push(filters.session_id);
+        }
+        query += ' ORDER BY created_at DESC';
+        if (filters?.limit) {
+          query += ' LIMIT ?';
+          params.push(filters.limit);
+        }
+        const rows = db.prepare(query).all(...params);
+        return { data: rows, error: null };
+      } catch (err) {
+        return { data: null, error: String(err) };
       }
     },
   );

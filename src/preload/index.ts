@@ -422,6 +422,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   qualityGateDelete: (id: string) => ipcRenderer.invoke('qualityGate:delete', id),
   qualityGateReorder: (gates: Array<{ id: string; sort_order: number }>) =>
     ipcRenderer.invoke('qualityGate:reorder', gates),
+  qualityGateRun: (
+    projectId: string,
+    options?: { agent_name?: string; session_id?: string; cwd?: string },
+  ) => ipcRenderer.invoke('qualityGate:run', projectId, options),
+  qualityGateResults: (filters?: {
+    project_id?: string;
+    agent_name?: string;
+    session_id?: string;
+    limit?: number;
+  }) => ipcRenderer.invoke('qualityGate:results', filters),
 
   // Hooks
   hookList: (filters?: { project_id?: string; hook_type?: string }) =>

@@ -443,6 +443,33 @@ export interface QualityGate {
   updated_at: string;
 }
 
+export type QualityGateResultStatus = 'pending' | 'running' | 'passed' | 'failed' | 'error';
+
+export interface QualityGateResult {
+  id: string;
+  gate_id: string;
+  agent_name: string | null;
+  session_id: string | null;
+  project_id: string;
+  gate_type: string;
+  gate_name: string;
+  command: string;
+  status: QualityGateResultStatus;
+  exit_code: number | null;
+  stdout: string | null;
+  stderr: string | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+export interface QualityGateRunSummary {
+  all_passed: boolean;
+  results: QualityGateResult[];
+  agent_name: string | null;
+  session_id: string | null;
+  project_id: string;
+}
+
 // Hook types
 export type HookType = 'SessionStart' | 'UserPromptSubmit' | 'PreToolUse';
 
@@ -1022,6 +1049,16 @@ export interface ElectronAPI {
   qualityGateReorder: (
     gates: Array<{ id: string; sort_order: number }>,
   ) => Promise<{ data: boolean; error: string | null }>;
+  qualityGateRun: (
+    projectId: string,
+    options?: { agent_name?: string; session_id?: string; cwd?: string },
+  ) => Promise<{ data: QualityGateRunSummary | null; error: string | null }>;
+  qualityGateResults: (filters?: {
+    project_id?: string;
+    agent_name?: string;
+    session_id?: string;
+    limit?: number;
+  }) => Promise<{ data: QualityGateResult[] | null; error: string | null }>;
 
   // Hooks
   hookList: (filters?: { project_id?: string; hook_type?: string }) => Promise<{

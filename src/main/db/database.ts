@@ -304,6 +304,23 @@ export async function initDatabase(): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS quality_gate_results (
+      id TEXT PRIMARY KEY,
+      gate_id TEXT NOT NULL,
+      agent_name TEXT,
+      session_id TEXT,
+      project_id TEXT NOT NULL,
+      gate_type TEXT NOT NULL,
+      gate_name TEXT NOT NULL,
+      command TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'running', 'passed', 'failed', 'error')),
+      exit_code INTEGER,
+      stdout TEXT,
+      stderr TEXT,
+      duration_ms INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS expertise_records (
       id TEXT PRIMARY KEY,
       domain TEXT NOT NULL,
@@ -363,6 +380,11 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_quality_gates_project ON quality_gates(project_id);
     CREATE INDEX IF NOT EXISTS idx_quality_gates_type ON quality_gates(gate_type);
     CREATE INDEX IF NOT EXISTS idx_quality_gates_enabled ON quality_gates(enabled);
+    CREATE INDEX IF NOT EXISTS idx_quality_gate_results_gate ON quality_gate_results(gate_id);
+    CREATE INDEX IF NOT EXISTS idx_quality_gate_results_agent ON quality_gate_results(agent_name);
+    CREATE INDEX IF NOT EXISTS idx_quality_gate_results_session ON quality_gate_results(session_id);
+    CREATE INDEX IF NOT EXISTS idx_quality_gate_results_project ON quality_gate_results(project_id);
+    CREATE INDEX IF NOT EXISTS idx_quality_gate_results_status ON quality_gate_results(status);
     CREATE INDEX IF NOT EXISTS idx_expertise_domain ON expertise_records(domain);
     CREATE INDEX IF NOT EXISTS idx_expertise_type ON expertise_records(type);
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);

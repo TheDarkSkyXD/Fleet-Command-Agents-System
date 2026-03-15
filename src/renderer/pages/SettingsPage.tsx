@@ -6,6 +6,7 @@ import {
   FiChevronUp,
   FiEdit2,
   FiEye,
+  FiPlay,
   FiPlus,
   FiRefreshCw,
   FiSave,
@@ -15,7 +16,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import { z } from 'zod';
-import type { ConfigProfile, QualityGate } from '../../shared/types';
+import type { ConfigProfile, QualityGate, QualityGateResult } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
 import {
   ACCENT_COLORS,
@@ -1555,6 +1556,10 @@ function QualityGatesSettings() {
   const [newGateName, setNewGateName] = useState('');
   const [newGateCommand, setNewGateCommand] = useState('npm test');
 
+  // Gate results state
+  const [gateResults, setGateResults] = useState<QualityGateResult[]>([]);
+  const [runningGates, setRunningGates] = useState(false);
+
   // Edit form state
   const [editName, setEditName] = useState('');
   const [editCommand, setEditCommand] = useState('');
@@ -1578,9 +1583,53 @@ function QualityGatesSettings() {
     }
   }, [activeProject]);
 
+  const loadResults = useCallback(async () => {
+    if (!activeProject) return;
+    try {
+      const result = await window.electronAPI.qualityGateResults({
+        project_id: activeProject.id,
+        limit: 20,
+      });
+      if (result.data) {
+        setGateResults(result.data);
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeProject]);
+
   useEffect(() => {
     loadGates();
-  }, [loadGates]);
+    loadResults();
+  }, [loadGates, loadResults]);
+
+  const handleRunGates = async () => {
+    if (!activeProject) return;
+    setRunningGates(true);
+    try {
+      const result = await window.electronAPI.qualityGateRun(activeProject.id);
+      if (result.error) {
+        showStatus('error', result.error);
+      } else if (result.data) {
+        if (result.data.all_passed) {
+          showStatus('success', 'All quality gates passed!');
+        } else {
+          showStatus(
+            'error',
+            `Some quality gates failed: ${result.data.results
+              .filter((r) => r.status !== 'passed')
+              .map((r) => r.gate_name)
+              .join(', ')}`,
+          );
+        }
+        loadResults();
+      }
+    } catch (err) {
+      showStatus('error', String(err));
+    } finally {
+      setRunningGates(false);
+    }
+  };
 
   const showStatus = (type: 'success' | 'error', text: string) => {
     setStatusMessage({ type, text });
@@ -2021,6 +2070,87 @@ function QualityGatesSettings() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Run Gates Button */}
+      {gates.length > 0 && (
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={handleRunGates}
+            disabled={runningGates}
+            className="flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            data-testid="run-quality-gates-btn"
+          >
+            {runningGates ? (
+              <FiRefreshCw className="animate-spin" size={14} />
+            ) : (
+              <FiPlay size={14} />
+            )}
+            {runningGates ? 'Running Gates...' : 'Run All Gates'}
+          </button>
+          <span className="text-xs text-slate-500">Test your quality gates manually</span>
+        </div>
+      )}
+
+      {/* Recent Gate Results */}
+      {gateResults.length > 0 && (
+        <div className="space-y-3" data-testid="gate-results-section">
+          <h3 className="text-sm font-medium text-slate-200">Recent Gate Results</h3>
+          <div className="space-y-1.5">
+            {gateResults.map((result) => (
+              <div
+                key={result.id}
+                className="flex items-center justify-between rounded-md border border-slate-700/50 bg-slate-800/30 px-3 py-2"
+                data-testid={`gate-result-${result.id}`}
+              >
+                <div className="flex items-center gap-2">
+                  {result.status === 'passed' ? (
+                    <FiCheck className="text-green-400" size={14} />
+                  ) : result.status === 'failed' ? (
+                    <FiX className="text-red-400" size={14} />
+                  ) : (
+                    <FiAlertTriangle className="text-amber-400" size={14} />
+                  )}
+                  <span className="text-sm text-slate-200">{result.gate_name}</span>
+                  <span
+                    className={`inline-flex items-center rounded-full border px-1.5 py-0 text-xs ${
+                      GATE_TYPE_COLORS[result.gate_type] || GATE_TYPE_COLORS.custom
+                    }`}
+                  >
+                    {result.gate_type}
+                  </span>
+                  {result.agent_name && (
+                    <span className="text-xs text-slate-500">by {result.agent_name}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-xs font-medium ${
+                      result.status === 'passed'
+                        ? 'text-green-400'
+                        : result.status === 'failed'
+                          ? 'text-red-400'
+                          : 'text-amber-400'
+                    }`}
+                  >
+                    {result.status}
+                  </span>
+                  {result.duration_ms != null && (
+                    <span className="text-xs text-slate-500">
+                      {result.duration_ms > 1000
+                        ? `${(result.duration_ms / 1000).toFixed(1)}s`
+                        : `${result.duration_ms}ms`}
+                    </span>
+                  )}
+                  <span className="text-xs text-slate-600">
+                    {new Date(result.created_at).toLocaleTimeString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
