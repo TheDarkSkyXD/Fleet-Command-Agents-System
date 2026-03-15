@@ -517,6 +517,19 @@ export function registerIpcHandlers(): void {
           data: JSON.stringify({ capability: options.capability, model, pid: agentProcess.pid }),
         });
 
+        // Broadcast agent spawned event for cascading UI updates
+        const spawnWindows = BrowserWindow.getAllWindows();
+        for (const win of spawnWindows) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('agent:update', {
+              agentId: options.id,
+              event: 'spawned',
+              state: 'booting',
+              agentName: options.agent_name,
+            });
+          }
+        }
+
         return {
           data: { ...(session as Record<string, unknown>), model, pid: agentProcess.pid },
           error: null,
@@ -661,6 +674,19 @@ export function registerIpcHandlers(): void {
         }
       }
 
+      // Broadcast agent state change to renderer for cascading UI updates
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('agent:update', {
+            agentId,
+            event: 'state_changed',
+            state: 'completed',
+            agentName: (session?.agent_name as string) ?? agentId,
+          });
+        }
+      }
+
       // Record session_end event
       recordEvent({
         eventType: 'session_end',
@@ -724,6 +750,18 @@ export function registerIpcHandlers(): void {
       log.info(
         `[IPC] agent:stop-all - killed ${processesKilled} pty processes, updated ${result.changes} sessions`,
       );
+
+      // Broadcast agent state change to renderer for cascading UI updates
+      const allWindows = BrowserWindow.getAllWindows();
+      for (const win of allWindows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('agent:update', {
+            event: 'all_stopped',
+            state: 'completed',
+          });
+        }
+      }
+
       return { data: { stopped: result.changes, processesKilled }, error: null };
     } catch (error) {
       log.error('agent:stop-all failed:', error);

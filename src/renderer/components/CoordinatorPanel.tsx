@@ -16,6 +16,7 @@ import {
   FiZap,
 } from 'react-icons/fi';
 import type { Session } from '../../shared/types';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 
 interface CoordinatorStatus {
   active: boolean;
@@ -222,7 +223,8 @@ export function CoordinatorPanel() {
       }
       await loadStatus();
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, { context: 'starting coordinator', showToast: false });
+      setError(msg);
     } finally {
       setIsStarting(false);
     }
@@ -241,7 +243,8 @@ export function CoordinatorPanel() {
       setLastPollResult(null);
       setPollCount(0);
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, { context: 'stopping coordinator', showToast: false });
+      setError(msg);
     } finally {
       setIsStopping(false);
     }
@@ -264,7 +267,8 @@ export function CoordinatorPanel() {
         await loadStatus();
       }
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, { context: 'dispatching lead', showToast: false });
+      setError(msg);
     } finally {
       setIsDispatching(false);
     }
@@ -284,7 +288,8 @@ export function CoordinatorPanel() {
         await loadOperatorHistory();
       }
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, { context: 'sending operator message', showToast: false });
+      setError(msg);
     } finally {
       setIsSendingOperator(false);
     }
@@ -310,7 +315,8 @@ export function CoordinatorPanel() {
         }
       }
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, { context: 'asking coordinator', showToast: false });
+      setError(msg);
     } finally {
       setIsAsking(false);
     }

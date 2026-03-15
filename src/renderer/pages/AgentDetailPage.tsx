@@ -39,6 +39,7 @@ import type {
 } from '../../shared/types';
 import { AgentTerminal } from '../components/AgentTerminal';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 
 const CAPABILITY_COLORS: Record<string, string> = {
   scout: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -729,10 +730,18 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       if (result.data) {
         setSession(result.data);
       } else if (result.error) {
-        setError(result.error);
+        const msg = handleIpcError(new Error(result.error), {
+          context: 'loading agent details',
+          showToast: false,
+        });
+        setError(msg);
       }
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, {
+        context: 'loading agent details',
+        showToast: false,
+      });
+      setError(msg);
     }
   }, [agentId]);
 
@@ -769,8 +778,18 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       loadProcessInfo();
     }, 3000);
 
+    // Listen for agent state change events for immediate cascading updates
+    window.electronAPI.onAgentUpdate((data: unknown) => {
+      const event = data as { agentId?: string };
+      // Refresh when this agent or any parent changes state
+      if (!event.agentId || event.agentId === agentId) {
+        loadSession();
+        loadProcessInfo();
+      }
+    });
+
     return () => clearInterval(interval);
-  }, [loadSession, loadProcessInfo]);
+  }, [loadSession, loadProcessInfo, agentId]);
 
   // Load associated issues when session is available
   useEffect(() => {
@@ -785,7 +804,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       await loadSession();
       await loadProcessInfo();
     } catch (err) {
-      setError(String(err));
+      handleIpcError(err, { context: 'stopping agent' });
     }
   };
 
@@ -794,7 +813,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       await window.electronAPI.agentNudge(agentId);
       await loadSession();
     } catch (err) {
-      setError(String(err));
+      handleIpcError(err, { context: 'nudging agent' });
     }
   };
 
@@ -816,7 +835,8 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       // Clear the status after 3 seconds
       setTimeout(() => setMailCheckResult(null), 3000);
     } catch (err) {
-      setMailCheckResult(`Error: ${String(err)}`);
+      const msg = handleIpcError(err, { context: 'checking mail', showToast: false });
+      setMailCheckResult(`Error: ${msg}`);
       setTimeout(() => setMailCheckResult(null), 3000);
     }
   };
@@ -1132,7 +1152,10 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
           setPerfData(result.data);
         }
       } catch (err) {
-        if (mounted) setError(String(err));
+        if (mounted) {
+          const msg = handleIpcError(err, { context: 'loading performance data', showToast: false });
+          setError(msg);
+        }
       } finally {
         if (mounted) setLoading(false);
       }

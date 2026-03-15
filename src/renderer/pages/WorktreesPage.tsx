@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fi';
 import { toast } from 'sonner';
 import type { Worktree } from '../../shared/types';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { useProjectStore } from '../stores/projectStore';
 
@@ -55,7 +56,8 @@ export function WorktreesPage() {
         setWorktrees(result.data || []);
       }
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, { context: 'loading worktrees', showToast: false });
+      setError(msg);
       setWorktrees([]);
     } finally {
       setLoading(false);

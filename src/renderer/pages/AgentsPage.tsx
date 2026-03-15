@@ -50,6 +50,7 @@ import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
 import { ScopeTreeViewer } from '../components/ScopeTreeViewer';
+import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 import { useProjectStore } from '../stores/projectStore';
 import { DEFAULT_MODEL_DEFAULTS, useSettingsStore } from '../stores/settingsStore';
@@ -473,6 +474,17 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [isSpawning, setIsSpawning] = useState(false);
   const [isOpeningSpawnDialog, setIsOpeningSpawnDialog] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
+
+  // Track dirty state for unsaved changes warning on navigation
+  const isSpawnFormDirty = showSpawnDialog && (
+    spawnName.trim() !== '' ||
+    spawnTaskId.trim() !== '' ||
+    spawnFileScope.trim() !== '' ||
+    spawnPrompt.trim() !== '' ||
+    spawnParentAgent !== '' ||
+    spawnTreePaths.length > 0
+  );
+  useFormDirtyTracking('agent-spawn-form', 'Agent Spawn Form', isSpawnFormDirty);
 
   const { activeProject, loadActiveProject } = useProjectStore();
 

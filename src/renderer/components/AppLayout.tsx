@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { hasUnsavedChanges, useNavigationGuard } from '../hooks/useUnsavedChanges';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
@@ -30,6 +31,7 @@ import { OrphanedProcessDialog } from './OrphanedProcessDialog';
 import { SetupWizard } from './SetupWizard';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
+import { UnsavedChangesDialog } from './UnsavedChangesDialog';
 import { UpdateBanner } from './UpdateBanner';
 
 // Parse hash to extract page and optional agent ID
@@ -106,6 +108,12 @@ export function AppLayout() {
     }
     fetchAgentCount();
     titleIntervalRef.current = setInterval(fetchAgentCount, 3000);
+
+    // Listen for agent state change events for immediate cascading updates
+    window.electronAPI.onAgentUpdate(() => {
+      fetchAgentCount();
+    });
+
     return () => {
       if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
     };
@@ -122,28 +130,55 @@ export function AppLayout() {
     window.electronAPI.windowSetTitle(title).catch(() => {});
   }, [activeProject, activeAgentCount]);
 
-  const handleNavigate = useCallback((page: string) => {
-    setCurrentPage((prev) => {
-      // Push current state to browser history before navigating (enables back button)
-      if (prev !== page) {
-        const newHash = buildHash(page);
-        window.history.pushState({ page }, '', newHash || window.location.pathname);
+  // Unsaved changes navigation guard
+  const {
+    showDialog: showUnsavedDialog,
+    dirtyFormLabels,
+    guardNavigation,
+    confirmLeave,
+    cancelLeave,
+  } = useNavigationGuard();
+
+  // Execute a navigation action (shared between direct and post-confirm flows)
+  const executeNavigation = useCallback((page: string, agentId?: string) => {
+    if (page === 'agent-detail' && agentId) {
+      setSelectedAgentId(agentId);
+      const newHash = buildHash('agent-detail', agentId);
+      window.history.pushState({ page: 'agent-detail', agentId }, '', newHash);
+      setCurrentPage('agent-detail');
+    } else {
+      setCurrentPage((prev) => {
+        if (prev !== page) {
+          const newHash = buildHash(page);
+          window.history.pushState({ page }, '', newHash || window.location.pathname);
+        }
+        return page;
+      });
+      if (page !== 'agent-detail') {
+        setSelectedAgentId(null);
       }
-      return page;
-    });
-    // Clear agent detail when navigating away
-    if (page !== 'agent-detail') {
-      setSelectedAgentId(null);
     }
   }, []);
 
+  const handleNavigate = useCallback((page: string) => {
+    const allowed = guardNavigation({ type: 'sidebar', page });
+    if (!allowed) return; // Dialog will show
+    executeNavigation(page);
+  }, [guardNavigation, executeNavigation]);
+
   const handleSelectAgent = useCallback((agentId: string) => {
-    setSelectedAgentId(agentId);
-    // Push current page to history before navigating to agent detail
-    const newHash = buildHash('agent-detail', agentId);
-    window.history.pushState({ page: 'agent-detail', agentId }, '', newHash);
-    setCurrentPage('agent-detail');
-  }, []);
+    const allowed = guardNavigation({ type: 'agent-select', page: 'agent-detail', agentId });
+    if (!allowed) return;
+    executeNavigation('agent-detail', agentId);
+  }, [guardNavigation, executeNavigation]);
+
+  // Handle confirmation from unsaved changes dialog
+  const handleConfirmLeave = useCallback(() => {
+    const nav = confirmLeave();
+    if (nav) {
+      executeNavigation(nav.page || 'agents', nav.agentId);
+    }
+  }, [confirmLeave, executeNavigation]);
 
   const handleBackFromDetail = useCallback(() => {
     // Use browser history back for proper back navigation
@@ -246,6 +281,19 @@ export function AppLayout() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
+  // Warn on window close/refresh if forms have unsaved changes (beforeunload)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges()) {
+        e.preventDefault();
+        // Modern browsers show a generic message, but returnValue is required
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   // Setup wizard: show on first launch when setupCompleted is false
   const showSetupWizard = loaded && !settings.setupCompleted;
 
@@ -325,6 +373,15 @@ export function AppLayout() {
 
       {/* Onboarding Tour (shows on first launch) */}
       {currentPage === 'agents' && <OnboardingTour />}
+
+      {/* Unsaved Changes Dialog */}
+      {showUnsavedDialog && (
+        <UnsavedChangesDialog
+          dirtyFormLabels={dirtyFormLabels}
+          onStay={cancelLeave}
+          onLeave={handleConfirmLeave}
+        />
+      )}
     </div>
   );
 }

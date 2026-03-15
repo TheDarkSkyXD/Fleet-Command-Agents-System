@@ -14,6 +14,7 @@ import {
   FiXCircle,
 } from 'react-icons/fi';
 import type { DoctorCheck, DoctorResult } from '../../shared/types';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 
 const checkIcons: Record<string, React.ReactNode> = {
   Database: <FiDatabase className="h-5 w-5" />,
@@ -46,7 +47,8 @@ export function DoctorPage() {
         setResult(res.data);
       }
     } catch (err) {
-      setError(String(err));
+      const msg = handleIpcError(err, { context: 'running diagnostics', showToast: false });
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
