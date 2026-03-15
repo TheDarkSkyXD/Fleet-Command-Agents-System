@@ -2122,3 +2122,38 @@
 - 135/366 features passing (added #67 and #68 this session)
 - All code passes Biome lint and type check (no new errors)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Mail Purge TTL & Event Feed)
+
+#### Feature #75: Mail purge with TTL - PASSING
+- Enhanced mail:purge IPC handler to support olderThanHours parameter alongside existing olderThanDays
+- Handler now returns count of deleted messages for UI feedback
+- Added purge dropdown menu to MailPage header with three purge modes:
+  - By age: Quick buttons for >1h, >6h, >24h, >7d
+  - By agent: Text input to purge all messages for a specific agent
+  - Purge all: Delete all messages with confirmation
+- Confirmation dialogs for all destructive operations
+- Click-outside-to-close behavior on dropdown menu
+
+#### Feature #76: Live real-time event feed - PASSING
+- Created EventFeedPage component with live real-time event display
+- Auto-refreshes every 2 seconds with animated Live indicator
+- Events shown chronologically (newest first) with color-coded type badges
+- Each event type has distinct icon and color scheme (9 types supported)
+- Filters: event type dropdown, agent name dropdown, event limit selector
+- Shows agent name, tool name, duration, relative timestamps with full time on hover
+- Auto-scrolls to top when new events arrive
+- Added Event Feed nav item to Sidebar (FiActivity icon)
+- Added events route case to AppLayout MainContent switch
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/EventFeedPage.tsx - Live event feed page
+- MODIFIED: src/main/ipc/handlers.ts - Enhanced mail:purge with olderThanHours
+- MODIFIED: src/renderer/pages/MailPage.tsx - Purge dropdown menu UI
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Event Feed nav item
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added EventFeedPage route
+
+#### Current Status
+- 144/366 features passing (added #75 and #76 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
