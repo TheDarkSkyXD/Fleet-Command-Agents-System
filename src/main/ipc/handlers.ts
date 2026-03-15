@@ -373,6 +373,21 @@ export function registerIpcHandlers(): void {
       ]);
       if (!validation.valid) return { data: null, error: validation.error };
 
+      // Validate agent name format (if provided - empty names get auto-generated)
+      if (options.agent_name && options.agent_name.trim().length > 0) {
+        const name = options.agent_name;
+        if (name.length > 64) {
+          return { data: null, error: 'Agent name must be 64 characters or fewer' };
+        }
+        if (!/^[a-zA-Z0-9_-][a-zA-Z0-9_ -]*$/.test(name)) {
+          return {
+            data: null,
+            error:
+              'Agent name can only contain letters, numbers, spaces, hyphens, and underscores',
+          };
+        }
+      }
+
       // Acquire operation lock to prevent concurrent spawn/stop race conditions
       await agentOpLock.acquire();
       try {

@@ -20,6 +20,7 @@ import type {
   ExpertiseRecord,
   ExpertiseType,
 } from '../../shared/types';
+import { toast } from 'sonner';
 import { formatAbsoluteTime } from '../components/RelativeTime';
 
 const EXPERTISE_TYPES: ExpertiseType[] = [
@@ -305,6 +306,7 @@ export function ExpertisePage() {
       }
 
       showStatus('success', 'Expertise record created');
+      toast.success('Expertise record created');
       setShowCreateForm(false);
       setNewRecord({
         domain: selectedDomain || '',
@@ -351,6 +353,7 @@ export function ExpertisePage() {
           return;
         }
         showStatus('success', 'Record deleted');
+        toast.success('Expertise record deleted');
         loadDomains();
         if (selectedDomain) {
           loadRecords(selectedDomain);

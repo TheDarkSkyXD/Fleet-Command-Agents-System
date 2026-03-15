@@ -317,6 +317,7 @@ export function MailPage() {
         setStatusMsg({ type: 'error', text: `Failed to send: ${result.error}` });
       } else {
         setStatusMsg({ type: 'success', text: 'Message sent successfully' });
+        toast.success('Message sent successfully');
         setComposeForm(defaultCompose);
         setShowCompose(false);
         loadMessages();
@@ -342,6 +343,7 @@ export function MailPage() {
           setSelectedMessage({ ...selectedMessage, read: 1 });
         }
         setStatusMsg({ type: 'success', text: 'All messages marked as read' });
+        toast.success('All messages marked as read');
       }
     } catch (err) {
       const msg = handleIpcError(err, { context: 'marking all as read', showToast: false });
@@ -384,6 +386,7 @@ export function MailPage() {
       setShowPurgeMenu(false);
       const deleted = (result?.data as { deleted?: number } | null)?.deleted ?? 0;
       setStatusMsg({ type: 'success', text: `Purged all messages (${deleted} removed)` });
+      toast.success(`Purged all messages (${deleted} removed)`);
     } catch (err) {
       const msg = handleIpcError(err, { context: 'purging messages', showToast: false });
       setStatusMsg({ type: 'error', text: msg });
@@ -406,6 +409,7 @@ export function MailPage() {
       setSelectedMessage(null);
       loadMessages();
       setStatusMsg({ type: 'success', text: `Purged messages older than ${label}` });
+      toast.success(`Purged messages older than ${label}`);
     } catch (err) {
       const msg = handleIpcError(err, { context: 'purging messages', showToast: false });
       setStatusMsg({ type: 'error', text: msg });
@@ -426,6 +430,7 @@ export function MailPage() {
       setSelectedMessage(null);
       loadMessages();
       setStatusMsg({ type: 'success', text: `Purged messages for agent "${name}"` });
+      toast.success(`Purged messages for agent "${name}"`);
     } catch (err) {
       const msg = handleIpcError(err, { context: 'purging messages', showToast: false });
       setStatusMsg({ type: 'error', text: msg });
