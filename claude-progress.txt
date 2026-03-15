@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Cascading Updates & IPC Error Messages)
+
+#### Feature #296: Cascading updates when parent data changes - PASSING
+- Wired onAgentUpdate IPC event listener to AgentsPage (immediate loadSessions + loadRunningProcesses)
+- Wired onAgentUpdate to AppLayout (immediate fetchAgentCount for status bar)
+- Wired onAgentUpdate to AgentDetailPage (immediate loadSession + loadProcessInfo for relevant agent)
+- Added agent:update broadcast from agent:spawn IPC handler (event: 'spawned')
+- Added agent:update broadcast from agent:stop IPC handler (event: 'state_changed')
+- Added agent:update broadcast from agent:stop-all IPC handler (event: 'all_stopped')
+- Hierarchy tree auto-updates via sessions prop from AgentsPage
+
+#### Feature #297: API error messages display in UI - PASSING
+- Updated AgentDetailPage: loadSession, handleStop, handleNudge, handleCheckMail, AgentPerformanceTab now use handleIpcError
+- Updated CoordinatorPanel: all 5 action handlers (start, stop, dispatch, operatorDispatch, ask) now use handleIpcError
+- Updated WorktreesPage: loadWorktrees error handling uses handleIpcError
+- Updated DoctorPage: runChecks error handling uses handleIpcError
+- handleIpcError translates ECONNREFUSED, SQLITE, EACCES, ENOENT, etc. to user-friendly messages
+- Error messages strip stack traces and internal details
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - agent:update broadcasts on spawn/stop/stop-all
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - onAgentUpdate listener for cascading refresh
+- MODIFIED: src/renderer/components/AppLayout.tsx - onAgentUpdate listener for status bar
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - onAgentUpdate listener + handleIpcError
+- MODIFIED: src/renderer/components/CoordinatorPanel.tsx - handleIpcError in all handlers
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - handleIpcError for worktree loading
+- MODIFIED: src/renderer/pages/DoctorPage.tsx - handleIpcError for diagnostics
+
+#### Current Status
+- 295/366 features passing (added #296 and #297 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Database-Driven Dropdowns & Filters)
 
 #### Feature #294: Database-driven dropdowns reflect real data - PASSING
