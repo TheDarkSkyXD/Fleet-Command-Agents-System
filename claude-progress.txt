@@ -2638,3 +2638,29 @@
 - 165/366 features passing (added #109 and #110 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Debug Timeline & Error Aggregation)
+
+#### Feature #126: Agent timeline trace view - PASSING
+- Added Timeline tab to Debug page with chronological event display
+- Agent selector filter to view events per agent
+- Vertical timeline line with color-coded dots per event type
+- tool_start and tool_end correlation showing computed duration
+- Expandable event details with full metadata (ID, session, run, level, timestamp)
+- Correlated tool pair display linking start/end events
+
+#### Feature #127: Error aggregation view across agents - PASSING
+- Added Errors tab to Debug page aggregating errors from all agents
+- Filters by agent name and error type/category
+- Per-agent error count summary cards (clickable to filter)
+- Error categories auto-extracted from JSON data or string patterns
+- Expandable error details with error data in red-highlighted pre blocks
+- Unattributed errors section for errors without agent names
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/DebugPage.tsx - Added Timeline and Errors tabs
+
+#### Current Status
+- 179/366 features passing (added #126 and #127 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
