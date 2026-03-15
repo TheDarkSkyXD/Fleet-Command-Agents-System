@@ -16,6 +16,7 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiClipboard,
+  FiCopy,
   FiCpu,
   FiEye,
   FiFilter,
@@ -713,6 +714,34 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                   title={STATE_TOOLTIPS[row.original.state] || row.original.state}
                 />
               )}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'id',
+        header: 'ID',
+        size: 100,
+        enableSorting: false,
+        cell: ({ getValue }) => {
+          const agentId = getValue<string>();
+          const shortId = agentId.length > 8 ? `${agentId.slice(0, 8)}…` : agentId;
+          return (
+            <div className="flex items-center gap-1 group/id">
+              <span className="text-xs text-slate-500 font-mono" title={agentId}>{shortId}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(agentId);
+                  toast.success('Agent ID copied to clipboard');
+                }}
+                className="opacity-0 group-hover/id:opacity-100 rounded p-0.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all"
+                title="Copy agent ID"
+                data-testid={`copy-agent-id-${agentId}`}
+              >
+                <FiCopy className="h-3 w-3" />
+              </button>
             </div>
           );
         },
@@ -1503,6 +1532,25 @@ function AgentCard({
 
       {/* Details row */}
       <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
+        {/* Agent ID with copy button */}
+        <span className="inline-flex items-center gap-1 group/card-id" data-testid="agent-card-id">
+          <span className="font-mono" title={session.id}>
+            ID: {session.id.length > 8 ? `${session.id.slice(0, 8)}…` : session.id}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(session.id);
+              toast.success('Agent ID copied to clipboard');
+            }}
+            className="opacity-0 group-hover/card-id:opacity-100 rounded p-0.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all"
+            title="Copy agent ID"
+            data-testid={`copy-agent-card-id-${session.id}`}
+          >
+            <FiCopy className="h-3 w-3" />
+          </button>
+        </span>
         {session.task_id && <span data-testid="agent-card-task">Task: {session.task_id}</span>}
         {session.worktree_path && <span>Worktree: {session.worktree_path}</span>}
         {session.branch_name && <span>Branch: {session.branch_name}</span>}

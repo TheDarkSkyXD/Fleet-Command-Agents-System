@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
+import { FiAlertTriangle, FiClipboard, FiRefreshCw } from 'react-icons/fi';
+import { toast } from 'sonner';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -12,6 +13,7 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  componentStack: string | null;
 }
 
 /**
@@ -22,11 +24,11 @@ interface ErrorBoundaryState {
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, componentStack: null };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error, componentStack: null };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -35,10 +37,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       error,
       errorInfo.componentStack,
     );
+    this.setState({ componentStack: errorInfo.componentStack || null });
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, componentStack: null });
   };
 
   render() {
@@ -51,6 +54,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <ErrorFallback
           sectionName={this.props.sectionName || 'This section'}
           error={this.state.error}
+          componentStack={this.state.componentStack}
           onRetry={this.handleRetry}
         />
       );
@@ -67,12 +71,40 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 function ErrorFallback({
   sectionName,
   error,
+  componentStack,
   onRetry,
 }: {
   sectionName: string;
   error: Error | null;
+  componentStack: string | null;
   onRetry: () => void;
 }) {
+  const handleCopyErrorDetails = () => {
+    const details = [
+      `Section: ${sectionName}`,
+      `Error: ${error?.name || 'Unknown'}`,
+      `Message: ${error?.message || 'No message'}`,
+      '',
+      '--- Stack Trace ---',
+      error?.stack || 'No stack trace available',
+      '',
+      '--- Component Stack ---',
+      componentStack || 'No component stack available',
+      '',
+      `Timestamp: ${new Date().toISOString()}`,
+      `User Agent: ${navigator.userAgent}`,
+    ].join('\n');
+
+    navigator.clipboard
+      .writeText(details)
+      .then(() => {
+        toast.success('Error details copied to clipboard');
+      })
+      .catch(() => {
+        toast.error('Failed to copy error details');
+      });
+  };
+
   return (
     <div
       className="flex h-full w-full items-center justify-center p-8"
@@ -102,16 +134,30 @@ function ErrorFallback({
           </div>
         )}
 
-        {/* Retry button */}
-        <button
-          type="button"
-          onClick={onRetry}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-          data-testid="error-boundary-retry"
-        >
-          <FiRefreshCw className="h-4 w-4" />
-          Try Again
-        </button>
+        {/* Action buttons */}
+        <div className="flex items-center justify-center gap-3">
+          {/* Retry button */}
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+            data-testid="error-boundary-retry"
+          >
+            <FiRefreshCw className="h-4 w-4" />
+            Try Again
+          </button>
+
+          {/* Copy Error Details button */}
+          <button
+            type="button"
+            onClick={handleCopyErrorDetails}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-700 px-5 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-600 hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+            data-testid="error-boundary-copy-details"
+          >
+            <FiClipboard className="h-4 w-4" />
+            Copy Error Details
+          </button>
+        </div>
 
         <p className="mt-4 text-xs text-slate-500">
           If this keeps happening, try restarting the application.
