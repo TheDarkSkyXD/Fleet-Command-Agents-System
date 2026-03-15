@@ -1,5 +1,30 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Spawn Spinner & Merge Progress Bar)
+
+#### Feature #226: Spinner for agent spawn in progress - PASSING
+- Spawn dialog already had isSpawning state, disabled button, and animated icon
+- Improved spinner icon from FiActivity to FiLoader (proper circular spinner)
+- Added data-testid="spawn-confirm-button" for testing
+- Button disabled with "Spawning..." text while spawn is in progress
+
+#### Feature #227: Progress bars for merge and discovery - PASSING
+- Added indeterminate animated progress bar for merge entries in 'merging' status
+- MergeElapsedTimer component shows live elapsed time (e.g., "2m 15s")
+- Added mergeProgress CSS keyframe animation for sliding indeterminate bar
+- Discovery page already had comprehensive progress bars (overall + per-category with percentages)
+- data-testid attributes on merge progress elements
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - FiLoader spinner, data-testid
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Merge progress bar, MergeElapsedTimer component
+- MODIFIED: src/renderer/styles/globals.css - mergeProgress keyframe animation
+
+#### Current Status
+- 233/366 features passing (added #226 and #227 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Truncated Text & Icon Tooltips)
 
 #### Feature #217: Truncated text expansion on hover - PASSING
