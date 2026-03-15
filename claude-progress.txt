@@ -1,5 +1,24 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Splash Screen & Health State Machine)
+
+#### Feature #12: Splash screen shows on startup - PASSING
+- Created resources/splash.html with animated Fleet Command branding
+- Spinning rings animation, gradient title, loading bar, status text
+- Main process creates frameless BrowserWindow for splash before main window
+- Splash auto-closes when main window fires ready-to-show event
+- Modified src/main/index.ts to show splash during DB init and IPC registration
+
+#### Feature #134: Health state machine visualization - PASSING
+- Created src/renderer/components/HealthStateMachine.tsx
+- SVG-based state machine diagram: booting -> working -> stalled -> zombie
+- Color-coded states: blue (booting), green (working), amber (stalled), red (zombie)
+- Animated icons per state (spinner for booting, bars for working, clock for stalled, X-eyes for zombie)
+- Transition arrows with labels, curved reverse arrow for nudge/resume
+- Glow effects on active state, accessible with SVG title
+- Integrated into agents page in AppLayout
+- Accepts optional currentState prop to highlight active state
+
 ### Session: 2026-03-14 (Settings Features)
 
 #### Feature #138: Max hierarchy depth setting - PASSING
