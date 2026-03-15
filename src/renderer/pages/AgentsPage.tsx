@@ -111,7 +111,7 @@ const STATE_COLORS: Record<string, string> = {
 
 const STATE_DOT_COLORS: Record<string, string> = {
   booting: 'bg-blue-400 animate-pulse',
-  working: 'bg-green-400 animate-pulse',
+  working: 'bg-green-400 animate-activity-pulse',
   completed: 'bg-slate-400',
   stalled: 'bg-amber-400',
   zombie: 'bg-red-400',
@@ -808,10 +808,11 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
               </span>
               {state === 'stalled' && (
                 <span
-                  className="inline-flex items-center gap-1 text-xs text-amber-400"
-                  title={`Stalled for ${stalledMin}m ${stalledSec}s (escalation level ${escalation})`}
+                  className="inline-flex items-center gap-1 text-xs text-amber-400 font-medium"
+                  title={`Agent is stalled and unresponsive. Stalled for ${stalledMin}m ${stalledSec}s (escalation level ${escalation}). Try nudging or stopping the agent.`}
+                  data-testid="agent-stalled-warning"
                 >
-                  <FiAlertTriangle className="h-3 w-3" />
+                  <FiAlertTriangle className="h-3.5 w-3.5" />
                   {stalledMin > 0 ? `${stalledMin}m` : `${stalledSec}s`}
                 </span>
               )}
@@ -1462,13 +1463,14 @@ function AgentCard({
             </span>
           )}
 
-          {/* Stale alert */}
+          {/* Stalled warning icon */}
           {session.state === 'stalled' && (
             <span
-              className="inline-flex items-center gap-1 text-xs text-amber-400"
-              title={`Agent stalled (escalation level ${session.escalation_level})`}
+              className="inline-flex items-center gap-1 text-xs text-amber-400 font-medium"
+              title={`Agent is stalled and unresponsive. Escalation level: ${session.escalation_level || 0}. Try nudging or stopping the agent.`}
+              data-testid="agent-stalled-warning"
             >
-              <FiAlertTriangle className="h-3 w-3" />
+              <FiAlertTriangle className="h-3.5 w-3.5" />
               {session.stalled_at &&
                 `${Math.floor((Date.now() - new Date(session.stalled_at).getTime()) / 60000)}m`}
             </span>
@@ -2051,7 +2053,7 @@ function VirtualizedTableBody({
                   width: '100%',
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
-                className="flex border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                className={`flex border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer ${row.original.state === 'working' || row.original.state === 'booting' ? 'animate-card-activity-pulse' : ''}`}
                 onClick={() => onSelectAgent?.(row.original.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') onSelectAgent?.(row.original.id);

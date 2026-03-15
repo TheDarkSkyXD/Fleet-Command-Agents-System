@@ -915,6 +915,23 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
               {STATE_ICONS[session.state]?.icon}
               {session.state}
             </span>
+
+            {/* Stalled warning indicator */}
+            {session.state === 'stalled' && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                title={`Agent is stalled and unresponsive. Escalation level: ${session.escalation_level || 0}. Try nudging or stopping the agent.`}
+                data-testid="agent-stalled-warning"
+              >
+                <FiAlertTriangle className="h-3.5 w-3.5" />
+                Stalled
+                {session.stalled_at && (
+                  <span className="text-amber-500/70">
+                    {`${Math.floor((Date.now() - new Date(session.stalled_at).getTime()) / 60000)}m`}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
 
           {/* Actions */}
