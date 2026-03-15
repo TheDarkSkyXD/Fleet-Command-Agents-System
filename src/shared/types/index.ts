@@ -240,14 +240,21 @@ export interface ElectronAPI {
     files_modified?: string[];
   }) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergeNext: () => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
-  mergeExecute: (id: number) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
+  mergeExecute: (
+    id: number,
+    repoPath?: string,
+    targetBranch?: string,
+  ) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergeComplete: (
     id: number,
     resolvedTier: string,
   ) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergeFail: (id: number) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergeConflict: (id: number) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
-  mergePreview: (id: number) => Promise<{ data: unknown; error: string | null }>;
+  mergePreview: (
+    id: number,
+    repoPath?: string,
+  ) => Promise<{ data: unknown; error: string | null }>;
   mergeHistory: () => Promise<{ data: MergeQueueEntry[] | null; error: string | null }>;
   mergeRemove: (id: number) => Promise<{ data: boolean; error: string | null }>;
   // Issues

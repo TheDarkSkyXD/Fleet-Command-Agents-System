@@ -374,18 +374,67 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // Execute merge - marks the entry as 'merging'
-  ipcMain.handle('merge:execute', (_event, id: number) => {
-    try {
-      loggedPrepare("UPDATE merge_queue SET status = 'merging' WHERE id = ?").run(id);
-      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
-      log.info(`[IPC] merge:execute - UPDATE merge in real database: id=${id}`);
-      return { data: entry, error: null };
-    } catch (error) {
-      log.error('merge:execute failed:', error);
-      return { data: null, error: String(error) };
-    }
-  });
+  // Execute merge - performs Tier 1 clean merge using git merge --no-edit
+  ipcMain.handle(
+    'merge:execute',
+    async (_event, id: number, repoPath?: string, targetBranch?: string) => {
+      try {
+        const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
+          id: number;
+          branch_name: string;
+          status: string;
+        } | null;
+        if (!entry) {
+          return { data: null, error: `Merge queue entry ${id} not found` };
+        }
+
+        // Mark as merging
+        loggedPrepare("UPDATE merge_queue SET status = 'merging' WHERE id = ?").run(id);
+        log.info(`[IPC] merge:execute - starting Tier 1 clean merge for id=${id}`);
+
+        // Use provided repoPath or fall back to current working directory
+        const mergePath = repoPath || process.cwd();
+
+        // Perform the actual git merge via simple-git
+        const result = await executeCleanMerge(mergePath, entry.branch_name, targetBranch);
+
+        if (result.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'clean-merge' WHERE id = ?",
+          ).run(id);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          log.info(`[IPC] merge:execute - Tier 1 clean merge succeeded for id=${id}`);
+          return { data: updated, error: null };
+        }
+
+        if (result.conflictFiles.length > 0) {
+          loggedPrepare("UPDATE merge_queue SET status = 'conflict' WHERE id = ?").run(id);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          log.warn(
+            `[IPC] merge:execute - conflicts detected for id=${id}: ${result.conflictFiles.join(', ')}`,
+          );
+          return {
+            data: updated,
+            error: result.error,
+            conflicts: result.conflictFiles,
+          };
+        }
+
+        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+        log.error(`[IPC] merge:execute - merge failed for id=${id}: ${result.error}`);
+        return { data: updated, error: result.error };
+      } catch (error) {
+        log.error('merge:execute failed:', error);
+        try {
+          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        } catch {
+          // ignore DB update failure on error path
+        }
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   // Complete a merge with a resolution tier
   ipcMain.handle('merge:complete', (_event, id: number, resolvedTier: string) => {
@@ -431,12 +480,25 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // Preview a merge (dry-run)
-  ipcMain.handle('merge:preview', (_event, id: number) => {
+  // Preview a merge (dry-run) - checks if merge would succeed without committing
+  ipcMain.handle('merge:preview', async (_event, id: number, repoPath?: string) => {
     try {
-      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
-      log.info(`[IPC] merge:preview - SELECT merge from real database: id=${id}`);
-      return { data: { entry, conflicts: [] }, error: null };
+      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
+        id: number;
+        branch_name: string;
+      } | null;
+      if (!entry) {
+        return { data: null, error: `Merge queue entry ${id} not found` };
+      }
+      const mergePath = repoPath || process.cwd();
+      const preview = await previewMerge(mergePath, entry.branch_name);
+      log.info(
+        `[IPC] merge:preview - dry-run for id=${id}: canMerge=${preview.canMerge}, conflicts=${preview.conflictFiles.length}`,
+      );
+      return {
+        data: { entry, canMerge: preview.canMerge, conflicts: preview.conflictFiles },
+        error: null,
+      };
     } catch (error) {
       log.error('merge:preview failed:', error);
       return { data: null, error: String(error) };

@@ -31,12 +31,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     files_modified?: string[];
   }) => ipcRenderer.invoke('merge:enqueue', entry),
   mergeNext: () => ipcRenderer.invoke('merge:next'),
-  mergeExecute: (id: number) => ipcRenderer.invoke('merge:execute', id),
+  mergeExecute: (id: number, repoPath?: string, targetBranch?: string) =>
+    ipcRenderer.invoke('merge:execute', id, repoPath, targetBranch),
   mergeComplete: (id: number, resolvedTier: string) =>
     ipcRenderer.invoke('merge:complete', id, resolvedTier),
   mergeFail: (id: number) => ipcRenderer.invoke('merge:fail', id),
   mergeConflict: (id: number) => ipcRenderer.invoke('merge:conflict', id),
-  mergePreview: (id: number) => ipcRenderer.invoke('merge:preview', id),
+  mergePreview: (id: number, repoPath?: string) =>
+    ipcRenderer.invoke('merge:preview', id, repoPath),
   mergeHistory: () => ipcRenderer.invoke('merge:history'),
   mergeRemove: (id: number) => ipcRenderer.invoke('merge:remove', id),
 

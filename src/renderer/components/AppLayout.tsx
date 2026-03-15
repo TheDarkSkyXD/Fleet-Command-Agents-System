@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { TasksPage } from '../pages/TasksPage';
 import { CommandPalette } from './CommandPalette';
 import { HealthStateMachine } from './HealthStateMachine';
 import { Sidebar } from './Sidebar';
@@ -70,14 +71,7 @@ function PageContent({ page }: { page: string }) {
     case 'merge':
       return <MergeQueuePage />;
     case 'tasks':
-      return (
-        <div>
-          <h1 className="text-2xl font-bold text-slate-50 mb-4">Tasks</h1>
-          <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
-            <p>No tasks created</p>
-          </div>
-        </div>
-      );
+      return <TasksPage />;
     case 'settings':
       return <SettingsPage />;
     case 'debug':
