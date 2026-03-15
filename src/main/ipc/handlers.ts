@@ -19,6 +19,12 @@ import {
   getUpdateStatus,
   installUpdate,
 } from '../services/updateService';
+import {
+  autoResolveConflicts,
+  aiResolveConflicts,
+  executeCleanMerge,
+  previewMerge,
+} from '../services/mergeService';
 import { watchdogService } from '../services/watchdogService';
 
 /**
@@ -903,6 +909,110 @@ export function registerIpcHandlers(): void {
     },
   );
 
+  // Tier 2: Auto-resolve conflicts by parsing conflict markers
+  ipcMain.handle(
+    'merge:auto-resolve',
+    async (_event, id: number, repoPath?: string, targetBranch?: string) => {
+      try {
+        const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
+          id: number;
+          branch_name: string;
+          status: string;
+        } | null;
+        if (!entry) {
+          return { data: null, error: `Merge queue entry ${id} not found` };
+        }
+
+        loggedPrepare("UPDATE merge_queue SET status = 'merging' WHERE id = ?").run(id);
+        log.info(`[IPC] merge:auto-resolve - starting Tier 2 auto-resolve for id=${id}`);
+
+        const mergePath = repoPath || process.cwd();
+        const result = await autoResolveConflicts(mergePath, entry.branch_name, targetBranch);
+
+        if (result.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'auto-resolve' WHERE id = ?",
+          ).run(id);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          log.info(`[IPC] merge:auto-resolve - Tier 2 succeeded for id=${id}`);
+          return { data: updated, error: null };
+        }
+
+        if (result.conflictFiles.length > 0) {
+          loggedPrepare("UPDATE merge_queue SET status = 'conflict' WHERE id = ?").run(id);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          log.warn(
+            `[IPC] merge:auto-resolve - unresolvable conflicts for id=${id}: ${result.conflictFiles.join(', ')}`,
+          );
+          return { data: updated, error: result.error, conflicts: result.conflictFiles };
+        }
+
+        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+        log.error(`[IPC] merge:auto-resolve - failed for id=${id}: ${result.error}`);
+        return { data: updated, error: result.error };
+      } catch (error) {
+        log.error('merge:auto-resolve failed:', error);
+        try {
+          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        } catch { /* ignore */ }
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // Tier 3: AI-resolve conflicts using Claude to intelligently merge
+  ipcMain.handle(
+    'merge:ai-resolve',
+    async (_event, id: number, repoPath?: string, targetBranch?: string) => {
+      try {
+        const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
+          id: number;
+          branch_name: string;
+          status: string;
+        } | null;
+        if (!entry) {
+          return { data: null, error: `Merge queue entry ${id} not found` };
+        }
+
+        loggedPrepare("UPDATE merge_queue SET status = 'merging' WHERE id = ?").run(id);
+        log.info(`[IPC] merge:ai-resolve - starting Tier 3 AI-resolve for id=${id}`);
+
+        const mergePath = repoPath || process.cwd();
+        const result = await aiResolveConflicts(mergePath, entry.branch_name, targetBranch);
+
+        if (result.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'ai-resolve' WHERE id = ?",
+          ).run(id);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          log.info(`[IPC] merge:ai-resolve - Tier 3 succeeded for id=${id}`);
+          return { data: updated, error: null };
+        }
+
+        if (result.conflictFiles.length > 0) {
+          loggedPrepare("UPDATE merge_queue SET status = 'conflict' WHERE id = ?").run(id);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          log.warn(
+            `[IPC] merge:ai-resolve - unresolvable conflicts for id=${id}: ${result.conflictFiles.join(', ')}`,
+          );
+          return { data: updated, error: result.error, conflicts: result.conflictFiles };
+        }
+
+        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+        log.error(`[IPC] merge:ai-resolve - failed for id=${id}: ${result.error}`);
+        return { data: updated, error: result.error };
+      } catch (error) {
+        log.error('merge:ai-resolve failed:', error);
+        try {
+          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        } catch { /* ignore */ }
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
   // Complete a merge with a resolution tier
   ipcMain.handle('merge:complete', (_event, id: number, resolvedTier: string) => {
     try {
@@ -1169,6 +1279,185 @@ export function registerIpcHandlers(): void {
       return { data: issue, error: null };
     } catch (error) {
       log.error('issue:claim failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Task Group channels - use real SQLite queries via loggedPrepare
+  ipcMain.handle(
+    'taskGroup:list',
+    (_event) => {
+      try {
+        const groups = loggedPrepare('SELECT * FROM task_groups ORDER BY created_at DESC').all();
+        log.info(`[IPC] taskGroup:list - SELECT returned ${(groups as unknown[]).length} groups from real database`);
+        return { data: groups, error: null };
+      } catch (error) {
+        log.error('taskGroup:list failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'taskGroup:create',
+    (_event, group: { id: string; name: string }) => {
+      try {
+        loggedPrepare(
+          'INSERT INTO task_groups (id, name, member_issues, status) VALUES (?, ?, ?, ?)',
+        ).run(group.id, group.name, '[]', 'active');
+        const created = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(group.id);
+        log.info(`[IPC] taskGroup:create - INSERT group into real database: ${group.name}`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('taskGroup:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('taskGroup:get', (_event, id: string) => {
+    try {
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(id);
+      log.info(`[IPC] taskGroup:get - SELECT group from real database: id=${id}`);
+      return { data: group || null, error: null };
+    } catch (error) {
+      log.error('taskGroup:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('taskGroup:delete', (_event, id: string) => {
+    try {
+      // Remove group_id from all member issues
+      loggedPrepare("UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE group_id = ?").run(id);
+      loggedPrepare('DELETE FROM task_groups WHERE id = ?').run(id);
+      log.info(`[IPC] taskGroup:delete - DELETE group from real database: id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('taskGroup:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('taskGroup:addIssue', (_event, groupId: string, issueId: string) => {
+    try {
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null } | undefined;
+      if (!group) return { data: null, error: 'Group not found' };
+
+      let members: string[] = [];
+      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+      if (!members.includes(issueId)) {
+        members.push(issueId);
+      }
+
+      loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(JSON.stringify(members), groupId);
+      loggedPrepare("UPDATE issues SET group_id = ?, updated_at = datetime('now') WHERE id = ?").run(groupId, issueId);
+
+      // Check auto-close: if all member issues are closed, close the group
+      if (members.length > 0) {
+        const placeholders = members.map(() => '?').join(',');
+        const closedCount = loggedPrepare(
+          `SELECT COUNT(*) as cnt FROM issues WHERE id IN (${placeholders}) AND status = 'closed'`,
+        ).get(...members) as { cnt: number };
+        if (closedCount.cnt === members.length) {
+          loggedPrepare("UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?").run(groupId);
+        }
+      }
+
+      const updated = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId);
+      log.info(`[IPC] taskGroup:addIssue - Added issue ${issueId} to group ${groupId}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('taskGroup:addIssue failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('taskGroup:removeIssue', (_event, groupId: string, issueId: string) => {
+    try {
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null } | undefined;
+      if (!group) return { data: null, error: 'Group not found' };
+
+      let members: string[] = [];
+      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+      members = members.filter((m) => m !== issueId);
+
+      loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(JSON.stringify(members), groupId);
+      loggedPrepare("UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE id = ?").run(issueId);
+
+      const updated = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId);
+      log.info(`[IPC] taskGroup:removeIssue - Removed issue ${issueId} from group ${groupId}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('taskGroup:removeIssue failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('taskGroup:getProgress', (_event, groupId: string) => {
+    try {
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null; status: string } | undefined;
+      if (!group) return { data: null, error: 'Group not found' };
+
+      let members: string[] = [];
+      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+
+      if (members.length === 0) {
+        return { data: { total: 0, completed: 0, in_progress: 0, open: 0, blocked: 0 }, error: null };
+      }
+
+      const placeholders = members.map(() => '?').join(',');
+      const issues = loggedPrepare(
+        `SELECT status FROM issues WHERE id IN (${placeholders})`,
+      ).all(...members) as { status: string }[];
+
+      const progress = {
+        total: members.length,
+        completed: issues.filter((i) => i.status === 'closed').length,
+        in_progress: issues.filter((i) => i.status === 'in_progress').length,
+        open: issues.filter((i) => i.status === 'open').length,
+        blocked: issues.filter((i) => i.status === 'blocked').length,
+      };
+
+      log.info(`[IPC] taskGroup:getProgress - Group ${groupId}: ${progress.completed}/${progress.total}`);
+      return { data: progress, error: null };
+    } catch (error) {
+      log.error('taskGroup:getProgress failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Auto-close check: called when issue status changes to 'closed'
+  // Check if the issue's group should auto-close
+  ipcMain.handle('taskGroup:checkAutoClose', (_event, issueId: string) => {
+    try {
+      const issue = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(issueId) as { group_id: string | null } | undefined;
+      if (!issue || !issue.group_id) return { data: null, error: null };
+
+      const groupId = issue.group_id;
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null; status: string } | undefined;
+      if (!group || group.status === 'completed') return { data: null, error: null };
+
+      let members: string[] = [];
+      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+
+      if (members.length === 0) return { data: null, error: null };
+
+      const placeholders = members.map(() => '?').join(',');
+      const closedCount = loggedPrepare(
+        `SELECT COUNT(*) as cnt FROM issues WHERE id IN (${placeholders}) AND status = 'closed'`,
+      ).get(...members) as { cnt: number };
+
+      if (closedCount.cnt === members.length) {
+        loggedPrepare("UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?").run(groupId);
+        const updated = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId);
+        log.info(`[IPC] taskGroup:checkAutoClose - Group ${groupId} auto-closed, all ${members.length} issues completed`);
+        return { data: updated, error: null };
+      }
+
+      return { data: null, error: null };
+    } catch (error) {
+      log.error('taskGroup:checkAutoClose failed:', error);
       return { data: null, error: String(error) };
     }
   });

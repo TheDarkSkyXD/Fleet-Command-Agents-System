@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { MergeQueueEntry, MergeStatus } from '../../shared/types';
+import { DiffViewer } from '../components/DiffViewer';
 import { useMergeStore } from '../stores/mergeStore';
 
 const STATUS_COLORS: Record<MergeStatus, string> = {
@@ -138,6 +139,7 @@ function QueueEntryRow({
   onComplete,
   onFail,
   onRemove,
+  onViewDiff,
 }: {
   entry: MergeQueueEntry;
   position: number;
@@ -145,6 +147,7 @@ function QueueEntryRow({
   onComplete: (id: number) => void;
   onFail: (id: number) => void;
   onRemove: (id: number) => void;
+  onViewDiff: (id: number) => void;
 }) {
   const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
 
@@ -173,6 +176,13 @@ function QueueEntryRow({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onViewDiff(entry.id)}
+          className="rounded-md border border-cyan-600/50 bg-cyan-600/10 px-3 py-1.5 text-xs font-medium text-cyan-400 hover:bg-cyan-600/20 transition-colors"
+        >
+          View Diff
+        </button>
         {entry.status === 'pending' && (
           <button
             type="button"
@@ -233,6 +243,8 @@ export function MergeQueuePage() {
 
   const [showEnqueue, setShowEnqueue] = useState(false);
   const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
+  const [diffData, setDiffData] = useState<{ diff: string; branchName: string } | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
 
   useEffect(() => {
     fetchQueue();
@@ -270,6 +282,33 @@ export function MergeQueuePage() {
   const handleRemove = async (id: number) => {
     await remove(id);
   };
+
+  const handleViewDiff = useCallback(
+    async (id: number) => {
+      setDiffLoading(true);
+      try {
+        const result = await window.electronAPI.mergeDiff(id);
+        if (result.error) {
+          console.error('Failed to get diff:', result.error);
+          // Show a sample diff as fallback when git diff fails (e.g., branch not found locally)
+          setDiffData({
+            diff: '',
+            branchName:
+              queue.find((e) => e.id === id)?.branch_name ||
+              history.find((e) => e.id === id)?.branch_name ||
+              'unknown',
+          });
+        } else if (result.data) {
+          setDiffData(result.data);
+        }
+      } catch (err) {
+        console.error('Failed to load diff:', err);
+      } finally {
+        setDiffLoading(false);
+      }
+    },
+    [queue, history],
+  );
 
   return (
     <div className="space-y-6">
@@ -364,6 +403,7 @@ export function MergeQueuePage() {
                 onComplete={handleComplete}
                 onFail={handleFail}
                 onRemove={handleRemove}
+                onViewDiff={handleViewDiff}
               />
             ))}
           </div>
@@ -384,6 +424,7 @@ export function MergeQueuePage() {
               onComplete={handleComplete}
               onFail={handleFail}
               onRemove={handleRemove}
+              onViewDiff={handleViewDiff}
             />
           ))}
         </div>
@@ -395,6 +436,30 @@ export function MergeQueuePage() {
         onClose={() => setShowEnqueue(false)}
         onEnqueue={handleEnqueue}
       />
+
+      {/* Diff Loading Overlay */}
+      {diffLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-slate-700 bg-slate-800 p-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+            <span className="text-sm text-slate-300">Loading diff...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Diff Viewer with file-level review */}
+      {diffData && (
+        <DiffViewer
+          diffString={diffData.diff}
+          branchName={diffData.branchName}
+          onClose={() => setDiffData(null)}
+          reviewMode={true}
+          onProceedMerge={(approvedFiles) => {
+            console.log('Proceeding with merge of approved files:', approvedFiles);
+            setDiffData(null);
+          }}
+        />
+      )}
     </div>
   );
 }

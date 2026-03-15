@@ -63,6 +63,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   issueDelete: (id: string) => ipcRenderer.invoke('issue:delete', id),
   issueClaim: (id: string, agentName: string) => ipcRenderer.invoke('issue:claim', id, agentName),
 
+  // Task Groups
+  taskGroupList: () => ipcRenderer.invoke('taskGroup:list'),
+  taskGroupCreate: (group: { id: string; name: string }) =>
+    ipcRenderer.invoke('taskGroup:create', group),
+  taskGroupGet: (id: string) => ipcRenderer.invoke('taskGroup:get', id),
+  taskGroupDelete: (id: string) => ipcRenderer.invoke('taskGroup:delete', id),
+  taskGroupAddIssue: (groupId: string, issueId: string) =>
+    ipcRenderer.invoke('taskGroup:addIssue', groupId, issueId),
+  taskGroupRemoveIssue: (groupId: string, issueId: string) =>
+    ipcRenderer.invoke('taskGroup:removeIssue', groupId, issueId),
+  taskGroupGetProgress: (groupId: string) =>
+    ipcRenderer.invoke('taskGroup:getProgress', groupId),
+  taskGroupCheckAutoClose: (issueId: string) =>
+    ipcRenderer.invoke('taskGroup:checkAutoClose', issueId),
+
   // Config Profiles
   profileList: () => ipcRenderer.invoke('profile:list'),
   profileCreate: (profile: {

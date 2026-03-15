@@ -631,6 +631,31 @@ export interface ElectronAPI {
     agentName: string,
   ) => Promise<{ data: Issue | null; error: string | null }>;
 
+  // Task Groups
+  taskGroupList: () => Promise<{ data: TaskGroup[] | null; error: string | null }>;
+  taskGroupCreate: (group: { id: string; name: string }) => Promise<{
+    data: TaskGroup | null;
+    error: string | null;
+  }>;
+  taskGroupGet: (id: string) => Promise<{ data: TaskGroup | null; error: string | null }>;
+  taskGroupDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  taskGroupAddIssue: (
+    groupId: string,
+    issueId: string,
+  ) => Promise<{ data: TaskGroup | null; error: string | null }>;
+  taskGroupRemoveIssue: (
+    groupId: string,
+    issueId: string,
+  ) => Promise<{ data: TaskGroup | null; error: string | null }>;
+  taskGroupGetProgress: (groupId: string) => Promise<{
+    data: { total: number; completed: number; in_progress: number; open: number; blocked: number } | null;
+    error: string | null;
+  }>;
+  taskGroupCheckAutoClose: (issueId: string) => Promise<{
+    data: TaskGroup | null;
+    error: string | null;
+  }>;
+
   // Agent Definitions
   agentDefList: () => Promise<{ data: AgentDefinition[] | null; error: string | null }>;
   agentDefGet: (role: string) => Promise<{ data: AgentDefinition | null; error: string | null }>;
