@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Mail Check Context Injection & Mark All Read)
+
+#### Feature #73: Mail check with context injection - PASSING
+- Added mail:check IPC handler that fetches unread messages for an agent (by to_agent name)
+- Formats messages into structured text block with sender, priority, type, timestamp, subject, body
+- Injects formatted messages into agent terminal via agentProcessManager.write()
+- After successful injection, marks all injected messages as read in SQLite
+- Records mail_received events for each injected message
+- Returns { injected: count, messages: [], contextWritten: boolean }
+- Added Check Mail button (FiMail, blue) to AgentDetailPage action bar (visible when agent running)
+- Shows status feedback: "N message(s) injected into context" / "No unread messages" / errors
+- Status auto-clears after 3 seconds
+
+#### Feature #74: Mark messages as read - PASSING
+- Verified existing mail:read IPC handler correctly updates SQLite (SET read = 1 WHERE id = ?)
+- MailPage unread indicators: blue dot icon, bold text for sender/subject, unread count badge
+- handleMarkRead auto-marks on message selection, updates local state and unread counter
+- Added mail:mark-all-read IPC handler for bulk marking (optionally filtered by agent name)
+- Added Mark All Read button (FiCheckCircle) to MailPage header, visible when unreadCount > 0
+- All read status persists in SQLite database
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added mail:check and mail:mark-all-read IPC handlers
+- MODIFIED: src/preload/index.ts - Added mailCheck, mailMarkAllRead bridge methods
+- MODIFIED: src/shared/types/index.ts - Added mailCheck, mailMarkAllRead to ElectronAPI interface
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Added Check Mail button and handler
+- MODIFIED: src/renderer/pages/MailPage.tsx - Added Mark All Read button and handler
+
+#### Current Status
+- 140/366 features passing (added #73 and #74 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Bulk Operations & Task Decomposition)
 
 #### Feature #53: Bulk agent operations select and stop - PASSING

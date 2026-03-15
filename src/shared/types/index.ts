@@ -112,6 +112,20 @@ export const PAYLOAD_TEMPLATES: Record<string, string> = {
   health_check: JSON.stringify({ status: 'ok', uptime_seconds: 0 }, null, 2),
 };
 
+// Group broadcast addresses for mail routing
+export const GROUP_BROADCAST_ADDRESSES = [
+  '@all',
+  '@builders',
+  '@scouts',
+  '@reviewers',
+  '@leads',
+  '@mergers',
+  '@coordinator',
+  '@monitor',
+] as const;
+
+export type GroupBroadcastAddress = (typeof GROUP_BROADCAST_ADDRESSES)[number];
+
 // Merge statuses
 export type MergeStatus = 'pending' | 'merging' | 'merged' | 'conflict' | 'failed';
 export type MergeResolutionTier = 'clean-merge' | 'auto-resolve' | 'ai-resolve' | 'reimagine';

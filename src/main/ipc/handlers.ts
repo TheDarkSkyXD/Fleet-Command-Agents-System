@@ -1775,6 +1775,46 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Group broadcast address mapping: @group -> capability filter
+  const GROUP_ADDRESSES: Record<string, string | null> = {
+    '@all': null, // all active agents
+    '@builders': 'builder',
+    '@scouts': 'scout',
+    '@reviewers': 'reviewer',
+    '@leads': 'lead',
+    '@mergers': 'merger',
+    '@coordinator': 'coordinator',
+    '@monitor': 'monitor',
+  };
+
+  /**
+   * Resolve a to_agent address: if it's a group address (@all, @builders, etc.),
+   * return the list of individual agent names; otherwise return [to_agent].
+   */
+  function resolveRecipients(toAgent: string, fromAgent: string): string[] {
+    const groupKey = toAgent.toLowerCase();
+    if (!(groupKey in GROUP_ADDRESSES)) {
+      return [toAgent]; // Direct address, not a group
+    }
+
+    const capability = GROUP_ADDRESSES[groupKey];
+    let agents: Array<{ agent_name: string }>;
+
+    if (capability === null) {
+      // @all - all active (non-completed) agents
+      agents = loggedPrepare(
+        `SELECT DISTINCT agent_name FROM sessions WHERE state NOT IN ('completed') AND agent_name != ?`,
+      ).all(fromAgent) as Array<{ agent_name: string }>;
+    } else {
+      // Specific capability group
+      agents = loggedPrepare(
+        `SELECT DISTINCT agent_name FROM sessions WHERE capability = ? AND state NOT IN ('completed') AND agent_name != ?`,
+      ).all(capability, fromAgent) as Array<{ agent_name: string }>;
+    }
+
+    return agents.map((a) => a.agent_name);
+  }
+
   ipcMain.handle(
     'mail:send',
     (
@@ -1792,23 +1832,43 @@ export function registerIpcHandlers(): void {
       },
     ) => {
       try {
-        loggedPrepare(
-          `INSERT INTO messages (id, thread_id, from_agent, to_agent, subject, body, type, priority, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).run(
-          message.id,
-          message.thread_id ?? null,
-          message.from_agent,
-          message.to_agent,
-          message.subject ?? null,
-          message.body ?? null,
-          message.type,
-          message.priority ?? 'normal',
-          message.payload ?? null,
-        );
-        log.info(
-          `[IPC] mail:send - INSERT message into real database: ${message.from_agent} -> ${message.to_agent}`,
-        );
+        const recipients = resolveRecipients(message.to_agent, message.from_agent);
+        const isGroupSend = message.to_agent.startsWith('@') && recipients.length > 0;
+        let sentCount = 0;
+
+        // Insert a message copy for each resolved recipient
+        for (const recipient of recipients) {
+          const msgId =
+            recipients.length === 1
+              ? message.id
+              : `${message.id}-${sentCount}`;
+
+          loggedPrepare(
+            `INSERT INTO messages (id, thread_id, from_agent, to_agent, subject, body, type, priority, payload)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ).run(
+            msgId,
+            message.thread_id ?? null,
+            message.from_agent,
+            recipient,
+            message.subject ?? null,
+            message.body ?? null,
+            message.type,
+            message.priority ?? 'normal',
+            message.payload ?? null,
+          );
+          sentCount++;
+        }
+
+        if (isGroupSend) {
+          log.info(
+            `[IPC] mail:send - BROADCAST ${message.from_agent} -> ${message.to_agent} (${sentCount} recipients: ${recipients.join(', ')})`,
+          );
+        } else {
+          log.info(
+            `[IPC] mail:send - INSERT message into real database: ${message.from_agent} -> ${message.to_agent}`,
+          );
+        }
 
         // Record mail_sent event
         recordEvent({
@@ -1818,6 +1878,8 @@ export function registerIpcHandlers(): void {
             to: message.to_agent,
             subject: message.subject,
             type: message.type,
+            broadcast: isGroupSend,
+            recipient_count: sentCount,
           }),
         });
 

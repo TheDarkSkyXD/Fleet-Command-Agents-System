@@ -17,7 +17,11 @@ import {
 } from 'react-icons/fi';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { Message, MessagePriority, MessageType } from '../../shared/types';
-import { PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
+import {
+  GROUP_BROADCAST_ADDRESSES,
+  PAYLOAD_TEMPLATES,
+  PROTOCOL_TYPES,
+} from '../../shared/types';
 
 type MailTab = 'inbox' | 'outbox' | 'all';
 
