@@ -85,6 +85,12 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
   const [showRunHistory, setShowRunHistory] = useState(false);
   const runHistoryRef = useRef<HTMLDivElement>(null);
   const { activeProject, loadActiveProject } = useProjectStore();
+  const [runProgress, setRunProgress] = useState<{
+    total: number;
+    completed: number;
+    working: number;
+    percentage: number;
+  } | null>(null);
 
   // Fetch active project on mount
   useEffect(() => {
@@ -123,6 +129,27 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
     const interval = setInterval(fetchActiveRun, 5000);
     return () => clearInterval(interval);
   }, [fetchActiveRun]);
+
+  // Poll run progress when there's an active run
+  useEffect(() => {
+    if (!activeRun) {
+      setRunProgress(null);
+      return;
+    }
+    const fetchProgress = async () => {
+      try {
+        const result = await window.electronAPI.runProgress(activeRun.id);
+        if (result.data) {
+          setRunProgress(result.data);
+        }
+      } catch {
+        // Silently fail
+      }
+    };
+    fetchProgress();
+    const interval = setInterval(fetchProgress, 5000);
+    return () => clearInterval(interval);
+  }, [activeRun]);
 
   // Fetch active profile on mount and poll every 10s
   const loadProfiles = useCallback(async () => {
@@ -353,6 +380,21 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
               Run: {activeRun.id.substring(0, 12)}...
             </span>
             <span className="text-slate-300">{runDuration}</span>
+            {runProgress && runProgress.total > 0 && (
+              <span
+                className="flex items-center gap-1.5"
+                data-testid="run-completion-percentage"
+                title={`${runProgress.completed}/${runProgress.total} agents completed (${runProgress.working} working)`}
+              >
+                <span className="w-16 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+                  <span
+                    className="block h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out"
+                    style={{ width: `${runProgress.percentage}%` }}
+                  />
+                </span>
+                <span className="text-emerald-300 font-medium">{runProgress.percentage}%</span>
+              </span>
+            )}
             <button
               type="button"
               onClick={handleCompleteRun}

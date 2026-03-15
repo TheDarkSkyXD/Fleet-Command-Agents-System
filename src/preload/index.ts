@@ -281,6 +281,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   runList: () => ipcRenderer.invoke('run:list'),
   runStop: (id: string) => ipcRenderer.invoke('run:stop', id),
   runGet: (id: string) => ipcRenderer.invoke('run:get', id),
+  runProgress: (runId: string) => ipcRenderer.invoke('run:progress', runId),
 
   // Agent Performance
   agentPerformanceHistory: (agentName: string) =>

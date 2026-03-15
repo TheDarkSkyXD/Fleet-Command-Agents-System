@@ -1275,6 +1275,10 @@ export interface ElectronAPI {
   runList: () => Promise<{ data: Run[] | null; error: string | null }>;
   runStop: (id: string) => Promise<{ data: Run | null; error: string | null }>;
   runGet: (id: string) => Promise<{ data: Run | null; error: string | null }>;
+  runProgress: (runId: string) => Promise<{
+    data: { total: number; completed: number; working: number; percentage: number } | null;
+    error: string | null;
+  }>;
 
   // Agent Performance
   agentPerformanceHistory: (agentName: string) => Promise<{

@@ -86,6 +86,44 @@ function recordEvent(params: {
   }
 }
 
+/**
+ * IPC parameter validation helper.
+ * Validates required parameters and returns a clean error response if invalid.
+ * Logs the invalid request for security auditing.
+ */
+function validateIpcParams(
+  channel: string,
+  params: Record<string, unknown>,
+  required: Array<{ name: string; type: 'string' | 'number' | 'object' | 'boolean' | 'array' }>,
+): { valid: true } | { valid: false; error: string } {
+  for (const req of required) {
+    const value = params[req.name];
+    if (value === undefined || value === null) {
+      const msg = `[IPC] ${channel} - REJECTED: missing required parameter '${req.name}'`;
+      log.warn(msg);
+      return { valid: false, error: `Missing required parameter: ${req.name}` };
+    }
+    if (req.type === 'array') {
+      if (!Array.isArray(value)) {
+        const msg = `[IPC] ${channel} - REJECTED: parameter '${req.name}' must be an array`;
+        log.warn(msg);
+        return { valid: false, error: `Invalid parameter type: ${req.name} must be an array` };
+      }
+    } else if (req.type === 'string') {
+      if (typeof value !== 'string' || value.trim() === '') {
+        const msg = `[IPC] ${channel} - REJECTED: parameter '${req.name}' must be a non-empty string`;
+        log.warn(msg);
+        return { valid: false, error: `Invalid parameter: ${req.name} must be a non-empty string` };
+      }
+    } else if (typeof value !== req.type) {
+      const msg = `[IPC] ${channel} - REJECTED: parameter '${req.name}' must be type ${req.type}`;
+      log.warn(msg);
+      return { valid: false, error: `Invalid parameter type: ${req.name} must be ${req.type}` };
+    }
+  }
+  return { valid: true };
+}
+
 export function registerIpcHandlers(): void {
   // Health check - verifies DB connection and WAL mode
   ipcMain.handle('health:check', () => {
@@ -169,6 +207,10 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('agent:detail', (_event, agentId: string) => {
+    const validation = validateIpcParams('agent:detail', { agentId }, [
+      { name: 'agentId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(agentId);
       log.info(`[IPC] agent:detail - SELECT session id=${agentId} from real database`);
@@ -199,6 +241,12 @@ export function registerIpcHandlers(): void {
         file_scope?: string;
       },
     ) => {
+      const validation = validateIpcParams('agent:spawn', options ?? {}, [
+        { name: 'id', type: 'string' },
+        { name: 'agent_name', type: 'string' },
+        { name: 'capability', type: 'string' },
+      ]);
+      if (!validation.valid) return { data: null, error: validation.error };
       try {
         const capability = options.capability as AgentCapability;
         // Use runtime registry model resolution chain:
@@ -382,6 +430,10 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('agent:stop', async (_event, agentId: string) => {
+    const validation = validateIpcParams('agent:stop', { agentId }, [
+      { name: 'agentId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       // Kill the node-pty process
       await agentProcessManager.stop(agentId);
@@ -581,6 +633,10 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('agent:nudge', (_event, agentId: string) => {
+    const validation = validateIpcParams('agent:nudge', { agentId }, [
+      { name: 'agentId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       // Send nudge prompt to the agent's terminal
       const nudgePrompt =
@@ -2082,6 +2138,13 @@ export function registerIpcHandlers(): void {
         payload?: string;
       },
     ) => {
+      const validation = validateIpcParams('mail:send', message ?? {}, [
+        { name: 'id', type: 'string' },
+        { name: 'from_agent', type: 'string' },
+        { name: 'to_agent', type: 'string' },
+        { name: 'type', type: 'string' },
+      ]);
+      if (!validation.valid) return { data: false, error: validation.error };
       try {
         const recipients = resolveRecipients(message.to_agent, message.from_agent);
         const isGroupSend = message.to_agent.startsWith('@') && recipients.length > 0;
@@ -2152,6 +2215,10 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('mail:read', (_event, messageId: string) => {
+    const validation = validateIpcParams('mail:read', { messageId }, [
+      { name: 'messageId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: false, error: validation.error };
     try {
       loggedPrepare('UPDATE messages SET read = 1 WHERE id = ?').run(messageId);
       log.info(`[IPC] mail:read - UPDATE message in real database: ${messageId}`);
@@ -2164,6 +2231,11 @@ export function registerIpcHandlers(): void {
 
   // Mail check with context injection - fetch unread messages for an agent and inject into terminal
   ipcMain.handle('mail:check', (_event, agentId: string, agentName: string) => {
+    const checkValidation = validateIpcParams('mail:check', { agentId, agentName }, [
+      { name: 'agentId', type: 'string' },
+      { name: 'agentName', type: 'string' },
+    ]);
+    if (!checkValidation.valid) return { data: null, error: checkValidation.error };
     try {
       // Fetch unread messages addressed to this agent
       const unreadMessages = loggedPrepare(
@@ -2315,6 +2387,10 @@ export function registerIpcHandlers(): void {
 
   // Mail thread - get all messages in a thread ordered chronologically
   ipcMain.handle('mail:thread', (_event, threadId: string) => {
+    const validation = validateIpcParams('mail:thread', { threadId }, [
+      { name: 'threadId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const messages = loggedPrepare(
         'SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at ASC',
@@ -2472,6 +2548,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'merge:execute',
     async (_event, id: number, repoPath?: string, targetBranch?: string) => {
+      const validation = validateIpcParams('merge:execute', { id }, [
+        { name: 'id', type: 'number' },
+      ]);
+      if (!validation.valid) return { data: null, error: validation.error };
       try {
         const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
           id: number;
@@ -3078,6 +3158,8 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('issue:get', (_event, id: string) => {
+    const validation = validateIpcParams('issue:get', { id }, [{ name: 'id', type: 'string' }]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const issue = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id);
       log.info(`[IPC] issue:get - SELECT issue from real database: id=${id}`);
@@ -3195,6 +3277,10 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('issue:delete', (_event, id: string) => {
+    const validation = validateIpcParams('issue:delete', { id }, [
+      { name: 'id', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: false, error: validation.error };
     try {
       loggedPrepare('DELETE FROM issues WHERE id = ?').run(id);
       log.info(`[IPC] issue:delete - DELETE issue from real database: id=${id}`);
@@ -4286,6 +4372,7 @@ export function registerIpcHandlers(): void {
         pid: a.pid,
         isRunning: a.isRunning,
         createdAt: a.createdAt.toISOString(),
+        outputLines: a.outputBuffer.length,
       }));
       return { data: agents, error: null };
     } catch (error) {
@@ -4830,6 +4917,10 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('project:get', (_event, id: string) => {
+    const validation = validateIpcParams('project:get', { id }, [
+      { name: 'id', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const project = loggedPrepare('SELECT * FROM projects WHERE id = ?').get(id);
       log.info(`[IPC] project:get - SELECT project from real database: id=${id}`);
@@ -4867,6 +4958,10 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('project:delete', (_event, id: string) => {
+    const validation = validateIpcParams('project:delete', { id }, [
+      { name: 'id', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: false, error: validation.error };
     try {
       loggedPrepare('DELETE FROM projects WHERE id = ?').run(id);
       log.info(`[IPC] project:delete - DELETE project from real database: id=${id}`);
@@ -6060,6 +6155,34 @@ export function registerIpcHandlers(): void {
       return { data: run || null, error: null };
     } catch (error) {
       log.error('run:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('run:progress', (_event, runId: string) => {
+    try {
+      const total = loggedPrepare(
+        'SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ?',
+      ).get(runId) as { cnt: number };
+      const completed = loggedPrepare(
+        "SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ? AND state = 'completed'",
+      ).get(runId) as { cnt: number };
+      const working = loggedPrepare(
+        "SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ? AND state = 'working'",
+      ).get(runId) as { cnt: number };
+      const percentage = total.cnt > 0 ? Math.round((completed.cnt / total.cnt) * 100) : 0;
+      log.info(`[IPC] run:progress - Run ${runId}: ${completed.cnt}/${total.cnt} (${percentage}%)`);
+      return {
+        data: {
+          total: total.cnt,
+          completed: completed.cnt,
+          working: working.cnt,
+          percentage,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('run:progress failed:', error);
       return { data: null, error: String(error) };
     }
   });
