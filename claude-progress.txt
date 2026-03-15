@@ -4769,3 +4769,36 @@
 - 322/366 features passing (added #323 and #324 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Layout at 1280px & Text Overflow Ellipsis)
+
+#### Feature #327: Layout at 1280px width - PASSING
+- Added min-w-0 to main content area in AppLayout to prevent flex children overflow
+- Added table-fixed layout to agents table for predictable column widths
+- Added min-w-0 and overflow-hidden to virtualized table cell divs
+- Added min-width:1024px to #root in globals.css
+- Sidebar w-56 (224px) + flex-1 content fits well at 1280px with no horizontal scrollbar
+
+#### Feature #329: Text overflow handling with ellipsis - PASSING
+- Agent name in table: added truncate block + title tooltip
+- Agent name in card view: added truncate max-w-[200px] + title tooltip
+- Agent name in completed list: added truncate max-w-[200px] + title tooltip
+- Agent name in detail header: added truncate max-w-[400px] + title tooltip
+- Breadcrumb last item: added truncate max-w-[200px] + title tooltip
+- Task ID in table: added truncate block + title tooltip
+- Notification title: added truncate + title tooltip
+- Kanban card title: added title tooltip (already had line-clamp-2)
+
+#### Files Modified
+- src/renderer/styles/globals.css - min-width on #root, min-width:0 on main
+- src/renderer/components/AppLayout.tsx - min-w-0 on main content area
+- src/renderer/pages/AgentsPage.tsx - table-fixed, truncate on name/task cells, min-w-0 on td
+- src/renderer/pages/AgentDetailPage.tsx - truncate on agent name h1
+- src/renderer/components/Breadcrumbs.tsx - truncate on last breadcrumb
+- src/renderer/pages/NotificationsPage.tsx - truncate on notification title
+- src/renderer/pages/TasksPage.tsx - title tooltip on kanban card
+
+#### Current Status
+- 325/366 features passing (added #327 and #329 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
