@@ -1,5 +1,33 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (System Tray & Close Dialog)
+
+#### Feature #13: System tray icon appears - PASSING
+- Created src/main/services/trayIconGenerator.ts with programmatic RGBA icon generation
+- 16x16 icon with "FC" letters on dark rounded rectangle background
+- Status indicator dot in bottom-right: idle (gray), active (green), warning (amber), error (red)
+- Tray icon updates every 5s based on running agent count
+- Context menu shows Show/Hide, active agent count, and Quit
+- Click on tray icon focuses/shows main window
+
+#### Feature #16: Close dialog with three options - PASSING
+- Replaced silent hide-to-tray with dialog.showMessageBox
+- Three buttons: "Keep Running in Tray", "Stop All Agents & Close", "Cancel"
+- Shows active agent count in dialog message when agents are running
+- "Keep Running in Tray" hides window, agents continue
+- "Stop All Agents & Close" calls agentProcessManager.stopAll() then app.quit()
+- "Cancel" dismisses dialog, app stays open
+- Cancel is default button (defaultId: 2, cancelId: 2)
+
+#### Files Created/Modified
+- NEW: src/main/services/trayIconGenerator.ts - Programmatic tray icon with status indicator
+- MODIFIED: src/main/index.ts - Updated createTray() and close handler with dialog
+
+#### Current Status
+- 31/366 features passing (added #13 and #16 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Sortable Agent Table & Skeleton Loading)
 
 #### Feature #45: Agent list sortable filterable table - PASSING
