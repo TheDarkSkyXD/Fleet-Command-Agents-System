@@ -18,13 +18,13 @@ interface MergeState {
     depends_on?: number[];
   }) => Promise<MergeQueueEntry | null>;
   getNext: () => Promise<MergeQueueEntry | null>;
-  execute: (id: number) => Promise<MergeQueueEntry | null>;
+  execute: (id: number, repoPath?: string, targetBranch?: string) => Promise<MergeQueueEntry | null>;
   complete: (id: number, resolvedTier: MergeResolutionTier) => Promise<MergeQueueEntry | null>;
   fail: (id: number) => Promise<MergeQueueEntry | null>;
   markConflict: (id: number) => Promise<MergeQueueEntry | null>;
-  autoResolve: (id: number) => Promise<MergeQueueEntry | null>;
-  aiResolve: (id: number) => Promise<MergeQueueEntry | null>;
-  reimagine: (id: number) => Promise<MergeQueueEntry | null>;
+  autoResolve: (id: number, repoPath?: string, targetBranch?: string) => Promise<MergeQueueEntry | null>;
+  aiResolve: (id: number, repoPath?: string, targetBranch?: string) => Promise<MergeQueueEntry | null>;
+  reimagine: (id: number, repoPath?: string, targetBranch?: string) => Promise<MergeQueueEntry | null>;
   rollback: (id: number) => Promise<MergeQueueEntry | null>;
   remove: (id: number) => Promise<boolean>;
 }
@@ -90,14 +90,15 @@ export const useMergeStore = create<MergeState>((set, get) => ({
     }
   },
 
-  execute: async (id) => {
+  execute: async (id, repoPath?, targetBranch?) => {
     try {
-      const result = await window.electronAPI.mergeExecute(id);
+      const result = await window.electronAPI.mergeExecute(id, repoPath, targetBranch);
       if (result.error) {
         set({ error: result.error });
         return null;
       }
       await get().fetchQueue();
+      await get().fetchHistory();
       return result.data;
     } catch (err) {
       set({ error: String(err) });
@@ -152,9 +153,9 @@ export const useMergeStore = create<MergeState>((set, get) => ({
     }
   },
 
-  autoResolve: async (id) => {
+  autoResolve: async (id, repoPath?, targetBranch?) => {
     try {
-      const result = await window.electronAPI.mergeAutoResolve(id);
+      const result = await window.electronAPI.mergeAutoResolve(id, repoPath, targetBranch);
       if (result.error) {
         set({ error: result.error });
         return null;
@@ -168,9 +169,9 @@ export const useMergeStore = create<MergeState>((set, get) => ({
     }
   },
 
-  aiResolve: async (id) => {
+  aiResolve: async (id, repoPath?, targetBranch?) => {
     try {
-      const result = await window.electronAPI.mergeAiResolve(id);
+      const result = await window.electronAPI.mergeAiResolve(id, repoPath, targetBranch);
       if (result.error) {
         set({ error: result.error });
         return null;
@@ -184,9 +185,9 @@ export const useMergeStore = create<MergeState>((set, get) => ({
     }
   },
 
-  reimagine: async (id) => {
+  reimagine: async (id, repoPath?, targetBranch?) => {
     try {
-      const result = await window.electronAPI.mergeReimagine(id);
+      const result = await window.electronAPI.mergeReimagine(id, repoPath, targetBranch);
       if (result.error) {
         set({ error: result.error });
         return null;

@@ -1209,7 +1209,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       <CoordinatorPanel />
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" data-testid="agent-filter-bar" data-filters-active={globalFilter !== '' || capabilityFilter !== 'all' ? 'true' : 'false'}>
         {/* Global search */}
         <div className="relative flex-1 max-w-sm">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -2013,6 +2013,8 @@ function SpawnDialog({
                   key={cap}
                   type="button"
                   onClick={() => onCapabilityChange(cap)}
+                  data-testid={`spawn-capability-${cap}`}
+                  aria-selected={capability === cap}
                   className={`rounded-lg border p-2 text-center text-xs font-medium transition-colors ${
                     capability === cap
                       ? `${CAPABILITY_COLORS[cap]} border-current`
@@ -2065,6 +2067,8 @@ function SpawnDialog({
                   key={m}
                   type="button"
                   onClick={() => onModelChange(m)}
+                  data-testid={`spawn-model-${m}`}
+                  aria-selected={model === m}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     model === m
                       ? 'border-blue-500 bg-blue-500/20 text-blue-400'
@@ -2076,7 +2080,7 @@ function SpawnDialog({
               ))}
             </div>
             {model !== configuredDefault && (
-              <p className="mt-1 text-xs text-amber-400">
+              <p className="mt-1 text-xs text-amber-400" data-testid="spawn-model-default-hint">
                 Default for {capability} is {configuredDefault}
               </p>
             )}

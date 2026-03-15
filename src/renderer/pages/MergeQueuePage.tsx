@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import type { MergeQueueEntry, MergeResolutionTier, MergeStatus } from '../../shared/types';
 import { DiffViewer } from '../components/DiffViewer';
 import { useMergeStore } from '../stores/mergeStore';
@@ -75,6 +76,7 @@ function HistoryEntryRow({
 
   return (
     <div
+      data-testid={`history-entry-${entry.id}`}
       className={`rounded-lg border bg-slate-800/50 hover:bg-slate-800 transition-colors ${
         entry.status === 'merged'
           ? 'border-emerald-700/40'
@@ -457,6 +459,7 @@ function QueueEntryRow({
 
   return (
     <div
+      data-testid={`queue-entry-${entry.id}`}
       className={`rounded-lg border transition-colors ${
         isBlocked
           ? 'border-orange-700/40 bg-orange-900/10 hover:bg-orange-900/15'
@@ -820,35 +823,76 @@ export function MergeQueuePage() {
   };
 
   const handleExecute = async (id: number) => {
-    await execute(id, undefined, targetBranch || undefined);
+    const entry = queue.find((e) => e.id === id);
+    const result = await execute(id, undefined, targetBranch || undefined);
+    if (result) {
+      if (result.status === 'merged') {
+        toast.success(`Merge completed: ${entry?.branch_name ?? `#${id}`}`);
+      } else if (result.status === 'conflict') {
+        toast.warning(`Merge conflicts detected: ${entry?.branch_name ?? `#${id}`}`);
+      } else {
+        toast.info(`Merge started: ${entry?.branch_name ?? `#${id}`}`);
+      }
+    }
   };
 
   const handleComplete = async (id: number) => {
-    await complete(id, 'clean-merge');
+    const entry = queue.find((e) => e.id === id);
+    const branchName = entry?.branch_name ?? `#${id}`;
+    const result = await complete(id, 'clean-merge');
+    if (result) {
+      toast.success(`Merge completed successfully: ${branchName}`, {
+        description: entry?.agent_name ? `Agent ${entry.agent_name} session updated` : undefined,
+      });
+    }
   };
 
   const handleFail = async (id: number) => {
-    await fail(id);
+    const entry = queue.find((e) => e.id === id);
+    const result = await fail(id);
+    if (result) {
+      toast.error(`Merge failed: ${entry?.branch_name ?? `#${id}`}`);
+    }
   };
 
   const handleRemove = async (id: number) => {
-    await remove(id);
+    const entry = queue.find((e) => e.id === id);
+    const success = await remove(id);
+    if (success) {
+      toast.info(`Removed from queue: ${entry?.branch_name ?? `#${id}`}`);
+    }
   };
 
   const handleAutoResolve = async (id: number) => {
-    await autoResolve(id, undefined, targetBranch || undefined);
+    const entry = queue.find((e) => e.id === id);
+    const result = await autoResolve(id, undefined, targetBranch || undefined);
+    if (result) {
+      toast.success(`Auto-resolved: ${entry?.branch_name ?? `#${id}`}`);
+    }
   };
 
   const handleAiResolve = async (id: number) => {
-    await aiResolve(id, undefined, targetBranch || undefined);
+    const entry = queue.find((e) => e.id === id);
+    const result = await aiResolve(id, undefined, targetBranch || undefined);
+    if (result) {
+      toast.success(`AI-resolved: ${entry?.branch_name ?? `#${id}`}`);
+    }
   };
 
   const handleReimagine = async (id: number) => {
-    await reimagine(id, undefined, targetBranch || undefined);
+    const entry = queue.find((e) => e.id === id);
+    const result = await reimagine(id, undefined, targetBranch || undefined);
+    if (result) {
+      toast.info(`Reimagine branch created: ${entry?.branch_name ?? `#${id}`}`);
+    }
   };
 
   const handleRollback = async (id: number) => {
-    await rollback(id);
+    const entry = history.find((e) => e.id === id);
+    const result = await rollback(id);
+    if (result) {
+      toast.info(`Rolled back: ${entry?.branch_name ?? `#${id}`}`);
+    }
   };
 
   const handleChangeTargetBranch = async (branch: string) => {
@@ -928,28 +972,28 @@ export function MergeQueuePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-6 gap-4">
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+      <div className="grid grid-cols-6 gap-4" data-testid="merge-stats">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4" data-testid="merge-stat-pending">
           <div className="text-2xl font-bold text-slate-300">{pendingCount}</div>
           <div className="text-xs text-slate-400 mt-1">Pending</div>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4" data-testid="merge-stat-merging">
           <div className="text-2xl font-bold text-blue-400">{mergingCount}</div>
           <div className="text-xs text-slate-400 mt-1">Merging</div>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4" data-testid="merge-stat-merged">
           <div className="text-2xl font-bold text-emerald-400">{mergedCount}</div>
           <div className="text-xs text-slate-400 mt-1">Merged</div>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4" data-testid="merge-stat-conflict">
           <div className="text-2xl font-bold text-amber-400">{conflictCount}</div>
           <div className="text-xs text-slate-400 mt-1">Conflict</div>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4" data-testid="merge-stat-failed">
           <div className="text-2xl font-bold text-red-400">{failedCount}</div>
           <div className="text-xs text-slate-400 mt-1">Failed</div>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4" data-testid="merge-stat-blocked">
           <div className="text-2xl font-bold text-orange-400">{blockedCount}</div>
           <div className="text-xs text-slate-400 mt-1">Blocked</div>
         </div>
@@ -971,10 +1015,11 @@ export function MergeQueuePage() {
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-700">
+      <div className="flex border-b border-slate-700" data-testid="merge-tabs">
         <button
           type="button"
           onClick={() => setActiveTab('queue')}
+          data-testid="merge-tab-queue"
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'queue'
               ? 'border-blue-500 text-blue-400'
@@ -986,6 +1031,7 @@ export function MergeQueuePage() {
         <button
           type="button"
           onClick={() => setActiveTab('history')}
+          data-testid="merge-tab-history"
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'history'
               ? 'border-blue-500 text-blue-400'
@@ -1008,7 +1054,7 @@ export function MergeQueuePage() {
             <p className="text-sm">Enqueue a branch to start the merge process</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2" data-testid="merge-queue-list">
             {queue.map((entry, index) => (
               <QueueEntryRow
                 key={entry.id}
@@ -1036,7 +1082,7 @@ export function MergeQueuePage() {
           <p className="text-sm">Completed and failed merges will appear here</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-testid="merge-history-list">
           <div className="flex items-center gap-4 text-xs text-slate-400 pb-2 border-b border-slate-700/50">
             <span className="font-medium text-slate-300">
               {history.length} merge{history.length !== 1 ? 's' : ''} total
