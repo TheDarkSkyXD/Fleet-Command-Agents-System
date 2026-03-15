@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Timestamp Tooltips & Mail Skeleton Loading)
+
+#### Feature #219: Timestamp tooltips relative to absolute - PASSING
+- Created shared RelativeTime component with formatAbsoluteTime utility
+- Formats absolute time with year, month, day, hour, minute, second, timezone
+- Added title attributes to relative timestamps in: WelcomePage, HooksPage, NotificationsPage, ExpertisePage, MailPage
+- Enhanced EventFeedPage existing tooltip to include timezone info
+- Hover over any "5m ago" style text to see full absolute date/time
+
+#### Feature #225: Skeleton screens for mail inbox loading - PASSING
+- Replaced simple spinner with 8 animated skeleton placeholder rows
+- Skeleton rows mimic actual message layout: indicator dot, sender/recipient names, timestamp, subject, body preview, tag badges
+- Uses animate-pulse CSS animation for shimmer effect
+- Varying widths per row for natural appearance
+- data-testid="mail-skeleton" for testing
+- Real messages replace skeletons once loading completes
+
+#### Files Created
+- NEW: src/renderer/components/RelativeTime.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/WelcomePage.tsx - Added absolute time tooltip
+- MODIFIED: src/renderer/pages/HooksPage.tsx - Added absolute time tooltip
+- MODIFIED: src/renderer/pages/NotificationsPage.tsx - Added absolute time tooltip
+- MODIFIED: src/renderer/pages/ExpertisePage.tsx - Added absolute time tooltip
+- MODIFIED: src/renderer/pages/MailPage.tsx - Added absolute time tooltip, skeleton loading
+- MODIFIED: src/renderer/pages/EventFeedPage.tsx - Enhanced tooltip with timezone
+
+#### Current Status
+- 229/366 features passing (added #219 and #225 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Runtime Registry & Model Resolution Chain)
 
 #### Feature #209: Runtime registry with adapter interface - PASSING
