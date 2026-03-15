@@ -191,6 +191,20 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS config_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      max_hierarchy_depth INTEGER NOT NULL DEFAULT 2,
+      max_concurrent_agents INTEGER NOT NULL DEFAULT 10,
+      max_agents_per_lead INTEGER NOT NULL DEFAULT 5,
+      default_capability TEXT NOT NULL DEFAULT 'builder',
+      default_model TEXT NOT NULL DEFAULT 'sonnet',
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Create indexes for common queries
@@ -209,6 +223,8 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_issues_assigned ON issues(assigned_agent);
     CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_active);
     CREATE INDEX IF NOT EXISTS idx_projects_path ON projects(path);
+    CREATE INDEX IF NOT EXISTS idx_config_profiles_name ON config_profiles(name);
+    CREATE INDEX IF NOT EXISTS idx_config_profiles_active ON config_profiles(is_active);
   `);
 
   // Seed default agent definitions if table is empty

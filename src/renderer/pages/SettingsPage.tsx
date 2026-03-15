@@ -1,10 +1,77 @@
-import { useEffect, useState } from 'react';
-import { FiRefreshCw, FiSave } from 'react-icons/fi';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  FiCheck,
+  FiEdit2,
+  FiPlus,
+  FiRefreshCw,
+  FiSave,
+  FiStar,
+  FiTrash2,
+  FiX,
+} from 'react-icons/fi';
+import { z } from 'zod';
+import type { ConfigProfile } from '../../shared/types';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../stores/settingsStore';
+
+// ── Zod schema for profile creation/editing ──────────────────────────
+
+const profileSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Profile name is required')
+    .max(50, 'Profile name must be 50 characters or less')
+    .regex(
+      /^[a-zA-Z0-9 _\-]+$/,
+      'Name can only contain letters, numbers, spaces, hyphens, and underscores',
+    ),
+  description: z.string().max(200, 'Description must be 200 characters or less').optional(),
+  max_hierarchy_depth: z.number().int().min(1, 'Min depth is 1').max(10, 'Max depth is 10'),
+  max_concurrent_agents: z.number().int().min(1, 'Min is 1').max(50, 'Max is 50'),
+  max_agents_per_lead: z.number().int().min(1, 'Min is 1').max(20, 'Max is 20'),
+  default_capability: z.enum([
+    'scout',
+    'builder',
+    'reviewer',
+    'lead',
+    'merger',
+    'coordinator',
+    'monitor',
+  ]),
+  default_model: z.enum(['haiku', 'sonnet', 'opus']),
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
+type ProfileFormErrors = Partial<Record<keyof ProfileFormData, string>>;
+
+const CAPABILITY_OPTIONS = [
+  { label: 'Scout', value: 'scout' },
+  { label: 'Builder', value: 'builder' },
+  { label: 'Reviewer', value: 'reviewer' },
+  { label: 'Lead', value: 'lead' },
+  { label: 'Merger', value: 'merger' },
+  { label: 'Coordinator', value: 'coordinator' },
+  { label: 'Monitor', value: 'monitor' },
+];
+
+const MODEL_OPTIONS = [
+  { label: 'Haiku (fast, lightweight)', value: 'haiku' },
+  { label: 'Sonnet (balanced)', value: 'sonnet' },
+  { label: 'Opus (most capable)', value: 'opus' },
+];
+
+const DEFAULT_PROFILE_FORM: ProfileFormData = {
+  name: '',
+  description: '',
+  max_hierarchy_depth: 2,
+  max_concurrent_agents: 10,
+  max_agents_per_lead: 5,
+  default_capability: 'builder',
+  default_model: 'sonnet',
+};
 
 export function SettingsPage() {
   const { loaded, saving, loadSettings } = useSettingsStore();
-  const [activeTab, setActiveTab] = useState<'agents' | 'terminal'>('agents');
+  const [activeTab, setActiveTab] = useState<'agents' | 'terminal' | 'profiles'>('agents');
 
   useEffect(() => {
     if (!loaded) {
@@ -24,6 +91,7 @@ export function SettingsPage() {
   const tabs = [
     { id: 'agents' as const, label: 'Agents' },
     { id: 'terminal' as const, label: 'Terminal' },
+    { id: 'profiles' as const, label: 'Profiles' },
   ];
 
   return (
@@ -59,9 +127,658 @@ export function SettingsPage() {
       {/* Tab Content */}
       {activeTab === 'agents' && <AgentSettings />}
       {activeTab === 'terminal' && <TerminalSettings />}
+      {activeTab === 'profiles' && <ProfilesSettings />}
     </div>
   );
 }
+
+// ── Profiles Tab ─────────────────────────────────────────────────────
+
+function ProfilesSettings() {
+  const [profiles, setProfiles] = useState<ConfigProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  const loadProfiles = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.profileList();
+      if (result.data) {
+        setProfiles(result.data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles]);
+
+  useEffect(() => {
+    if (statusMessage) {
+      const timer = setTimeout(() => setStatusMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [statusMessage]);
+
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      const result = await window.electronAPI.profileDelete(id);
+      if (result.data) {
+        setStatusMessage({ type: 'success', text: `Deleted profile "${name}"` });
+        loadProfiles();
+      } else {
+        setStatusMessage({ type: 'error', text: result.error || 'Failed to delete' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Failed to delete profile' });
+    }
+  };
+
+  const handleActivate = async (id: string, name: string) => {
+    try {
+      const result = await window.electronAPI.profileActivate(id);
+      if (result.data) {
+        setStatusMessage({ type: 'success', text: `Activated profile "${name}"` });
+        loadProfiles();
+      } else {
+        setStatusMessage({ type: 'error', text: result.error || 'Failed to activate' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Failed to activate profile' });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <FiRefreshCw className="animate-spin text-slate-400 mr-2" size={20} />
+        <span className="text-slate-400">Loading profiles...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Status message */}
+      {statusMessage && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            statusMessage.type === 'success'
+              ? 'border-emerald-700 bg-emerald-900/30 text-emerald-300'
+              : 'border-red-700 bg-red-900/30 text-red-300'
+          }`}
+        >
+          {statusMessage.text}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-100">Configuration Profiles</h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Create named profiles with different agent configurations (e.g., "Fast Build", "Careful
+            Review").
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCreateDialog(true)}
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+        >
+          <FiPlus size={16} />
+          New Profile
+        </button>
+      </div>
+
+      {/* Profile List */}
+      {profiles.length === 0 ? (
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-12 text-center">
+          <div className="text-slate-500 text-4xl mb-3">
+            <FiStar className="mx-auto" />
+          </div>
+          <p className="text-slate-400 text-sm">No configuration profiles yet.</p>
+          <p className="text-slate-500 text-xs mt-1">
+            Create a profile to quickly switch between different agent configurations.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {profiles.map((profile) => (
+            <ProfileCard
+              key={profile.id}
+              profile={profile}
+              isEditing={editingId === profile.id}
+              onEdit={() => setEditingId(profile.id)}
+              onCancelEdit={() => setEditingId(null)}
+              onSaveEdit={() => {
+                setEditingId(null);
+                loadProfiles();
+              }}
+              onDelete={() => handleDelete(profile.id, profile.name)}
+              onActivate={() => handleActivate(profile.id, profile.name)}
+              existingNames={profiles.filter((p) => p.id !== profile.id).map((p) => p.name)}
+              setStatusMessage={setStatusMessage}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Create Dialog */}
+      {showCreateDialog && (
+        <ProfileCreateDialog
+          existingNames={profiles.map((p) => p.name)}
+          onClose={() => setShowCreateDialog(false)}
+          onCreated={() => {
+            setShowCreateDialog(false);
+            setStatusMessage({ type: 'success', text: 'Profile created successfully' });
+            loadProfiles();
+          }}
+          setStatusMessage={setStatusMessage}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Profile Card ─────────────────────────────────────────────────────
+
+function ProfileCard({
+  profile,
+  isEditing,
+  onEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
+  onActivate,
+  existingNames,
+  setStatusMessage,
+}: {
+  profile: ConfigProfile;
+  isEditing: boolean;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onDelete: () => void;
+  onActivate: () => void;
+  existingNames: string[];
+  setStatusMessage: (msg: { type: 'success' | 'error'; text: string }) => void;
+}) {
+  if (isEditing) {
+    return (
+      <ProfileEditForm
+        profile={profile}
+        existingNames={existingNames}
+        onCancel={onCancelEdit}
+        onSaved={onSaveEdit}
+        setStatusMessage={setStatusMessage}
+      />
+    );
+  }
+
+  const capabilityColors: Record<string, string> = {
+    scout: 'text-purple-400 bg-purple-900/30',
+    builder: 'text-blue-400 bg-blue-900/30',
+    reviewer: 'text-cyan-400 bg-cyan-900/30',
+    lead: 'text-amber-400 bg-amber-900/30',
+    merger: 'text-emerald-400 bg-emerald-900/30',
+    coordinator: 'text-rose-400 bg-rose-900/30',
+    monitor: 'text-teal-400 bg-teal-900/30',
+  };
+
+  return (
+    <div
+      className={`rounded-lg border bg-slate-800 p-5 ${
+        profile.is_active ? 'border-blue-500 ring-1 ring-blue-500/30' : 'border-slate-700'
+      }`}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h3 className="text-base font-semibold text-slate-100">{profile.name}</h3>
+            {profile.is_active ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-900/40 px-2 py-0.5 text-xs font-medium text-blue-300">
+                <FiCheck size={12} />
+                Active
+              </span>
+            ) : null}
+          </div>
+          {profile.description && (
+            <p className="text-sm text-slate-400 mt-1">{profile.description}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <span className="text-xs text-slate-500">
+              Depth: <span className="text-slate-300">{profile.max_hierarchy_depth}</span>
+            </span>
+            <span className="text-xs text-slate-500">
+              Max Agents: <span className="text-slate-300">{profile.max_concurrent_agents}</span>
+            </span>
+            <span className="text-xs text-slate-500">
+              Per Lead: <span className="text-slate-300">{profile.max_agents_per_lead}</span>
+            </span>
+            <span
+              className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
+                capabilityColors[profile.default_capability] || 'text-slate-400 bg-slate-700'
+              }`}
+            >
+              {profile.default_capability}
+            </span>
+            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium text-slate-300 bg-slate-700">
+              {profile.default_model}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 ml-4">
+          {!profile.is_active && (
+            <button
+              type="button"
+              onClick={onActivate}
+              title="Activate this profile"
+              className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-blue-400 transition-colors"
+            >
+              <FiStar size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Edit profile"
+            className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+          >
+            <FiEdit2 size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            title="Delete profile"
+            className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
+          >
+            <FiTrash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Profile Create Dialog ────────────────────────────────────────────
+
+function ProfileCreateDialog({
+  existingNames,
+  onClose,
+  onCreated,
+  setStatusMessage,
+}: {
+  existingNames: string[];
+  onClose: () => void;
+  onCreated: () => void;
+  setStatusMessage: (msg: { type: 'success' | 'error'; text: string }) => void;
+}) {
+  const [form, setForm] = useState<ProfileFormData>({ ...DEFAULT_PROFILE_FORM });
+  const [errors, setErrors] = useState<ProfileFormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const validateForm = (): boolean => {
+    // Add uniqueness refinement dynamically
+    const schemaWithUniqueness = profileSchema.refine(
+      (data) => !existingNames.includes(data.name),
+      { message: 'A profile with this name already exists', path: ['name'] },
+    );
+
+    const result = schemaWithUniqueness.safeParse(form);
+    if (!result.success) {
+      const fieldErrors: ProfileFormErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof ProfileFormData;
+        if (!fieldErrors[field]) {
+          fieldErrors[field] = issue.message;
+        }
+      }
+      setErrors(fieldErrors);
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+    setSubmitting(true);
+    try {
+      const id = `profile-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const result = await window.electronAPI.profileCreate({
+        id,
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+        max_hierarchy_depth: form.max_hierarchy_depth,
+        max_concurrent_agents: form.max_concurrent_agents,
+        max_agents_per_lead: form.max_agents_per_lead,
+        default_capability: form.default_capability,
+        default_model: form.default_model,
+      });
+      if (result.data) {
+        onCreated();
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: result.error || 'Failed to create profile',
+        });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Failed to create profile' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-800 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4">
+          <h3 className="text-lg font-semibold text-slate-100">Create Profile</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+          >
+            <FiX size={20} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <ProfileFormFields form={form} setForm={setForm} errors={errors} />
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-slate-700 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+          >
+            {submitting ? <FiRefreshCw className="animate-spin" size={14} /> : <FiPlus size={14} />}
+            Create Profile
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Profile Edit Form (inline) ───────────────────────────────────────
+
+function ProfileEditForm({
+  profile,
+  existingNames,
+  onCancel,
+  onSaved,
+  setStatusMessage,
+}: {
+  profile: ConfigProfile;
+  existingNames: string[];
+  onCancel: () => void;
+  onSaved: () => void;
+  setStatusMessage: (msg: { type: 'success' | 'error'; text: string }) => void;
+}) {
+  const [form, setForm] = useState<ProfileFormData>({
+    name: profile.name,
+    description: profile.description || '',
+    max_hierarchy_depth: profile.max_hierarchy_depth,
+    max_concurrent_agents: profile.max_concurrent_agents,
+    max_agents_per_lead: profile.max_agents_per_lead,
+    default_capability: profile.default_capability as ProfileFormData['default_capability'],
+    default_model: profile.default_model as ProfileFormData['default_model'],
+  });
+  const [errors, setErrors] = useState<ProfileFormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const validateForm = (): boolean => {
+    const schemaWithUniqueness = profileSchema.refine(
+      (data) => !existingNames.includes(data.name),
+      { message: 'A profile with this name already exists', path: ['name'] },
+    );
+
+    const result = schemaWithUniqueness.safeParse(form);
+    if (!result.success) {
+      const fieldErrors: ProfileFormErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof ProfileFormData;
+        if (!fieldErrors[field]) {
+          fieldErrors[field] = issue.message;
+        }
+      }
+      setErrors(fieldErrors);
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+    setSubmitting(true);
+    try {
+      const result = await window.electronAPI.profileUpdate(profile.id, {
+        name: form.name.trim(),
+        description: form.description?.trim() || null,
+        max_hierarchy_depth: form.max_hierarchy_depth,
+        max_concurrent_agents: form.max_concurrent_agents,
+        max_agents_per_lead: form.max_agents_per_lead,
+        default_capability: form.default_capability,
+        default_model: form.default_model,
+      });
+      if (result.data) {
+        setStatusMessage({ type: 'success', text: `Updated profile "${form.name}"` });
+        onSaved();
+      } else {
+        setStatusMessage({ type: 'error', text: result.error || 'Failed to update' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Failed to update profile' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-blue-500/50 bg-slate-800 p-5">
+      <h3 className="text-base font-semibold text-slate-100 mb-4">Edit Profile</h3>
+      <ProfileFormFields form={form} setForm={setForm} errors={errors} />
+      <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-slate-700">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={submitting}
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+        >
+          {submitting ? <FiRefreshCw className="animate-spin" size={14} /> : <FiSave size={14} />}
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Shared Form Fields ───────────────────────────────────────────────
+
+function ProfileFormFields({
+  form,
+  setForm,
+  errors,
+}: {
+  form: ProfileFormData;
+  setForm: (form: ProfileFormData) => void;
+  errors: ProfileFormErrors;
+}) {
+  return (
+    <>
+      {/* Name */}
+      <div>
+        {/* biome-ignore lint/a11y/noLabelWithoutControl: input is rendered below label in same container */}
+        <label className="block text-sm font-medium text-slate-200 mb-1">
+          Profile Name <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder='e.g., "Fast Build" or "Careful Review"'
+          className={`w-full rounded-md border bg-slate-700 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 ${
+            errors.name
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+              : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'
+          }`}
+        />
+        {errors.name && <p className="mt-1 text-xs text-red-400">{errors.name}</p>}
+      </div>
+
+      {/* Description */}
+      <div>
+        {/* biome-ignore lint/a11y/noLabelWithoutControl: input is rendered below label in same container */}
+        <label className="block text-sm font-medium text-slate-200 mb-1">Description</label>
+        <input
+          type="text"
+          value={form.description || ''}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Brief description of this profile's purpose"
+          className={`w-full rounded-md border bg-slate-700 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 ${
+            errors.description
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+              : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'
+          }`}
+        />
+        {errors.description && <p className="mt-1 text-xs text-red-400">{errors.description}</p>}
+      </div>
+
+      {/* Agent config row */}
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: NumberInput is a custom component */}
+          <label className="block text-xs font-medium text-slate-300 mb-1">
+            Max Hierarchy Depth
+          </label>
+          <NumberInput
+            value={form.max_hierarchy_depth}
+            min={1}
+            max={10}
+            onChange={(v) => setForm({ ...form, max_hierarchy_depth: v })}
+          />
+          {errors.max_hierarchy_depth && (
+            <p className="mt-1 text-xs text-red-400">{errors.max_hierarchy_depth}</p>
+          )}
+        </div>
+        <div>
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: NumberInput is a custom component */}
+          <label className="block text-xs font-medium text-slate-300 mb-1">Max Concurrent</label>
+          <NumberInput
+            value={form.max_concurrent_agents}
+            min={1}
+            max={50}
+            onChange={(v) => setForm({ ...form, max_concurrent_agents: v })}
+          />
+          {errors.max_concurrent_agents && (
+            <p className="mt-1 text-xs text-red-400">{errors.max_concurrent_agents}</p>
+          )}
+        </div>
+        <div>
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: NumberInput is a custom component */}
+          <label className="block text-xs font-medium text-slate-300 mb-1">Per Lead</label>
+          <NumberInput
+            value={form.max_agents_per_lead}
+            min={1}
+            max={20}
+            onChange={(v) => setForm({ ...form, max_agents_per_lead: v })}
+          />
+          {errors.max_agents_per_lead && (
+            <p className="mt-1 text-xs text-red-400">{errors.max_agents_per_lead}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Default Capability & Model row */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: select is rendered below label */}
+          <label className="block text-xs font-medium text-slate-300 mb-1">
+            Default Capability
+          </label>
+          <select
+            value={form.default_capability}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                default_capability: e.target.value as ProfileFormData['default_capability'],
+              })
+            }
+            className={`w-full rounded-md border bg-slate-700 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 ${
+              errors.default_capability
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'
+            }`}
+          >
+            {CAPABILITY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {errors.default_capability && (
+            <p className="mt-1 text-xs text-red-400">{errors.default_capability}</p>
+          )}
+        </div>
+        <div>
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: select is rendered below label */}
+          <label className="block text-xs font-medium text-slate-300 mb-1">Default Model</label>
+          <select
+            value={form.default_model}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                default_model: e.target.value as ProfileFormData['default_model'],
+              })
+            }
+            className={`w-full rounded-md border bg-slate-700 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 ${
+              errors.default_model
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'
+            }`}
+          >
+            {MODEL_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {errors.default_model && (
+            <p className="mt-1 text-xs text-red-400">{errors.default_model}</p>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Agent Settings Tab ───────────────────────────────────────────────
 
 function AgentSettings() {
   const { settings, updateSetting } = useSettingsStore();
@@ -128,6 +845,8 @@ function AgentSettings() {
     </div>
   );
 }
+
+// ── Terminal Settings Tab ────────────────────────────────────────────
 
 function TerminalSettings() {
   const { settings, updateSetting } = useSettingsStore();
@@ -212,7 +931,7 @@ function TerminalSettings() {
   );
 }
 
-// Reusable components
+// ── Reusable components ──────────────────────────────────────────────
 
 function SettingRow({
   label,
