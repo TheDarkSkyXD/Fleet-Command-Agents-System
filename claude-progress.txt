@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Guard Enforcement Service)
+
+#### Feature #265: Agent process isolation to worktree - PASSING
+- Created guardEnforcementService.ts with real-time path boundary enforcement
+- Monitors agent stream-json tool_use events for file-related tools (Read, Write, Edit, Glob, Grep)
+- Validates file paths against worktree boundaries from agent_definitions table
+- Violations logged to guard_violations table with severity levels
+- Integrated into agentProcessManager.handleParsedEvent() for automatic enforcement
+- Cache with 1-minute TTL avoids repeated DB queries; cleared on guard rule updates
+
+#### Feature #266: Guard rules prevent dangerous git commands - PASSING
+- checkBashCommand() matches Bash tool commands against role's bash_restrictions
+- Strips "no " prefix from restrictions (e.g., "no git push" → matches "git push")
+- Hardcoded DANGEROUS_GIT_PATTERNS safety net: git push, git reset --hard, git checkout --, git clean -f, git branch -D, git push --force/-f
+- Severity classification: critical (force push, reset hard, clean -f), warning (git push, branch -D), info (other)
+- Violations broadcast to renderer via guard_violation event for real-time display
+
+#### Files Created
+- NEW: src/main/services/guardEnforcementService.ts - Guard enforcement service with path + bash validation
+
+#### Files Modified
+- MODIFIED: src/main/services/agentProcessManager.ts - Import guardEnforcementService, enforce in handleParsedEvent
+- MODIFIED: src/main/ipc/handlers.ts - Import guardEnforcementService, clear cache on guard rule updates
+
+#### Current Status
+- 266/366 features passing (added #265 and #266 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Operator Ask-Reply & IPC Validation)
 
 #### Feature #259: Operator synchronous ask-reply - PASSING
