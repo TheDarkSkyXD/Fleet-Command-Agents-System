@@ -4,6 +4,7 @@ import {
   FiChevronRight,
   FiClock,
   FiEdit2,
+  FiEye,
   FiFile,
   FiFilePlus,
   FiGitBranch,
@@ -61,6 +62,195 @@ function buildTree(prompts: Prompt[]): PromptTreeNode[] {
   sortChildren(roots);
 
   return roots;
+}
+
+// ── Inheritance Chain Resolution ──────────────────────────────────
+
+interface InheritanceLink {
+  id: string;
+  name: string;
+  type: PromptType;
+  content: string;
+}
+
+/** Walk up the parent chain and return the full inheritance path (root → ... → self) */
+function resolveInheritanceChain(prompt: Prompt, allPrompts: Prompt[]): InheritanceLink[] {
+  const chain: InheritanceLink[] = [];
+  const visited = new Set<string>();
+  let current: Prompt | undefined = prompt;
+
+  while (current) {
+    if (visited.has(current.id)) break; // prevent cycles
+    visited.add(current.id);
+    chain.unshift({
+      id: current.id,
+      name: current.name,
+      type: current.type,
+      content: current.content,
+    });
+    const parentId = current.parent_id;
+    current = parentId ? allPrompts.find((p) => p.id === parentId) : undefined;
+  }
+
+  return chain;
+}
+
+/** Merge content from the inheritance chain: parent content first, then child appends */
+function renderMergedContent(chain: InheritanceLink[]): string {
+  if (chain.length === 0) return '';
+  if (chain.length === 1) return chain[0].content;
+  return chain.map((link) => link.content).join('\n\n---\n\n');
+}
+
+/** Regex for template variables like {{var}}, {var}, or ${var} */
+const TEMPLATE_VAR_PATTERN = /(\{\{[\w.]+\}\}|\$\{[\w.]+\}|\{[\w.]+\})/g;
+
+/** Extract unique template variable names from content */
+function extractTemplateVars(content: string): string[] {
+  const matches = content.match(TEMPLATE_VAR_PATTERN);
+  if (!matches) return [];
+  return [...new Set(matches)];
+}
+
+/** Render content with highlighted template variables as React nodes */
+function renderHighlightedContent(content: string): React.ReactNode[] {
+  const parts = content.split(TEMPLATE_VAR_PATTERN);
+  return parts.map((part) => {
+    if (TEMPLATE_VAR_PATTERN.test(part)) {
+      // Reset lastIndex since we reuse the regex
+      TEMPLATE_VAR_PATTERN.lastIndex = 0;
+      return (
+        <span
+          key={`var-${part}`}
+          className="rounded bg-amber-500/20 px-1 py-0.5 font-semibold text-amber-300 border border-amber-500/30"
+          data-testid="template-variable"
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
+// ── Prompt Preview Panel ─────────────────────────────────────────
+
+function PromptPreviewPanel({
+  prompt,
+  prompts,
+  onClose,
+}: {
+  prompt: Prompt;
+  prompts: Prompt[];
+  onClose: () => void;
+}) {
+  const chain = useMemo(() => resolveInheritanceChain(prompt, prompts), [prompt, prompts]);
+  const mergedContent = useMemo(() => renderMergedContent(chain), [chain]);
+  const templateVars = useMemo(() => extractTemplateVars(mergedContent), [mergedContent]);
+  const highlightedContent = useMemo(
+    () => renderHighlightedContent(mergedContent),
+    [mergedContent],
+  );
+
+  return (
+    <div className="flex h-full flex-col" data-testid="prompt-preview-panel">
+      {/* Preview header */}
+      <div className="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+        <div className="flex items-center gap-3">
+          <FiEye size={18} className="text-cyan-400" />
+          <h3 className="text-lg font-semibold text-slate-100">Rendered Preview</h3>
+          <span className="text-sm text-slate-400">— {prompt.name}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-1.5 rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
+        >
+          <FiX size={14} />
+          Close Preview
+        </button>
+      </div>
+
+      {/* Inheritance chain visualization */}
+      {chain.length > 1 && (
+        <div className="mb-4" data-testid="inheritance-chain">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Inheritance Chain ({chain.length} levels)
+          </h4>
+          <div className="flex items-center gap-1 flex-wrap">
+            {chain.map((link, idx) => (
+              <div key={link.id} className="flex items-center gap-1">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${
+                    idx === chain.length - 1
+                      ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-300'
+                      : 'border-slate-600 bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  <TypeBadge type={link.type} />
+                  {link.name}
+                </span>
+                {idx < chain.length - 1 && <span className="text-slate-500 mx-1">→</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Template variables summary */}
+      {templateVars.length > 0 && (
+        <div className="mb-4" data-testid="template-variables-summary">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Template Variables ({templateVars.length})
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {templateVars.map((v) => (
+              <span
+                key={v}
+                className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-mono text-amber-300"
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Rendered content */}
+      <div className="flex-1 overflow-auto" data-testid="rendered-output">
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          {chain.length > 1 ? 'Merged Output' : 'Rendered Output'}
+        </h4>
+        <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-300 leading-relaxed">
+          {highlightedContent}
+        </pre>
+      </div>
+
+      {/* Per-level breakdown for multi-level chains */}
+      {chain.length > 1 && (
+        <div className="mt-4 border-t border-slate-700 pt-4">
+          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Per-Level Content
+          </h4>
+          <div className="space-y-3 max-h-48 overflow-auto">
+            {chain.map((link, idx) => (
+              <div key={link.id} className="rounded-md border border-slate-700 bg-slate-800/50 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-bold text-slate-400">Level {idx + 1}</span>
+                  <TypeBadge type={link.type} />
+                  <span className="text-xs font-medium text-slate-300">{link.name}</span>
+                </div>
+                <pre className="whitespace-pre-wrap text-xs text-slate-400 font-mono max-h-24 overflow-auto">
+                  {link.content.substring(0, 500)}
+                  {link.content.length > 500 ? '...' : ''}
+                </pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Tree Node Component ───────────────────────────────────────────
@@ -287,13 +477,243 @@ function CreatePromptDialog({
   );
 }
 
+// ── Line-level Diff Engine ────────────────────────────────────────
+
+interface DiffLine {
+  type: 'added' | 'removed' | 'unchanged';
+  content: string;
+  leftNum: number | null;
+  rightNum: number | null;
+}
+
+function computeLineDiff(oldText: string, newText: string): DiffLine[] {
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+
+  // Simple LCS-based diff
+  const m = oldLines.length;
+  const n = newLines.length;
+
+  // Build LCS table
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (oldLines[i - 1] === newLines[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  // Backtrack to build diff
+  const result: DiffLine[] = [];
+  let i = m;
+  let j = n;
+  const stack: DiffLine[] = [];
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      stack.push({ type: 'unchanged', content: oldLines[i - 1], leftNum: i, rightNum: j });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      stack.push({ type: 'added', content: newLines[j - 1], leftNum: null, rightNum: j });
+      j--;
+    } else {
+      stack.push({ type: 'removed', content: oldLines[i - 1], leftNum: i, rightNum: null });
+      i--;
+    }
+  }
+
+  // Reverse since we built bottom-up
+  for (let k = stack.length - 1; k >= 0; k--) {
+    result.push(stack[k]);
+  }
+
+  return result;
+}
+
+// ── Version Diff Viewer ──────────────────────────────────────────
+
+function VersionDiffViewer({
+  promptName,
+  versions,
+  onClose,
+}: {
+  promptName: string;
+  versions: PromptVersion[];
+  onClose: () => void;
+}) {
+  const sortedVersions = useMemo(
+    () => [...versions].sort((a, b) => a.version - b.version),
+    [versions],
+  );
+
+  const [leftVersionId, setLeftVersionId] = useState(
+    sortedVersions.length >= 2
+      ? sortedVersions[sortedVersions.length - 2].id
+      : sortedVersions[0]?.id || '',
+  );
+  const [rightVersionId, setRightVersionId] = useState(
+    sortedVersions[sortedVersions.length - 1]?.id || '',
+  );
+
+  const leftVersion = sortedVersions.find((v) => v.id === leftVersionId);
+  const rightVersion = sortedVersions.find((v) => v.id === rightVersionId);
+
+  const diffLines = useMemo(() => {
+    if (!leftVersion || !rightVersion) return [];
+    return computeLineDiff(leftVersion.content, rightVersion.content);
+  }, [leftVersion, rightVersion]);
+
+  const addedCount = diffLines.filter((l) => l.type === 'added').length;
+  const removedCount = diffLines.filter((l) => l.type === 'removed').length;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-slate-900/98"
+      data-testid="version-diff-viewer"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-6 py-3">
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-semibold text-slate-50">Compare Versions</h2>
+          <span className="text-sm text-slate-400">— {promptName}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-emerald-400">+{addedCount} added</span>
+          <span className="text-xs text-red-400">−{removedCount} removed</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+            data-testid="diff-close-btn"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Version selectors */}
+      <div className="flex items-center gap-4 border-b border-slate-700 bg-slate-800/60 px-6 py-2.5">
+        <label className="flex items-center gap-2 text-sm text-slate-300">
+          <span className="font-medium text-red-400">Old:</span>
+          <select
+            value={leftVersionId}
+            onChange={(e) => setLeftVersionId(e.target.value)}
+            className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-sm text-slate-200 focus:border-blue-500 focus:outline-none"
+            data-testid="diff-left-selector"
+          >
+            {sortedVersions.map((v) => (
+              <option key={v.id} value={v.id}>
+                v{v.version} — {new Date(v.created_at).toLocaleString()}
+                {v.change_summary ? ` (${v.change_summary})` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="text-slate-500">→</span>
+        <label className="flex items-center gap-2 text-sm text-slate-300">
+          <span className="font-medium text-emerald-400">New:</span>
+          <select
+            value={rightVersionId}
+            onChange={(e) => setRightVersionId(e.target.value)}
+            className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-sm text-slate-200 focus:border-blue-500 focus:outline-none"
+            data-testid="diff-right-selector"
+          >
+            {sortedVersions.map((v) => (
+              <option key={v.id} value={v.id}>
+                v{v.version} — {new Date(v.created_at).toLocaleString()}
+                {v.change_summary ? ` (${v.change_summary})` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {/* Diff content */}
+      <div className="flex-1 overflow-auto font-mono text-sm" data-testid="diff-content">
+        {leftVersion && rightVersion && leftVersion.id === rightVersion.id ? (
+          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+            Select two different versions to compare
+          </div>
+        ) : diffLines.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+            No differences found
+          </div>
+        ) : (
+          <table className="w-full border-collapse">
+            <tbody>
+              {diffLines.map((line, idx) => (
+                <tr
+                  key={`diff-${line.type}-${line.leftNum ?? 'n'}-${line.rightNum ?? 'n'}-${idx}`}
+                  className={
+                    line.type === 'added'
+                      ? 'bg-emerald-500/10'
+                      : line.type === 'removed'
+                        ? 'bg-red-500/10'
+                        : ''
+                  }
+                >
+                  {/* Left line number */}
+                  <td className="w-12 select-none border-r border-slate-700/50 px-2 py-0.5 text-right text-xs text-slate-500 align-top">
+                    {line.leftNum ?? ''}
+                  </td>
+                  {/* Right line number */}
+                  <td className="w-12 select-none border-r border-slate-700/50 px-2 py-0.5 text-right text-xs text-slate-500 align-top">
+                    {line.rightNum ?? ''}
+                  </td>
+                  {/* Change indicator */}
+                  <td
+                    className={`w-6 select-none px-1 py-0.5 text-center text-xs font-bold ${
+                      line.type === 'added'
+                        ? 'text-emerald-400'
+                        : line.type === 'removed'
+                          ? 'text-red-400'
+                          : 'text-slate-600'
+                    }`}
+                  >
+                    {line.type === 'added' ? '+' : line.type === 'removed' ? '−' : ' '}
+                  </td>
+                  {/* Content */}
+                  <td
+                    className={`px-3 py-0.5 whitespace-pre-wrap ${
+                      line.type === 'added'
+                        ? 'text-emerald-200'
+                        : line.type === 'removed'
+                          ? 'text-red-200'
+                          : 'text-slate-300'
+                    }`}
+                    data-testid={
+                      line.type === 'added'
+                        ? 'diff-addition'
+                        : line.type === 'removed'
+                          ? 'diff-deletion'
+                          : undefined
+                    }
+                  >
+                    {line.content}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Version History Panel ─────────────────────────────────────────
 function VersionHistoryPanel({
   promptId,
   onSelectVersion,
+  onCompareVersions,
 }: {
   promptId: string;
   onSelectVersion: (version: PromptVersion) => void;
+  onCompareVersions: (versions: PromptVersion[]) => void;
 }) {
   const [versions, setVersions] = useState<PromptVersion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,6 +744,17 @@ function VersionHistoryPanel({
 
   return (
     <div className="space-y-2">
+      {versions.length >= 2 && (
+        <button
+          type="button"
+          onClick={() => onCompareVersions(versions)}
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/20"
+          data-testid="compare-versions-btn"
+        >
+          <FiGitBranch size={14} />
+          Compare Versions
+        </button>
+      )}
       {versions.map((v) => (
         <button
           type="button"
@@ -372,6 +803,8 @@ function PromptDetail({
   const [showVersions, setShowVersions] = useState(false);
   const [viewingVersion, setViewingVersion] = useState<PromptVersion | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [compareVersions, setCompareVersions] = useState<PromptVersion[] | null>(null);
 
   // Reset state when prompt changes
   useEffect(() => {
@@ -384,6 +817,8 @@ function PromptDetail({
     setChangeSummary('');
     setViewingVersion(null);
     setConfirmDelete(false);
+    setShowPreview(false);
+    setCompareVersions(null);
   }, [prompt.content, prompt.name, prompt.description, prompt.type, prompt.parent_id]);
 
   const parentPrompt = prompts.find((p) => p.id === prompt.parent_id);
@@ -453,6 +888,27 @@ function PromptDetail({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowPreview(!showPreview);
+              if (!showPreview) {
+                setEditing(false);
+                setShowVersions(false);
+                setViewingVersion(null);
+              }
+            }}
+            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors ${
+              showPreview
+                ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400'
+                : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+            }`}
+            data-testid="preview-btn"
+          >
+            <FiEye size={14} />
+            Preview
+          </button>
+
           <button
             type="button"
             onClick={() => setShowVersions(!showVersions)}
@@ -584,77 +1040,98 @@ function PromptDetail({
       )}
 
       {/* Content area */}
-      <div className="mt-4 flex flex-1 gap-4 overflow-hidden">
-        {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {editing && (
-            <label className="mb-2 block">
-              <span className="mb-1 block text-xs font-medium text-slate-400">
-                Change Summary (optional)
-              </span>
-              <input
-                type="text"
-                value={changeSummary}
-                onChange={(e) => setChangeSummary(e.target.value)}
-                placeholder="Describe what changed..."
-                className="w-full rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-              />
-            </label>
-          )}
-
-          {viewingVersion ? (
-            <div className="flex-1 overflow-auto">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium text-amber-400">
-                  Viewing v{viewingVersion.version} -{' '}
-                  {new Date(viewingVersion.created_at).toLocaleString()}
+      {showPreview ? (
+        <div className="mt-4 flex-1 overflow-hidden">
+          <PromptPreviewPanel
+            prompt={prompt}
+            prompts={prompts}
+            onClose={() => setShowPreview(false)}
+          />
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-1 gap-4 overflow-hidden">
+          {/* Main content */}
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {editing && (
+              <label className="mb-2 block">
+                <span className="mb-1 block text-xs font-medium text-slate-400">
+                  Change Summary (optional)
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setViewingVersion(null)}
-                  className="text-sm text-slate-400 hover:text-slate-200"
-                >
-                  Back to current
-                </button>
-              </div>
-              <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-300">
-                {viewingVersion.content}
-              </pre>
-            </div>
-          ) : editing ? (
-            <textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="flex-1 resize-none rounded-md border border-slate-600 bg-slate-900 p-4 font-mono text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
-            />
-          ) : (
-            <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-300">
-              {prompt.content}
-            </pre>
-          )}
+                <input
+                  type="text"
+                  value={changeSummary}
+                  onChange={(e) => setChangeSummary(e.target.value)}
+                  placeholder="Describe what changed..."
+                  className="w-full rounded border border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                />
+              </label>
+            )}
 
-          {/* Description */}
-          {!editing && prompt.description && (
-            <div className="mt-3 text-sm text-slate-400">
-              <span className="font-medium text-slate-500">Description:</span> {prompt.description}
+            {viewingVersion ? (
+              <div className="flex-1 overflow-auto">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-amber-400">
+                    Viewing v{viewingVersion.version} -{' '}
+                    {new Date(viewingVersion.created_at).toLocaleString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setViewingVersion(null)}
+                    className="text-sm text-slate-400 hover:text-slate-200"
+                  >
+                    Back to current
+                  </button>
+                </div>
+                <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-300">
+                  {viewingVersion.content}
+                </pre>
+              </div>
+            ) : editing ? (
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="flex-1 resize-none rounded-md border border-slate-600 bg-slate-900 p-4 font-mono text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+              />
+            ) : (
+              <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-300">
+                {prompt.content}
+              </pre>
+            )}
+
+            {/* Description */}
+            {!editing && prompt.description && (
+              <div className="mt-3 text-sm text-slate-400">
+                <span className="font-medium text-slate-500">Description:</span>{' '}
+                {prompt.description}
+              </div>
+            )}
+          </div>
+
+          {/* Version history sidebar */}
+          {showVersions && (
+            <div className="w-72 flex-shrink-0 overflow-auto rounded-md border border-slate-700 bg-slate-800/50 p-3">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
+                <FiClock size={14} />
+                Version History
+              </h3>
+              <VersionHistoryPanel
+                promptId={prompt.id}
+                onSelectVersion={(v) => setViewingVersion(v)}
+                onCompareVersions={(v) => setCompareVersions(v)}
+              />
             </div>
           )}
         </div>
+      )}
 
-        {/* Version history sidebar */}
-        {showVersions && (
-          <div className="w-72 flex-shrink-0 overflow-auto rounded-md border border-slate-700 bg-slate-800/50 p-3">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
-              <FiClock size={14} />
-              Version History
-            </h3>
-            <VersionHistoryPanel
-              promptId={prompt.id}
-              onSelectVersion={(v) => setViewingVersion(v)}
-            />
-          </div>
-        )}
-      </div>
+      {/* Version diff viewer overlay */}
+      {compareVersions && compareVersions.length >= 2 && (
+        <VersionDiffViewer
+          promptName={prompt.name}
+          versions={compareVersions}
+          onClose={() => setCompareVersions(null)}
+        />
+      )}
     </div>
   );
 }
