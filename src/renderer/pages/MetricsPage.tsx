@@ -4,32 +4,43 @@ import {
   FiBarChart2,
   FiCpu,
   FiDatabase,
+  FiDownload,
   FiRefreshCw,
   FiTrash2,
+  FiUsers,
   FiZap,
 } from 'react-icons/fi';
-import type { Metric, MetricsSummary, ModelBreakdown } from '../../shared/types';
+import type {
+  CapabilityBreakdown,
+  Metric,
+  MetricsSummary,
+  ModelBreakdown,
+} from '../../shared/types';
 
-type TabId = 'sessions' | 'models';
+type TabId = 'sessions' | 'models' | 'capabilities';
 
 export function MetricsPage() {
   const [activeTab, setActiveTab] = useState<TabId>('sessions');
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [modelBreakdown, setModelBreakdown] = useState<ModelBreakdown[]>([]);
+  const [capabilityBreakdown, setCapabilityBreakdown] = useState<CapabilityBreakdown[]>([]);
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<Metric | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [metricsRes, modelRes, summaryRes] = await Promise.all([
+      const [metricsRes, modelRes, capabilityRes, summaryRes] = await Promise.all([
         window.electronAPI.metricsList(),
         window.electronAPI.metricsByModel(),
+        window.electronAPI.metricsByCapability(),
         window.electronAPI.metricsSummary(),
       ]);
       if (metricsRes.data) setMetrics(metricsRes.data);
       if (modelRes.data) setModelBreakdown(modelRes.data);
+      if (capabilityRes.data) setCapabilityBreakdown(capabilityRes.data);
       if (summaryRes.data) setSummary(summaryRes.data);
     } catch (err) {
       console.error('Failed to load metrics:', err);
@@ -37,6 +48,20 @@ export function MetricsPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    setExporting(true);
+    try {
+      const result = await window.electronAPI.metricsExport(format);
+      if (result.error) {
+        console.error('Export failed:', result.error);
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -85,6 +110,7 @@ export function MetricsPage() {
   const tabs: { id: TabId; label: string; icon: typeof FiActivity }[] = [
     { id: 'sessions', label: 'Per Session', icon: FiActivity },
     { id: 'models', label: 'Model Breakdown', icon: FiCpu },
+    { id: 'capabilities', label: 'By Capability', icon: FiUsers },
   ];
 
   const totalTokens = summary
@@ -107,14 +133,48 @@ export function MetricsPage() {
             Token usage tracking per agent session and model breakdown
           </p>
         </div>
-        <button
-          type="button"
-          onClick={loadData}
-          className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
-        >
-          <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="relative group">
+            <button
+              type="button"
+              disabled={exporting || metrics.length === 0}
+              className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="export-metrics-btn"
+              onClick={() => {
+                /* toggle dropdown via group-focus-within */
+              }}
+            >
+              <FiDownload size={14} className={exporting ? 'animate-bounce' : ''} />
+              Export
+            </button>
+            <div className="absolute right-0 mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 hidden group-focus-within:block">
+              <button
+                type="button"
+                onClick={() => handleExport('csv')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-t-lg transition-colors"
+                data-testid="export-csv-btn"
+              >
+                Export as CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExport('json')}
+                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg transition-colors"
+                data-testid="export-json-btn"
+              >
+                Export as JSON
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={loadData}
+            className="flex items-center gap-2 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -181,7 +241,7 @@ export function MetricsPage() {
           modelColor={modelColor}
           onRefresh={loadData}
         />
-      ) : (
+      ) : activeTab === 'models' ? (
         <ModelBreakdownTab
           breakdown={modelBreakdown}
           formatTokenCount={formatTokenCount}
@@ -189,6 +249,13 @@ export function MetricsPage() {
           formatCost={formatCost}
           modelColor={modelColor}
           modelBgColor={modelBgColor}
+        />
+      ) : (
+        <CapabilityBreakdownTab
+          breakdown={capabilityBreakdown}
+          formatTokenCount={formatTokenCount}
+          formatDuration={formatDuration}
+          formatCost={formatCost}
         />
       )}
     </div>
@@ -460,6 +527,202 @@ function ModelBreakdownTab({
                 <FiCpu className={`${modelColor(b.model_used)}`} size={20} />
                 <span className={`text-lg font-bold ${modelColor(b.model_used)}`}>
                   {b.model_used}
+                </span>
+                <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded">
+                  {b.session_count} session{b.session_count !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-slate-400">{formatDuration(b.total_duration_ms)}</span>
+                <span className="text-slate-300 font-medium">{formatCost(b.total_cost)}</span>
+              </div>
+            </div>
+
+            {/* Token usage bar */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                <span>Total: {formatTokenCount(totalTokens)} tokens</span>
+                <span>{pct.toFixed(0)}% of max</span>
+              </div>
+              <div className="h-4 bg-slate-900/50 rounded-full overflow-hidden flex">
+                <div
+                  className="bg-blue-500/70 h-full transition-all"
+                  style={{ width: `${inputPct}%` }}
+                  title={`Input: ${formatTokenCount(b.total_input_tokens)}`}
+                />
+                <div
+                  className="bg-emerald-500/70 h-full transition-all"
+                  style={{ width: `${outputPct}%` }}
+                  title={`Output: ${formatTokenCount(b.total_output_tokens)}`}
+                />
+                <div
+                  className="bg-amber-500/70 h-full transition-all"
+                  style={{ width: `${cacheReadPct}%` }}
+                  title={`Cache Read: ${formatTokenCount(b.total_cache_read_tokens)}`}
+                />
+                <div
+                  className="bg-purple-500/70 h-full transition-all"
+                  style={{ width: `${cacheCreatePct}%` }}
+                  title={`Cache Create: ${formatTokenCount(b.total_cache_creation_tokens)}`}
+                />
+              </div>
+            </div>
+
+            {/* Token breakdown grid */}
+            <div className="grid grid-cols-4 gap-3 text-sm">
+              <div>
+                <div className="text-xs text-slate-500 mb-0.5">Input</div>
+                <div className="text-blue-400 font-medium">
+                  {formatTokenCount(b.total_input_tokens)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 mb-0.5">Output</div>
+                <div className="text-emerald-400 font-medium">
+                  {formatTokenCount(b.total_output_tokens)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 mb-0.5">Cache Read</div>
+                <div className="text-amber-400 font-medium">
+                  {formatTokenCount(b.total_cache_read_tokens)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 mb-0.5">Cache Create</div>
+                <div className="text-purple-400 font-medium">
+                  {formatTokenCount(b.total_cache_creation_tokens)}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-xs text-slate-500 pt-2">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-blue-500/70" /> Input
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-emerald-500/70" /> Output
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-amber-500/70" /> Cache Read
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-purple-500/70" /> Cache Create
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const capabilityColor = (cap: string | null | undefined): string => {
+  if (!cap) return 'text-slate-400';
+  switch (cap) {
+    case 'scout':
+      return 'text-emerald-400';
+    case 'builder':
+      return 'text-blue-400';
+    case 'reviewer':
+      return 'text-amber-400';
+    case 'lead':
+      return 'text-purple-400';
+    case 'merger':
+      return 'text-cyan-400';
+    case 'coordinator':
+      return 'text-rose-400';
+    case 'monitor':
+      return 'text-teal-400';
+    default:
+      return 'text-slate-400';
+  }
+};
+
+const capabilityBgColor = (cap: string | null | undefined): string => {
+  if (!cap) return 'bg-slate-700';
+  switch (cap) {
+    case 'scout':
+      return 'bg-emerald-900/40 border-emerald-700/50';
+    case 'builder':
+      return 'bg-blue-900/40 border-blue-700/50';
+    case 'reviewer':
+      return 'bg-amber-900/40 border-amber-700/50';
+    case 'lead':
+      return 'bg-purple-900/40 border-purple-700/50';
+    case 'merger':
+      return 'bg-cyan-900/40 border-cyan-700/50';
+    case 'coordinator':
+      return 'bg-rose-900/40 border-rose-700/50';
+    case 'monitor':
+      return 'bg-teal-900/40 border-teal-700/50';
+    default:
+      return 'bg-slate-700';
+  }
+};
+
+function CapabilityBreakdownTab({
+  breakdown,
+  formatTokenCount,
+  formatDuration,
+  formatCost,
+}: {
+  breakdown: CapabilityBreakdown[];
+  formatTokenCount: (n: number | null | undefined) => string;
+  formatDuration: (ms: number | null | undefined) => string;
+  formatCost: (cost: number | null | undefined) => string;
+}) {
+  if (breakdown.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <FiUsers size={40} className="mb-3 opacity-50" />
+        <p className="text-lg font-medium">No capability usage data yet</p>
+        <p className="text-sm mt-1">
+          Capability breakdown will appear after sessions with assigned capabilities complete
+        </p>
+      </div>
+    );
+  }
+
+  const maxTokens = Math.max(
+    ...breakdown.map(
+      (b) =>
+        (b.total_input_tokens || 0) +
+        (b.total_output_tokens || 0) +
+        (b.total_cache_read_tokens || 0) +
+        (b.total_cache_creation_tokens || 0),
+    ),
+  );
+
+  return (
+    <div className="space-y-4" data-testid="capability-breakdown">
+      {breakdown.map((b) => {
+        const totalTokens =
+          (b.total_input_tokens || 0) +
+          (b.total_output_tokens || 0) +
+          (b.total_cache_read_tokens || 0) +
+          (b.total_cache_creation_tokens || 0);
+        const pct = maxTokens > 0 ? (totalTokens / maxTokens) * 100 : 0;
+        const inputPct = totalTokens > 0 ? ((b.total_input_tokens || 0) / totalTokens) * 100 : 0;
+        const outputPct = totalTokens > 0 ? ((b.total_output_tokens || 0) / totalTokens) * 100 : 0;
+        const cacheReadPct =
+          totalTokens > 0 ? ((b.total_cache_read_tokens || 0) / totalTokens) * 100 : 0;
+        const cacheCreatePct =
+          totalTokens > 0 ? ((b.total_cache_creation_tokens || 0) / totalTokens) * 100 : 0;
+
+        return (
+          <div
+            key={b.capability}
+            className={`rounded-lg border p-5 ${capabilityBgColor(b.capability)}`}
+            data-testid={`capability-row-${b.capability}`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <FiUsers className={capabilityColor(b.capability)} size={20} />
+                <span className={`text-lg font-bold ${capabilityColor(b.capability)} capitalize`}>
+                  {b.capability}
                 </span>
                 <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded">
                   {b.session_count} session{b.session_count !== 1 ? 's' : ''}
