@@ -4619,3 +4619,23 @@
 - 301/366 features passing (added #302 and #303 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Filter Reset & Form Defaults)
+
+#### Feature #313: Filter reset when changing views - PASSING
+- Verified filters use local React useState (globalFilter, capabilityFilter, sorting, columnFilters)
+- PageContent switch statement in AppLayout unmounts/remounts page components on navigation
+- Component remount naturally resets all local state to defaults
+- Same pattern applies to MailPage and TasksPage filters
+- Added data-testid=agent-filter-bar with data-filters-active attribute
+
+#### Feature #314: Form defaults are sensible - PASSING
+- Spawn form: capability=scout, model auto-set per capability, name placeholder with auto-gen hint
+- Settings: maxConcurrentAgents=10, maxAgentsPerLead=5, maxHierarchyDepth=2
+- Added data-testid wrappers with data-default-value for settings fields
+- Added data-default-model attribute to spawn model picker
+
+#### Current Status
+- 312/366 features passing (added #313 and #314 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
