@@ -1997,7 +1997,7 @@ export function registerIpcHandlers(): void {
       );
 
       const updated = loggedPrepare('SELECT * FROM runs WHERE id = ?').get(typedRun.id);
-      log.info(`[IPC] run:get-active - SELECT active run from real database`);
+      log.info('[IPC] run:get-active - SELECT active run from real database');
       return { data: updated, error: null };
     } catch (error) {
       log.error('run:get-active failed:', error);
