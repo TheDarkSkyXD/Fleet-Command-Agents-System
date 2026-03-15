@@ -264,6 +264,59 @@ class GuardEnforcementService {
   /**
    * Record a guard violation in the database.
    */
+  /**
+   * Validate tracker closure: agents can only close tasks/issues assigned to them.
+   * Returns { allowed, reason } indicating whether the closure is permitted.
+   *
+   * @param agentName - The agent attempting the closure
+   * @param issueId - The issue being closed
+   * @param assignedAgent - The agent currently assigned to the issue (from DB)
+   * @returns { allowed: boolean, reason: string }
+   */
+  validateTrackerClosure(
+    agentName: string,
+    issueId: string,
+    assignedAgent: string | null,
+  ): { allowed: boolean; reason: string } {
+    // If no agent is assigned, block closure (no one owns it)
+    if (!assignedAgent) {
+      const reason = `Agent '${agentName}' attempted to close issue '${issueId}' which is not assigned to any agent`;
+      return { allowed: false, reason };
+    }
+
+    // If the closing agent doesn't match the assigned agent, block
+    if (assignedAgent !== agentName) {
+      const reason = `Agent '${agentName}' attempted to close issue '${issueId}' assigned to '${assignedAgent}'. Agents can only close their own tasks.`;
+      return { allowed: false, reason };
+    }
+
+    return { allowed: true, reason: 'Agent is the assigned owner of this task' };
+  }
+
+  /**
+   * Record a tracker closure violation in the database.
+   */
+  recordTrackerClosureViolation(params: {
+    agentName: string;
+    capability: string;
+    violation: string;
+    severity: 'info' | 'warning' | 'critical';
+  }): void {
+    try {
+      const db = getDatabase();
+      const id = `gv-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      db.prepare(
+        `INSERT INTO guard_violations (id, agent_name, capability, rule_type, violation, severity)
+         VALUES (?, ?, ?, 'tracker_closure', ?, ?)`,
+      ).run(id, params.agentName, params.capability, params.violation, params.severity);
+      log.warn(
+        `[GuardEnforcement] Tracker closure violation recorded: ${params.violation} (agent=${params.agentName}, severity=${params.severity})`,
+      );
+    } catch (error) {
+      log.error('[GuardEnforcement] Failed to record tracker closure violation:', error);
+    }
+  }
+
   private recordViolation(params: {
     agentName: string;
     capability: string;

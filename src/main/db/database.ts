@@ -487,6 +487,35 @@ export async function initDatabase(): Promise<void> {
     db.exec('ALTER TABLE agent_definitions ADD COLUMN path_boundaries TEXT');
   }
 
+  // Migration: extend guard_violations rule_type CHECK to include 'tracker_closure'
+  try {
+    const tableInfo = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='guard_violations'")
+      .get() as { sql: string } | undefined;
+    if (tableInfo?.sql && !tableInfo.sql.includes('tracker_closure')) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS guard_violations_new (
+          id TEXT PRIMARY KEY,
+          agent_name TEXT NOT NULL,
+          capability TEXT NOT NULL,
+          rule_type TEXT NOT NULL CHECK(rule_type IN ('tool_allowlist', 'bash_restriction', 'file_scope', 'tracker_closure')),
+          violation TEXT NOT NULL,
+          tool_attempted TEXT,
+          command_attempted TEXT,
+          file_attempted TEXT,
+          severity TEXT NOT NULL DEFAULT 'warning' CHECK(severity IN ('info', 'warning', 'critical')),
+          acknowledged INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO guard_violations_new SELECT * FROM guard_violations;
+        DROP TABLE guard_violations;
+        ALTER TABLE guard_violations_new RENAME TO guard_violations;
+      `);
+    }
+  } catch {
+    // Table already migrated or doesn't exist yet
+  }
+
   // Seed default agent definitions if table is empty
   const defCount = db.prepare('SELECT COUNT(*) as cnt FROM agent_definitions').get() as {
     cnt: number;

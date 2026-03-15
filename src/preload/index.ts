@@ -74,8 +74,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     priority: string;
   }) => ipcRenderer.invoke('issue:create', issue),
   issueGet: (id: string) => ipcRenderer.invoke('issue:get', id),
-  issueUpdate: (id: string, updates: Record<string, unknown>) =>
-    ipcRenderer.invoke('issue:update', id, updates),
+  issueUpdate: (id: string, updates: Record<string, unknown>, closingAgent?: string) =>
+    ipcRenderer.invoke('issue:update', id, updates, closingAgent),
   issueDelete: (id: string) => ipcRenderer.invoke('issue:delete', id),
   issueClaim: (id: string, agentName: string) => ipcRenderer.invoke('issue:claim', id, agentName),
   issueSetDependencies: (id: string, dependencyIds: string[]) =>

@@ -1031,6 +1031,7 @@ export interface ElectronAPI {
   issueUpdate: (
     id: string,
     updates: Record<string, unknown>,
+    closingAgent?: string,
   ) => Promise<{ data: Issue | null; error: string | null }>;
   issueDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
   issueClaim: (

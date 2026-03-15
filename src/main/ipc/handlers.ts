@@ -3244,111 +3244,138 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('issue:update', (_event, id: string, updates: Record<string, unknown>) => {
-    try {
-      const allowedFields = [
-        'title',
-        'description',
-        'type',
-        'priority',
-        'status',
-        'assigned_agent',
-        'group_id',
-        'close_summary',
-        'dependencies',
-      ];
-      const setClauses: string[] = [];
-      const params: unknown[] = [];
-      for (const [key, value] of Object.entries(updates)) {
-        if (allowedFields.includes(key)) {
-          setClauses.push(`${key} = ?`);
-          params.push(value);
-        }
-      }
-      if (setClauses.length === 0) {
-        return { data: null, error: 'No valid fields to update' };
-      }
-      setClauses.push("updated_at = datetime('now')");
-      if (updates.status === 'closed') {
-        setClauses.push("closed_at = datetime('now')");
-      }
-      params.push(id);
-      loggedPrepare(`UPDATE issues SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
-      const updated = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id) as
-        | { id: string; group_id: string | null }
-        | undefined;
-      log.info(`[IPC] issue:update - UPDATE issue in real database: id=${id}`);
-
-      // Auto-close group check when issue is marked as closed
-      if (updates.status === 'closed' && updated?.group_id) {
-        const groupId = updated.group_id;
-        const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
-          | { id: string; member_issues: string | null; status: string }
-          | undefined;
-        if (group && group.status !== 'completed') {
-          let members: string[] = [];
-          try {
-            members = JSON.parse(group.member_issues || '[]');
-          } catch {
-            members = [];
-          }
-          if (members.length > 0) {
-            const placeholders = members.map(() => '?').join(',');
-            const closedCount = loggedPrepare(
-              `SELECT COUNT(*) as cnt FROM issues WHERE id IN (${placeholders}) AND status = 'closed'`,
-            ).get(...members) as { cnt: number };
-            if (closedCount.cnt === members.length) {
-              loggedPrepare(
-                "UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?",
-              ).run(groupId);
-              log.info(
-                `[IPC] issue:update - Auto-closed group ${groupId}, all ${members.length} issues completed`,
-              );
+  ipcMain.handle(
+    'issue:update',
+    (_event, id: string, updates: Record<string, unknown>, closingAgent?: string) => {
+      try {
+        // Tracker closure guard: when an agent tries to close an issue, verify ownership
+        if (updates.status === 'closed' && closingAgent) {
+          const existingIssue = loggedPrepare('SELECT assigned_agent FROM issues WHERE id = ?').get(
+            id,
+          ) as { assigned_agent: string | null } | undefined;
+          if (existingIssue) {
+            const closureCheck = guardEnforcementService.validateTrackerClosure(
+              closingAgent,
+              id,
+              existingIssue.assigned_agent,
+            );
+            if (!closureCheck.allowed) {
+              guardEnforcementService.recordTrackerClosureViolation({
+                agentName: closingAgent,
+                capability: 'agent',
+                violation: closureCheck.reason,
+                severity: 'warning',
+              });
+              log.warn(`[IPC] issue:update - TRACKER CLOSURE BLOCKED: ${closureCheck.reason}`);
+              return { data: null, error: closureCheck.reason };
             }
           }
         }
-      }
 
-      // Auto-unblock dependent issues when this issue is closed
-      if (updates.status === 'closed') {
-        const allRows = loggedPrepare(
-          'SELECT id, dependencies, status FROM issues',
-        ).all() as Array<{
-          id: string;
-          dependencies: string | null;
-          status: string;
-        }>;
-        const statusMap = new Map<string, string>();
-        for (const row of allRows) {
-          statusMap.set(row.id, row.status);
-        }
-        statusMap.set(id, 'closed');
-
-        for (const row of allRows) {
-          if (row.id === id || row.status !== 'blocked') continue;
-          let depIds: string[] = [];
-          try {
-            depIds = JSON.parse(row.dependencies || '[]');
-          } catch {
-            continue;
-          }
-          if (!depIds.includes(id)) continue;
-          const allResolved = depIds.every((depId) => statusMap.get(depId) === 'closed');
-          if (allResolved) {
-            loggedPrepare(
-              "UPDATE issues SET status = 'open', updated_at = datetime('now') WHERE id = ?",
-            ).run(row.id);
-            log.info(`[IPC] issue:update - Auto-unblocked issue ${row.id} (all deps resolved)`);
+        const allowedFields = [
+          'title',
+          'description',
+          'type',
+          'priority',
+          'status',
+          'assigned_agent',
+          'group_id',
+          'close_summary',
+          'dependencies',
+        ];
+        const setClauses: string[] = [];
+        const params: unknown[] = [];
+        for (const [key, value] of Object.entries(updates)) {
+          if (allowedFields.includes(key)) {
+            setClauses.push(`${key} = ?`);
+            params.push(value);
           }
         }
-      }
+        if (setClauses.length === 0) {
+          return { data: null, error: 'No valid fields to update' };
+        }
+        setClauses.push("updated_at = datetime('now')");
+        if (updates.status === 'closed') {
+          setClauses.push("closed_at = datetime('now')");
+        }
+        params.push(id);
+        loggedPrepare(`UPDATE issues SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
+        const updated = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id) as
+          | { id: string; group_id: string | null }
+          | undefined;
+        log.info(`[IPC] issue:update - UPDATE issue in real database: id=${id}`);
 
-      return { data: updated, error: null };
-    } catch (error) {
-      log.error('issue:update failed:', error);
-      return { data: null, error: String(error) };
-    }
-  });
+        // Auto-close group check when issue is marked as closed
+        if (updates.status === 'closed' && updated?.group_id) {
+          const groupId = updated.group_id;
+          const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
+            | { id: string; member_issues: string | null; status: string }
+            | undefined;
+          if (group && group.status !== 'completed') {
+            let members: string[] = [];
+            try {
+              members = JSON.parse(group.member_issues || '[]');
+            } catch {
+              members = [];
+            }
+            if (members.length > 0) {
+              const placeholders = members.map(() => '?').join(',');
+              const closedCount = loggedPrepare(
+                `SELECT COUNT(*) as cnt FROM issues WHERE id IN (${placeholders}) AND status = 'closed'`,
+              ).get(...members) as { cnt: number };
+              if (closedCount.cnt === members.length) {
+                loggedPrepare(
+                  "UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?",
+                ).run(groupId);
+                log.info(
+                  `[IPC] issue:update - Auto-closed group ${groupId}, all ${members.length} issues completed`,
+                );
+              }
+            }
+          }
+        }
+
+        // Auto-unblock dependent issues when this issue is closed
+        if (updates.status === 'closed') {
+          const allRows = loggedPrepare(
+            'SELECT id, dependencies, status FROM issues',
+          ).all() as Array<{
+            id: string;
+            dependencies: string | null;
+            status: string;
+          }>;
+          const statusMap = new Map<string, string>();
+          for (const row of allRows) {
+            statusMap.set(row.id, row.status);
+          }
+          statusMap.set(id, 'closed');
+
+          for (const row of allRows) {
+            if (row.id === id || row.status !== 'blocked') continue;
+            let depIds: string[] = [];
+            try {
+              depIds = JSON.parse(row.dependencies || '[]');
+            } catch {
+              continue;
+            }
+            if (!depIds.includes(id)) continue;
+            const allResolved = depIds.every((depId) => statusMap.get(depId) === 'closed');
+            if (allResolved) {
+              loggedPrepare(
+                "UPDATE issues SET status = 'open', updated_at = datetime('now') WHERE id = ?",
+              ).run(row.id);
+              log.info(`[IPC] issue:update - Auto-unblocked issue ${row.id} (all deps resolved)`);
+            }
+          }
+        }
+
+        return { data: updated, error: null };
+      } catch (error) {
+        log.error('issue:update failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   ipcMain.handle('issue:delete', (_event, id: string) => {
     const validation = validateIpcParams('issue:delete', { id }, [{ name: 'id', type: 'string' }]);
