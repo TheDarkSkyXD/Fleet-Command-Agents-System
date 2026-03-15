@@ -3497,3 +3497,28 @@
 - 229/366 features passing (added #220 and #221 this session)
 - All code passes Biome lint (only pre-existing warnings) and Vite build
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Right-Click Context Menus)
+
+#### Feature #222: Right-click context menu on worktrees - PASSING
+- Added onContextMenu handler to worktree cards using existing ContextMenu component
+- Menu items: Open in VS Code (FiCode), Open in Explorer (FiExternalLink)
+- Clean Up / Force Remove option for non-main unassigned worktrees (with danger styling)
+- Separator between navigation and destructive actions
+- data-testid on worktree cards for testing
+
+#### Feature #223: Right-click context menu on terminal - PASSING
+- Added onContextMenu handler to terminal container div
+- Copy Selection: uses navigator.clipboard.writeText with xterm getSelection(), disabled when no selection
+- Clear: calls term.clear() to clear terminal buffer
+- Scroll to Bottom: reuses existing scrollToBottom callback
+- Separator between copy and terminal actions
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Context menu integration, import ContextMenu
+- MODIFIED: src/renderer/components/AgentTerminal.tsx - Context menu integration, import ContextMenu
+
+#### Current Status
+- 233/366 features passing (added #222 and #223 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
