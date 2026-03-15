@@ -21,6 +21,8 @@ interface MergeState {
   complete: (id: number, resolvedTier: MergeResolutionTier) => Promise<MergeQueueEntry | null>;
   fail: (id: number) => Promise<MergeQueueEntry | null>;
   markConflict: (id: number) => Promise<MergeQueueEntry | null>;
+  autoResolve: (id: number) => Promise<MergeQueueEntry | null>;
+  aiResolve: (id: number) => Promise<MergeQueueEntry | null>;
   remove: (id: number) => Promise<boolean>;
 }
 
@@ -140,6 +142,38 @@ export const useMergeStore = create<MergeState>((set, get) => ({
         return null;
       }
       await get().fetchQueue();
+      return result.data;
+    } catch (err) {
+      set({ error: String(err) });
+      return null;
+    }
+  },
+
+  autoResolve: async (id) => {
+    try {
+      const result = await window.electronAPI.mergeAutoResolve(id);
+      if (result.error) {
+        set({ error: result.error });
+        return null;
+      }
+      await get().fetchQueue();
+      await get().fetchHistory();
+      return result.data;
+    } catch (err) {
+      set({ error: String(err) });
+      return null;
+    }
+  },
+
+  aiResolve: async (id) => {
+    try {
+      const result = await window.electronAPI.mergeAiResolve(id);
+      if (result.error) {
+        set({ error: result.error });
+        return null;
+      }
+      await get().fetchQueue();
+      await get().fetchHistory();
       return result.data;
     } catch (err) {
       set({ error: String(err) });

@@ -608,6 +608,16 @@ export interface ElectronAPI {
     repoPath?: string,
   ) => Promise<{ data: { diff: string; branchName: string } | null; error: string | null }>;
   mergeRemove: (id: number) => Promise<{ data: boolean; error: string | null }>;
+  mergeAutoResolve: (
+    id: number,
+    repoPath?: string,
+    targetBranch?: string,
+  ) => Promise<{ data: MergeQueueEntry | null; error: string | null; conflicts?: string[] }>;
+  mergeAiResolve: (
+    id: number,
+    repoPath?: string,
+    targetBranch?: string,
+  ) => Promise<{ data: MergeQueueEntry | null; error: string | null; conflicts?: string[] }>;
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) => Promise<{
     data: Issue[] | null;
@@ -648,7 +658,13 @@ export interface ElectronAPI {
     issueId: string,
   ) => Promise<{ data: TaskGroup | null; error: string | null }>;
   taskGroupGetProgress: (groupId: string) => Promise<{
-    data: { total: number; completed: number; in_progress: number; open: number; blocked: number } | null;
+    data: {
+      total: number;
+      completed: number;
+      in_progress: number;
+      open: number;
+      blocked: number;
+    } | null;
     error: string | null;
   }>;
   taskGroupCheckAutoClose: (issueId: string) => Promise<{

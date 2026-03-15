@@ -12,6 +12,12 @@ import {
   detectClaudeCli,
   getClaudeCliStatus,
 } from '../services/claudeCliService';
+import {
+  aiResolveConflicts,
+  autoResolveConflicts,
+  executeCleanMerge,
+  previewMerge,
+} from '../services/mergeService';
 import { type NotificationEventType, notificationService } from '../services/notificationService';
 import {
   checkForUpdates,
@@ -19,12 +25,6 @@ import {
   getUpdateStatus,
   installUpdate,
 } from '../services/updateService';
-import {
-  autoResolveConflicts,
-  aiResolveConflicts,
-  executeCleanMerge,
-  previewMerge,
-} from '../services/mergeService';
 import { watchdogService } from '../services/watchdogService';
 
 /**
@@ -955,7 +955,9 @@ export function registerIpcHandlers(): void {
         log.error('merge:auto-resolve failed:', error);
         try {
           loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         return { data: null, error: String(error) };
       }
     },
@@ -1007,7 +1009,9 @@ export function registerIpcHandlers(): void {
         log.error('merge:ai-resolve failed:', error);
         try {
           loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         return { data: null, error: String(error) };
       }
     },
@@ -1248,8 +1252,41 @@ export function registerIpcHandlers(): void {
       }
       params.push(id);
       loggedPrepare(`UPDATE issues SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
-      const updated = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id);
+      const updated = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id) as
+        | { id: string; group_id: string | null }
+        | undefined;
       log.info(`[IPC] issue:update - UPDATE issue in real database: id=${id}`);
+
+      // Auto-close group check when issue is marked as closed
+      if (updates.status === 'closed' && updated?.group_id) {
+        const groupId = updated.group_id;
+        const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
+          | { id: string; member_issues: string | null; status: string }
+          | undefined;
+        if (group && group.status !== 'completed') {
+          let members: string[] = [];
+          try {
+            members = JSON.parse(group.member_issues || '[]');
+          } catch {
+            members = [];
+          }
+          if (members.length > 0) {
+            const placeholders = members.map(() => '?').join(',');
+            const closedCount = loggedPrepare(
+              `SELECT COUNT(*) as cnt FROM issues WHERE id IN (${placeholders}) AND status = 'closed'`,
+            ).get(...members) as { cnt: number };
+            if (closedCount.cnt === members.length) {
+              loggedPrepare(
+                "UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?",
+              ).run(groupId);
+              log.info(
+                `[IPC] issue:update - Auto-closed group ${groupId}, all ${members.length} issues completed`,
+              );
+            }
+          }
+        }
+      }
+
       return { data: updated, error: null };
     } catch (error) {
       log.error('issue:update failed:', error);
@@ -1284,36 +1321,32 @@ export function registerIpcHandlers(): void {
   });
 
   // Task Group channels - use real SQLite queries via loggedPrepare
-  ipcMain.handle(
-    'taskGroup:list',
-    (_event) => {
-      try {
-        const groups = loggedPrepare('SELECT * FROM task_groups ORDER BY created_at DESC').all();
-        log.info(`[IPC] taskGroup:list - SELECT returned ${(groups as unknown[]).length} groups from real database`);
-        return { data: groups, error: null };
-      } catch (error) {
-        log.error('taskGroup:list failed:', error);
-        return { data: null, error: String(error) };
-      }
-    },
-  );
+  ipcMain.handle('taskGroup:list', (_event) => {
+    try {
+      const groups = loggedPrepare('SELECT * FROM task_groups ORDER BY created_at DESC').all();
+      log.info(
+        `[IPC] taskGroup:list - SELECT returned ${(groups as unknown[]).length} groups from real database`,
+      );
+      return { data: groups, error: null };
+    } catch (error) {
+      log.error('taskGroup:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
 
-  ipcMain.handle(
-    'taskGroup:create',
-    (_event, group: { id: string; name: string }) => {
-      try {
-        loggedPrepare(
-          'INSERT INTO task_groups (id, name, member_issues, status) VALUES (?, ?, ?, ?)',
-        ).run(group.id, group.name, '[]', 'active');
-        const created = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(group.id);
-        log.info(`[IPC] taskGroup:create - INSERT group into real database: ${group.name}`);
-        return { data: created, error: null };
-      } catch (error) {
-        log.error('taskGroup:create failed:', error);
-        return { data: null, error: String(error) };
-      }
-    },
-  );
+  ipcMain.handle('taskGroup:create', (_event, group: { id: string; name: string }) => {
+    try {
+      loggedPrepare(
+        'INSERT INTO task_groups (id, name, member_issues, status) VALUES (?, ?, ?, ?)',
+      ).run(group.id, group.name, '[]', 'active');
+      const created = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(group.id);
+      log.info(`[IPC] taskGroup:create - INSERT group into real database: ${group.name}`);
+      return { data: created, error: null };
+    } catch (error) {
+      log.error('taskGroup:create failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
 
   ipcMain.handle('taskGroup:get', (_event, id: string) => {
     try {
@@ -1329,7 +1362,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('taskGroup:delete', (_event, id: string) => {
     try {
       // Remove group_id from all member issues
-      loggedPrepare("UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE group_id = ?").run(id);
+      loggedPrepare(
+        "UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE group_id = ?",
+      ).run(id);
       loggedPrepare('DELETE FROM task_groups WHERE id = ?').run(id);
       log.info(`[IPC] taskGroup:delete - DELETE group from real database: id=${id}`);
       return { data: true, error: null };
@@ -1341,17 +1376,28 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('taskGroup:addIssue', (_event, groupId: string, issueId: string) => {
     try {
-      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null } | undefined;
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
+        | { id: string; member_issues: string | null }
+        | undefined;
       if (!group) return { data: null, error: 'Group not found' };
 
       let members: string[] = [];
-      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+      try {
+        members = JSON.parse(group.member_issues || '[]');
+      } catch {
+        members = [];
+      }
       if (!members.includes(issueId)) {
         members.push(issueId);
       }
 
-      loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(JSON.stringify(members), groupId);
-      loggedPrepare("UPDATE issues SET group_id = ?, updated_at = datetime('now') WHERE id = ?").run(groupId, issueId);
+      loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(
+        JSON.stringify(members),
+        groupId,
+      );
+      loggedPrepare(
+        "UPDATE issues SET group_id = ?, updated_at = datetime('now') WHERE id = ?",
+      ).run(groupId, issueId);
 
       // Check auto-close: if all member issues are closed, close the group
       if (members.length > 0) {
@@ -1360,7 +1406,9 @@ export function registerIpcHandlers(): void {
           `SELECT COUNT(*) as cnt FROM issues WHERE id IN (${placeholders}) AND status = 'closed'`,
         ).get(...members) as { cnt: number };
         if (closedCount.cnt === members.length) {
-          loggedPrepare("UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?").run(groupId);
+          loggedPrepare(
+            "UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?",
+          ).run(groupId);
         }
       }
 
@@ -1375,15 +1423,26 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('taskGroup:removeIssue', (_event, groupId: string, issueId: string) => {
     try {
-      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null } | undefined;
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
+        | { id: string; member_issues: string | null }
+        | undefined;
       if (!group) return { data: null, error: 'Group not found' };
 
       let members: string[] = [];
-      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+      try {
+        members = JSON.parse(group.member_issues || '[]');
+      } catch {
+        members = [];
+      }
       members = members.filter((m) => m !== issueId);
 
-      loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(JSON.stringify(members), groupId);
-      loggedPrepare("UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE id = ?").run(issueId);
+      loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(
+        JSON.stringify(members),
+        groupId,
+      );
+      loggedPrepare(
+        "UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE id = ?",
+      ).run(issueId);
 
       const updated = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId);
       log.info(`[IPC] taskGroup:removeIssue - Removed issue ${issueId} from group ${groupId}`);
@@ -1396,20 +1455,29 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('taskGroup:getProgress', (_event, groupId: string) => {
     try {
-      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null; status: string } | undefined;
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
+        | { id: string; member_issues: string | null; status: string }
+        | undefined;
       if (!group) return { data: null, error: 'Group not found' };
 
       let members: string[] = [];
-      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+      try {
+        members = JSON.parse(group.member_issues || '[]');
+      } catch {
+        members = [];
+      }
 
       if (members.length === 0) {
-        return { data: { total: 0, completed: 0, in_progress: 0, open: 0, blocked: 0 }, error: null };
+        return {
+          data: { total: 0, completed: 0, in_progress: 0, open: 0, blocked: 0 },
+          error: null,
+        };
       }
 
       const placeholders = members.map(() => '?').join(',');
-      const issues = loggedPrepare(
-        `SELECT status FROM issues WHERE id IN (${placeholders})`,
-      ).all(...members) as { status: string }[];
+      const issues = loggedPrepare(`SELECT status FROM issues WHERE id IN (${placeholders})`).all(
+        ...members,
+      ) as { status: string }[];
 
       const progress = {
         total: members.length,
@@ -1419,7 +1487,9 @@ export function registerIpcHandlers(): void {
         blocked: issues.filter((i) => i.status === 'blocked').length,
       };
 
-      log.info(`[IPC] taskGroup:getProgress - Group ${groupId}: ${progress.completed}/${progress.total}`);
+      log.info(
+        `[IPC] taskGroup:getProgress - Group ${groupId}: ${progress.completed}/${progress.total}`,
+      );
       return { data: progress, error: null };
     } catch (error) {
       log.error('taskGroup:getProgress failed:', error);
@@ -1431,15 +1501,23 @@ export function registerIpcHandlers(): void {
   // Check if the issue's group should auto-close
   ipcMain.handle('taskGroup:checkAutoClose', (_event, issueId: string) => {
     try {
-      const issue = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(issueId) as { group_id: string | null } | undefined;
+      const issue = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(issueId) as
+        | { group_id: string | null }
+        | undefined;
       if (!issue || !issue.group_id) return { data: null, error: null };
 
       const groupId = issue.group_id;
-      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as { id: string; member_issues: string | null; status: string } | undefined;
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
+        | { id: string; member_issues: string | null; status: string }
+        | undefined;
       if (!group || group.status === 'completed') return { data: null, error: null };
 
       let members: string[] = [];
-      try { members = JSON.parse(group.member_issues || '[]'); } catch { members = []; }
+      try {
+        members = JSON.parse(group.member_issues || '[]');
+      } catch {
+        members = [];
+      }
 
       if (members.length === 0) return { data: null, error: null };
 
@@ -1449,9 +1527,13 @@ export function registerIpcHandlers(): void {
       ).get(...members) as { cnt: number };
 
       if (closedCount.cnt === members.length) {
-        loggedPrepare("UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?").run(groupId);
+        loggedPrepare(
+          "UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?",
+        ).run(groupId);
         const updated = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId);
-        log.info(`[IPC] taskGroup:checkAutoClose - Group ${groupId} auto-closed, all ${members.length} issues completed`);
+        log.info(
+          `[IPC] taskGroup:checkAutoClose - Group ${groupId} auto-closed, all ${members.length} issues completed`,
+        );
         return { data: updated, error: null };
       }
 
@@ -3290,7 +3372,7 @@ export function registerIpcHandlers(): void {
     'discovery:update-progress',
     (_event, id: string, progress: Record<string, string>) => {
       try {
-        loggedPrepare(`UPDATE discovery_scans SET progress = ? WHERE id = ?`).run(
+        loggedPrepare('UPDATE discovery_scans SET progress = ? WHERE id = ?').run(
           JSON.stringify(progress),
           id,
         );
@@ -3405,13 +3487,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('expertise:domains', () => {
     try {
       const domains = loggedPrepare(
-        `SELECT domain, COUNT(*) as record_count FROM expertise_records GROUP BY domain ORDER BY domain ASC`,
+        'SELECT domain, COUNT(*) as record_count FROM expertise_records GROUP BY domain ORDER BY domain ASC',
       ).all() as Array<{ domain: string; record_count: number }>;
 
       // For each domain, get type breakdown
       const result = domains.map((d) => {
         const types = loggedPrepare(
-          `SELECT type, COUNT(*) as cnt FROM expertise_records WHERE domain = ? GROUP BY type`,
+          'SELECT type, COUNT(*) as cnt FROM expertise_records WHERE domain = ? GROUP BY type',
         ).all(d.domain) as Array<{ type: string; cnt: number }>;
 
         const typeMap: Record<string, number> = {};
@@ -3632,7 +3714,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('identity:sessions', (_event, agentName: string) => {
     try {
       const sessions = loggedPrepare(
-        `SELECT * FROM sessions WHERE agent_name = ? ORDER BY created_at DESC LIMIT 20`,
+        'SELECT * FROM sessions WHERE agent_name = ? ORDER BY created_at DESC LIMIT 20',
       ).all(agentName);
       log.info(
         `[IPC] identity:sessions - SELECT sessions for ${agentName} (${(sessions as unknown[]).length})`,

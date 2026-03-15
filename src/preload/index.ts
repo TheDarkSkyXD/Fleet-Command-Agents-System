@@ -46,6 +46,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mergeHistory: () => ipcRenderer.invoke('merge:history'),
   mergeDiff: (id: number, repoPath?: string) => ipcRenderer.invoke('merge:diff', id, repoPath),
   mergeRemove: (id: number) => ipcRenderer.invoke('merge:remove', id),
+  mergeAutoResolve: (id: number, repoPath?: string, targetBranch?: string) =>
+    ipcRenderer.invoke('merge:auto-resolve', id, repoPath, targetBranch),
+  mergeAiResolve: (id: number, repoPath?: string, targetBranch?: string) =>
+    ipcRenderer.invoke('merge:ai-resolve', id, repoPath, targetBranch),
 
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) =>
@@ -73,8 +77,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('taskGroup:addIssue', groupId, issueId),
   taskGroupRemoveIssue: (groupId: string, issueId: string) =>
     ipcRenderer.invoke('taskGroup:removeIssue', groupId, issueId),
-  taskGroupGetProgress: (groupId: string) =>
-    ipcRenderer.invoke('taskGroup:getProgress', groupId),
+  taskGroupGetProgress: (groupId: string) => ipcRenderer.invoke('taskGroup:getProgress', groupId),
   taskGroupCheckAutoClose: (issueId: string) =>
     ipcRenderer.invoke('taskGroup:checkAutoClose', issueId),
 

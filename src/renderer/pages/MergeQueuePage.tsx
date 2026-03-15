@@ -140,6 +140,8 @@ function QueueEntryRow({
   onFail,
   onRemove,
   onViewDiff,
+  onAutoResolve,
+  onAiResolve,
 }: {
   entry: MergeQueueEntry;
   position: number;
@@ -148,6 +150,8 @@ function QueueEntryRow({
   onFail: (id: number) => void;
   onRemove: (id: number) => void;
   onViewDiff: (id: number) => void;
+  onAutoResolve?: (id: number) => void;
+  onAiResolve?: (id: number) => void;
 }) {
   const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
 
@@ -190,6 +194,26 @@ function QueueEntryRow({
             className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 transition-colors"
           >
             Merge
+          </button>
+        )}
+        {entry.status === 'conflict' && onAutoResolve && (
+          <button
+            type="button"
+            onClick={() => onAutoResolve(entry.id)}
+            data-testid={`auto-resolve-${entry.id}`}
+            className="rounded-md border border-amber-600/50 bg-amber-600/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-600/20 transition-colors"
+          >
+            Auto-Resolve
+          </button>
+        )}
+        {entry.status === 'conflict' && onAiResolve && (
+          <button
+            type="button"
+            onClick={() => onAiResolve(entry.id)}
+            data-testid={`ai-resolve-${entry.id}`}
+            className="rounded-md border border-violet-600/50 bg-violet-600/10 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-600/20 transition-colors"
+          >
+            AI-Resolve
           </button>
         )}
         {entry.status === 'merging' && (
@@ -239,6 +263,8 @@ export function MergeQueuePage() {
     complete,
     fail,
     remove,
+    autoResolve,
+    aiResolve,
   } = useMergeStore();
 
   const [showEnqueue, setShowEnqueue] = useState(false);
@@ -281,6 +307,14 @@ export function MergeQueuePage() {
 
   const handleRemove = async (id: number) => {
     await remove(id);
+  };
+
+  const handleAutoResolve = async (id: number) => {
+    await autoResolve(id);
+  };
+
+  const handleAiResolve = async (id: number) => {
+    await aiResolve(id);
   };
 
   const handleViewDiff = useCallback(
@@ -404,6 +438,8 @@ export function MergeQueuePage() {
                 onFail={handleFail}
                 onRemove={handleRemove}
                 onViewDiff={handleViewDiff}
+                onAutoResolve={handleAutoResolve}
+                onAiResolve={handleAiResolve}
               />
             ))}
           </div>
