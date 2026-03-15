@@ -4431,3 +4431,29 @@
 - 284/366 features passing (added #285 and #286 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (URL Protection & Spawn Guard)
+
+#### Feature #302: URL manipulation doesn't bypass access - PASSING
+- Added notFound state to AgentDetailPage for non-existent agent IDs
+- When agentDetail IPC returns null data with no error, shows 404 UI
+- 404 page shows invalid ID, explanation text, and back-to-agents button
+- data-testid attributes: agent-not-found, agent-not-found-id, agent-not-found-back-button
+- Existing protections: parameterized SQL prevents injection, React JSX auto-escapes XSS
+- AppLayout default case in PageContent already shows 404 for unknown routes
+
+#### Feature #303: Double-click spawn doesn't create duplicate agents - PASSING
+- Spawn button already had disabled={isSpawning} to prevent most double-clicks
+- Added ref-based guard (spawnLockRef) for bulletproof protection against React batching race conditions
+- Ref checked synchronously at start of handleSpawn, returns immediately if spawn in progress
+- Ref cleared in finally block to ensure cleanup
+- Button shows Spawning... spinner and is visually disabled during spawn
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - notFound state, 404 UI for invalid agent IDs
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - useRef import, spawnLockRef guard in handleSpawn
+
+#### Current Status
+- 301/366 features passing (added #302 and #303 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
