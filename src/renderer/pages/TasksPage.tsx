@@ -82,9 +82,11 @@ interface GroupProgress {
 }
 
 type ActiveTab = 'issues' | 'groups' | 'ready' | 'completed';
+type ViewMode = 'list' | 'kanban';
 
 export function TasksPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('issues');
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [issues, setIssues] = useState<Issue[]>([]);
   const [readyIssues, setReadyIssues] = useState<Issue[]>([]);
   const [readyLoading, setReadyLoading] = useState(false);
@@ -424,14 +426,48 @@ export function TasksPage() {
             </button>
           )}
           {activeTab === 'issues' && (
-            <button
-              type="button"
-              onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
-            >
-              <FiPlus size={16} />
-              Create Issue
-            </button>
+            <div className="flex items-center gap-2">
+              {/* View mode toggle */}
+              <div
+                className="flex items-center rounded-md border border-slate-700 bg-slate-800"
+                data-testid="view-mode-toggle"
+              >
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1 rounded-l-md px-3 py-2 text-sm font-medium transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                  }`}
+                  title="List view"
+                  data-testid="view-mode-list"
+                >
+                  <FiList size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('kanban')}
+                  className={`flex items-center gap-1 rounded-r-md px-3 py-2 text-sm font-medium transition-colors ${
+                    viewMode === 'kanban'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                  }`}
+                  title="Kanban board"
+                  data-testid="view-mode-kanban"
+                >
+                  <FiColumns size={16} />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateForm(true)}
+                className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+              >
+                <FiPlus size={16} />
+                Create Issue
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -694,7 +730,7 @@ export function TasksPage() {
             </div>
           )}
 
-          {/* Issue List */}
+          {/* Issue Views */}
           {loading ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
               <FiLoader className="mx-auto mb-2 animate-spin" size={24} />
@@ -716,6 +752,15 @@ export function TasksPage() {
                   : 'Create an issue to get started'}
               </p>
             </div>
+          ) : viewMode === 'kanban' ? (
+            <KanbanBoard
+              issues={issues}
+              statusConfig={statusConfig}
+              getPriorityInfo={getPriorityInfo}
+              getTypeInfo={getTypeInfo}
+              onStatusChange={handleStatusChangeWithClose}
+              onSelect={(id) => setSelectedIssueId(id)}
+            />
           ) : (
             <div className="space-y-2" data-testid="issue-list">
               {issues.map((issue) => (
@@ -1275,6 +1320,234 @@ export function TasksPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Kanban board column order
+const kanbanColumns: IssueStatus[] = ['open', 'in_progress', 'blocked', 'closed'];
+
+function KanbanBoard({
+  issues,
+  statusConfig: statuses,
+  getPriorityInfo,
+  getTypeInfo,
+  onStatusChange,
+  onSelect,
+}: {
+  issues: Issue[];
+  statusConfig: Record<
+    IssueStatus,
+    { label: string; icon: typeof FiCircle; color: string; bg: string }
+  >;
+  getPriorityInfo: (p: IssuePriority) => {
+    value: IssuePriority;
+    label: string;
+    icon: typeof FiArrowUp;
+    color: string;
+  };
+  getTypeInfo: (t: IssueType) => { value: IssueType; label: string; color: string };
+  onStatusChange: (id: string, newStatus: IssueStatus) => void;
+  onSelect: (id: string) => void;
+}) {
+  const [dragOverColumn, setDragOverColumn] = useState<IssueStatus | null>(null);
+
+  // Group issues by status
+  const issuesByStatus: Record<IssueStatus, Issue[]> = {
+    open: [],
+    in_progress: [],
+    blocked: [],
+    closed: [],
+  };
+  for (const issue of issues) {
+    if (issuesByStatus[issue.status]) {
+      issuesByStatus[issue.status].push(issue);
+    }
+  }
+
+  const handleDragStart = (e: React.DragEvent, issueId: string) => {
+    e.dataTransfer.setData('text/plain', issueId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, status: IssueStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverColumn(status);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if leaving the column entirely (not entering a child)
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setDragOverColumn(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStatus: IssueStatus) => {
+    e.preventDefault();
+    setDragOverColumn(null);
+    const issueId = e.dataTransfer.getData('text/plain');
+    if (issueId) {
+      const issue = issues.find((i) => i.id === issueId);
+      if (issue && issue.status !== targetStatus) {
+        onStatusChange(issueId, targetStatus);
+      }
+    }
+  };
+
+  // Column border accent colors
+  const columnAccent: Record<IssueStatus, string> = {
+    open: 'border-t-blue-500',
+    in_progress: 'border-t-amber-500',
+    blocked: 'border-t-red-500',
+    closed: 'border-t-green-500',
+  };
+
+  return (
+    <div className="grid grid-cols-4 gap-4" data-testid="kanban-board">
+      {kanbanColumns.map((status) => {
+        const config = statuses[status];
+        const columnIssues = issuesByStatus[status];
+        const StatusIcon = config.icon;
+        const isDragOver = dragOverColumn === status;
+
+        return (
+          <div
+            key={status}
+            className={`flex flex-col rounded-lg border border-slate-700 ${columnAccent[status]} border-t-2 bg-slate-800/50 min-h-[300px] transition-colors ${
+              isDragOver ? 'bg-slate-700/50 border-slate-500' : ''
+            }`}
+            onDragOver={(e) => handleDragOver(e, status)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, status)}
+            data-testid={`kanban-column-${status}`}
+          >
+            {/* Column Header */}
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
+              <div className="flex items-center gap-2">
+                <StatusIcon size={14} className={config.color} />
+                <span className="text-sm font-medium text-slate-200">{config.label}</span>
+              </div>
+              <span
+                className={`inline-flex items-center justify-center min-w-[20px] rounded-full px-1.5 py-0.5 text-xs font-semibold ${config.bg} ${config.color}`}
+                data-testid={`kanban-column-count-${status}`}
+              >
+                {columnIssues.length}
+              </span>
+            </div>
+
+            {/* Column Body */}
+            <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+              {columnIssues.length === 0 ? (
+                <div className="flex items-center justify-center h-20 text-xs text-slate-500 italic">
+                  No issues
+                </div>
+              ) : (
+                columnIssues.map((issue) => (
+                  <KanbanCard
+                    key={issue.id}
+                    issue={issue}
+                    getPriorityInfo={getPriorityInfo}
+                    getTypeInfo={getTypeInfo}
+                    onDragStart={handleDragStart}
+                    onSelect={onSelect}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function KanbanCard({
+  issue,
+  getPriorityInfo,
+  getTypeInfo,
+  onDragStart,
+  onSelect,
+}: {
+  issue: Issue;
+  getPriorityInfo: (p: IssuePriority) => {
+    value: IssuePriority;
+    label: string;
+    icon: typeof FiArrowUp;
+    color: string;
+  };
+  getTypeInfo: (t: IssueType) => { value: IssueType; label: string; color: string };
+  onDragStart: (e: React.DragEvent, issueId: string) => void;
+  onSelect: (id: string) => void;
+}) {
+  const priorityInfo = getPriorityInfo(issue.priority);
+  const typeInfo = getTypeInfo(issue.type);
+  const PriorityIcon = priorityInfo.icon;
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, issue.id)}
+      onClick={() => onSelect(issue.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onSelect(issue.id);
+      }}
+      className="rounded-md border border-slate-600 bg-slate-800 p-3 cursor-grab hover:border-blue-500/50 hover:bg-slate-750 active:cursor-grabbing transition-colors"
+      data-testid={`kanban-card-${issue.id}`}
+    >
+      {/* Title */}
+      <h4 className="text-sm font-medium text-slate-100 mb-2 line-clamp-2">{issue.title}</h4>
+
+      {/* Badges row */}
+      <div className="flex items-center flex-wrap gap-1.5">
+        {/* Type badge */}
+        <span
+          className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${typeInfo.color} bg-slate-700/50`}
+        >
+          {typeInfo.label}
+        </span>
+
+        {/* Priority */}
+        <span
+          className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${priorityInfo.color} bg-slate-700/50`}
+        >
+          <PriorityIcon size={10} />
+          {priorityInfo.label}
+        </span>
+
+        {/* Dependency count */}
+        {issue.dependencies &&
+          (() => {
+            try {
+              const depCount = JSON.parse(issue.dependencies).length;
+              if (depCount > 0) {
+                return (
+                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-slate-700/50">
+                    <FiLink size={9} />
+                    {depCount}
+                  </span>
+                );
+              }
+              return null;
+            } catch {
+              return null;
+            }
+          })()}
+      </div>
+
+      {/* Bottom row: agent + date */}
+      <div className="flex items-center justify-between mt-2 text-[10px] text-slate-500">
+        {issue.assigned_agent ? (
+          <span className="inline-flex items-center gap-1 text-amber-400 truncate max-w-[60%]">
+            <FiUser size={10} />
+            {issue.assigned_agent}
+          </span>
+        ) : (
+          <span />
+        )}
+        <span>{new Date(issue.created_at).toLocaleDateString()}</span>
+      </div>
     </div>
   );
 }
