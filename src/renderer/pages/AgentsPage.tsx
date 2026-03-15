@@ -44,13 +44,13 @@ import type {
   ScopeOverlap,
   Session,
 } from '../../shared/types';
-import { handleIpcError } from '../lib/ipcErrorHandler';
 import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
 import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
 import { ScopeTreeViewer } from '../components/ScopeTreeViewer';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 import { useProjectStore } from '../stores/projectStore';
 import { DEFAULT_MODEL_DEFAULTS, useSettingsStore } from '../stores/settingsStore';
 

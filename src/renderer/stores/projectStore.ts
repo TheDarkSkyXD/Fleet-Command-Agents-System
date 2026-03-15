@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import type { Project } from '../../shared/types';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 
 interface ProjectState {
   projects: Project[];
@@ -37,7 +38,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       set({ projects: result.data || [], loading: false });
     } catch (err) {
-      set({ error: String(err), loading: false });
+      const msg = handleIpcError(err, { context: 'loading projects' });
+      set({ error: msg, loading: false });
     }
   },
 
@@ -48,7 +50,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         set({ activeProject: result.data });
       }
     } catch (err) {
-      console.error('Failed to load active project:', err);
+      handleIpcError(err, { context: 'loading active project', showToast: false });
     }
   },
 
@@ -66,8 +68,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       await get().loadProjects();
       return result.data;
     } catch (err) {
-      set({ error: String(err) });
-      toast.error('Failed to create project');
+      const msg = handleIpcError(err, { context: 'creating project' });
+      set({ error: msg });
       return null;
     }
   },
@@ -85,8 +87,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // Reload projects to update order
       await get().loadProjects();
     } catch (err) {
-      set({ error: String(err) });
-      toast.error('Failed to switch project');
+      const msg = handleIpcError(err, { context: 'switching project' });
+      set({ error: msg });
     }
   },
 
@@ -105,8 +107,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       toast.success('Project deleted');
       await get().loadProjects();
     } catch (err) {
-      set({ error: String(err) });
-      toast.error('Failed to delete project');
+      const msg = handleIpcError(err, { context: 'deleting project' });
+      set({ error: msg });
     }
   },
 
@@ -123,7 +125,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       await get().loadProjects();
     } catch (err) {
-      set({ error: String(err) });
+      const msg = handleIpcError(err, { context: 'updating project' });
+      set({ error: msg });
     }
   },
 }));

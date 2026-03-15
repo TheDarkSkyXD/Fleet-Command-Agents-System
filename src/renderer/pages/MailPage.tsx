@@ -378,7 +378,7 @@ export function MailPage() {
         setShowThread(true);
       }
     } catch (err) {
-      console.error('Failed to load thread:', err);
+      handleIpcError(err, { context: 'loading thread' });
     } finally {
       setLoadingThread(false);
     }

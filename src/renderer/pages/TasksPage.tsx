@@ -25,6 +25,7 @@ import {
 } from 'react-icons/fi';
 import { toast } from 'sonner';
 import type { Issue, IssuePriority, IssueStatus, IssueType, TaskGroup } from '../../shared/types';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 
 // ID generator (simple nanoid-like)
 function generateId(prefix: string): string {
@@ -143,7 +144,7 @@ export function TasksPage() {
         setIssues(result.data);
       }
     } catch (err) {
-      console.error('Failed to load issues:', err);
+      handleIpcError(err, { context: 'loading issues', retry: () => loadIssues() });
     } finally {
       setLoading(false);
     }
@@ -217,7 +218,7 @@ export function TasksPage() {
         toast.success(`Issue "${(result.data as Issue).title}" created`);
       }
     } catch (err) {
-      console.error('Failed to create issue:', err);
+      handleIpcError(err, { context: 'creating issue' });
     } finally {
       setCreating(false);
     }
@@ -244,7 +245,7 @@ export function TasksPage() {
         }
       }
     } catch (err) {
-      console.error('Failed to delete issue:', err);
+      handleIpcError(err, { context: 'deleting issue' });
     }
   };
 
@@ -258,7 +259,7 @@ export function TasksPage() {
       setClaimingId(null);
       setClaimAgent('');
     } catch (err) {
-      console.error('Failed to claim issue:', err);
+      handleIpcError(err, { context: 'claiming issue' });
     }
   };
 
