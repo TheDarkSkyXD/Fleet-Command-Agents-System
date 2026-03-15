@@ -628,7 +628,7 @@ export function MailPage() {
                       disabled={!purgeAgentName.trim() || purging}
                       className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 transition-colors hover:border-red-600 hover:bg-red-900/30 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {purging ? 'Purging...' : 'Purge'}
+                      {purging ? <><FiLoader size={10} className="inline animate-spin mr-1" />Purging...</> : 'Purge'}
                     </button>
                   </div>
                 </div>
@@ -640,7 +640,7 @@ export function MailPage() {
                   disabled={purging}
                   className="w-full rounded border border-red-800 bg-red-900/20 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {purging ? 'Purging...' : 'Purge All Messages'}
+                  {purging ? <><FiLoader size={12} className="inline animate-spin mr-1" />Purging...</> : 'Purge All Messages'}
                 </button>
               </div>
             )}
@@ -1405,7 +1405,7 @@ export function MailPage() {
                     disabled={sending}
                     className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
                   >
-                    <FiSend size={14} />
+                    {sending ? <FiLoader size={14} className="animate-spin" /> : <FiSend size={14} />}
                     {sending ? 'Sending...' : 'Send'}
                   </button>
                 </div>

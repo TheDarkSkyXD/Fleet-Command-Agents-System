@@ -5,6 +5,7 @@ import {
   FiEdit2,
   FiFile,
   FiFolder,
+  FiLoader,
   FiRefreshCw,
   FiSave,
 } from 'react-icons/fi';
@@ -265,7 +266,7 @@ export function ProjectConfigEditor() {
             disabled={saving || !hasChanges}
             className="flex items-center gap-1.5 rounded-md bg-blue-600/20 px-3 py-1.5 text-xs text-blue-400 hover:bg-blue-600/30 hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-blue-500/30"
           >
-            <FiSave size={12} className={saving ? 'animate-pulse' : ''} />
+            {saving ? <FiLoader size={12} className="animate-spin" /> : <FiSave size={12} />}
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>

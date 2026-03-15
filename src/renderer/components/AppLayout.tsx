@@ -345,7 +345,7 @@ export function AppLayout() {
         </ErrorBoundary>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto bg-slate-900 p-6">
+        <main className="flex-1 min-w-0 overflow-auto bg-slate-900 p-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}

@@ -943,7 +943,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         header: 'Name',
         enableSorting: true,
         cell: ({ getValue }) => (
-          <span className="font-medium text-slate-50">{getValue<string>()}</span>
+          <span className="font-medium text-slate-50 truncate block" title={getValue<string>()}>{getValue<string>()}</span>
         ),
       },
       {
@@ -1043,7 +1043,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         cell: ({ getValue }) => {
           const taskId = getValue<string>();
           return taskId ? (
-            <span className="text-xs text-slate-400">{taskId}</span>
+            <span className="text-xs text-slate-400 truncate block" title={taskId}>{taskId}</span>
           ) : (
             <span className="text-xs text-slate-600">-</span>
           );
@@ -1362,8 +1362,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         />
       ) : viewMode === 'table' ? (
         /* Table view with @tanstack/react-table */
-        <div className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden">
-          <table className="w-full">
+        <div className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden" data-testid="agents-table-container">
+          <table className="w-full table-fixed">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b border-slate-700">
@@ -1470,7 +1470,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                           >
                             {session.capability}
                           </span>
-                          <span className="text-sm text-slate-300">{session.agent_name}</span>
+                          <span className="text-sm text-slate-300 truncate max-w-[200px]" title={session.agent_name}>{session.agent_name}</span>
                         </div>
                         <span className="text-xs text-slate-500">
                           {session.completed_at
@@ -1660,7 +1660,7 @@ function AgentCard({
           </div>
 
           {/* Agent name */}
-          <span className="font-medium text-slate-50" data-testid="agent-card-name">
+          <span className="font-medium text-slate-50 truncate max-w-[200px]" data-testid="agent-card-name" title={session.agent_name}>
             {session.agent_name}
           </span>
 
@@ -2415,7 +2415,7 @@ function VirtualizedTableBody({
                 tabIndex={0}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <div key={cell.id} className="px-4 py-3 flex-1">
+                  <div key={cell.id} className="px-4 py-3 flex-1 min-w-0 overflow-hidden">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </div>
                 ))}

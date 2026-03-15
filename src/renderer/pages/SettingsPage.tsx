@@ -3112,6 +3112,7 @@ function CleanupSettings() {
       setConfirmTarget(null);
     } catch (err) {
       console.error('Cleanup failed:', err);
+      toast.error('Cleanup failed');
       setLastResult({ target, success: false });
       setConfirmTarget(null);
     } finally {

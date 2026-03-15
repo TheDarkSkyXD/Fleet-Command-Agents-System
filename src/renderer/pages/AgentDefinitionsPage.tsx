@@ -8,6 +8,7 @@ import {
   FiEye,
   FiFileText,
   FiLayers,
+  FiLoader,
   FiLock,
   FiPlus,
   FiRefreshCw,
@@ -325,7 +326,7 @@ function InstructionEditor({
             }`}
             data-testid="save-instruction-btn"
           >
-            <FiSave size={14} />
+            {saving ? <FiLoader size={14} className="animate-spin" /> : <FiSave size={14} />}
             {saving ? 'Saving...' : 'Save'}
           </button>
           <button
@@ -1005,7 +1006,7 @@ function CreateRoleModal({
             className="flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white text-sm hover:bg-green-500 transition-colors disabled:opacity-50"
             data-testid="create-role-submit"
           >
-            <FiPlus size={14} />
+            {saving ? <FiLoader size={14} className="animate-spin" /> : <FiPlus size={14} />}
             {saving ? 'Creating...' : 'Create Role'}
           </button>
         </div>

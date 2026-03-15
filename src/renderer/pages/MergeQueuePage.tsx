@@ -531,7 +531,7 @@ function QueueEntryRow({
               className="rounded-md border border-teal-600/50 bg-teal-600/10 px-3 py-1.5 text-xs font-medium text-teal-400 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
               title="Check for conflicts without performing the merge"
             >
-              {previewLoading ? 'Checking...' : 'Dry-Run'}
+              {previewLoading ? <><div className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-teal-400 border-t-transparent mr-1 align-middle" />Checking...</> : 'Dry-Run'}
             </button>
           )}
           {entry.status === 'pending' && !isBlocked && (
@@ -906,6 +906,7 @@ export function MergeQueuePage() {
       const result = await window.electronAPI.mergePreview(id);
       if (result.error) {
         console.error('Preview failed:', result.error);
+        toast.error('Merge preview failed');
       } else if (result.data) {
         const { canMerge, conflicts } = result.data as {
           canMerge: boolean;
@@ -942,6 +943,7 @@ export function MergeQueuePage() {
         }
       } catch (err) {
         console.error('Failed to load diff:', err);
+        toast.error('Failed to load diff');
       } finally {
         setDiffLoading(false);
       }

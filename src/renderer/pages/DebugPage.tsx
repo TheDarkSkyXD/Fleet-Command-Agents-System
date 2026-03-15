@@ -4,6 +4,7 @@ import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
   FiActivity,
   FiAlertTriangle,
@@ -241,6 +242,7 @@ function DebugTerminalPanel() {
         }
       } catch (err) {
         console.error('Failed to spawn debug shell:', err);
+        toast.error('Failed to spawn debug shell');
       }
     };
 
@@ -286,6 +288,7 @@ function DebugTerminalPanel() {
       }
     } catch (err) {
       console.error('Failed to restart debug shell:', err);
+      toast.error('Failed to restart debug shell');
     }
   };
 
@@ -406,6 +409,7 @@ function AppLogPanel() {
       setTimeout(() => setStatusMessage(''), 3000);
     } catch (error) {
       console.error('Failed to purge logs:', error);
+      toast.error('Failed to purge logs');
     }
   };
 
@@ -426,6 +430,7 @@ function AppLogPanel() {
       loadLogs();
     } catch (error) {
       console.error('Failed to create test log:', error);
+      toast.error('Failed to create test log');
     }
   };
 
@@ -446,6 +451,7 @@ function AppLogPanel() {
       }
     } catch (error) {
       console.error('Failed to import NDJSON:', error);
+      toast.error('Failed to import NDJSON file');
       setStatusMessage('Import failed');
       setTimeout(() => setStatusMessage(''), 3000);
     }
@@ -1123,6 +1129,7 @@ function EventLogPanel() {
       setEvents([]);
     } catch (error) {
       console.error('Failed to purge events:', error);
+      toast.error('Failed to purge events');
     }
   };
 

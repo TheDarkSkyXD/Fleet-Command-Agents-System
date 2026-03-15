@@ -136,3 +136,13 @@ body {
     transform: translateX(-100%);
   }
 }
+
+/* Ensure layout works at 1280px and above */
+#root {
+  min-width: 1024px;
+}
+
+/* Prevent flex children from overflowing their containers */
+main {
+  min-width: 0;
+}

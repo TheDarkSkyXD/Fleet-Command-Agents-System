@@ -336,6 +336,7 @@ export function TasksPage() {
       }
     } catch (err) {
       console.error('Failed to create group:', err);
+      toast.error('Failed to create group');
     } finally {
       setCreatingGroup(false);
     }
@@ -355,6 +356,7 @@ export function TasksPage() {
       });
     } catch (err) {
       console.error('Failed to delete group:', err);
+      toast.error('Failed to delete group');
     } finally {
       deleteGroupLockRef.current.delete(id);
     }
@@ -372,6 +374,7 @@ export function TasksPage() {
       setRenameGroupName('');
     } catch (err) {
       console.error('Failed to rename group:', err);
+      toast.error('Failed to rename group');
     }
   };
 
@@ -384,6 +387,7 @@ export function TasksPage() {
       }
     } catch (err) {
       console.error('Failed to close group:', err);
+      toast.error('Failed to close group');
     }
   };
 
@@ -396,6 +400,7 @@ export function TasksPage() {
       }
     } catch (err) {
       console.error('Failed to reopen group:', err);
+      toast.error('Failed to reopen group');
     }
   };
 
@@ -416,6 +421,7 @@ export function TasksPage() {
       setSelectedIssueForGroup('');
     } catch (err) {
       console.error('Failed to add issue to group:', err);
+      toast.error('Failed to add issue to group');
     }
   };
 
@@ -433,6 +439,7 @@ export function TasksPage() {
       }
     } catch (err) {
       console.error('Failed to remove issue from group:', err);
+      toast.error('Failed to remove issue from group');
     }
   };
 
@@ -498,6 +505,7 @@ export function TasksPage() {
       setCloseSummary('');
     } catch (err) {
       console.error('Failed to close issue:', err);
+      toast.error('Failed to close issue');
     } finally {
       setClosingInProgress(false);
     }
@@ -517,6 +525,7 @@ export function TasksPage() {
       }
     } catch (err) {
       console.error('Failed to update issue status:', err);
+      toast.error('Failed to update issue status');
     }
   };
 
@@ -842,7 +851,7 @@ export function TasksPage() {
                       disabled={!form.title.trim() || creating}
                       className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      {creating ? 'Creating...' : 'Create Issue'}
+                      {creating ? <><FiLoader size={14} className="inline animate-spin mr-1" />Creating...</> : 'Create Issue'}
                     </button>
                   </div>
                 </div>
@@ -922,6 +931,7 @@ export function TasksPage() {
                   }
                 } catch (err) {
                   console.error('Failed to update dependencies:', err);
+                  toast.error('Failed to update dependencies');
                 }
               }}
             />
@@ -993,7 +1003,7 @@ export function TasksPage() {
                       className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       data-testid="confirm-create-group"
                     >
-                      {creatingGroup ? 'Creating...' : 'Create Group'}
+                      {creatingGroup ? <><FiLoader size={14} className="inline animate-spin mr-1" />Creating...</> : 'Create Group'}
                     </button>
                   </div>
                 </div>
@@ -1711,7 +1721,7 @@ function KanbanCard({
       data-testid={`kanban-card-${issue.id}`}
     >
       {/* Title */}
-      <h4 className="text-sm font-medium text-slate-100 mb-2 line-clamp-2">{issue.title}</h4>
+      <h4 className="text-sm font-medium text-slate-100 mb-2 line-clamp-2" title={issue.title}>{issue.title}</h4>
 
       {/* Badges row */}
       <div className="flex items-center flex-wrap gap-1.5">
