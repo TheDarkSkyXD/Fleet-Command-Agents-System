@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Issue/Task CRUD & Claim)
+
+#### Feature #113: Create task/issue with title type priority - PASSING
+- Created `issues` table in SQLite with id, title, description, type, priority, status, assigned_agent, etc.
+- Added indexes on status, priority, and assigned_agent
+- Created IPC handlers: issue:list (with filters), issue:create, issue:get, issue:update, issue:delete, issue:claim
+- Added preload bridge methods and TypeScript types (Issue, IssueType, IssuePriority, IssueStatus)
+- Built TasksPage with create issue modal (title, type selector, priority selector, description)
+- Issue list with status badges, type labels, priority icons, and filter dropdowns
+- Integrated TasksPage into AppLayout replacing placeholder
+- Added issue cleanup to nuclear cleanup handler
+
+#### Feature #117: Claim issues and update status - PASSING
+- issue:claim IPC handler atomically sets status='in_progress' and assigned_agent
+- Only open issues can be claimed (WHERE status = 'open')
+- UI shows inline claim input with agent name field on open issues
+- After claiming, issue displays In Progress badge and assigned agent name
+- Claimed issues excluded from open queue via status filter
+
+#### Files Created/Modified
+- MODIFIED: src/main/db/database.ts - Added issues table with indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added issue CRUD + claim IPC handlers
+- MODIFIED: src/shared/types/index.ts - Added Issue interface and type aliases
+- MODIFIED: src/preload/index.ts - Added issue bridge methods
+- NEW: src/renderer/pages/TasksPage.tsx - Full tasks page with create, list, filter, claim
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated TasksPage
+
+#### Current Status
+- 13/366 features passing (added #113, #117)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Splash Screen & Health State Machine)
 
 #### Feature #12: Splash screen shows on startup - PASSING
