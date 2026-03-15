@@ -43,8 +43,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) =>
     ipcRenderer.invoke('issue:list', filters),
-  issueCreate: (issue: { id: string; title: string; description?: string; type: string; priority: string }) =>
-    ipcRenderer.invoke('issue:create', issue),
+  issueCreate: (issue: {
+    id: string;
+    title: string;
+    description?: string;
+    type: string;
+    priority: string;
+  }) => ipcRenderer.invoke('issue:create', issue),
   issueGet: (id: string) => ipcRenderer.invoke('issue:get', id),
   issueUpdate: (id: string, updates: Record<string, unknown>) =>
     ipcRenderer.invoke('issue:update', id, updates),
@@ -57,7 +62,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Claude CLI
   claudeStatus: () => ipcRenderer.invoke('claude:status'),
-  claudeDetect: () => ipcRenderer.invoke('claude:detect'),
+  claudeDetect: (options?: { forceRefresh?: boolean }) =>
+    ipcRenderer.invoke('claude:detect', options),
 
   // System
   updateCheck: () => ipcRenderer.invoke('update:check'),

@@ -1,6 +1,11 @@
 import { ipcMain } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
+import {
+  clearClaudeCliCache,
+  detectClaudeCli,
+  getClaudeCliStatus,
+} from '../services/claudeCliService';
 
 /**
  * Logged database prepare - wraps db.prepare() with SQL query logging.
@@ -467,35 +472,38 @@ export function registerIpcHandlers(): void {
   });
 
   // Issue channels - all use real SQLite queries via loggedPrepare
-  ipcMain.handle('issue:list', (_event, filters?: { status?: string; priority?: string; type?: string }) => {
-    try {
-      const conditions: string[] = [];
-      const params: string[] = [];
-      if (filters?.status) {
-        conditions.push('status = ?');
-        params.push(filters.status);
+  ipcMain.handle(
+    'issue:list',
+    (_event, filters?: { status?: string; priority?: string; type?: string }) => {
+      try {
+        const conditions: string[] = [];
+        const params: string[] = [];
+        if (filters?.status) {
+          conditions.push('status = ?');
+          params.push(filters.status);
+        }
+        if (filters?.priority) {
+          conditions.push('priority = ?');
+          params.push(filters.priority);
+        }
+        if (filters?.type) {
+          conditions.push('type = ?');
+          params.push(filters.type);
+        }
+        let query = 'SELECT * FROM issues';
+        if (conditions.length > 0) {
+          query += ` WHERE ${conditions.join(' AND ')}`;
+        }
+        query += ' ORDER BY created_at DESC';
+        const issues = loggedPrepare(query).all(...params);
+        log.info(`[IPC] issue:list - SELECT returned ${issues.length} issues from real database`);
+        return { data: issues, error: null };
+      } catch (error) {
+        log.error('issue:list failed:', error);
+        return { data: null, error: String(error) };
       }
-      if (filters?.priority) {
-        conditions.push('priority = ?');
-        params.push(filters.priority);
-      }
-      if (filters?.type) {
-        conditions.push('type = ?');
-        params.push(filters.type);
-      }
-      let query = 'SELECT * FROM issues';
-      if (conditions.length > 0) {
-        query += ` WHERE ${conditions.join(' AND ')}`;
-      }
-      query += ' ORDER BY created_at DESC';
-      const issues = loggedPrepare(query).all(...params);
-      log.info(`[IPC] issue:list - SELECT returned ${issues.length} issues from real database`);
-      return { data: issues, error: null };
-    } catch (error) {
-      log.error('issue:list failed:', error);
-      return { data: null, error: String(error) };
-    }
-  });
+    },
+  );
 
   ipcMain.handle(
     'issue:create',
@@ -513,13 +521,7 @@ export function registerIpcHandlers(): void {
         loggedPrepare(
           `INSERT INTO issues (id, title, description, type, priority, status)
           VALUES (?, ?, ?, ?, ?, 'open')`,
-        ).run(
-          issue.id,
-          issue.title,
-          issue.description ?? null,
-          issue.type,
-          issue.priority,
-        );
+        ).run(issue.id, issue.title, issue.description ?? null, issue.type, issue.priority);
         const created = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(issue.id);
         log.info(`[IPC] issue:create - INSERT issue into real database: ${issue.title}`);
         return { data: created, error: null };
@@ -543,7 +545,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('issue:update', (_event, id: string, updates: Record<string, unknown>) => {
     try {
-      const allowedFields = ['title', 'description', 'type', 'priority', 'status', 'assigned_agent', 'group_id', 'close_summary'];
+      const allowedFields = [
+        'title',
+        'description',
+        'type',
+        'priority',
+        'status',
+        'assigned_agent',
+        'group_id',
+        'close_summary',
+      ];
       const setClauses: string[] = [];
       const params: unknown[] = [];
       for (const [key, value] of Object.entries(updates)) {
@@ -624,15 +635,52 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // Claude CLI channels (stub - will use real CLI detection in later features)
+  // Claude CLI channels - real binary detection via PATH + fallback paths
   ipcMain.handle('claude:status', () => {
-    log.info('[IPC] claude:status - checking CLI status');
-    return { data: { installed: false, authenticated: false, version: null }, error: null };
+    log.info('[IPC] claude:status - checking CLI status via real detection');
+    try {
+      const result = getClaudeCliStatus();
+      return {
+        data: {
+          installed: result.found,
+          authenticated: result.authenticated,
+          version: result.version,
+          path: result.path,
+        },
+        error: result.error,
+      };
+    } catch (error) {
+      log.error('claude:status failed:', error);
+      return {
+        data: { installed: false, authenticated: false, version: null, path: null },
+        error: String(error),
+      };
+    }
   });
 
-  ipcMain.handle('claude:detect', () => {
-    log.info('[IPC] claude:detect - detecting CLI binary');
-    return { data: { found: false, path: null }, error: null };
+  ipcMain.handle('claude:detect', (_event, options?: { forceRefresh?: boolean }) => {
+    log.info('[IPC] claude:detect - detecting CLI binary via PATH + fallback paths');
+    try {
+      if (options?.forceRefresh) {
+        clearClaudeCliCache();
+      }
+      const result = detectClaudeCli(options?.forceRefresh ?? false);
+      return {
+        data: {
+          found: result.found,
+          path: result.path,
+          version: result.version,
+          authenticated: result.authenticated,
+        },
+        error: result.error,
+      };
+    } catch (error) {
+      log.error('claude:detect failed:', error);
+      return {
+        data: { found: false, path: null, version: null, authenticated: false },
+        error: String(error),
+      };
+    }
   });
 
   // System channels
@@ -677,6 +725,8 @@ export function registerIpcHandlers(): void {
         loggedPrepare('DELETE FROM metrics').run();
       } else if (options?.target === 'events') {
         loggedPrepare('DELETE FROM events').run();
+      } else if (options?.target === 'issues') {
+        loggedPrepare('DELETE FROM issues').run();
       } else {
         // Clean all tables
         loggedPrepare('DELETE FROM messages').run();
@@ -685,6 +735,7 @@ export function registerIpcHandlers(): void {
         loggedPrepare('DELETE FROM events').run();
         loggedPrepare('DELETE FROM merge_queue').run();
         loggedPrepare('DELETE FROM checkpoints').run();
+        loggedPrepare('DELETE FROM issues').run();
       }
       log.info(`[IPC] cleanup:execute - DELETE from real database: ${options?.target ?? 'all'}`);
       return { data: true, error: null };

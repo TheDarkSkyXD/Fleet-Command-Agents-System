@@ -275,8 +275,19 @@ export interface ElectronAPI {
 
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
-  claudeStatus: () => Promise<{ data: unknown; error: string | null }>;
-  claudeDetect: () => Promise<{ data: unknown; error: string | null }>;
+  claudeStatus: () => Promise<{
+    data: {
+      installed: boolean;
+      authenticated: boolean;
+      version: string | null;
+      path: string | null;
+    };
+    error: string | null;
+  }>;
+  claudeDetect: (options?: { forceRefresh?: boolean }) => Promise<{
+    data: { found: boolean; path: string | null; version: string | null; authenticated: boolean };
+    error: string | null;
+  }>;
   updateCheck: () => Promise<{ data: unknown; error: string | null }>;
   doctorRun: () => Promise<{ data: unknown; error: string | null }>;
   onAgentUpdate: (callback: (data: unknown) => void) => void;
