@@ -66,6 +66,19 @@ export function CoordinatorPanel() {
   const [isDispatching, setIsDispatching] = useState(false);
   const [dispatchedLeads, setDispatchedLeads] = useState<DispatchedLead[]>([]);
 
+  // Ask state
+  const [showAsk, setShowAsk] = useState(false);
+  const [askSubject, setAskSubject] = useState('');
+  const [askBody, setAskBody] = useState('');
+  const [isAsking, setIsAsking] = useState(false);
+  const [askResult, setAskResult] = useState<{
+    correlation_id: string;
+    question_message_id: string;
+    reply: Record<string, unknown> | null;
+    elapsed_ms: number;
+    timed_out: boolean;
+  } | null>(null);
+
   // Mail polling state
   const [lastPollResult, setLastPollResult] = useState<PollResult | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -73,6 +86,21 @@ export function CoordinatorPanel() {
 
   // Work streams state
   const [workStreams, setWorkStreams] = useState<WorkStream[]>([]);
+
+  // Operator dispatch state
+  const [showOperatorMessage, setShowOperatorMessage] = useState(false);
+  const [operatorMessage, setOperatorMessage] = useState('');
+  const [isSendingOperator, setIsSendingOperator] = useState(false);
+  const [operatorHistory, setOperatorHistory] = useState<
+    Array<{
+      id: string;
+      from_agent: string;
+      to_agent: string;
+      subject: string;
+      body: string;
+      created_at: string;
+    }>
+  >([]);
 
   // Activity log state
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -132,20 +160,33 @@ export function CoordinatorPanel() {
     }
   }, []);
 
-  // Poll coordinator status, dispatched leads, work streams, and activity log
+  const loadOperatorHistory = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.operatorHistory(20);
+      if (result.data) {
+        setOperatorHistory(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to load operator history:', err);
+    }
+  }, []);
+
+  // Poll coordinator status, dispatched leads, work streams, activity log, and operator history
   useEffect(() => {
     loadStatus();
     loadDispatchedLeads();
     loadWorkStreams();
     loadActivityLog();
+    loadOperatorHistory();
     const interval = setInterval(() => {
       loadStatus();
       loadDispatchedLeads();
       loadWorkStreams();
       loadActivityLog();
+      loadOperatorHistory();
     }, 3000);
     return () => clearInterval(interval);
-  }, [loadStatus, loadDispatchedLeads, loadWorkStreams, loadActivityLog]);
+  }, [loadStatus, loadDispatchedLeads, loadWorkStreams, loadActivityLog, loadOperatorHistory]);
 
   // Auto-poll mail when coordinator is active
   useEffect(() => {
@@ -226,6 +267,52 @@ export function CoordinatorPanel() {
       setError(String(err));
     } finally {
       setIsDispatching(false);
+    }
+  };
+
+  const handleOperatorDispatch = async () => {
+    if (!operatorMessage.trim()) return;
+    setIsSendingOperator(true);
+    setError(null);
+    try {
+      const result = await window.electronAPI.operatorDispatch(operatorMessage.trim());
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setOperatorMessage('');
+        setShowOperatorMessage(false);
+        await loadOperatorHistory();
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsSendingOperator(false);
+    }
+  };
+
+  const handleAsk = async () => {
+    if (!askSubject.trim() || !askBody.trim()) return;
+    setIsAsking(true);
+    setError(null);
+    setAskResult(null);
+    try {
+      const result = await window.electronAPI.coordinatorAsk({
+        subject: askSubject.trim(),
+        body: askBody.trim(),
+      });
+      if (result.error) {
+        setError(result.error);
+      } else if (result.data) {
+        setAskResult(result.data);
+        if (!result.data.timed_out) {
+          setAskSubject('');
+          setAskBody('');
+        }
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsAsking(false);
     }
   };
 
@@ -633,6 +720,27 @@ export function CoordinatorPanel() {
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  setShowAsk(!showAsk);
+                  setAskResult(null);
+                }}
+                data-testid="operator-ask-btn"
+                className="flex-1 flex items-center justify-center gap-2 rounded-md bg-blue-600/20 border border-blue-500/30 px-3 py-2 text-sm font-medium text-blue-400 hover:bg-blue-600/30 transition-colors"
+              >
+                <FiMail className="h-4 w-4" />
+                Ask
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowOperatorMessage(!showOperatorMessage)}
+                data-testid="operator-message-btn"
+                className="flex-1 flex items-center justify-center gap-2 rounded-md bg-cyan-600/20 border border-cyan-500/30 px-3 py-2 text-sm font-medium text-cyan-400 hover:bg-cyan-600/30 transition-colors"
+              >
+                <FiMail className="h-4 w-4" />
+                Message
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowStopConfirm(true)}
                 disabled={isStopping}
                 className="flex-1 flex items-center justify-center gap-2 rounded-md bg-red-600/20 border border-red-500/30 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -695,6 +803,112 @@ export function CoordinatorPanel() {
                     )}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Ask form - synchronous ask-reply */}
+            {showAsk && (
+              <div
+                className="rounded-lg border border-blue-500/30 bg-blue-900/10 p-3 space-y-2"
+                data-testid="operator-ask-panel"
+              >
+                <label htmlFor="ask-subject" className="text-xs font-medium text-blue-300">
+                  Ask Coordinator (sync reply, 120s timeout)
+                </label>
+                <input
+                  id="ask-subject"
+                  type="text"
+                  value={askSubject}
+                  onChange={(e) => setAskSubject(e.target.value)}
+                  placeholder="Subject of your question..."
+                  data-testid="ask-subject-input"
+                  className="w-full rounded-md bg-slate-900 border border-slate-600 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                />
+                <textarea
+                  id="ask-body"
+                  value={askBody}
+                  onChange={(e) => setAskBody(e.target.value)}
+                  placeholder="Describe your question in detail..."
+                  data-testid="ask-body-input"
+                  className="w-full rounded-md bg-slate-900 border border-slate-600 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none resize-none"
+                  rows={3}
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAsk(false);
+                      setAskSubject('');
+                      setAskBody('');
+                      setAskResult(null);
+                    }}
+                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAsk}
+                    disabled={isAsking || !askSubject.trim() || !askBody.trim()}
+                    data-testid="ask-send-btn"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isAsking ? (
+                      <>
+                        <FiClock className="h-3 w-3 animate-spin" />
+                        Waiting for reply...
+                      </>
+                    ) : (
+                      <>
+                        <FiSend className="h-3 w-3" />
+                        Send Ask
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Ask result display */}
+                {askResult && (
+                  <div
+                    className={`mt-2 rounded-lg border p-2.5 ${
+                      askResult.timed_out
+                        ? 'border-amber-500/30 bg-amber-900/10'
+                        : 'border-green-500/30 bg-green-900/10'
+                    }`}
+                    data-testid="ask-result"
+                  >
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span
+                        className={`font-medium ${askResult.timed_out ? 'text-amber-400' : 'text-green-400'}`}
+                      >
+                        {askResult.timed_out ? 'Timed Out (120s)' : 'Reply Received'}
+                      </span>
+                      <span className="text-slate-500 text-[10px]">
+                        {Math.round(askResult.elapsed_ms / 1000)}s elapsed
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mb-1" data-testid="ask-correlation-id">
+                      Correlation: {askResult.correlation_id}
+                    </div>
+                    {askResult.reply ? (
+                      <div className="text-xs text-slate-200" data-testid="ask-reply-body">
+                        {askResult.reply.subject && (
+                          <div className="font-medium text-slate-300 mb-0.5">
+                            {String(askResult.reply.subject)}
+                          </div>
+                        )}
+                        <p className="text-slate-400 whitespace-pre-wrap">
+                          {String(askResult.reply.body || '')}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-400">
+                        No reply received within timeout period. The coordinator may still process
+                        this question asynchronously.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

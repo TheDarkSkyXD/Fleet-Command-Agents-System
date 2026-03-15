@@ -820,6 +820,21 @@ export interface ElectronAPI {
     } | null;
     error: string | null;
   }>;
+  coordinatorAsk: (options: {
+    subject: string;
+    body: string;
+    from?: string;
+    timeout_ms?: number;
+  }) => Promise<{
+    data: {
+      correlation_id: string;
+      question_message_id: string;
+      reply: Record<string, unknown> | null;
+      elapsed_ms: number;
+      timed_out: boolean;
+    } | null;
+    error: string | null;
+  }>;
   coordinatorDispatchedLeads: () => Promise<{
     data: Array<Session & { objective?: string }> | null;
     error: string | null;
@@ -876,6 +891,28 @@ export interface ElectronAPI {
       total_tasks: number;
       completed_tasks: number;
       in_progress_tasks: number;
+      created_at: string;
+    }> | null;
+    error: string | null;
+  }>;
+
+  // Operator dispatch messages
+  operatorDispatch: (message: string) => Promise<{
+    data: {
+      success: boolean;
+      message_id: string;
+      target_agent: string;
+      written: boolean;
+    } | null;
+    error: string | null;
+  }>;
+  operatorHistory: (limit?: number) => Promise<{
+    data: Array<{
+      id: string;
+      from_agent: string;
+      to_agent: string;
+      subject: string;
+      body: string;
       created_at: string;
     }> | null;
     error: string | null;

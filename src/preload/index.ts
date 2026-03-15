@@ -181,12 +181,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     task_id?: string;
     file_scope?: string;
   }) => ipcRenderer.invoke('coordinator:dispatch', options),
+  coordinatorAsk: (options: { subject: string; body: string; from?: string; timeout_ms?: number }) =>
+    ipcRenderer.invoke('coordinator:ask', options),
   coordinatorDispatchedLeads: () => ipcRenderer.invoke('coordinator:dispatched-leads'),
   coordinatorPollMail: () => ipcRenderer.invoke('coordinator:poll-mail'),
   coordinatorDecompose: (options?: { scope?: string; coordinatorSessionId?: string }) =>
     ipcRenderer.invoke('coordinator:decompose', options),
   coordinatorWorkStreams: () => ipcRenderer.invoke('coordinator:workStreams'),
   coordinatorActivityLog: (limit?: number) => ipcRenderer.invoke('coordinator:activity-log', limit),
+
+  // Operator dispatch messages
+  operatorDispatch: (message: string) => ipcRenderer.invoke('operator:dispatch', message),
+  operatorHistory: (limit?: number) => ipcRenderer.invoke('operator:history', limit),
 
   // Agent process management (node-pty)
   agentOutput: (id: string) => ipcRenderer.invoke('agent:output', id),

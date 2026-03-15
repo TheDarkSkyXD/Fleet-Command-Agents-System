@@ -26,6 +26,7 @@ import {
   FiGrid,
   FiList,
   FiLoader,
+  FiMap,
   FiPlay,
   FiSearch,
   FiSquare,
@@ -48,6 +49,7 @@ import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard'
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
+import { ScopeTreeViewer } from '../components/ScopeTreeViewer';
 import { useProjectStore } from '../stores/projectStore';
 import { DEFAULT_MODEL_DEFAULTS, useSettingsStore } from '../stores/settingsStore';
 
@@ -331,7 +333,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy' | 'scope'>('table');
 
   // Table state
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -1091,6 +1093,19 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           >
             <FiGitBranch className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('scope')}
+            className={`p-2 transition-colors ${
+              viewMode === 'scope'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+            }`}
+            title="Scope map - file tree color-coded by agent"
+            data-testid="view-mode-scope"
+          >
+            <FiMap className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -1101,6 +1116,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         ) : (
           <AgentCardSkeleton />
         )
+      ) : viewMode === 'scope' ? (
+        /* Scope map view */
+        <ScopeTreeViewer maxHeight="calc(100vh - 200px)" />
       ) : sessions.length === 0 ? (
         /* Empty state */
         <div

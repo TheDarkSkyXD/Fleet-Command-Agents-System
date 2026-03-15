@@ -1183,6 +1183,109 @@ export function registerIpcHandlers(): void {
     },
   );
 
+  // Coordinator synchronous ask-reply - sends question to coordinator and waits for reply
+  ipcMain.handle(
+    'coordinator:ask',
+    async (
+      _event,
+      options: {
+        subject: string;
+        body: string;
+        from?: string;
+        timeout_ms?: number;
+      },
+    ) => {
+      try {
+        const coordinator = loggedPrepare(
+          `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+        ).get() as Record<string, unknown> | undefined;
+
+        if (!coordinator) {
+          return { data: null, error: 'No active coordinator found' };
+        }
+
+        const coordinatorName = coordinator.agent_name as string;
+        const fromAgent = options.from || 'operator';
+        const timeoutMs = options.timeout_ms ?? 120000;
+        const correlationId = `ask-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+        // Send the question message to coordinator with correlation ID as thread_id
+        loggedPrepare(
+          `INSERT INTO messages (id, thread_id, from_agent, to_agent, subject, body, type, priority)
+           VALUES (?, ?, ?, ?, ?, ?, 'question', 'high')`,
+        ).run(messageId, correlationId, fromAgent, coordinatorName, options.subject, options.body);
+
+        log.info(
+          `[IPC] coordinator:ask - sent question from ${fromAgent} to ${coordinatorName} with correlationId=${correlationId}`,
+        );
+
+        // Record event
+        recordEvent({
+          eventType: 'mail_sent',
+          agentName: fromAgent,
+          data: JSON.stringify({
+            to: coordinatorName,
+            subject: options.subject,
+            type: 'question',
+            correlation_id: correlationId,
+          }),
+        });
+
+        // Poll for a reply in the same thread
+        const pollIntervalMs = 2000;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < timeoutMs) {
+          const reply = loggedPrepare(
+            `SELECT * FROM messages
+             WHERE thread_id = ? AND from_agent = ? AND id != ?
+             ORDER BY created_at ASC LIMIT 1`,
+          ).get(correlationId, coordinatorName, messageId) as Record<string, unknown> | undefined;
+
+          if (reply) {
+            log.info(
+              `[IPC] coordinator:ask - received reply for correlationId=${correlationId} after ${Date.now() - startTime}ms`,
+            );
+
+            loggedPrepare(`UPDATE messages SET read = 1 WHERE id = ?`).run(reply.id);
+
+            return {
+              data: {
+                correlation_id: correlationId,
+                question_message_id: messageId,
+                reply: reply,
+                elapsed_ms: Date.now() - startTime,
+                timed_out: false,
+              },
+              error: null,
+            };
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        }
+
+        log.warn(
+          `[IPC] coordinator:ask - TIMEOUT after ${timeoutMs}ms for correlationId=${correlationId}`,
+        );
+
+        return {
+          data: {
+            correlation_id: correlationId,
+            question_message_id: messageId,
+            reply: null,
+            elapsed_ms: Date.now() - startTime,
+            timed_out: true,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('coordinator:ask failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
   // Coordinator dispatch list - get all leads dispatched with their objectives
   ipcMain.handle('coordinator:dispatched-leads', () => {
     try {
@@ -1754,6 +1857,101 @@ export function registerIpcHandlers(): void {
       return { data: result, error: null };
     } catch (error) {
       log.error('coordinator:activity-log failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Operator dispatch message to coordinator - fire-and-forget message from human operator
+  ipcMain.handle(
+    'operator:dispatch',
+    (_event, message: string) => {
+      try {
+        if (!message || !message.trim()) {
+          return { data: null, error: 'Message cannot be empty' };
+        }
+
+        // Find the active coordinator session
+        const coordinatorSession = loggedPrepare(
+          db,
+          'operator:dispatch',
+          `SELECT id, agent_name FROM sessions WHERE capability = 'lead' AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1`,
+        ).get() as { id: string; agent_name: string } | undefined;
+
+        // Also check for coordinator capability
+        const coordSession = coordinatorSession || loggedPrepare(
+          db,
+          'operator:dispatch',
+          `SELECT id, agent_name FROM sessions WHERE agent_name LIKE '%coordinator%' AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1`,
+        ).get() as { id: string; agent_name: string } | undefined;
+
+        if (!coordSession) {
+          return { data: null, error: 'No active coordinator found. Start the coordinator first.' };
+        }
+
+        // Write the operator message to the coordinator's PTY terminal
+        const operatorPrompt = `\n[OPERATOR MESSAGE]: ${message.trim()}\n`;
+        const written = agentProcessManager.write(coordSession.id, operatorPrompt);
+
+        // Store the message in messages table for history
+        const msgId = `msg-operator-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          db,
+          'operator:dispatch',
+          `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, created_at)
+           VALUES (?, ?, ?, ?, ?, 'dispatch', 'high', datetime('now'))`,
+        ).run(
+          msgId,
+          'operator',
+          coordSession.agent_name,
+          'Operator Dispatch',
+          message.trim(),
+        );
+
+        log.info(
+          `[IPC] operator:dispatch - message sent to ${coordSession.agent_name} (written=${written}): ${message.trim().substring(0, 80)}`,
+        );
+
+        return {
+          data: {
+            success: true,
+            message_id: msgId,
+            target_agent: coordSession.agent_name,
+            written,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('operator:dispatch failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // Operator message history - retrieve past operator dispatch messages
+  ipcMain.handle('operator:history', (_event, limit?: number) => {
+    try {
+      const maxEntries = limit ?? 50;
+      const messages = loggedPrepare(
+        db,
+        'operator:history',
+        `SELECT id, from_agent, to_agent, subject, body, created_at
+         FROM messages
+         WHERE from_agent = 'operator' AND type = 'dispatch'
+         ORDER BY created_at DESC
+         LIMIT ?`,
+      ).all(maxEntries) as Array<{
+        id: string;
+        from_agent: string;
+        to_agent: string;
+        subject: string;
+        body: string;
+        created_at: string;
+      }>;
+
+      log.info(`[IPC] operator:history - returned ${messages.length} operator messages`);
+      return { data: messages, error: null };
+    } catch (error) {
+      log.error('operator:history failed:', error);
       return { data: null, error: String(error) };
     }
   });
