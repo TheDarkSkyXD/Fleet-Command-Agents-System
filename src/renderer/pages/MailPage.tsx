@@ -21,7 +21,7 @@ import {
 } from 'react-icons/fi';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
-import type { Message, MessagePriority, MessageType } from '../../shared/types';
+import type { Message, MessagePriority, MessageType, Run } from '../../shared/types';
 import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { formatAbsoluteTime } from '../components/RelativeTime';
@@ -47,6 +47,7 @@ interface MailFilters {
   type: string;
   priority: string;
   agent: string;
+  runId: string;
 }
 
 const isProtocolType = (type: MessageType): boolean => PROTOCOL_TYPES.includes(type);
@@ -80,6 +81,7 @@ const defaultFilters: MailFilters = {
   type: '',
   priority: '',
   agent: '',
+  runId: '',
 };
 
 const MESSAGE_TYPES: MessageType[] = [
@@ -178,8 +180,9 @@ export function MailPage() {
 
   // Database-driven agent names derived from messages
   const [knownAgents, setKnownAgents] = useState<string[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
 
-  const activeFilterCount = [filters.type, filters.priority, filters.agent].filter(Boolean).length;
+  const activeFilterCount = [filters.type, filters.priority, filters.agent, filters.runId].filter(Boolean).length;
   const hasAnyFilter = filters.search !== '' || activeFilterCount > 0;
 
   const loadMessages = useCallback(
@@ -192,6 +195,7 @@ export function MailPage() {
         if (f.type) queryFilters.type = f.type;
         if (f.priority) queryFilters.priority = f.priority;
         if (f.agent) queryFilters.agent = f.agent;
+        if (f.runId) queryFilters.runId = f.runId;
 
         const result = await window.electronAPI.mailList(
           Object.keys(queryFilters).length > 0 ? queryFilters : undefined,
@@ -218,6 +222,20 @@ export function MailPage() {
     },
     [filters],
   );
+
+  // Load available runs for filtering
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await window.electronAPI.runList();
+        if (result.data) {
+          setRuns(result.data as Run[]);
+        }
+      } catch (err) {
+        console.error('Failed to load runs:', err);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     loadMessages();
@@ -775,6 +793,26 @@ export function MailPage() {
                 ))}
               </select>
             </div>
+
+            <div className="flex items-center gap-2">
+              <label htmlFor="filter-run" className="text-xs font-medium text-slate-400">
+                Run:
+              </label>
+              <select
+                id="filter-run"
+                value={filters.runId}
+                onChange={(e) => handleFilterChange('runId', e.target.value)}
+                className="w-40 rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-blue-500 focus:outline-none"
+                data-testid="mail-filter-run"
+              >
+                <option value="">All runs</option>
+                {runs.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.id.slice(0, 8)}… ({r.status}{r.agent_count ? `, ${r.agent_count} agents` : ''})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 
@@ -805,6 +843,11 @@ export function MailPage() {
             {filters.agent && (
               <span className="rounded-full bg-slate-700 px-2 py-0.5 text-slate-300">
                 agent: {filters.agent}
+              </span>
+            )}
+            {filters.runId && (
+              <span className="rounded-full bg-slate-700 px-2 py-0.5 text-slate-300">
+                run: {filters.runId.slice(0, 8)}…
               </span>
             )}
           </div>

@@ -15,7 +15,7 @@ import {
   FiX,
   FiZap,
 } from 'react-icons/fi';
-import type { Event, EventType } from '../../shared/types';
+import type { Event, EventType, Run } from '../../shared/types';
 import { SlidePanel } from '../components/SlidePanel';
 
 type ViewTab = 'feed' | 'replay' | 'correlation';
@@ -163,17 +163,34 @@ export function EventFeedPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterType, setFilterType] = useState<string>('');
   const [filterAgent, setFilterAgent] = useState('');
+  const [filterRunId, setFilterRunId] = useState('');
+  const [runs, setRuns] = useState<Run[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [eventLimit, setEventLimit] = useState(100);
   const [activeTab, setActiveTab] = useState<ViewTab>('feed');
   const feedRef = useRef<HTMLDivElement>(null);
   const prevEventCountRef = useRef(0);
 
+  // Load available runs for the filter dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await window.electronAPI.runList();
+        if (result.data) {
+          setRuns(result.data as Run[]);
+        }
+      } catch (err) {
+        console.error('Failed to load runs:', err);
+      }
+    })();
+  }, []);
+
   const loadEvents = useCallback(async () => {
     try {
       const filters: Record<string, unknown> = { limit: eventLimit };
       if (filterType) filters.eventType = filterType;
       if (filterAgent) filters.agentName = filterAgent;
+      if (filterRunId) filters.runId = filterRunId;
 
       const result = await window.electronAPI.eventList(filters);
       if (result.data) {
@@ -184,7 +201,7 @@ export function EventFeedPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterAgent, eventLimit]);
+  }, [filterType, filterAgent, filterRunId, eventLimit]);
 
   // Initial load
   useEffect(() => {
@@ -211,7 +228,7 @@ export function EventFeedPage() {
     new Set(events.map((e) => e.agent_name).filter(Boolean) as string[]),
   ).sort();
 
-  const activeFilterCount = [filterType, filterAgent].filter(Boolean).length;
+  const activeFilterCount = [filterType, filterAgent, filterRunId].filter(Boolean).length;
 
   // Replay view: events sorted chronologically (ascending) with agent color mapping
   const replayData = useMemo(() => {
@@ -448,6 +465,25 @@ export function EventFeedPage() {
             </select>
           </div>
 
+          {/* Run filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">Run:</span>
+            <select
+              value={filterRunId}
+              onChange={(e) => setFilterRunId(e.target.value)}
+              className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
+              aria-label="Filter by run ID"
+              data-testid="event-filter-run"
+            >
+              <option value="">All runs</option>
+              {runs.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.id.slice(0, 8)}… ({r.status}{r.agent_count ? `, ${r.agent_count} agents` : ''})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Limit */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">Show:</span>
@@ -471,6 +507,7 @@ export function EventFeedPage() {
               onClick={() => {
                 setFilterType('');
                 setFilterAgent('');
+                setFilterRunId('');
               }}
               className="flex items-center gap-1 rounded border border-slate-700 px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
             >
