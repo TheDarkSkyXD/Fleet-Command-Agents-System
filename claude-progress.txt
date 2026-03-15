@@ -1,5 +1,30 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Activity Pulse & Stalled Warning)
+
+#### Feature #245: Activity pulse animation on running agents - PASSING
+- Added CSS @keyframes card-activity-pulse with green glow border animation in globals.css
+- Applied animate-card-activity-pulse to agent cards (grid view) and table rows (list view) when state is 'working' or 'booting'
+- Enhanced state dot for working agents with animate-activity-pulse (green box-shadow pulse)
+- Smooth 2s ease-in-out infinite animation cycle
+
+#### Feature #246: Warning icon on stalled agents - PASSING
+- Amber FiAlertTriangle warning icon already present in agent list table and card views
+- Enhanced with descriptive tooltips explaining stalled state, escalation level, and suggested actions
+- Added prominent stalled warning badge in AgentDetailPage header with border styling
+- Added data-testid="agent-stalled-warning" to all stalled indicators
+- Increased icon size to h-3.5 w-3.5 and added font-medium for better visibility
+
+#### Files Modified
+- MODIFIED: src/renderer/styles/globals.css - activity-pulse and card-activity-pulse CSS animations
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Pulse on cards/rows, enhanced stalled tooltips
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Stalled warning badge in detail header
+
+#### Current Status
+- 250/366 features passing (added #245 and #246 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Card Animations & Mail Badge)
 
 #### Feature #243: Card entrance animations - PASSING
