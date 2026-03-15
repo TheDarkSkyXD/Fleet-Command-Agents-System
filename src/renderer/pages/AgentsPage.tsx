@@ -26,7 +26,7 @@ import {
   FiX,
   FiZap,
 } from 'react-icons/fi';
-import type { AgentCapability, AgentProcessInfo, Session } from '../../shared/types';
+import type { AgentCapability, AgentProcessInfo, ScopeOverlap, Session } from '../../shared/types';
 import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
@@ -1204,6 +1204,41 @@ function SpawnDialog({
 }) {
   const capabilityInfo = CAPABILITY_DEFAULTS[capability];
   const [showTreePicker, setShowTreePicker] = useState(capability === 'builder');
+  const [scopeOverlaps, setScopeOverlaps] = useState<ScopeOverlap[]>([]);
+  const [checkingOverlaps, setCheckingOverlaps] = useState(false);
+
+  // Check for scope overlaps when file selections change
+  useEffect(() => {
+    const paths =
+      treePaths.length > 0
+        ? treePaths
+        : fileScope.trim()
+          ? fileScope
+              .split(',')
+              .map((p) => p.trim())
+              .filter(Boolean)
+          : [];
+    if (paths.length === 0) {
+      setScopeOverlaps([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setCheckingOverlaps(true);
+      try {
+        const result = await window.electronAPI.scopeCheckOverlap(paths);
+        if (result.data) {
+          setScopeOverlaps(result.data);
+        }
+      } catch {
+        // Silently ignore overlap check failures
+      } finally {
+        setCheckingOverlaps(false);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timer);
+  }, [treePaths, fileScope]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -1397,6 +1432,41 @@ function SpawnDialog({
                 {treePaths.length} file{treePaths.length !== 1 ? 's' : ''}/folder
                 {treePaths.length !== 1 ? 's' : ''} selected
               </p>
+            )}
+
+            {/* Scope overlap warning */}
+            {checkingOverlaps && (
+              <p className="mt-1 text-xs text-slate-500 animate-pulse">
+                Checking for scope conflicts...
+              </p>
+            )}
+            {scopeOverlaps.length > 0 && (
+              <div
+                className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"
+                data-testid="scope-overlap-warning"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <FiAlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                  <span className="text-sm font-medium text-amber-400">Scope Overlap Detected</span>
+                </div>
+                <div className="space-y-2">
+                  {scopeOverlaps.map((overlap) => (
+                    <div key={overlap.sessionId} className="text-xs text-amber-300/80">
+                      <span className="font-medium text-amber-300">{overlap.agentName}</span>{' '}
+                      already owns:{' '}
+                      <span className="text-amber-200/70 font-mono">
+                        {overlap.overlappingPaths.slice(0, 3).join(', ')}
+                        {overlap.overlappingPaths.length > 3 &&
+                          ` +${overlap.overlappingPaths.length - 3} more`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-amber-400/60">
+                  Assigning overlapping files to multiple builders may cause merge conflicts. You
+                  can continue anyway or adjust the file scope.
+                </p>
+              </div>
             )}
           </div>
 

@@ -1,5 +1,32 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Merge Queue Visualization & Onboarding Tour)
+
+#### Feature #81: Merge queue visualization - PASSING
+- Fixed status colors to match spec: pending=neutral (slate), merging=blue, merged=green, conflict=amber, failed=red
+- Updated pulse indicator from amber to blue for merging state
+- Added separate conflict count stat card (5-column grid instead of 4)
+- Split conflict and failed counts (were previously combined)
+- All entries correctly show branch name, agent name, and enqueue time
+
+#### Feature #251: Onboarding tour merge workflow tooltip - PASSING
+- Added merge workflow guided tooltip as step 3 in OnboardingTour
+- Tooltip targets [data-testid="nav-merge"] sidebar nav item
+- Explains merge queue workflow and 4 resolution tiers (clean merge, auto-resolve, AI-resolve, reimagine)
+- Also added mail checking tooltip as step 2 targeting [data-testid="nav-mail"]
+- Added data-testid attributes to all sidebar nav items for tour targeting
+- Tour finishes with "Got it!" button on the last step
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Fixed status colors, added conflict stat card
+- MODIFIED: src/renderer/components/OnboardingTour.tsx - Added mail and merge tour steps
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added data-testid to nav items
+
+#### Current Status
+- 87/366 features passing (added #81 and #251 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Mail Search & Search Performance)
 
 #### Feature #77: Mail search and filtering - PASSING

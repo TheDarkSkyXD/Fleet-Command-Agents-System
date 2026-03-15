@@ -67,9 +67,19 @@ export interface Session {
   prompt_version: string | null;
   escalation_level: number;
   stalled_at: string | null;
+  file_scope: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+}
+
+// Scope overlap detection
+export interface ScopeOverlap {
+  agentName: string;
+  sessionId: string;
+  capability: string;
+  fileScope: string;
+  overlappingPaths: string[];
 }
 
 export interface Run {
@@ -531,6 +541,11 @@ export interface ElectronAPI {
   agentStop: (name: string) => Promise<{ data: unknown; error: string | null }>;
   agentStopAll: () => Promise<{ data: unknown; error: string | null }>;
   agentNudge: (name: string) => Promise<{ data: unknown; error: string | null }>;
+  // Scope overlap detection
+  scopeCheckOverlap: (
+    filePaths: string[],
+    excludeSessionId?: string,
+  ) => Promise<{ data: ScopeOverlap[] | null; error: string | null }>;
   // Coordinator
   coordinatorStart: (options?: { prompt?: string; run_id?: string }) => Promise<{
     data: Session | null;
@@ -588,6 +603,10 @@ export interface ElectronAPI {
   mergeConflict: (id: number) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergePreview: (id: number, repoPath?: string) => Promise<{ data: unknown; error: string | null }>;
   mergeHistory: () => Promise<{ data: MergeQueueEntry[] | null; error: string | null }>;
+  mergeDiff: (
+    id: number,
+    repoPath?: string,
+  ) => Promise<{ data: { diff: string; branchName: string } | null; error: string | null }>;
   mergeRemove: (id: number) => Promise<{ data: boolean; error: string | null }>;
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) => Promise<{

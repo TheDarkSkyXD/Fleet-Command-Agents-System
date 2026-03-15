@@ -181,6 +181,7 @@ export function registerIpcHandlers(): void {
         branch_name?: string;
         depth?: number;
         prompt?: string;
+        file_scope?: string;
       },
     ) => {
       try {
@@ -202,10 +203,10 @@ export function registerIpcHandlers(): void {
           prompt: options.prompt,
         });
 
-        // Insert session record into database with PID and model
+        // Insert session record into database with PID, model, and file_scope
         loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?)`,
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?)`,
         ).run(
           options.id,
           options.agent_name,
@@ -218,6 +219,7 @@ export function registerIpcHandlers(): void {
           options.branch_name ?? null,
           options.depth ?? 0,
           agentProcess.pid,
+          options.file_scope ?? null,
         );
 
         // Transition to 'working' state after successful spawn
@@ -364,6 +366,79 @@ export function registerIpcHandlers(): void {
       return { data: session, error: null };
     } catch (error) {
       log.error('agent:nudge failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Scope overlap detection - check if file paths conflict with active builder scopes
+  ipcMain.handle('scope:checkOverlap', (_event, filePaths: string[], excludeSessionId?: string) => {
+    try {
+      // Get all active builder sessions with file_scope
+      let query =
+        "SELECT id, agent_name, capability, file_scope FROM sessions WHERE capability = 'builder' AND state NOT IN ('completed') AND file_scope IS NOT NULL AND file_scope != ''";
+      const params: string[] = [];
+      if (excludeSessionId) {
+        query += ' AND id != ?';
+        params.push(excludeSessionId);
+      }
+      const activeBuilders = loggedPrepare(query).all(...params) as Array<{
+        id: string;
+        agent_name: string;
+        capability: string;
+        file_scope: string;
+      }>;
+
+      const overlaps: Array<{
+        agentName: string;
+        sessionId: string;
+        capability: string;
+        fileScope: string;
+        overlappingPaths: string[];
+      }> = [];
+
+      // Parse incoming paths into a set for quick lookup
+      const incomingPaths = new Set(filePaths.map((p) => p.trim().toLowerCase()));
+
+      for (const builder of activeBuilders) {
+        // Parse the builder's file_scope (comma-separated paths)
+        const builderPaths = builder.file_scope
+          .split(',')
+          .map((p) => p.trim().toLowerCase())
+          .filter((p) => p.length > 0);
+
+        // Find overlapping paths
+        const overlapping: string[] = [];
+        for (const bp of builderPaths) {
+          for (const ip of incomingPaths) {
+            // Exact match
+            if (bp === ip) {
+              overlapping.push(ip);
+              continue;
+            }
+            // Check if one is a parent directory of the other
+            if (ip.startsWith(`${bp}/`) || bp.startsWith(`${ip}/`)) {
+              overlapping.push(ip);
+            }
+          }
+        }
+
+        if (overlapping.length > 0) {
+          overlaps.push({
+            agentName: builder.agent_name,
+            sessionId: builder.id,
+            capability: builder.capability,
+            fileScope: builder.file_scope,
+            overlappingPaths: [...new Set(overlapping)],
+          });
+        }
+      }
+
+      log.info(
+        `[IPC] scope:checkOverlap - checked ${filePaths.length} paths against ${activeBuilders.length} active builders, found ${overlaps.length} overlaps`,
+      );
+      return { data: overlaps, error: null };
+    } catch (error) {
+      log.error('scope:checkOverlap failed:', error);
       return { data: null, error: String(error) };
     }
   });
@@ -909,6 +984,43 @@ export function registerIpcHandlers(): void {
       return { data: history, error: null };
     } catch (error) {
       log.error('merge:history failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Get diff for a merge queue branch (for side-by-side diff viewer)
+  ipcMain.handle('merge:diff', async (_event, id: number, repoPath?: string) => {
+    try {
+      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
+        id: number;
+        branch_name: string;
+      } | null;
+      if (!entry) {
+        return { data: null, error: `Merge queue entry ${id} not found` };
+      }
+
+      // Use active project path or provided repoPath
+      let projectPath = repoPath;
+      if (!projectPath) {
+        const activeProject = loggedPrepare(
+          'SELECT path FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { path: string } | null;
+        projectPath = activeProject?.path || '.';
+      }
+
+      const simpleGitModule = await import('simple-git');
+      const git = simpleGitModule.default(projectPath);
+
+      // Get the diff between current branch and the merge branch
+      const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
+      const diffOutput = await git.diff([`${currentBranch.trim()}...${entry.branch_name}`]);
+
+      log.info(
+        `[IPC] merge:diff - got diff for branch ${entry.branch_name} (${diffOutput.length} chars)`,
+      );
+      return { data: { diff: diffOutput, branchName: entry.branch_name }, error: null };
+    } catch (error) {
+      log.error('merge:diff failed:', error);
       return { data: null, error: String(error) };
     }
   });

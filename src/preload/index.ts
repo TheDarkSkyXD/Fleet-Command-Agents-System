@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agentStopAll: () => ipcRenderer.invoke('agent:stop-all'),
   agentNudge: (name: string) => ipcRenderer.invoke('agent:nudge', name),
 
+  // Scope overlap detection
+  scopeCheckOverlap: (filePaths: string[], excludeSessionId?: string) =>
+    ipcRenderer.invoke('scope:checkOverlap', filePaths, excludeSessionId),
+
   // Mail
   mailList: (filters?: Record<string, unknown>) => ipcRenderer.invoke('mail:list', filters),
   mailUnreadCount: () => ipcRenderer.invoke('mail:unread-count'),
@@ -40,6 +44,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mergePreview: (id: number, repoPath?: string) =>
     ipcRenderer.invoke('merge:preview', id, repoPath),
   mergeHistory: () => ipcRenderer.invoke('merge:history'),
+  mergeDiff: (id: number, repoPath?: string) => ipcRenderer.invoke('merge:diff', id, repoPath),
   mergeRemove: (id: number) => ipcRenderer.invoke('merge:remove', id),
 
   // Issues
