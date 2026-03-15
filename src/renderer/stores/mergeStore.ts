@@ -15,6 +15,7 @@ interface MergeState {
     task_id?: string;
     agent_name?: string;
     files_modified?: string[];
+    depends_on?: number[];
   }) => Promise<MergeQueueEntry | null>;
   getNext: () => Promise<MergeQueueEntry | null>;
   execute: (id: number) => Promise<MergeQueueEntry | null>;
@@ -24,6 +25,7 @@ interface MergeState {
   autoResolve: (id: number) => Promise<MergeQueueEntry | null>;
   aiResolve: (id: number) => Promise<MergeQueueEntry | null>;
   reimagine: (id: number) => Promise<MergeQueueEntry | null>;
+  rollback: (id: number) => Promise<MergeQueueEntry | null>;
   remove: (id: number) => Promise<boolean>;
 }
 
@@ -185,6 +187,22 @@ export const useMergeStore = create<MergeState>((set, get) => ({
   reimagine: async (id) => {
     try {
       const result = await window.electronAPI.mergeReimagine(id);
+      if (result.error) {
+        set({ error: result.error });
+        return null;
+      }
+      await get().fetchQueue();
+      await get().fetchHistory();
+      return result.data;
+    } catch (err) {
+      set({ error: String(err) });
+      return null;
+    }
+  },
+
+  rollback: async (id) => {
+    try {
+      const result = await window.electronAPI.mergeRollback(id);
       if (result.error) {
         set({ error: result.error });
         return null;

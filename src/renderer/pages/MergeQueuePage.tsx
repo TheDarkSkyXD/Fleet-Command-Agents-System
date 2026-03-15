@@ -197,6 +197,7 @@ function EnqueueDialog({
   open,
   onClose,
   onEnqueue,
+  existingEntries,
 }: {
   open: boolean;
   onClose: () => void;
@@ -205,11 +206,14 @@ function EnqueueDialog({
     task_id?: string;
     agent_name?: string;
     files_modified?: string[];
+    depends_on?: number[];
   }) => void;
+  existingEntries: MergeQueueEntry[];
 }) {
   const [branchName, setBranchName] = useState('');
   const [taskId, setTaskId] = useState('');
   const [agentName, setAgentName] = useState('');
+  const [selectedDeps, setSelectedDeps] = useState<number[]>([]);
 
   if (!open) return null;
 
@@ -220,11 +224,17 @@ function EnqueueDialog({
       branch_name: branchName.trim(),
       task_id: taskId.trim() || undefined,
       agent_name: agentName.trim() || undefined,
+      depends_on: selectedDeps.length > 0 ? selectedDeps : undefined,
     });
     setBranchName('');
     setTaskId('');
     setAgentName('');
+    setSelectedDeps([]);
     onClose();
+  };
+
+  const toggleDep = (id: number) => {
+    setSelectedDeps((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   };
 
   return (
@@ -271,6 +281,36 @@ function EnqueueDialog({
               className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
+          {existingEntries.length > 0 && (
+            <div>
+              <span className="block text-sm font-medium text-slate-300 mb-1">
+                Dependencies (optional)
+              </span>
+              <p className="text-xs text-slate-500 mb-2">
+                Select entries that must be merged before this branch
+              </p>
+              <div className="max-h-32 overflow-y-auto rounded-md border border-slate-600 bg-slate-900 p-2 space-y-1">
+                {existingEntries
+                  .filter((e) => e.status !== 'merged' && e.status !== 'failed')
+                  .map((e) => (
+                    <label
+                      key={e.id}
+                      className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:bg-slate-800 rounded p-1"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDeps.includes(e.id)}
+                        onChange={() => toggleDep(e.id)}
+                        className="rounded border-slate-600 bg-slate-800"
+                      />
+                      <span className="font-mono truncate">
+                        #{e.id} {e.branch_name}
+                      </span>
+                    </label>
+                  ))}
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -309,6 +349,7 @@ function QueueEntryRow({
   onAutoResolve,
   onAiResolve,
   onReimagine,
+  onRollback,
   onPreview,
   previewResult,
   previewLoading,
@@ -323,14 +364,27 @@ function QueueEntryRow({
   onAutoResolve?: (id: number) => void;
   onAiResolve?: (id: number) => void;
   onReimagine?: (id: number) => void;
+  onRollback?: (id: number) => void;
   onPreview?: (id: number) => void;
   previewResult?: PreviewResult | null;
   previewLoading?: boolean;
 }) {
   const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
+  const isBlocked = entry.blocked === true;
+  const dependsOn = entry.depends_on
+    ? (() => {
+        try {
+          return JSON.parse(entry.depends_on) as number[];
+        } catch {
+          return [];
+        }
+      })()
+    : [];
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-colors">
+    <div
+      className={`rounded-lg border bg-slate-800/50 hover:bg-slate-800 transition-colors ${isBlocked ? 'border-orange-700/40 opacity-75' : 'border-slate-700'}`}
+    >
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-4">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-mono text-slate-300">
@@ -340,11 +394,21 @@ function QueueEntryRow({
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm text-slate-50">{entry.branch_name}</span>
               <StatusBadge status={entry.status} />
+              {isBlocked && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/15 px-2 py-0.5 text-xs font-medium text-orange-400">
+                  {'\u23F3'} Waiting on deps
+                </span>
+              )}
             </div>
             <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
               {entry.agent_name && <span>Agent: {entry.agent_name}</span>}
               {entry.task_id && <span>Task: {entry.task_id}</span>}
               {entry.resolved_tier && <span>Tier: {entry.resolved_tier}</span>}
+              {dependsOn.length > 0 && (
+                <span className="text-orange-400/70">
+                  Depends on: {dependsOn.map((id) => `#${id}`).join(', ')}
+                </span>
+              )}
               <span>Enqueued: {new Date(entry.enqueued_at).toLocaleString()}</span>
             </div>
             {filesModified.length > 0 && (
@@ -362,7 +426,7 @@ function QueueEntryRow({
           >
             View Diff
           </button>
-          {entry.status === 'pending' && onPreview && (
+          {entry.status === 'pending' && !isBlocked && onPreview && (
             <button
               type="button"
               onClick={() => onPreview(entry.id)}
@@ -374,7 +438,7 @@ function QueueEntryRow({
               {previewLoading ? 'Checking...' : 'Dry-Run'}
             </button>
           )}
-          {entry.status === 'pending' && (
+          {entry.status === 'pending' && !isBlocked && (
             <button
               type="button"
               onClick={() => onExecute(entry.id)}
@@ -529,6 +593,7 @@ export function MergeQueuePage() {
     task_id?: string;
     agent_name?: string;
     files_modified?: string[];
+    depends_on?: number[];
   }) => {
     await enqueue(entry);
   };
@@ -765,6 +830,7 @@ export function MergeQueuePage() {
         open={showEnqueue}
         onClose={() => setShowEnqueue(false)}
         onEnqueue={handleEnqueue}
+        existingEntries={queue}
       />
 
       {/* Diff Loading Overlay */}
