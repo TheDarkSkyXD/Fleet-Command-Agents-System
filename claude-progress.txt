@@ -1,5 +1,42 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Merge History & Dependency Ordering)
+
+#### Feature #89: Merge history log with tier tracking - PASSING
+- Added completed_at column to merge_queue table with migration for existing DBs
+- All merge handlers (execute, auto-resolve, ai-resolve, reimagine, complete, fail) now set completed_at timestamp
+- History query sorts by completed_at DESC for proper chronological ordering
+- Created dedicated HistoryEntryRow component with:
+  - Color-coded outcome icons (checkmark for success, X for failed, warning for conflict)
+  - Prominent TierBadge showing tier number and label (Tier 1: Clean Merge through Tier 4: Reimagine)
+  - Timestamps for both enqueued and completed dates
+  - Agent/task metadata display
+- Added history summary bar showing total count, success/fail breakdown, and tier distribution
+
+#### Feature #90: Dependency-based merge ordering - PASSING
+- Updated merge:next IPC handler to skip entries whose dependencies aren't all merged
+  - Iterates pending entries in FIFO order, checks each entry's depends_on array
+  - Only returns entries where all dependency IDs have status='merged'
+- Updated merge:execute to block if any dependency is not yet merged (not just failed)
+- Updated merge:queue blocked computation: blocked = any dep not merged (was: only failed)
+- Queue UI shows "Waiting on deps" badge with orange styling on blocked entries
+- Merge and Dry-Run buttons hidden when entry is blocked
+- Dependency IDs shown in metadata row (e.g., "Depends on: #1, #3")
+- EnqueueDialog now has Dependencies section with checkbox list of existing queue entries
+- mergeStore enqueue accepts depends_on parameter
+
+#### Files Modified
+- MODIFIED: src/main/db/database.ts - Added completed_at column and migration
+- MODIFIED: src/main/ipc/handlers.ts - completed_at timestamps, dependency-aware merge:next, dependency blocking in merge:execute
+- MODIFIED: src/shared/types/index.ts - Added completed_at to MergeQueueEntry
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - HistoryEntryRow, TierBadge, blocked status UI, dependency selection in EnqueueDialog
+- MODIFIED: src/renderer/stores/mergeStore.ts - depends_on in enqueue type
+
+#### Current Status
+- 147/366 features passing (added #89 and #90 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Message Detail View & Unread Badge)
 
 #### Feature #78: Message detail view with full body - PASSING
