@@ -135,6 +135,38 @@ function validateIpcParams(
   return { valid: true };
 }
 
+/**
+ * Agent operation lock to serialize concurrent spawn/stop operations.
+ * Prevents race conditions when multiple spawn/stop requests arrive simultaneously.
+ * Node.js is single-threaded for synchronous code, but async gaps (e.g., tree-kill)
+ * can interleave operations. This lock ensures one operation completes before the next starts.
+ */
+class AgentOperationLock {
+  private queue: Array<{ resolve: () => void }> = [];
+  private locked = false;
+
+  async acquire(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.queue.push({ resolve });
+    });
+  }
+
+  release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      next.resolve();
+    } else {
+      this.locked = false;
+    }
+  }
+}
+
+const agentOpLock = new AgentOperationLock();
+
 export function registerIpcHandlers(): void {
   // Health check - verifies DB connection and WAL mode
   // Returns consistent { data, error } format
@@ -316,7 +348,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'agent:spawn',
-    (
+    async (
       _event,
       options: {
         id: string;
@@ -340,6 +372,9 @@ export function registerIpcHandlers(): void {
         { name: 'capability', type: 'string' },
       ]);
       if (!validation.valid) return { data: null, error: validation.error };
+
+      // Acquire operation lock to prevent concurrent spawn/stop race conditions
+      await agentOpLock.acquire();
       try {
         const capability = options.capability as AgentCapability;
         // Use runtime registry model resolution chain:
@@ -458,50 +493,56 @@ export function registerIpcHandlers(): void {
           'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
         ).get() as { id: string } | undefined;
 
-        // Insert session record into database with PID, model, file_scope, transcript_path, and project_id
-        loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, transcript_path, project_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?, ?, ?)`,
-        ).run(
-          options.id,
-          options.agent_name,
-          options.capability,
-          model,
-          options.run_id ?? null,
-          options.task_id ?? null,
-          options.parent_agent ?? null,
-          options.worktree_path ?? null,
-          options.branch_name ?? null,
-          options.depth ?? 0,
-          agentProcess.pid,
-          options.file_scope ?? null,
-          transcriptPath,
-          spawnActiveProject?.id ?? null,
-        );
-
-        // Transition to 'working' state after successful spawn
-        loggedPrepare(
-          `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
-        ).run(options.id);
-
-        // Upsert agent identity for persistent identity across sessions
-        const existingIdentity = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(
-          options.agent_name,
-        );
-        if (existingIdentity) {
-          // Update capability if changed, update timestamp
+        // Use a transaction to atomically insert session + update state + upsert identity
+        // This prevents partial writes if concurrent operations interleave
+        const db = getDatabase();
+        const spawnTransaction = db.transaction(() => {
+          // Insert session record into database with PID, model, file_scope, transcript_path, and project_id
           loggedPrepare(
-            `UPDATE agent_identities SET capability = ?, updated_at = datetime('now') WHERE name = ?`,
-          ).run(options.capability, options.agent_name);
-          log.info(`[IPC] agent:spawn - updated existing identity for ${options.agent_name}`);
-        } else {
-          // Create new identity record
+            `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, transcript_path, project_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?, ?, ?)`,
+          ).run(
+            options.id,
+            options.agent_name,
+            options.capability,
+            model,
+            options.run_id ?? null,
+            options.task_id ?? null,
+            options.parent_agent ?? null,
+            options.worktree_path ?? null,
+            options.branch_name ?? null,
+            options.depth ?? 0,
+            agentProcess.pid,
+            options.file_scope ?? null,
+            transcriptPath,
+            spawnActiveProject?.id ?? null,
+          );
+
+          // Transition to 'working' state after successful spawn
           loggedPrepare(
-            `INSERT INTO agent_identities (name, capability, sessions_completed, expertise_domains, recent_tasks)
-             VALUES (?, ?, 0, '[]', '[]')`,
-          ).run(options.agent_name, options.capability);
-          log.info(`[IPC] agent:spawn - created new identity for ${options.agent_name}`);
-        }
+            `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
+          ).run(options.id);
+
+          // Upsert agent identity for persistent identity across sessions
+          const existingIdentity = loggedPrepare(
+            'SELECT * FROM agent_identities WHERE name = ?',
+          ).get(options.agent_name);
+          if (existingIdentity) {
+            // Update capability if changed, update timestamp
+            loggedPrepare(
+              `UPDATE agent_identities SET capability = ?, updated_at = datetime('now') WHERE name = ?`,
+            ).run(options.capability, options.agent_name);
+            log.info(`[IPC] agent:spawn - updated existing identity for ${options.agent_name}`);
+          } else {
+            // Create new identity record
+            loggedPrepare(
+              `INSERT INTO agent_identities (name, capability, sessions_completed, expertise_domains, recent_tasks)
+               VALUES (?, ?, 0, '[]', '[]')`,
+            ).run(options.agent_name, options.capability);
+            log.info(`[IPC] agent:spawn - created new identity for ${options.agent_name}`);
+          }
+        });
+        spawnTransaction();
 
         const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(options.id);
         log.info(
@@ -537,6 +578,8 @@ export function registerIpcHandlers(): void {
       } catch (error) {
         log.error('agent:spawn failed:', error);
         return { data: null, error: String(error) };
+      } finally {
+        agentOpLock.release();
       }
     },
   );
@@ -546,6 +589,9 @@ export function registerIpcHandlers(): void {
       { name: 'agentId', type: 'string' },
     ]);
     if (!validation.valid) return { data: null, error: validation.error };
+
+    // Acquire operation lock to prevent concurrent spawn/stop race conditions
+    await agentOpLock.acquire();
     try {
       // Kill the node-pty process
       await agentProcessManager.stop(agentId);
@@ -696,35 +742,39 @@ export function registerIpcHandlers(): void {
         data: JSON.stringify({ reason: 'manual_stop' }),
       });
 
-      // Update agent identity: increment sessions_completed and track recent task
+      // Update agent identity in a transaction: increment sessions_completed and track recent task
       if (session?.agent_name) {
         const agentName = session.agent_name as string;
         const taskId = (session.task_id as string) || null;
         try {
-          loggedPrepare(
-            `UPDATE agent_identities SET sessions_completed = sessions_completed + 1, updated_at = datetime('now') WHERE name = ?`,
-          ).run(agentName);
+          const stopDb = getDatabase();
+          const stopIdentityTransaction = stopDb.transaction(() => {
+            loggedPrepare(
+              `UPDATE agent_identities SET sessions_completed = sessions_completed + 1, updated_at = datetime('now') WHERE name = ?`,
+            ).run(agentName);
 
-          // Append to recent_tasks (keep last 10)
-          if (taskId) {
-            const identity = loggedPrepare(
-              'SELECT recent_tasks FROM agent_identities WHERE name = ?',
-            ).get(agentName) as { recent_tasks: string } | undefined;
-            if (identity) {
-              let tasks: string[] = [];
-              try {
-                tasks = JSON.parse(identity.recent_tasks || '[]');
-              } catch {
-                tasks = [];
+            // Append to recent_tasks (keep last 10)
+            if (taskId) {
+              const identity = loggedPrepare(
+                'SELECT recent_tasks FROM agent_identities WHERE name = ?',
+              ).get(agentName) as { recent_tasks: string } | undefined;
+              if (identity) {
+                let tasks: string[] = [];
+                try {
+                  tasks = JSON.parse(identity.recent_tasks || '[]');
+                } catch {
+                  tasks = [];
+                }
+                tasks.unshift(taskId);
+                if (tasks.length > 10) tasks = tasks.slice(0, 10);
+                loggedPrepare('UPDATE agent_identities SET recent_tasks = ? WHERE name = ?').run(
+                  JSON.stringify(tasks),
+                  agentName,
+                );
               }
-              tasks.unshift(taskId);
-              if (tasks.length > 10) tasks = tasks.slice(0, 10);
-              loggedPrepare('UPDATE agent_identities SET recent_tasks = ? WHERE name = ?').run(
-                JSON.stringify(tasks),
-                agentName,
-              );
             }
-          }
+          });
+          stopIdentityTransaction();
           log.info(`[IPC] agent:stop - updated identity for ${agentName}: sessions_completed++`);
         } catch (identityErr) {
           log.warn(`[IPC] agent:stop - failed to update identity for ${agentName}:`, identityErr);
@@ -735,10 +785,14 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('agent:stop failed:', error);
       return { data: null, error: String(error) };
+    } finally {
+      agentOpLock.release();
     }
   });
 
   ipcMain.handle('agent:stop-all', async () => {
+    // Acquire operation lock to prevent concurrent spawn/stop race conditions
+    await agentOpLock.acquire();
     try {
       // Kill all node-pty processes first
       const processesKilled = await agentProcessManager.stopAll();
@@ -766,6 +820,8 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('agent:stop-all failed:', error);
       return { data: null, error: String(error) };
+    } finally {
+      agentOpLock.release();
     }
   });
 
@@ -3489,28 +3545,49 @@ export function registerIpcHandlers(): void {
     const validation = validateIpcParams('issue:delete', { id }, [{ name: 'id', type: 'string' }]);
     if (!validation.valid) return { data: false, error: validation.error };
     try {
-      // Check if issue belongs to a task group and clean up member_issues reference
-      const issue = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(id) as
-        | { group_id: string | null }
-        | undefined;
-      if (issue?.group_id) {
-        const group = loggedPrepare('SELECT member_issues FROM task_groups WHERE id = ?').get(
-          issue.group_id,
-        ) as { member_issues: string | null } | undefined;
-        if (group) {
-          try {
-            const members: string[] = JSON.parse(group.member_issues || '[]');
-            const updated = members.filter((m: string) => m !== id);
-            loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(
-              JSON.stringify(updated),
-              issue.group_id,
-            );
-          } catch {
-            // member_issues parse failed, skip cleanup
+      // Use a transaction to atomically delete issue and clean up parent references
+      const issueDb = getDatabase();
+      const deleteIssueTransaction = issueDb.transaction(() => {
+        // Check if issue belongs to a task group and clean up member_issues reference
+        const issue = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(id) as
+          | { group_id: string | null }
+          | undefined;
+        if (issue?.group_id) {
+          const group = loggedPrepare('SELECT member_issues FROM task_groups WHERE id = ?').get(
+            issue.group_id,
+          ) as { member_issues: string | null } | undefined;
+          if (group) {
+            try {
+              const members: string[] = JSON.parse(group.member_issues || '[]');
+              const updated = members.filter((m: string) => m !== id);
+              loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(
+                JSON.stringify(updated),
+                issue.group_id,
+              );
+            } catch {
+              // member_issues parse failed, skip cleanup
+            }
           }
         }
-      }
-      loggedPrepare('DELETE FROM issues WHERE id = ?').run(id);
+        // Remove this issue from any other issues' dependency lists
+        const allIssues = loggedPrepare('SELECT id, dependencies FROM issues WHERE dependencies IS NOT NULL').all() as Array<{ id: string; dependencies: string }>;
+        for (const other of allIssues) {
+          try {
+            const deps: string[] = JSON.parse(other.dependencies || '[]');
+            if (deps.includes(id)) {
+              const updatedDeps = deps.filter((d: string) => d !== id);
+              loggedPrepare('UPDATE issues SET dependencies = ? WHERE id = ?').run(
+                JSON.stringify(updatedDeps),
+                other.id,
+              );
+            }
+          } catch {
+            // dependencies parse failed, skip
+          }
+        }
+        loggedPrepare('DELETE FROM issues WHERE id = ?').run(id);
+      });
+      deleteIssueTransaction();
       log.info(`[IPC] issue:delete - DELETE issue from real database: id=${id}`);
       return { data: true, error: null };
     } catch (error) {
@@ -3725,11 +3802,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('taskGroup:delete', (_event, id: string) => {
     try {
-      // Remove group_id from all member issues
-      loggedPrepare(
-        "UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE group_id = ?",
-      ).run(id);
-      loggedPrepare('DELETE FROM task_groups WHERE id = ?').run(id);
+      // Use a transaction to atomically remove group and unlink member issues
+      const groupDb = getDatabase();
+      const deleteGroupTransaction = groupDb.transaction(() => {
+        // Remove group_id from all member issues
+        loggedPrepare(
+          "UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE group_id = ?",
+        ).run(id);
+        loggedPrepare('DELETE FROM task_groups WHERE id = ?').run(id);
+      });
+      deleteGroupTransaction();
       log.info(`[IPC] taskGroup:delete - DELETE group from real database: id=${id}`);
       return { data: true, error: null };
     } catch (error) {
@@ -5220,8 +5302,41 @@ export function registerIpcHandlers(): void {
     ]);
     if (!validation.valid) return { data: false, error: validation.error };
     try {
-      loggedPrepare('DELETE FROM projects WHERE id = ?').run(id);
-      log.info(`[IPC] project:delete - DELETE project from real database: id=${id}`);
+      // Use a transaction to cascade delete all child records atomically
+      const deleteDb = getDatabase();
+      const deleteProjectTransaction = deleteDb.transaction(() => {
+        // Delete quality gate results for this project
+        loggedPrepare('DELETE FROM quality_gate_results WHERE project_id = ?').run(id);
+        // Delete quality gates for this project
+        loggedPrepare('DELETE FROM quality_gates WHERE project_id = ?').run(id);
+        // Delete discovery findings linked to scans for this project
+        const scanIds = loggedPrepare(
+          'SELECT id FROM discovery_scans WHERE project_id = ?',
+        ).all(id) as Array<{ id: string }>;
+        for (const scan of scanIds) {
+          loggedPrepare('DELETE FROM discovery_findings WHERE scan_id = ?').run(scan.id);
+        }
+        // Delete discovery scans for this project
+        loggedPrepare('DELETE FROM discovery_scans WHERE project_id = ?').run(id);
+        // Delete hooks for this project
+        const hookIds = loggedPrepare('SELECT id FROM hooks WHERE project_id = ?').all(id) as Array<{
+          id: string;
+        }>;
+        for (const hook of hookIds) {
+          loggedPrepare('DELETE FROM hook_events WHERE hook_id = ?').run(hook.id);
+        }
+        loggedPrepare('DELETE FROM hooks WHERE project_id = ?').run(id);
+        // Nullify project_id on sessions (preserve session history but unlink)
+        loggedPrepare(
+          "UPDATE sessions SET project_id = NULL, updated_at = datetime('now') WHERE project_id = ?",
+        ).run(id);
+        // Delete the project itself
+        loggedPrepare('DELETE FROM projects WHERE id = ?').run(id);
+      });
+      deleteProjectTransaction();
+      log.info(
+        `[IPC] project:delete - DELETE project and cascaded child records from real database: id=${id}`,
+      );
       return { data: true, error: null };
     } catch (error) {
       log.error('project:delete failed:', error);
@@ -6368,10 +6483,10 @@ export function registerIpcHandlers(): void {
         return { data: null, error: null };
       }
 
-      // Get count of sessions linked to this run
+      // Get count of ACTIVE (non-completed) sessions linked to this run
       const typedRun = run as { id: string };
       const agentCountRow = loggedPrepare(
-        'SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ?',
+        "SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ? AND state != 'completed'",
       ).get(typedRun.id) as { cnt: number };
 
       // Update agent_count in the run record
@@ -8074,11 +8189,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('prompt:delete', (_event, id: string) => {
     try {
-      // Delete versions first
-      loggedPrepare('DELETE FROM prompt_versions WHERE prompt_id = ?').run(id);
-      // Unlink children (set parent_id to null)
-      loggedPrepare('UPDATE prompts SET parent_id = NULL WHERE parent_id = ?').run(id);
-      loggedPrepare('DELETE FROM prompts WHERE id = ?').run(id);
+      // Use a transaction to atomically delete prompt, its versions, and unlink children
+      const promptDb = getDatabase();
+      const deletePromptTransaction = promptDb.transaction(() => {
+        // Delete versions first
+        loggedPrepare('DELETE FROM prompt_versions WHERE prompt_id = ?').run(id);
+        // Unlink children (set parent_id to null)
+        loggedPrepare('UPDATE prompts SET parent_id = NULL WHERE parent_id = ?').run(id);
+        loggedPrepare('DELETE FROM prompts WHERE id = ?').run(id);
+      });
+      deletePromptTransaction();
       log.info(`[IPC] prompt:delete - DELETE prompt id=${id}`);
       return { data: true, error: null };
     } catch (error) {
