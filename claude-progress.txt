@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Prompt Git Sync & Guard Rule Preview)
+
+#### Feature #361: Prompt sync with git - PASSING
+- Added prompt:git-sync IPC handler that exports all prompts as markdown files with YAML frontmatter to .overstory/prompts/
+- Handles staging, committing, and cleanup of deleted prompt files
+- Added prompt:git-log IPC handler returning last 20 git commits affecting prompts directory
+- Added "Sync to Git" button with loading state and toast feedback (success/info/error)
+- Added "Git History" toggle panel showing commit hash, message, date, author
+- Updated types (ElectronAPI) and preload bridge for both new IPC channels
+
+#### Feature #362: Guard rule preview what agent can do - PASSING
+- Added "Preview Permissions" tab (TabId: 'preview') to GuardRulesPage
+- Left panel: agent type selector with capability colors and security posture badges
+- Right panel shows comprehensive effective permissions for selected agent:
+  - Allowed tools (green badges with checkmark icons)
+  - Blocked tools (red badges, computed as ALL_TOOLS minus allowlist)
+  - Bash restrictions (red mono-font entries)
+  - Path boundaries (with type labels: worktree/directory/glob)
+  - File scope (emerald text)
+- All sections have data-testid attributes for testing
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - prompt:git-sync, prompt:git-log handlers
+- MODIFIED: src/preload/index.ts - promptGitSync, promptGitLog bridge methods
+- MODIFIED: src/shared/types/index.ts - ElectronAPI type additions
+- MODIFIED: src/renderer/pages/PromptsPage.tsx - Sync to Git button, Git History panel
+- MODIFIED: src/renderer/pages/GuardRulesPage.tsx - Preview Permissions tab
+
+#### Current Status
+- 362/366 features passing (added #361 and #362 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (App Preview Dev Server)
 
 #### Feature #365: Run app preview to see agent changes - PASSING
