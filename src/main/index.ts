@@ -5,6 +5,7 @@ import windowStateKeeper from 'electron-window-state';
 import { closeDatabase, initDatabase } from './db/database';
 import { registerIpcHandlers } from './ipc/handlers';
 import { agentProcessManager } from './services/agentProcessManager';
+import { checkpointService } from './services/checkpointService';
 import { type TrayIconStatus, generateTrayIcon } from './services/trayIconGenerator';
 import { checkForUpdates, initAutoUpdater } from './services/updateService';
 import { watchdogService } from './services/watchdogService';
@@ -278,6 +279,18 @@ app.whenReady().then(async () => {
 
   // Register IPC handlers
   registerIpcHandlers();
+
+  // Restore checkpoints from previous session
+  try {
+    const recoveryStatus = checkpointService.restore();
+    if (recoveryStatus.checkpointsFound > 0) {
+      log.info(
+        `[Startup] Restored ${recoveryStatus.checkpointsFound} checkpoint(s), ${recoveryStatus.processesAlive} process(es) still alive`,
+      );
+    }
+  } catch (error) {
+    log.error('[Startup] Failed to restore checkpoints:', error);
+  }
 
   // Start watchdog daemon for agent liveness monitoring
   watchdogService.start();

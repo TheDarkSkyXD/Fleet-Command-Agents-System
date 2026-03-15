@@ -6,6 +6,7 @@ import {
   agentProcessManager,
   getDefaultModel,
 } from '../services/agentProcessManager';
+import { checkpointService } from '../services/checkpointService';
 import {
   clearClaudeCliCache,
   detectClaudeCli,
@@ -2387,6 +2388,214 @@ export function registerIpcHandlers(): void {
       return { data: true, error: null };
     } catch (error) {
       log.error('checkpoint:delete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('checkpoint:recovery-status', () => {
+    try {
+      const status = checkpointService.getRecoveryStatus();
+      log.info('[IPC] checkpoint:recovery-status - returning recovery status');
+      return { data: status, error: null };
+    } catch (error) {
+      log.error('checkpoint:recovery-status failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('checkpoint:clear-all', () => {
+    try {
+      const deleted = checkpointService.clearCheckpoints();
+      log.info(`[IPC] checkpoint:clear-all - cleared ${deleted} checkpoints`);
+      return { data: { deleted }, error: null };
+    } catch (error) {
+      log.error('checkpoint:clear-all failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ==========================================
+  // Expertise Records
+  // ==========================================
+
+  ipcMain.handle(
+    'expertise:list',
+    (
+      _event,
+      filters?: { domain?: string; type?: string; classification?: string; search?: string },
+    ) => {
+      try {
+        let sql = 'SELECT * FROM expertise_records WHERE 1=1';
+        const params: unknown[] = [];
+
+        if (filters?.domain) {
+          sql += ' AND domain = ?';
+          params.push(filters.domain);
+        }
+        if (filters?.type) {
+          sql += ' AND type = ?';
+          params.push(filters.type);
+        }
+        if (filters?.classification) {
+          sql += ' AND classification = ?';
+          params.push(filters.classification);
+        }
+        if (filters?.search) {
+          sql += ' AND (title LIKE ? OR content LIKE ? OR domain LIKE ?)';
+          const searchTerm = `%${filters.search}%`;
+          params.push(searchTerm, searchTerm, searchTerm);
+        }
+
+        sql += ' ORDER BY updated_at DESC';
+
+        const records = loggedPrepare(sql).all(...params);
+        log.info(`[IPC] expertise:list - found ${(records as unknown[]).length} records`);
+        return { data: records, error: null };
+      } catch (error) {
+        log.error('expertise:list failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('expertise:domains', () => {
+    try {
+      const domains = loggedPrepare(
+        `SELECT domain, COUNT(*) as record_count FROM expertise_records GROUP BY domain ORDER BY domain ASC`,
+      ).all() as Array<{ domain: string; record_count: number }>;
+
+      // For each domain, get type breakdown
+      const result = domains.map((d) => {
+        const types = loggedPrepare(
+          `SELECT type, COUNT(*) as cnt FROM expertise_records WHERE domain = ? GROUP BY type`,
+        ).all(d.domain) as Array<{ type: string; cnt: number }>;
+
+        const typeMap: Record<string, number> = {};
+        for (const t of types) {
+          typeMap[t.type] = t.cnt;
+        }
+
+        return {
+          domain: d.domain,
+          record_count: d.record_count,
+          types: typeMap,
+        };
+      });
+
+      log.info(`[IPC] expertise:domains - found ${result.length} domains`);
+      return { data: result, error: null };
+    } catch (error) {
+      log.error('expertise:domains failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'expertise:create',
+    (
+      _event,
+      record: {
+        id: string;
+        domain: string;
+        title: string;
+        content: string;
+        type: string;
+        classification: string;
+        agent_name?: string;
+        source_file?: string;
+        tags?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          `INSERT INTO expertise_records (id, domain, title, content, type, classification, agent_name, source_file, tags)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          record.id,
+          record.domain,
+          record.title,
+          record.content,
+          record.type,
+          record.classification,
+          record.agent_name ?? null,
+          record.source_file ?? null,
+          record.tags ?? null,
+        );
+
+        const created = loggedPrepare('SELECT * FROM expertise_records WHERE id = ?').get(
+          record.id,
+        );
+        log.info(
+          `[IPC] expertise:create - INSERT into real database: domain=${record.domain}, title=${record.title}`,
+        );
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('expertise:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('expertise:get', (_event, id: string) => {
+    try {
+      const record = loggedPrepare('SELECT * FROM expertise_records WHERE id = ?').get(id);
+      log.info(`[IPC] expertise:get - SELECT from real database: id=${id}`);
+      return { data: record ?? null, error: null };
+    } catch (error) {
+      log.error('expertise:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('expertise:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM expertise_records WHERE id = ?').run(id);
+      log.info(`[IPC] expertise:delete - DELETE from real database: id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('expertise:delete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('expertise:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      const allowedFields = [
+        'domain',
+        'title',
+        'content',
+        'type',
+        'classification',
+        'agent_name',
+        'source_file',
+        'tags',
+      ];
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (allowedFields.includes(key)) {
+          setClauses.push(`${key} = ?`);
+          values.push(value);
+        }
+      }
+
+      if (setClauses.length === 0) {
+        return { data: null, error: 'No valid fields to update' };
+      }
+
+      setClauses.push("updated_at = datetime('now')");
+      values.push(id);
+
+      loggedPrepare(`UPDATE expertise_records SET ${setClauses.join(', ')} WHERE id = ?`).run(
+        ...values,
+      );
+
+      const updated = loggedPrepare('SELECT * FROM expertise_records WHERE id = ?').get(id);
+      log.info(`[IPC] expertise:update - UPDATE in real database: id=${id}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('expertise:update failed:', error);
       return { data: null, error: String(error) };
     }
   });

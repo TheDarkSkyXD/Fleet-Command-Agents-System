@@ -191,6 +191,26 @@ export interface Checkpoint {
   timestamp: string;
 }
 
+export interface CheckpointRestoreResult {
+  agentName: string;
+  taskId: string | null;
+  sessionId: string | null;
+  progressSummary: string | null;
+  filesModified: string | null;
+  currentBranch: string | null;
+  pendingWork: string | null;
+  processAlive: boolean;
+  restored: boolean;
+  timestamp: string;
+}
+
+export interface RecoveryStatus {
+  checkpointsFound: number;
+  processesAlive: number;
+  restored: CheckpointRestoreResult[];
+  recoveryTimestamp: string;
+}
+
 // Issue types
 export type IssueType = 'task' | 'bug' | 'feature' | 'research' | 'spike';
 export type IssuePriority = 'critical' | 'high' | 'medium' | 'low';
@@ -274,6 +294,64 @@ export interface ToolStats {
   min_duration_ms: number | null;
   max_duration_ms: number | null;
   total_duration_ms: number | null;
+}
+
+// Expertise record types
+export type ExpertiseType =
+  | 'convention'
+  | 'pattern'
+  | 'failure'
+  | 'decision'
+  | 'reference'
+  | 'guide';
+export type ExpertiseClassification = 'foundational' | 'tactical' | 'observational';
+
+export interface ExpertiseRecord {
+  id: string;
+  domain: string;
+  title: string;
+  content: string;
+  type: ExpertiseType;
+  classification: ExpertiseClassification;
+  agent_name: string | null;
+  source_file: string | null;
+  tags: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpertiseDomainSummary {
+  domain: string;
+  record_count: number;
+  types: Record<string, number>;
+}
+
+// Discovery types
+export type DiscoveryCategory = 'architecture' | 'dependencies' | 'testing' | 'apis' | 'config' | 'conventions';
+export type DiscoveryScanStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type FindingSeverity = 'info' | 'warning' | 'important';
+
+export interface DiscoveryScan {
+  id: string;
+  project_id: string | null;
+  status: DiscoveryScanStatus;
+  categories: string; // JSON array of DiscoveryCategory
+  progress: string | null; // JSON object tracking per-category progress
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface DiscoveryFinding {
+  id: string;
+  scan_id: string;
+  category: DiscoveryCategory;
+  title: string;
+  description: string;
+  file_path: string | null;
+  line_number: number | null;
+  severity: FindingSeverity;
+  created_at: string;
 }
 
 // App log entry
@@ -612,11 +690,71 @@ export interface ElectronAPI {
     error: string | null;
   }>;
 
+  // Expertise
+  expertiseList: (filters?: {
+    domain?: string;
+    type?: string;
+    classification?: string;
+    search?: string;
+  }) => Promise<{ data: ExpertiseRecord[] | null; error: string | null }>;
+  expertiseDomains: () => Promise<{ data: ExpertiseDomainSummary[] | null; error: string | null }>;
+  expertiseCreate: (record: {
+    id: string;
+    domain: string;
+    title: string;
+    content: string;
+    type: string;
+    classification: string;
+    agent_name?: string;
+    source_file?: string;
+    tags?: string;
+  }) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
+  expertiseGet: (id: string) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
+  expertiseDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  expertiseUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
+
+  // Discovery
+  discoveryList: () => Promise<{ data: DiscoveryScan[] | null; error: string | null }>;
+  discoveryGet: (id: string) => Promise<{ data: DiscoveryScan | null; error: string | null }>;
+  discoveryStart: (options: {
+    id: string;
+    categories: string[];
+    project_id?: string;
+  }) => Promise<{ data: DiscoveryScan | null; error: string | null }>;
+  discoveryComplete: (id: string) => Promise<{ data: DiscoveryScan | null; error: string | null }>;
+  discoveryDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  discoveryUpdateProgress: (
+    id: string,
+    progress: Record<string, string>,
+  ) => Promise<{ data: DiscoveryScan | null; error: string | null }>;
+  discoveryFindings: (
+    scanId: string,
+    category?: string,
+  ) => Promise<{ data: DiscoveryFinding[] | null; error: string | null }>;
+  discoveryAddFinding: (finding: {
+    id: string;
+    scan_id: string;
+    category: string;
+    title: string;
+    description: string;
+    file_path?: string;
+    line_number?: number;
+    severity?: string;
+  }) => Promise<{ data: DiscoveryFinding | null; error: string | null }>;
+
   // Checkpoints
   checkpointList: () => Promise<{ data: Checkpoint[] | null; error: string | null }>;
   checkpointGet: (agentName: string) => Promise<{ data: Checkpoint | null; error: string | null }>;
   checkpointSaveNow: () => Promise<{ data: { saved: number } | null; error: string | null }>;
   checkpointDelete: (agentName: string) => Promise<{ data: boolean; error: string | null }>;
+  checkpointRecoveryStatus: () => Promise<{
+    data: RecoveryStatus | null;
+    error: string | null;
+  }>;
+  checkpointClearAll: () => Promise<{ data: { deleted: number } | null; error: string | null }>;
 
   // Notifications
   notificationSend: (options: {

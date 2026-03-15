@@ -256,11 +256,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   appLogImportNdjson: (ndjsonContent: string) =>
     ipcRenderer.invoke('appLog:import-ndjson', ndjsonContent),
 
+  // Expertise
+  expertiseList: (filters?: {
+    domain?: string;
+    type?: string;
+    classification?: string;
+    search?: string;
+  }) => ipcRenderer.invoke('expertise:list', filters),
+  expertiseDomains: () => ipcRenderer.invoke('expertise:domains'),
+  expertiseCreate: (record: {
+    id: string;
+    domain: string;
+    title: string;
+    content: string;
+    type: string;
+    classification: string;
+    agent_name?: string;
+    source_file?: string;
+    tags?: string;
+  }) => ipcRenderer.invoke('expertise:create', record),
+  expertiseGet: (id: string) => ipcRenderer.invoke('expertise:get', id),
+  expertiseDelete: (id: string) => ipcRenderer.invoke('expertise:delete', id),
+  expertiseUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('expertise:update', id, updates),
+
   // Checkpoints
   checkpointList: () => ipcRenderer.invoke('checkpoint:list'),
   checkpointGet: (agentName: string) => ipcRenderer.invoke('checkpoint:get', agentName),
   checkpointSaveNow: () => ipcRenderer.invoke('checkpoint:save-now'),
   checkpointDelete: (agentName: string) => ipcRenderer.invoke('checkpoint:delete', agentName),
+  checkpointRecoveryStatus: () => ipcRenderer.invoke('checkpoint:recovery-status'),
+  checkpointClearAll: () => ipcRenderer.invoke('checkpoint:clear-all'),
 
   // Notifications
   notificationSend: (options: {
