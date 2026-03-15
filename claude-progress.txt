@@ -3112,3 +3112,32 @@
 - 199/366 features passing (added #168 and #175 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Metrics Dashboard and Quality Gates Per Agent)
+
+#### Feature #186: Metrics dashboard with summary statistics - PASSING
+- Added data-testid attributes to all summary cards (total sessions, total tokens, total duration, estimated cost)
+- Added data-testid="metrics-dashboard" to main container and data-testid="metrics-summary" to card grid
+- Added Token Usage Breakdown chart with horizontal progress bars for input/output/cache read/cache creation tokens
+- Each bar shows count and percentage of total tokens
+- Chart only renders when summary data exists and totalTokens > 0
+- All data fetched from real database via metricsSummary IPC
+
+#### Feature #198: Quality gate status per agent - PASSING
+- Added Gates tab with FiShield icon to AgentDetailPage tab bar
+- AgentGatesTab component fetches quality gate results via qualityGateResults IPC filtered by agent_name
+- Each gate result shows pass/fail/error/running/pending status with color-coded icons and badges
+- Green checkmark for passed, red alert for failed, amber alert for error, blue spinner for running
+- Header summary shows passed count and failed count
+- Each gate row shows gate name, type badge, duration, and command
+- Clickable to expand with full details: run timestamp, exit code, stdout, stderr
+- Empty state shown when no gate results exist
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MetricsPage.tsx - Token chart, data-testid attributes, TokenBar component
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Added gates tab and AgentGatesTab component
+
+#### Current Status
+- 201/366 features passing (added #186 and #198 this session)
+- All code passes Biome lint (only pre-existing noArrayIndexKey warning) and Vite build
+- No mock data patterns in codebase
