@@ -33,10 +33,21 @@
 - Added complete IPC handlers: agent:spawn, agent:stop, agent:stop-all, agent:nudge, mail:send, mail:read, mail:purge, merge:execute, merge:preview, merge:history, claude:status, claude:detect, update:check, doctor:run, cleanup:execute, db:status
 - Updated preload and shared types to match new IPC handlers
 
+#### Feature #1: Database connection established - PASSING
+- better-sqlite3 connects in WAL mode on app startup
+- health:check IPC returns database: 'connected', walMode: 'wal', foreignKeys: true, dbPath
+- Database file created on disk at userData/fleet-command.db
+
+#### Feature #2: Database schema applied correctly - PASSING
+- All 10 tables from spec created: sessions, runs, messages, events, metrics, merge_queue, task_groups, agent_identities, checkpoints, app_settings
+- All columns match spec schema
+- Indexes created for common queries (sessions.state, messages.to_agent, events.run_id, etc.)
+- db:status IPC handler provides full schema introspection
+
 #### Current Status
-- 3/366 features passing (Features #3, #4, #5)
-- Infrastructure features (0-4) being handled by multiple agents
-- Project compiles cleanly with Biome lint
+- 5/366 features passing (Features #1, #2, #3, #4, #5)
+- All 5 infrastructure features complete
+- Project compiles cleanly: Biome lint, TypeScript, and Vite build all pass
 
 #### Architecture Notes
 - IPC handlers: `src/main/ipc/handlers.ts` - all database-backed handlers via loggedPrepare()
