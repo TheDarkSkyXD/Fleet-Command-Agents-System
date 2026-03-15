@@ -1838,10 +1838,7 @@ export function registerIpcHandlers(): void {
 
         // Insert a message copy for each resolved recipient
         for (const recipient of recipients) {
-          const msgId =
-            recipients.length === 1
-              ? message.id
-              : `${message.id}-${sentCount}`;
+          const msgId = recipients.length === 1 ? message.id : `${message.id}-${sentCount}`;
 
           loggedPrepare(
             `INSERT INTO messages (id, thread_id, from_agent, to_agent, subject, body, type, priority, payload)

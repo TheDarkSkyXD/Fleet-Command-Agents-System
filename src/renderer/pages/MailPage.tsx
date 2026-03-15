@@ -17,11 +17,7 @@ import {
 } from 'react-icons/fi';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { Message, MessagePriority, MessageType } from '../../shared/types';
-import {
-  GROUP_BROADCAST_ADDRESSES,
-  PAYLOAD_TEMPLATES,
-  PROTOCOL_TYPES,
-} from '../../shared/types';
+import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
 
 type MailTab = 'inbox' | 'outbox' | 'all';
 
@@ -1039,13 +1035,27 @@ export function MailPage() {
                         <input
                           id="compose-to"
                           type="text"
+                          list="group-addresses"
                           value={composeForm.to_agent}
                           onChange={(e) =>
                             setComposeForm((f) => ({ ...f, to_agent: e.target.value }))
                           }
-                          placeholder="e.g. builder-1"
+                          placeholder="e.g. builder-1 or @all"
                           className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
                         />
+                        <datalist id="group-addresses">
+                          {GROUP_BROADCAST_ADDRESSES.map((addr) => (
+                            <option key={addr} value={addr} />
+                          ))}
+                        </datalist>
+                        {composeForm.to_agent.startsWith('@') && (
+                          <p className="mt-1 text-xs text-amber-400">
+                            Broadcast: message will be sent to all{' '}
+                            {composeForm.to_agent === '@all'
+                              ? 'active agents'
+                              : `${composeForm.to_agent.slice(1)} agents`}
+                          </p>
+                        )}
                       </div>
                     </div>
 
