@@ -1505,6 +1505,7 @@ export function AgentDefinitionsPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                data-testid="export-definitions-confirm"
                 onClick={handleExport}
                 className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-500 transition-colors"
               >
@@ -1513,6 +1514,7 @@ export function AgentDefinitionsPage() {
               </button>
               <button
                 type="button"
+                data-testid="export-definitions-cancel"
                 onClick={() => {
                   setShowExportSelect(false);
                   setSelectedForExport(new Set());
@@ -1525,6 +1527,7 @@ export function AgentDefinitionsPage() {
           ) : (
             <button
               type="button"
+              data-testid="export-definitions-btn"
               onClick={() => setShowExportSelect(true)}
               className="flex items-center gap-2 px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 transition-colors"
             >
@@ -1568,6 +1571,7 @@ export function AgentDefinitionsPage() {
                 <div className="absolute top-3 right-3 z-10">
                   <input
                     type="checkbox"
+                    data-testid={`export-select-${def.role}`}
                     checked={selectedForExport.has(def.role)}
                     onChange={() => toggleExportSelection(def.role)}
                     className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 cursor-pointer"
