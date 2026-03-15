@@ -25,7 +25,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mailUnreadCount: () => ipcRenderer.invoke('mail:unread-count'),
   mailSend: (message: Record<string, unknown>) => ipcRenderer.invoke('mail:send', message),
   mailMarkRead: (id: string) => ipcRenderer.invoke('mail:read', id),
+  mailCheck: (agentId: string, agentName: string) =>
+    ipcRenderer.invoke('mail:check', agentId, agentName),
+  mailMarkAllRead: (agentName?: string) => ipcRenderer.invoke('mail:mark-all-read', agentName),
   mailPurge: (options?: Record<string, unknown>) => ipcRenderer.invoke('mail:purge', options),
+  mailThread: (threadId: string) => ipcRenderer.invoke('mail:thread', threadId),
 
   // Merge
   mergeQueue: () => ipcRenderer.invoke('merge:queue'),
