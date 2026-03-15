@@ -98,7 +98,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-2">
+      <nav data-testid="sidebar-nav" className="flex-1 space-y-1 p-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;

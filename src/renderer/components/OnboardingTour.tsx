@@ -4,6 +4,8 @@ import { FiArrowRight, FiPlay, FiX } from 'react-icons/fi';
 export interface TourStep {
   /** CSS selector or data-testid to anchor the tooltip to */
   targetSelector: string;
+  /** Unique identifier for this step (used for data-testid) */
+  stepId: string;
   /** Title of the tooltip */
   title: string;
   /** Description text */
@@ -14,7 +16,16 @@ export interface TourStep {
 
 const TOUR_STEPS: TourStep[] = [
   {
+    targetSelector: '[data-testid="sidebar-nav"]',
+    stepId: 'sidebar',
+    title: 'Sidebar Navigation',
+    description:
+      'This is your main navigation panel. Use it to switch between Agents, Mail, Merge Queue, Worktrees, Tasks, Metrics, and more. Each section gives you control over a different aspect of your fleet. The sidebar can be collapsed for more workspace.',
+    position: 'right',
+  },
+  {
     targetSelector: '[data-testid="spawn-agent-button"]',
+    stepId: 'spawn-agent',
     title: 'Spawn Your First Agent',
     description:
       'Click here to spawn an AI coding agent. Choose a capability (scout, builder, reviewer, etc.), select a model, and optionally set a file scope to restrict which files the agent can modify.',
@@ -22,13 +33,15 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     targetSelector: '[data-testid="nav-mail"]',
+    stepId: 'mail',
     title: 'Check Agent Mail',
     description:
-      'Agents communicate via an internal mail system. Check the inbox to see status updates, questions, and results from your agents. You can also send messages to coordinate work.',
+      'Agents communicate via an internal mail system. Check the inbox to see status updates, questions, and results from your agents. You can also send messages to coordinate work. Unread messages are indicated by a badge on the Mail icon.',
     position: 'right',
   },
   {
     targetSelector: '[data-testid="nav-merge"]',
+    stepId: 'merge',
     title: 'Merge Workflow',
     description:
       'When agents finish their work, their branches are enqueued here for merging. Review the queue, preview diffs, and merge changes into your main branch. The system supports 4 resolution tiers: clean merge, auto-resolve, AI-resolve, and reimagine.',
@@ -223,7 +236,7 @@ export function OnboardingTour() {
       {/* Tooltip */}
       <div
         ref={tooltipRef}
-        data-testid="onboarding-tooltip"
+        data-testid={`onboarding-tooltip-${step.stepId}`}
         className="absolute w-80 rounded-xl border border-blue-500/30 bg-slate-800 shadow-2xl shadow-blue-500/10 pointer-events-auto"
         style={{
           top: tooltipPos.top,
