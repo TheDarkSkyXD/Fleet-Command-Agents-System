@@ -464,6 +464,7 @@ function AgentLogsTab({ agentName }: { agentName: string }) {
               key={f}
               type="button"
               onClick={() => setFilter(f)}
+              data-testid={`log-filter-${f}`}
               className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                 filter === f
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'

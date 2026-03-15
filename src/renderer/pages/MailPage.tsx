@@ -677,6 +677,7 @@ export function MailPage() {
                 type="button"
                 onClick={() => handleSearchChange('')}
                 className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                data-testid="mail-search-clear"
               >
                 <FiX size={14} />
               </button>
@@ -1445,7 +1446,7 @@ function VirtualizedMailList({
   });
 
   return (
-    <div ref={parentRef} className="flex-1 overflow-y-auto" data-testid="virtualized-mail-list">
+    <div ref={parentRef} className="flex-1 overflow-y-auto" data-testid="virtualized-mail-list" data-message-count={messages.length}>
       <div
         style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}
       >

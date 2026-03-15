@@ -1115,7 +1115,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     state: {
       sorting,
       columnFilters,
-      globalFilter,
+      globalFilter: globalFilter.trim(),
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -1209,7 +1209,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       <CoordinatorPanel />
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3" data-testid="agent-filter-bar" data-filters-active={globalFilter !== '' || capabilityFilter !== 'all' ? 'true' : 'false'}>
+      <div className="flex items-center gap-3" data-testid="agent-filter-bar" data-filters-active={globalFilter.trim() !== '' || capabilityFilter !== 'all' ? 'true' : 'false'}>
         {/* Global search */}
         <div className="relative flex-1 max-w-sm">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -1227,6 +1227,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
               onClick={() => setGlobalFilter('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
               title="Clear search"
+              data-testid="agent-search-clear"
             >
               <FiX className="h-3.5 w-3.5" />
             </button>
@@ -1401,7 +1402,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             />
           </table>
           {/* Table footer with count */}
-          <div className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500">
+          <div className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500" data-testid="agent-filter-count" data-filtered-count={filteredRows.length} data-total-count={sessions.length}>
             Showing {filteredRows.length} of {sessions.length} agents
           </div>
         </div>
