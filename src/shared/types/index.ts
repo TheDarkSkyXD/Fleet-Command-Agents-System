@@ -1056,6 +1056,10 @@ export interface ElectronAPI {
     error: string | null;
   }>;
   taskGroupGet: (id: string) => Promise<{ data: TaskGroup | null; error: string | null }>;
+  taskGroupUpdate: (
+    id: string,
+    updates: { name?: string; status?: 'active' | 'completed' },
+  ) => Promise<{ data: TaskGroup | null; error: string | null }>;
   taskGroupDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
   taskGroupAddIssue: (
     groupId: string,

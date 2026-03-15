@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   taskGroupCreate: (group: { id: string; name: string }) =>
     ipcRenderer.invoke('taskGroup:create', group),
   taskGroupGet: (id: string) => ipcRenderer.invoke('taskGroup:get', id),
+  taskGroupUpdate: (id: string, updates: { name?: string; status?: 'active' | 'completed' }) =>
+    ipcRenderer.invoke('taskGroup:update', id, updates),
   taskGroupDelete: (id: string) => ipcRenderer.invoke('taskGroup:delete', id),
   taskGroupAddIssue: (groupId: string, issueId: string) =>
     ipcRenderer.invoke('taskGroup:addIssue', groupId, issueId),

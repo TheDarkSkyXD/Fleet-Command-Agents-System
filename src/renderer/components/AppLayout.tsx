@@ -232,6 +232,20 @@ export function AppLayout() {
     });
   }, []);
 
+  // Refresh data when window becomes visible (after minimize-to-tray and restore)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Refresh Zustand stores when window is restored from tray
+        useProjectStore.getState().loadProjects();
+        useProjectStore.getState().loadActiveProject();
+        useSettingsStore.getState().loadSettings();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   // Setup wizard: show on first launch when setupCompleted is false
   const showSetupWizard = loaded && !settings.setupCompleted;
 

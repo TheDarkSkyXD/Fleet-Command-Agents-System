@@ -24,6 +24,7 @@ import type { Message, MessagePriority, MessageType } from '../../shared/types';
 import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { formatAbsoluteTime } from '../components/RelativeTime';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 
 type MailTab = 'inbox' | 'outbox' | 'all';
 
@@ -197,7 +198,7 @@ export function MailPage() {
           setUnreadCount(countResult.data);
         }
       } catch (err) {
-        console.error('Failed to load messages:', err);
+        handleIpcError(err, { context: 'loading messages', retry: () => loadMessages() });
       } finally {
         setLoading(false);
       }
@@ -291,7 +292,8 @@ export function MailPage() {
         loadMessages();
       }
     } catch (err) {
-      setStatusMsg({ type: 'error', text: `Failed to send: ${String(err)}` });
+      const msg = handleIpcError(err, { context: 'sending message', showToast: false });
+      setStatusMsg({ type: 'error', text: msg });
     } finally {
       setSending(false);
     }

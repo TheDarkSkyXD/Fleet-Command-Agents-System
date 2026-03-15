@@ -44,6 +44,7 @@ import type {
   ScopeOverlap,
   Session,
 } from '../../shared/types';
+import { handleIpcError } from '../lib/ipcErrorHandler';
 import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
 import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
@@ -498,7 +499,10 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         setSessions(result.data);
       }
     } catch (err) {
-      console.error('Failed to load sessions:', err);
+      handleIpcError(err, {
+        context: 'loading agents',
+        retry: () => loadSessions(),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -511,7 +515,11 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         setRunningProcesses(result.data);
       }
     } catch (err) {
-      console.error('Failed to load running processes:', err);
+      handleIpcError(err, {
+        context: 'loading running processes',
+        retry: () => loadRunningProcesses(),
+        showToast: false,
+      });
     }
   }, []);
 
@@ -634,8 +642,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         onSelectAgent(agentName);
       }
     } catch (err) {
-      setSpawnError(String(err));
-      toast.error('Failed to spawn agent');
+      const msg = handleIpcError(err, { context: 'spawning agent' });
+      setSpawnError(msg);
     } finally {
       setIsSpawning(false);
     }
@@ -676,8 +684,11 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       await loadSessions();
       await loadRunningProcesses();
     } catch (err) {
-      setError(String(err));
-      toast.error('Failed to stop agent(s)');
+      const msg = handleIpcError(err, {
+        context: 'stopping agent(s)',
+        retry: () => confirmStop(),
+      });
+      setError(msg);
     } finally {
       setIsStopping(false);
       setStopConfirm(null);
@@ -737,8 +748,11 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         toast.success('Agent nudged');
         await loadSessions();
       } catch (err) {
-        setError(String(err));
-        toast.error('Failed to nudge agent');
+        const msg = handleIpcError(err, {
+          context: 'nudging agent',
+          retry: () => handleNudgeAgent(sessionId),
+        });
+        setError(msg);
       }
     },
     [loadSessions],
