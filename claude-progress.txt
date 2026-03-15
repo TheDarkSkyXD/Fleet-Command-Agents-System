@@ -1,5 +1,31 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Merge Authorization & Mail Notification)
+
+#### Feature #61: Merge authorization and execution triggers - PASSING
+- Enhanced coordinator:poll-mail handler's merge_ready case
+- When coordinator receives merge_ready mail, it now extracts branch name from subject/body
+- Parses optional payload JSON for files_modified and task_id
+- Inserts directly into merge_queue table with 'pending' status
+- Records merge_authorized custom event with branch/agent/queue_id details
+- Completes flow: agent sends merge_ready → coordinator polls → authorizes → enqueued in merge queue
+
+#### Feature #64: Receive message notification - PASSING
+- Added unread mail count badge to Sidebar Mail nav item
+- Polls mail:unread-count IPC every 5 seconds via useEffect interval
+- Red badge shown in both expanded sidebar (right of label) and collapsed sidebar (corner of icon)
+- Count capped at 99+ for display
+- Uses existing mail:unread-count IPC handler (queries real SQLite database)
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Merge authorization logic in coordinator:poll-mail
+- MODIFIED: src/renderer/components/Sidebar.tsx - Unread mail notification badge
+
+#### Current Status
+- 130/366 features passing (added #61 and #64 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Coordinator Dispatch & Mail Polling)
 
 #### Feature #59: Lead agent dispatching with objectives - PASSING
