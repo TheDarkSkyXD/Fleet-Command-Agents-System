@@ -3755,3 +3755,29 @@
 - 246/366 features passing (added #241 and #242 this session)
 - All code passes Biome lint and TypeScript (pre-existing MailPage errors only)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Onboarding Tour Tooltips)
+
+#### Feature #248: Onboarding tour sidebar tooltip - PASSING
+- Added new "Sidebar Navigation" tour step as first step in OnboardingTour
+- Targets [data-testid="sidebar-nav"] on the Sidebar nav element
+- Explains all navigation sections: Agents, Mail, Merge Queue, Worktrees, Tasks, Metrics, etc.
+- Mentions sidebar collapse feature
+- Added data-testid="sidebar-nav" to Sidebar.tsx nav element
+- Added unique stepId property to TourStep interface
+- Per-step data-testid attributes (onboarding-tooltip-sidebar, etc.)
+
+#### Feature #250: Onboarding tour mail checking tooltip - PASSING
+- Enhanced existing mail tour step with additional description about unread badge indicator
+- Step targets [data-testid="nav-mail"] and explains mail system features
+- Covers: status updates, questions, results, sending messages, unread badge
+- Tour flow is now: Sidebar Nav -> Spawn Agent -> Mail -> Merge (4 steps)
+
+#### Files Modified
+- MODIFIED: src/renderer/components/OnboardingTour.tsx - Added sidebar step, stepId field, per-step data-testid, enhanced mail description
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added data-testid="sidebar-nav" to nav element
+
+#### Current Status
+- 253/366 features passing (added #248 and #250 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
