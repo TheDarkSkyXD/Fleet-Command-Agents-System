@@ -911,6 +911,97 @@ export function CoordinatorPanel() {
                 )}
               </div>
             )}
+
+            {/* Operator message form - fire-and-forget */}
+            {showOperatorMessage && (
+              <div
+                className="rounded-lg border border-cyan-500/30 bg-cyan-900/10 p-3 space-y-2"
+                data-testid="operator-message-panel"
+              >
+                <label htmlFor="operator-message" className="text-xs font-medium text-cyan-300">
+                  Operator Message (fire-and-forget)
+                </label>
+                <textarea
+                  id="operator-message"
+                  value={operatorMessage}
+                  onChange={(e) => setOperatorMessage(e.target.value)}
+                  placeholder="Send a message directly to the coordinator's terminal..."
+                  className="w-full rounded-md bg-slate-900 border border-slate-600 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none resize-none"
+                  rows={2}
+                  data-testid="operator-message-input"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowOperatorMessage(false);
+                      setOperatorMessage('');
+                    }}
+                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOperatorDispatch}
+                    disabled={isSendingOperator || !operatorMessage.trim()}
+                    data-testid="operator-message-send"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-cyan-600 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isSendingOperator ? (
+                      <>
+                        <FiActivity className="h-3 w-3 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <FiSend className="h-3 w-3" />
+                        Send
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Operator message history */}
+                {operatorHistory.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-cyan-500/20">
+                    <div className="text-[10px] font-medium text-cyan-400/70 mb-1.5">
+                      Recent Messages ({operatorHistory.length})
+                    </div>
+                    <div
+                      className="space-y-1 max-h-24 overflow-y-auto"
+                      data-testid="operator-history"
+                    >
+                      {operatorHistory.map((msg) => {
+                        const timeStr = msg.created_at
+                          ? new Date(
+                              msg.created_at.includes('Z')
+                                ? msg.created_at
+                                : `${msg.created_at}Z`,
+                            ).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '';
+                        return (
+                          <div
+                            key={msg.id}
+                            className="flex items-start justify-between gap-2 text-[11px]"
+                          >
+                            <span className="text-slate-300 truncate" title={msg.body}>
+                              {msg.body}
+                            </span>
+                            <span className="text-slate-500 whitespace-nowrap shrink-0">
+                              {timeStr}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           /* Inactive - show start button */

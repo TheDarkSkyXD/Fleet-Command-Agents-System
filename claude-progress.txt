@@ -1,5 +1,35 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Zombie Error Icon & Scope Visualization)
+
+#### Feature #247: Error icon on zombie agents - PASSING
+- Changed zombie agent icon from FiZap (lightning bolt) to FiXCircle (red error icon) across all components
+- Updated in AgentsPage (table + card views), AgentDetailPage, and AgentHierarchyTree
+- Enhanced tooltip to clearly explain zombie state with recovery instructions
+- Added data-testid attributes for zombie error icons
+
+#### Feature #257: Scope visualization on project tree - PASSING
+- Created ScopeTreeViewer component (src/renderer/components/ScopeTreeViewer.tsx)
+- Color-codes project file tree by assigned builder agent using 10 distinct colors
+- Legend shows agent-to-color mapping with agent names and path counts
+- Unassigned files shown in neutral gray/slate color
+- Search filtering, hover tooltips showing agent assignment
+- Scope stats bar showing assigned vs total file count
+- Integrated into AgentsPage as 4th view mode ('scope') with FiMap toggle button
+
+#### Files Created
+- NEW: src/renderer/components/ScopeTreeViewer.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - FiXCircle zombie icon, ScopeTreeViewer integration, scope view mode
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - FiXCircle zombie icon, enhanced tooltip
+- MODIFIED: src/renderer/components/AgentHierarchyTree.tsx - FiXCircle zombie icon
+
+#### Current Status
+- 253/366 features passing (added #247 and #257 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Activity Pulse & Stalled Warning)
 
 #### Feature #245: Activity pulse animation on running agents - PASSING
