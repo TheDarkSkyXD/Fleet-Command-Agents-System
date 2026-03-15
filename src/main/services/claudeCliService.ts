@@ -116,22 +116,55 @@ function getVersion(binaryPath: string): string | null {
 }
 
 /**
- * Check if the CLI is authenticated (has valid OAuth session)
+ * Check if the CLI is authenticated (has valid OAuth session).
+ * Tries to parse JSON response first, then falls back to text parsing.
  */
 function checkAuthentication(binaryPath: string): boolean {
   try {
-    const result = execSync(`"${binaryPath}" auth status`, {
-      encoding: 'utf-8',
-      timeout: 10000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    // Parse auth status - look for indicators of authentication
+    // Try with --output-format json first for structured response
+    let result: string;
+    try {
+      result = execSync(`"${binaryPath}" auth status --output-format json`, {
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+
+      // Attempt JSON parse
+      try {
+        const parsed = JSON.parse(result);
+        const isAuth =
+          parsed.authenticated === true ||
+          parsed.status === 'authenticated' ||
+          parsed.loggedIn === true;
+        log.info(
+          `[ClaudeCLI] Auth status (JSON): ${isAuth ? 'authenticated' : 'not authenticated'}`,
+        );
+        return isAuth;
+      } catch {
+        // JSON parse failed, fall through to text parsing
+      }
+    } catch {
+      // --output-format json not supported, try plain text
+      result = execSync(`"${binaryPath}" auth status`, {
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+    }
+
+    // Text-based parsing as fallback
+    const lower = result.toLowerCase();
     const isAuthenticated =
-      result.toLowerCase().includes('authenticated') ||
-      result.toLowerCase().includes('logged in') ||
-      result.toLowerCase().includes('valid') ||
-      !result.toLowerCase().includes('not authenticated');
-    log.info(`[ClaudeCLI] Auth status: ${isAuthenticated ? 'authenticated' : 'not authenticated'}`);
+      lower.includes('authenticated') ||
+      lower.includes('logged in') ||
+      lower.includes('valid') ||
+      (lower.includes('status') &&
+        !lower.includes('not authenticated') &&
+        !lower.includes('unauthenticated'));
+    log.info(
+      `[ClaudeCLI] Auth status (text): ${isAuthenticated ? 'authenticated' : 'not authenticated'}, raw: ${result.substring(0, 200)}`,
+    );
     return isAuthenticated;
   } catch {
     log.warn('[ClaudeCLI] Auth check failed or CLI not authenticated');
