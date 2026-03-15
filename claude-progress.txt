@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Form Validation & Error Recovery)
+
+#### Feature #289: Invalid input rejection with clear messages - PASSING
+- WelcomePage AddProjectForm: added field-specific validation with touched state
+  - Project Name: required, max 100 chars
+  - Project Path: required, must be absolute path format
+  - Red border highlighting on invalid fields, error messages below inputs
+  - Errors clear when user fixes the input, validated on blur and submit
+- MergeQueuePage EnqueueDialog: added branch name validation
+  - Required, must start with letter/number, valid git branch chars only, max 200 chars
+  - Red border + error message on invalid, clears when fixed
+- Follows existing patterns from SpawnDialog (Zod) and ProfileFormFields
+
+#### Feature #291: Error recovery without app restart - PASSING
+- ErrorBoundary already wraps every page section (20+) with Try Again + Copy Error Details
+- IPC error handler (handleIpcError) provides toast notifications with optional Retry buttons
+- Enhanced DoctorPage error display with Retry + dismiss (FiX) buttons
+- Enhanced MergeQueuePage error display with Retry (fetchQueue) + dismiss buttons
+- Enhanced AgentDefinitionsPage editor errors with dismiss buttons (2 locations)
+- AgentsPage already had dismiss button; AgentDefinitionsPage main page already had Retry
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/WelcomePage.tsx - AddProjectForm validation with fieldErrors/touched state
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - EnqueueDialog branch validation, error retry/dismiss
+- MODIFIED: src/renderer/pages/DoctorPage.tsx - Error display with Retry + dismiss buttons, FiX import
+- MODIFIED: src/renderer/pages/AgentDefinitionsPage.tsx - Editor error dismiss buttons (2 locations)
+
+#### Current Status
+- 289/366 features passing (added #289 and #291 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Window Restore Persistence & IPC Error Handling)
 
 #### Feature #287: Data persists after window minimize and restore - PASSING
