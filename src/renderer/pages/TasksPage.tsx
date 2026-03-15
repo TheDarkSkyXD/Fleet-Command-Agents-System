@@ -2412,7 +2412,7 @@ function IssueDetailModal({
             <div className="flex items-center gap-4">
               <span className="inline-flex items-center gap-1">
                 <FiClock size={11} />
-                Created: {formatDateTime(issue.created_at)}
+                <span data-testid="issue-created-at" data-created-at={issue.created_at}>Created: {formatDateTime(issue.created_at)}</span>
               </span>
               {issue.updated_at && issue.updated_at !== issue.created_at && (
                 <span className="inline-flex items-center gap-1">

@@ -1,5 +1,23 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (ARIA Labels & Input Labels)
+
+#### Feature #333: ARIA labels on icon-only buttons - PASSING
+- Added aria-label to all icon-only buttons across 11 files
+- Breadcrumbs home, AgentsPage nudge/stop/clear/view-modes/close, AgentDetailPage copy-error,
+  AgentDefinitionsPage dismiss-error/close, PromptsPage expand/collapse, WorktreesPage copy buttons,
+  TasksPage back/close, GuardRulesPage close, UpdateBanner close/dismiss, MailPage clear-search
+
+#### Feature #335: Labels on all inputs - PASSING
+- Added aria-label to all inputs/selects missing label associations across 10 files
+- AgentsPage search+capability filter, MailPage search+purge-agent, DebugPage search+filters+datetime,
+  ExpertisePage 2 search inputs, GuardRulesPage 14+ inputs/selects, ScopeTreeViewer file filter
+
+#### Current Status
+- 333/366 features passing (added #333 and #335 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (No Horizontal Scroll & Focus Rings)
 
 #### Feature #330: No horizontal scrollbar on main views - PASSING

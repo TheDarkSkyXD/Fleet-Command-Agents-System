@@ -8,6 +8,7 @@ import {
   FiXCircle,
 } from 'react-icons/fi';
 import type { OrphanedProcess } from '../../shared/types';
+import { formatDateTime } from '../lib/dateFormatting';
 
 /**
  * OrphanedProcessDialog detects agent processes still running without app connection
@@ -174,7 +175,7 @@ export function OrphanedProcessDialog() {
                           </span>
                         </div>
                         <p className="text-xs text-gray-400 mt-1">
-                          Started {new Date(orphan.createdAt).toLocaleString()} &middot;{' '}
+                          Started {formatDateTime(orphan.createdAt)} &middot;{' '}
                           {orphan.model}
                         </p>
                       </div>
@@ -244,7 +245,7 @@ export function OrphanedProcessDialog() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Started {new Date(orphan.createdAt).toLocaleString()}
+                        Started {formatDateTime(orphan.createdAt)}
                       </p>
                     </div>
                     <button

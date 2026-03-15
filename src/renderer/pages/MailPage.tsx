@@ -25,7 +25,7 @@ import type { Message, MessagePriority, MessageType } from '../../shared/types';
 import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { formatAbsoluteTime } from '../components/RelativeTime';
-import { formatRelativeTime as formatRelTime } from '../lib/dateFormatting';
+import { formatRelativeTime as formatRelTime, formatCompactDateTime } from '../lib/dateFormatting';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 
@@ -1518,12 +1518,7 @@ function VirtualizedMailList({
                       title={formatAbsoluteTime(msg.created_at)}
                     >
                       {activeTab === 'outbox'
-                        ? new Date(msg.created_at).toLocaleString([], {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                        ? formatCompactDateTime(msg.created_at)
                         : formatDate(msg.created_at)}
                     </span>
                   </div>

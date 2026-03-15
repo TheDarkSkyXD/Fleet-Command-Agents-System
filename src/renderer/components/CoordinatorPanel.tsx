@@ -16,6 +16,7 @@ import {
   FiZap,
 } from 'react-icons/fi';
 import type { Session } from '../../shared/types';
+import { formatTimeOnly, formatDateOnly } from '../lib/dateFormatting';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 
 interface CoordinatorStatus {
@@ -622,22 +623,14 @@ export function CoordinatorPanel() {
                     </p>
                   ) : (
                     activityLog.map((entry) => {
-                      const timeStr = entry.timestamp
-                        ? new Date(
-                            entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`,
-                          ).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit',
-                          })
+                      const normalizedTs = entry.timestamp
+                        ? (entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`)
+                        : null;
+                      const timeStr = normalizedTs
+                        ? formatTimeOnly(normalizedTs)
                         : '';
-                      const dateStr = entry.timestamp
-                        ? new Date(
-                            entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`,
-                          ).toLocaleDateString([], {
-                            month: 'short',
-                            day: 'numeric',
-                          })
+                      const dateStr = normalizedTs
+                        ? formatDateOnly(normalizedTs)
                         : '';
 
                       const levelColor =
@@ -983,12 +976,9 @@ export function CoordinatorPanel() {
                     >
                       {operatorHistory.map((msg) => {
                         const timeStr = msg.created_at
-                          ? new Date(
+                          ? formatTimeOnly(
                               msg.created_at.includes('Z') ? msg.created_at : `${msg.created_at}Z`,
-                            ).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
+                            )
                           : '';
                         return (
                           <div

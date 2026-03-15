@@ -13,6 +13,7 @@ import {
   FiXCircle,
 } from 'react-icons/fi';
 import type { ConfigProfile } from '../../shared/types';
+import { formatDateTime, formatCompactDateTime } from '../lib/dateFormatting';
 import { useProjectStore } from '../stores/projectStore';
 import { useRunStore } from '../stores/runStore';
 
@@ -285,7 +286,7 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
           data-testid="status-bar-agent-count"
           title={
             activeRun
-              ? `${activeRun.agent_count} agent(s) currently running\nRun started: ${new Date(activeRun.started_at).toLocaleString()}`
+              ? `${activeRun.agent_count} agent(s) currently running\nRun started: ${formatDateTime(activeRun.started_at)}`
               : 'No agents currently running'
           }
         >
@@ -513,26 +514,18 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
                       <div className="flex items-center gap-3 text-[10px] text-slate-400 ml-5">
                         <span
                           className="flex items-center gap-0.5"
-                          title={`Started: ${startDate.toLocaleString()}`}
+                          title={`Started: ${formatDateTime(run.started_at)}`}
                         >
                           <FiPlay className="h-2.5 w-2.5" />
-                          {startDate.toLocaleString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {formatCompactDateTime(run.started_at)}
                         </span>
                         {endDate && (
                           <span
                             className="flex items-center gap-0.5"
-                            title={`Ended: ${endDate.toLocaleString()}`}
+                            title={`Ended: ${formatDateTime(run.completed_at)}`}
                           >
                             <FiSquare className="h-2.5 w-2.5" />
-                            {endDate.toLocaleString(undefined, {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {formatCompactDateTime(run.completed_at)}
                           </span>
                         )}
                         <span className="flex items-center gap-0.5" title="Duration">
