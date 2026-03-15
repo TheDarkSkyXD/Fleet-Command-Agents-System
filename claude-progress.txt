@@ -4689,3 +4689,31 @@
 - 317/366 features passing (added #317 and #318 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Filter Persistence and Required Field Validation)
+
+#### Feature #319: Filter persistence within a session - PASSING
+- Created Zustand filterStore (src/renderer/stores/filterStore.ts) for persisting filter state
+- AgentsPage filters (viewMode, sorting, columnFilters, globalFilter, capabilityFilter) initialize from store
+- TasksPage filters (activeTab, viewMode, filterStatus, filterPriority, filterType) initialize from store
+- Both pages sync filter changes back to store via useEffect
+- Filters survive component unmount/remount when navigating to detail views and back
+
+#### Feature #320: Required field validation on all forms - PASSING
+- Issue creation: added visible "Title is required" error with red border on empty submit
+- Group creation: added visible "Group name is required" error with red border on empty submit
+- Errors clear automatically when user types valid content
+- Agent spawn and profile forms already had Zod validation with field-level errors (pre-existing)
+- Added data-testid attributes for error elements
+
+#### Files Created
+- NEW: src/renderer/stores/filterStore.ts
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Import filterStore, init filters from store, sync effect
+- MODIFIED: src/renderer/pages/TasksPage.tsx - Import filterStore, init filters from store, sync effect, validation errors
+
+#### Current Status
+- 317/366 features passing (added #319 and #320 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
