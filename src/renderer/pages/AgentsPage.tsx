@@ -29,6 +29,8 @@ import {
 import type { AgentCapability, AgentProcessInfo, Session } from '../../shared/types';
 import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
+import { FileTreePicker } from '../components/FileTreePicker';
+import { useProjectStore } from '../stores/projectStore';
 
 /** Default model per capability */
 const CAPABILITY_DEFAULTS: Record<
@@ -285,8 +287,17 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [spawnFileScope, setSpawnFileScope] = useState('');
   const [spawnPrompt, setSpawnPrompt] = useState('');
   const [spawnParentAgent, setSpawnParentAgent] = useState('');
+  const [spawnTreePaths, setSpawnTreePaths] = useState<string[]>([]);
   const [isSpawning, setIsSpawning] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
+
+  const { activeProject, loadActiveProject } = useProjectStore();
+
+  // Load active project on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load once on mount
+  useEffect(() => {
+    loadActiveProject();
+  }, []);
 
   // Stop confirmation dialog state
   const [stopConfirm, setStopConfirm] = useState<{
@@ -362,6 +373,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     setSpawnFileScope('');
     setSpawnPrompt('');
     setSpawnParentAgent('');
+    setSpawnTreePaths([]);
     setSpawnError(null);
     setShowSpawnDialog(true);
   };
@@ -386,7 +398,10 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         capability: spawnCapability,
         model: spawnModel,
         task_id: spawnTaskId.trim() || undefined,
-        file_scope: spawnFileScope.trim() || undefined,
+        file_scope:
+          spawnTreePaths.length > 0
+            ? spawnTreePaths.join(', ')
+            : spawnFileScope.trim() || undefined,
         prompt: spawnPrompt.trim() || undefined,
         parent_agent: spawnParentAgent || undefined,
         depth,
@@ -936,6 +951,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           availableParents={activeSessions.filter(
             (s) => s.capability === 'lead' || s.capability === 'coordinator',
           )}
+          treePaths={spawnTreePaths}
+          projectPath={activeProject?.path ?? null}
           isSpawning={isSpawning}
           error={spawnError}
           onCapabilityChange={(cap) => {
@@ -948,6 +965,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           onFileScopeChange={setSpawnFileScope}
           onPromptChange={setSpawnPrompt}
           onParentAgentChange={setSpawnParentAgent}
+          onTreePathsChange={setSpawnTreePaths}
           onSpawn={handleSpawn}
           onClose={() => setShowSpawnDialog(false)}
         />
@@ -980,6 +998,24 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   );
 }
 
+/** Border accent colors per capability for left-border styling */
+const CAPABILITY_BORDER_ACCENT: Record<string, string> = {
+  scout: 'border-l-purple-500',
+  builder: 'border-l-blue-500',
+  reviewer: 'border-l-cyan-500',
+  lead: 'border-l-amber-500',
+  merger: 'border-l-emerald-500',
+  coordinator: 'border-l-rose-500',
+  monitor: 'border-l-teal-500',
+};
+
+/** Model badge styling */
+const MODEL_COLORS: Record<string, string> = {
+  haiku: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+  sonnet: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  opus: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+};
+
 function AgentCard({
   session,
   processInfo,
@@ -993,9 +1029,12 @@ function AgentCard({
   onStop: () => void;
   onSelect?: () => void;
 }) {
+  const agentModel = session.model || processInfo?.model || null;
+  const borderAccent = CAPABILITY_BORDER_ACCENT[session.capability] || 'border-l-slate-500';
+
   return (
     <div
-      className="rounded-lg border border-slate-700 bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors"
+      className={`rounded-lg border border-slate-700 border-l-[3px] ${borderAccent} bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors`}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onSelect?.();
@@ -1109,6 +1148,8 @@ function SpawnDialog({
   prompt,
   parentAgent,
   availableParents,
+  treePaths,
+  projectPath,
   isSpawning,
   error,
   onCapabilityChange,
@@ -1118,6 +1159,7 @@ function SpawnDialog({
   onFileScopeChange,
   onPromptChange,
   onParentAgentChange,
+  onTreePathsChange,
   onSpawn,
   onClose,
 }: {
@@ -1129,6 +1171,8 @@ function SpawnDialog({
   prompt: string;
   parentAgent: string;
   availableParents: Session[];
+  treePaths: string[];
+  projectPath: string | null;
   isSpawning: boolean;
   error: string | null;
   onCapabilityChange: (c: AgentCapability) => void;
@@ -1138,15 +1182,17 @@ function SpawnDialog({
   onFileScopeChange: (f: string) => void;
   onPromptChange: (p: string) => void;
   onParentAgentChange: (p: string) => void;
+  onTreePathsChange: (paths: string[]) => void;
   onSpawn: () => void;
   onClose: () => void;
 }) {
   const capabilityInfo = CAPABILITY_DEFAULTS[capability];
+  const [showTreePicker, setShowTreePicker] = useState(capability === 'builder');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div
-        className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-800 shadow-2xl"
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 shadow-2xl"
         data-testid="spawn-dialog"
       >
         {/* Header */}
@@ -1286,24 +1332,56 @@ function SpawnDialog({
 
           {/* File scope */}
           <div>
-            <label
-              htmlFor="spawn-file-scope"
-              className="block text-sm font-medium text-slate-300 mb-1"
-            >
-              File Scope <span className="text-slate-500 font-normal">(optional)</span>
-            </label>
-            <input
-              id="spawn-file-scope"
-              type="text"
-              value={fileScope}
-              onChange={(e) => onFileScopeChange(e.target.value)}
-              placeholder="e.g. src/components/**, src/utils/*.ts"
-              data-testid="spawn-file-scope"
-              className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              Glob patterns restricting which files this agent can modify
-            </p>
+            <div className="flex items-center justify-between mb-1">
+              <label
+                htmlFor="spawn-file-scope"
+                className="block text-sm font-medium text-slate-300"
+              >
+                File Scope <span className="text-slate-500 font-normal">(optional)</span>
+              </label>
+              {projectPath && (
+                <button
+                  type="button"
+                  onClick={() => setShowTreePicker(!showTreePicker)}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  data-testid="toggle-tree-picker"
+                >
+                  {showTreePicker ? 'Use text input' : 'Browse files'}
+                </button>
+              )}
+            </div>
+
+            {showTreePicker && projectPath ? (
+              <FileTreePicker
+                rootPath={projectPath}
+                selectedPaths={treePaths}
+                onSelectionChange={onTreePathsChange}
+                maxHeight="200px"
+              />
+            ) : (
+              <>
+                <input
+                  id="spawn-file-scope"
+                  type="text"
+                  value={fileScope}
+                  onChange={(e) => onFileScopeChange(e.target.value)}
+                  placeholder="e.g. src/components/**, src/utils/*.ts"
+                  data-testid="spawn-file-scope"
+                  className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Glob patterns restricting which files this agent can modify
+                </p>
+              </>
+            )}
+
+            {/* Show selected files summary when tree picker has selections */}
+            {showTreePicker && treePaths.length > 0 && (
+              <p className="mt-1 text-xs text-blue-400">
+                {treePaths.length} file{treePaths.length !== 1 ? 's' : ''}/folder
+                {treePaths.length !== 1 ? 's' : ''} selected
+              </p>
+            )}
           </div>
 
           {/* Initial prompt */}

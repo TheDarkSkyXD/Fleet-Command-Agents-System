@@ -416,8 +416,8 @@ export function registerIpcHandlers(): void {
 
       // Insert session record
       loggedPrepare(
-        `INSERT INTO sessions (id, agent_name, capability, run_id, worktree_path, depth, state, pid, created_at, updated_at)
-        VALUES (?, ?, 'coordinator', ?, ?, 0, 'booting', ?, datetime('now'), datetime('now'))`,
+        `INSERT INTO sessions (id, agent_name, capability, model, run_id, worktree_path, depth, state, pid, created_at, updated_at)
+        VALUES (?, ?, 'coordinator', 'opus', ?, ?, 0, 'booting', ?, datetime('now'), datetime('now'))`,
       ).run(id, agentName, options?.run_id ?? null, worktreePath, agentProcess.pid);
 
       // Update state to working after brief boot
@@ -523,21 +523,63 @@ export function registerIpcHandlers(): void {
   });
 
   // Mail channels - all use real SQLite queries via loggedPrepare
-  ipcMain.handle('mail:list', (_event, filters?: { unreadOnly?: boolean }) => {
-    try {
-      let query = 'SELECT * FROM messages';
-      if (filters?.unreadOnly) {
-        query += ' WHERE read = 0';
+  ipcMain.handle(
+    'mail:list',
+    (
+      _event,
+      filters?: {
+        unreadOnly?: boolean;
+        search?: string;
+        type?: string;
+        priority?: string;
+        agent?: string;
+      },
+    ) => {
+      try {
+        const conditions: string[] = [];
+        const params: unknown[] = [];
+
+        if (filters?.unreadOnly) {
+          conditions.push('read = 0');
+        }
+        if (filters?.search) {
+          const searchTerm = `%${filters.search}%`;
+          conditions.push(
+            '(subject LIKE ? OR body LIKE ? OR from_agent LIKE ? OR to_agent LIKE ?)',
+          );
+          params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+        }
+        if (filters?.type) {
+          conditions.push('type = ?');
+          params.push(filters.type);
+        }
+        if (filters?.priority) {
+          conditions.push('priority = ?');
+          params.push(filters.priority);
+        }
+        if (filters?.agent) {
+          const agentTerm = `%${filters.agent}%`;
+          conditions.push('(from_agent LIKE ? OR to_agent LIKE ?)');
+          params.push(agentTerm, agentTerm);
+        }
+
+        let query = 'SELECT * FROM messages';
+        if (conditions.length > 0) {
+          query += ` WHERE ${conditions.join(' AND ')}`;
+        }
+        query += ' ORDER BY created_at DESC';
+
+        const messages = loggedPrepare(query).all(...params);
+        log.info(
+          `[IPC] mail:list - SELECT returned ${messages.length} messages from real database`,
+        );
+        return { data: messages, error: null };
+      } catch (error) {
+        log.error('mail:list failed:', error);
+        return { data: null, error: String(error) };
       }
-      query += ' ORDER BY created_at DESC';
-      const messages = loggedPrepare(query).all();
-      log.info(`[IPC] mail:list - SELECT returned ${messages.length} messages from real database`);
-      return { data: messages, error: null };
-    } catch (error) {
-      log.error('mail:list failed:', error);
-      return { data: null, error: String(error) };
-    }
-  });
+    },
+  );
 
   ipcMain.handle('mail:unread-count', () => {
     try {
