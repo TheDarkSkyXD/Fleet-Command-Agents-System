@@ -22,13 +22,7 @@ import {
   FiUser,
   FiZap,
 } from 'react-icons/fi';
-import type {
-  AgentIdentity,
-  AgentProcessInfo,
-  Event,
-  Message,
-  Session,
-} from '../../shared/types';
+import type { AgentIdentity, AgentProcessInfo, Event, Message, Session } from '../../shared/types';
 import { AgentTerminal } from '../components/AgentTerminal';
 
 const CAPABILITY_COLORS: Record<string, string> = {
