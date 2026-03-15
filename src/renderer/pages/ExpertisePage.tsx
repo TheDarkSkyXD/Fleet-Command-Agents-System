@@ -5,7 +5,9 @@ import {
   FiBook,
   FiChevronRight,
   FiClock,
+  FiCopy,
   FiDatabase,
+  FiDownload,
   FiFilter,
   FiPlus,
   FiSearch,
@@ -279,6 +281,55 @@ export function ExpertisePage() {
     setGlobalSearchResults([]);
     setIsGlobalSearchActive(false);
   }, []);
+
+  const [loadedContext, setLoadedContext] = useState<{
+    domain: string;
+    record_count: number;
+    context: string;
+  } | null>(null);
+  const [isLoadingContext, setIsLoadingContext] = useState<string | null>(null);
+
+  const handleLoadContext = useCallback(
+    async (domain: string, e?: React.MouseEvent) => {
+      if (e) {
+        e.stopPropagation();
+      }
+      setIsLoadingContext(domain);
+      try {
+        const result = await window.electronAPI.expertiseLoadContext(domain);
+        if (result.error) {
+          toast.error(`Failed to load context: ${result.error}`);
+          return;
+        }
+        if (result.data) {
+          setLoadedContext({
+            domain: result.data.domain,
+            record_count: result.data.record_count,
+            context: result.data.context,
+          });
+          toast.success(
+            `Loaded ${result.data.record_count} record(s) for "${domain}"`,
+          );
+        }
+      } catch (error) {
+        console.error('Failed to load context:', error);
+        toast.error('Failed to load domain context');
+      } finally {
+        setIsLoadingContext(null);
+      }
+    },
+    [],
+  );
+
+  const handleCopyContext = useCallback(async () => {
+    if (!loadedContext) return;
+    try {
+      await navigator.clipboard.writeText(loadedContext.context);
+      toast.success('Context copied to clipboard');
+    } catch {
+      toast.error('Failed to copy to clipboard');
+    }
+  }, [loadedContext]);
 
   const handleCreate = useCallback(async () => {
     if (!newRecord.domain.trim() || !newRecord.title.trim() || !newRecord.content.trim()) {
@@ -775,39 +826,103 @@ export function ExpertisePage() {
             >
               {domains.map((domain) => (
                 <AnimatedCard key={domain.domain}>
-                <button
-                  type="button"
-                  onClick={() => handleSelectDomain(domain.domain)}
+                <div
                   className="group rounded-lg border border-slate-700 bg-slate-800/50 p-4 text-left transition-all hover:border-blue-500/50 hover:bg-slate-800"
                   data-testid={`domain-card-${domain.domain}`}
                 >
-                  <div className="flex items-start justify-between">
-                    <h3 className="text-base font-semibold text-slate-100 group-hover:text-blue-400 transition-colors">
-                      {domain.domain}
-                    </h3>
-                    <FiChevronRight
-                      size={16}
-                      className="mt-0.5 text-slate-400 group-hover:text-blue-400"
-                    />
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDomain(domain.domain)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start justify-between">
+                      <h3 className="text-base font-semibold text-slate-100 group-hover:text-blue-400 transition-colors">
+                        {domain.domain}
+                      </h3>
+                      <FiChevronRight
+                        size={16}
+                        className="mt-0.5 text-slate-400 group-hover:text-blue-400"
+                      />
+                    </div>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {domain.record_count} record{domain.record_count !== 1 ? 's' : ''}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {Object.entries(domain.types).map(([type, count]) => (
+                        <span
+                          key={type}
+                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs ${TYPE_COLORS[type as ExpertiseType] || 'bg-slate-700 text-slate-300'}`}
+                        >
+                          {type}: {count}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                  <div className="mt-3 border-t border-slate-700/50 pt-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleLoadContext(domain.domain, e)}
+                      disabled={isLoadingContext === domain.domain}
+                      className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-indigo-400 hover:bg-indigo-600/20 hover:text-indigo-300 transition-colors disabled:opacity-50"
+                      data-testid={`load-context-${domain.domain}`}
+                      aria-label={`Load context for ${domain.domain} domain`}
+                    >
+                      <FiDownload size={12} />
+                      {isLoadingContext === domain.domain ? 'Loading...' : 'Load Context'}
+                    </button>
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {domain.record_count} record{domain.record_count !== 1 ? 's' : ''}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {Object.entries(domain.types).map(([type, count]) => (
-                      <span
-                        key={type}
-                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs ${TYPE_COLORS[type as ExpertiseType] || 'bg-slate-700 text-slate-300'}`}
-                      >
-                        {type}: {count}
-                      </span>
-                    ))}
-                  </div>
-                </button>
+                </div>
                 </AnimatedCard>
               ))}
             </AnimatedCardContainer>
           )}
+        </div>
+      )}
+
+      {/* Loaded context preview */}
+      {loadedContext && (
+        <div
+          className="rounded-lg border border-indigo-500/30 bg-indigo-900/10 p-4"
+          data-testid="loaded-context-preview"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <FiDatabase size={16} className="text-indigo-400" />
+              <h3 className="text-sm font-semibold text-slate-100">
+                Loaded Context: <span className="text-indigo-400" data-testid="loaded-context-domain">{loadedContext.domain}</span>
+              </h3>
+              <span className="text-xs text-slate-400" data-testid="loaded-context-count">
+                ({loadedContext.record_count} record{loadedContext.record_count !== 1 ? 's' : ''})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyContext}
+                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+                data-testid="copy-context-btn"
+                aria-label="Copy context to clipboard"
+              >
+                <FiCopy size={12} />
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoadedContext(null)}
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-700 hover:text-slate-300 transition-colors"
+                data-testid="dismiss-context-btn"
+                aria-label="Dismiss loaded context"
+              >
+                <FiX size={12} />
+              </button>
+            </div>
+          </div>
+          <pre
+            className="max-h-64 overflow-auto rounded bg-slate-900/80 p-3 text-xs text-slate-300 font-mono whitespace-pre-wrap border border-slate-700/50"
+            data-testid="loaded-context-content"
+          >
+            {loadedContext.context}
+          </pre>
         </div>
       )}
 

@@ -186,6 +186,7 @@ export interface Run {
   status: RunStatus;
   coordinator_session_id: string | null;
   agent_count: number;
+  session_branch: string | null;
   started_at: string;
   completed_at: string | null;
 }
@@ -1418,6 +1419,18 @@ export interface ElectronAPI {
     source_file?: string;
     tags?: string;
   }) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
+  expertiseLoadContext: (
+    domain: string,
+    options?: { classification?: string; type?: string; limit?: number },
+  ) => Promise<{
+    data: {
+      domain: string;
+      record_count: number;
+      records: ExpertiseRecord[];
+      context: string;
+    } | null;
+    error: string | null;
+  }>;
   expertiseGet: (id: string) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
   expertiseDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
   expertiseUpdate: (

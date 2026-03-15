@@ -6495,14 +6495,41 @@ export function registerIpcHandlers(): void {
 
   // ── Runs ──────────────────────────────────────────────────────────────
 
-  ipcMain.handle('run:start', () => {
+  ipcMain.handle('run:start', async () => {
     try {
       const id = `run-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      loggedPrepare('INSERT INTO runs (id, status, agent_count) VALUES (?, ?, ?)').run(
-        id,
-        'active',
-        0,
-      );
+
+      // Detect current git branch from active project to use as session branch
+      let sessionBranch: string | null = null;
+      try {
+        const activeProject = loggedPrepare(
+          'SELECT path FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { path: string } | null;
+        const repoPath = activeProject?.path || '.';
+        const simpleGitModule = await import('simple-git');
+        const git = simpleGitModule.default(repoPath);
+        const branchSummary = await git.branch();
+        sessionBranch = branchSummary.current || null;
+        log.info(`[IPC] run:start - detected session branch: ${sessionBranch}`);
+      } catch (branchError) {
+        log.warn('[IPC] run:start - could not detect git branch:', branchError);
+      }
+
+      loggedPrepare(
+        'INSERT INTO runs (id, status, agent_count, session_branch) VALUES (?, ?, ?, ?)',
+      ).run(id, 'active', 0, sessionBranch);
+
+      // Auto-set merge target branch to session branch
+      if (sessionBranch) {
+        loggedPrepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(
+          'mergeTargetBranch',
+          JSON.stringify(sessionBranch),
+        );
+        log.info(
+          `[IPC] run:start - auto-set merge target branch to session branch: ${sessionBranch}`,
+        );
+      }
+
       const run = loggedPrepare('SELECT * FROM runs WHERE id = ?').get(id);
       log.info(`[IPC] run:start - INSERT new run into real database: id=${id}`);
       return { data: run, error: null };
@@ -7975,6 +8002,102 @@ export function registerIpcHandlers(): void {
       return { data: null, error: String(error) };
     }
   });
+
+  // ── Domain-Scoped Context Loading ────────────────────────────
+  ipcMain.handle(
+    'expertise:load-context',
+    (_event, domain: string, options?: { classification?: string; type?: string; limit?: number }) => {
+      try {
+        if (!domain || typeof domain !== 'string' || !domain.trim()) {
+          return { data: null, error: 'Domain is required' };
+        }
+
+        const sanitizedDomain = domain.trim().slice(0, 200);
+        let sql = 'SELECT * FROM expertise_records WHERE domain = ?';
+        const params: unknown[] = [sanitizedDomain];
+
+        if (options?.classification) {
+          sql += ' AND classification = ?';
+          params.push(options.classification);
+        }
+        if (options?.type) {
+          sql += ' AND type = ?';
+          params.push(options.type);
+        }
+
+        // Order: foundational first, then tactical, then observational
+        sql +=
+          " ORDER BY CASE classification WHEN 'foundational' THEN 1 WHEN 'tactical' THEN 2 WHEN 'observational' THEN 3 ELSE 4 END, updated_at DESC";
+
+        if (options?.limit && options.limit > 0) {
+          sql += ' LIMIT ?';
+          params.push(options.limit);
+        }
+
+        const records = loggedPrepare(sql).all(...params) as Array<{
+          id: string;
+          domain: string;
+          title: string;
+          content: string;
+          type: string;
+          classification: string;
+          agent_name: string | null;
+          source_file: string | null;
+          tags: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+
+        // Format records into a structured context payload for agent priming
+        const contextLines: string[] = [
+          `--- DOMAIN CONTEXT: ${sanitizedDomain} (${records.length} record(s)) ---`,
+          '',
+        ];
+
+        // Group by classification for structured output
+        const groups: Record<string, typeof records> = {};
+        for (const rec of records) {
+          const cls = rec.classification || 'uncategorized';
+          if (!groups[cls]) groups[cls] = [];
+          groups[cls].push(rec);
+        }
+
+        for (const [cls, recs] of Object.entries(groups)) {
+          contextLines.push(`## ${cls.toUpperCase()} (${recs.length})`);
+          contextLines.push('');
+          for (const rec of recs) {
+            contextLines.push(`### [${rec.type}] ${rec.title}`);
+            if (rec.tags) contextLines.push(`Tags: ${rec.tags}`);
+            if (rec.source_file) contextLines.push(`Source: ${rec.source_file}`);
+            contextLines.push('');
+            contextLines.push(rec.content);
+            contextLines.push('');
+          }
+        }
+
+        contextLines.push(`--- END DOMAIN CONTEXT: ${sanitizedDomain} ---`);
+
+        const contextPayload = contextLines.join('\n');
+
+        log.info(
+          `[IPC] expertise:load-context - Loaded ${records.length} records for domain "${sanitizedDomain}"`,
+        );
+
+        return {
+          data: {
+            domain: sanitizedDomain,
+            record_count: records.length,
+            records,
+            context: contextPayload,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('expertise:load-context failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   // ── Agent Identity ────────────────────────────────────────────
   ipcMain.handle('identity:get', (_event, name: string) => {

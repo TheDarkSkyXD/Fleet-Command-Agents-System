@@ -584,6 +584,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     source_file?: string;
     tags?: string;
   }) => ipcRenderer.invoke('expertise:create', record),
+  expertiseLoadContext: (
+    domain: string,
+    options?: { classification?: string; type?: string; limit?: number },
+  ) => ipcRenderer.invoke('expertise:load-context', domain, options),
   expertiseGet: (id: string) => ipcRenderer.invoke('expertise:get', id),
   expertiseDelete: (id: string) => ipcRenderer.invoke('expertise:delete', id),
   expertiseUpdate: (id: string, updates: Record<string, unknown>) =>

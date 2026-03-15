@@ -803,9 +803,22 @@ export function MergeQueuePage() {
   useEffect(() => {
     fetchQueue();
     fetchHistory();
-    window.electronAPI.mergeGetTargetBranch().then((result) => {
+    // Load merge target branch, falling back to active run's session branch
+    window.electronAPI.mergeGetTargetBranch().then(async (result) => {
       if (!result.error && result.data) {
         setTargetBranch(result.data);
+      } else {
+        // Fall back to active run's session branch
+        try {
+          const runResult = await window.electronAPI.runGetActive();
+          if (!runResult.error && runResult.data?.session_branch) {
+            setTargetBranch(runResult.data.session_branch);
+            // Persist it as the merge target
+            await window.electronAPI.mergeSetTargetBranch(runResult.data.session_branch);
+          }
+        } catch {
+          // Silently fail - target will be empty (current branch)
+        }
       }
     });
   }, [fetchQueue, fetchHistory]);

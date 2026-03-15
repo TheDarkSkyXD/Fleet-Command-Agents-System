@@ -577,6 +577,13 @@ export async function initDatabase(): Promise<void> {
     db.exec('ALTER TABLE merge_queue ADD COLUMN rolled_back INTEGER DEFAULT 0');
   }
 
+  // Migration: add session_branch column to runs for merge target tracking
+  try {
+    db.prepare('SELECT session_branch FROM runs LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE runs ADD COLUMN session_branch TEXT');
+  }
+
   // Migration: add path_boundaries column for path boundary enforcement
   try {
     db.prepare('SELECT path_boundaries FROM agent_definitions LIMIT 1').get();

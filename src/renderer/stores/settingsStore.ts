@@ -68,6 +68,9 @@ export interface AppSettings {
   // Setup
   setupCompleted: boolean;
 
+  // Default project path
+  defaultProjectPath: string;
+
   // Notification preferences
   notificationPreferences: NotificationPreferences;
 }
@@ -182,6 +185,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   accentColor: 'blue',
   sidebarCollapsed: false,
   setupCompleted: false,
+  defaultProjectPath: '',
   notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
 };
 
