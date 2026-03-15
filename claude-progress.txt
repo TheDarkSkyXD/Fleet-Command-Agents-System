@@ -930,3 +930,29 @@
 #### Current Status
 - 15/366 features passing (added #22 and #24 this session)
 - Claude CLI integration service established at src/main/services/claudeCliService.ts
+
+### Session: 2026-03-14 (Discovery Mode and Findings Viewer)
+
+#### Feature #167: Brownfield discovery mode UI - PASSING
+- Created DiscoveryPage with category-based discovery mode
+- 6 discovery categories: architecture, dependencies, testing, APIs, config, conventions
+- Card-based selection UI with icons, descriptions, select all button
+- Start discovery button (disabled when no categories selected)
+- Previous scans list with status indicators, view results, and delete actions
+- Discovery progress view with per-category status tracking and progress bar
+
+#### Feature #169: Discovery findings viewer - PASSING
+- Findings view with category sidebar for filtering
+- Findings displayed as cards with title, description, severity badge
+- File path references with line numbers shown (FiFile icon)
+- Severity levels: info (blue), warning (amber), important (red)
+- Empty state for categories with no findings
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/DiscoveryPage.tsx - Full discovery UI with setup, progress, findings views
+- MODIFIED: src/main/db/database.ts - Added discovery_scans and discovery_findings tables
+- MODIFIED: src/main/ipc/handlers.ts - Added 8 discovery IPC handlers
+- MODIFIED: src/preload/index.ts - Added discovery bridge methods
+- MODIFIED: src/shared/types/index.ts - Added DiscoveryScan, DiscoveryFinding, related types
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated DiscoveryPage
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Discovery nav item
