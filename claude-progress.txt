@@ -2157,3 +2157,34 @@
 - 144/366 features passing (added #75 and #76 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Tier 4 Reimagine and Merge Preview)
+
+#### Feature #87: Tier 4 reimagine from scratch - PASSING
+- Added reimagineFromScratch() function in mergeService.ts
+- Abandons original conflicting branch, creates new reimagine branch from target
+- Writes .reimagine-manifest.json with context (original files, commits, task description)
+- Switches back to target branch after creating reimagine branch
+- Added merge:reimagine IPC handler, preload bridge, ElectronAPI type, store action
+- Rose-themed Reimagine button on conflict and failed entries in MergeQueuePage
+
+#### Feature #88: Dry-run merge preview - PASSING
+- Added teal-themed preview button on pending merge queue entries
+- Calls existing mergePreview IPC (git merge no-commit no-ff then abort)
+- Preview results display inline below entry with per-entry state management
+- Green checkmark for clean merges, amber warning with conflict file list
+- Clear message about no changes made to target branch
+- Backend was already fully wired (previewMerge service, IPC, preload, types)
+
+#### Files Created/Modified
+- MODIFIED: src/main/services/mergeService.ts - Added reimagineFromScratch() function
+- MODIFIED: src/main/ipc/handlers.ts - Added merge:reimagine IPC handler
+- MODIFIED: src/preload/index.ts - Added mergeReimagine bridge method
+- MODIFIED: src/shared/types/index.ts - Added mergeReimagine to ElectronAPI
+- MODIFIED: src/renderer/stores/mergeStore.ts - Added reimagine store action
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Added Reimagine button, preview button, preview results
+
+#### Current Status
+- 147/366 features passing (added #87 and #88 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
