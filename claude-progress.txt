@@ -2726,3 +2726,40 @@
 - 181/366 features passing (added #133 and #136 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Max Concurrent Agents and Per-Event Notif Preferences)
+
+#### Feature #137: Max concurrent agents setting - PASSING
+- Added max concurrent agents enforcement in agent:spawn IPC handler
+- Reads maxConcurrentAgents from app_settings JSON blob in database
+- Counts currently running agents via agentProcessManager.getAll().filter(a => a.isRunning)
+- Blocks spawn with descriptive error message when limit is reached
+- Error message directs user to Settings > Agents to increase the limit
+- Setting UI already existed (ValidatedNumberInput, range 1-50, default 10)
+
+#### Feature #140: Per-event notif preferences - PASSING
+- Added preferences interface with 7 event types (all default to true)
+- Updated service with setPreferences/getPreferences methods
+- notify() method now checks per-event-type preference before showing
+- Added set-preferences and get-preferences IPC handlers
+- Added preload bridge methods for preferences
+- Updated ElectronAPI types for new bridge methods
+- Created tab in Settings with toggles for each event type
+- Enable All / Disable All bulk action buttons
+- Reset to Defaults button and platform support warning banner
+- Preferences load from DB on app startup and sync to service
+- Preferences persist in app_settings JSON blob alongside other settings
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Max concurrent agents check, preference IPC handlers, startup loading
+- MODIFIED: src/main/services/notificationService.ts - Per-event-type filtering, preferences API
+- MODIFIED: src/preload/index.ts - Preference bridge methods
+- MODIFIED: src/shared/types/index.ts - ElectronAPI type updates
+- MODIFIED: src/renderer/stores/settingsStore.ts - Preferences type and defaults
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Notifications tab with event type toggles
+
+#### Current Status
+- 184/366 features passing (added #137 and #140 this session)
+- All code passes Biome lint (no new issues)
+- No new TypeScript errors (pre-existing errors in other files unchanged)
+- No mock data patterns in codebase
