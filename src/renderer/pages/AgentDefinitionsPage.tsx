@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FiAlertTriangle,
   FiCheck,
@@ -22,6 +22,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import type { AgentDefinition } from '../../shared/types';
+import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 
 // Built-in roles that cannot be deleted
 const BUILT_IN_ROLES = new Set([
@@ -224,6 +225,13 @@ function InstructionEditor({
   const [error, setError] = useState<string | null>(null);
   const [isDefault, setIsDefault] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Track definition editor dirty state for beforeunload warning
+  const isEditorDirty = useMemo(
+    () => content !== originalContent && originalContent !== '',
+    [content, originalContent],
+  );
+  useFormDirtyTracking(`agent-def-editor-${role}`, 'Agent Definition Editor', isEditorDirty);
 
   useEffect(() => {
     (async () => {
