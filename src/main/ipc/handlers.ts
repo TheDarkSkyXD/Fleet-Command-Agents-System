@@ -2615,6 +2615,15 @@ export function registerIpcHandlers(): void {
           };
         }
         log.info(`[IPC] mail:purge - DELETE removed ${info.changes} messages from real database`);
+
+        // Broadcast mail:purged event so all views (sidebar badge, search, etc.) update immediately
+        const allWindows = BrowserWindow.getAllWindows();
+        for (const win of allWindows) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('mail:purged', { deleted: info.changes });
+          }
+        }
+
         return { data: { deleted: info.changes }, error: null };
       } catch (error) {
         log.error('mail:purge failed:', error);
@@ -2650,7 +2659,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('merge:queue', () => {
     try {
       const queue = loggedPrepare(
-        'SELECT * FROM merge_queue ORDER BY enqueued_at ASC',
+        "SELECT * FROM merge_queue WHERE status IN ('pending', 'merging') ORDER BY enqueued_at ASC",
       ).all() as Array<Record<string, unknown>>;
       // Compute blocked status: entry is blocked if any dependency is not yet 'merged'
       const statusMap = new Map<number, string>();
@@ -3108,10 +3117,25 @@ export function registerIpcHandlers(): void {
       loggedPrepare(
         "UPDATE merge_queue SET status = 'merged', resolved_tier = ?, completed_at = datetime('now') WHERE id = ?",
       ).run(resolvedTier, id);
-      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as Record<string, unknown> | undefined;
       log.info(
         `[IPC] merge:complete - UPDATE merge in real database: id=${id}, tier=${resolvedTier}`,
       );
+      // Update associated agent session status if agent_name is set
+      if (entry?.agent_name) {
+        const agentName = entry.agent_name as string;
+        const agentSession = loggedPrepare(
+          "SELECT id FROM sessions WHERE agent_name = ? AND state = 'active' ORDER BY rowid DESC LIMIT 1",
+        ).get(agentName) as { id: string } | undefined;
+        if (agentSession) {
+          loggedPrepare(
+            "UPDATE sessions SET state = 'completed' WHERE id = ?",
+          ).run(agentSession.id);
+          log.info(
+            `[IPC] merge:complete - Updated agent session ${agentSession.id} (${agentName}) to completed after merge`,
+          );
+        }
+      }
       return { data: entry, error: null };
     } catch (error) {
       log.error('merge:complete failed:', error);

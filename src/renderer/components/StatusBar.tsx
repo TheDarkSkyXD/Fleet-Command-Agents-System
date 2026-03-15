@@ -130,6 +130,13 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
     return () => clearInterval(interval);
   }, [fetchActiveRun]);
 
+  // Refresh active run immediately when an agent state changes (stop/spawn)
+  useEffect(() => {
+    window.electronAPI.onAgentUpdate(() => {
+      fetchActiveRun();
+    });
+  }, [fetchActiveRun]);
+
   // Poll run progress when there's an active run
   useEffect(() => {
     if (!activeRun) {

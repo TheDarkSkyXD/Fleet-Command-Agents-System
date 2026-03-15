@@ -1690,6 +1690,7 @@ export interface ElectronAPI {
     callback: (data: { agentId: string; event: Record<string, unknown> }) => void,
   ) => void;
   onMailReceived: (callback: (data: unknown) => void) => void;
+  onMailPurged: (callback: (data: { deleted: number }) => void) => void;
   onMergeUpdate: (callback: (data: unknown) => void) => void;
   onUpdateStatus: (callback: (data: UpdateStatus) => void) => void;
   onUpdateDownloadProgress: (

@@ -67,6 +67,9 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
     };
     fetchUnread();
     const interval = setInterval(fetchUnread, 5000);
+    // Refresh immediately when mail is purged or received
+    window.electronAPI.onMailPurged(() => fetchUnread());
+    window.electronAPI.onMailReceived(() => fetchUnread());
     return () => clearInterval(interval);
   }, []);
 

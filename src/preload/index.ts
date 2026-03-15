@@ -337,6 +337,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ) => ipcRenderer.on('agent:parsed-event', (_event, data) => callback(data)),
   onMailReceived: (callback: (data: unknown) => void) =>
     ipcRenderer.on('mail:received', (_event, data) => callback(data)),
+  onMailPurged: (callback: (data: { deleted: number }) => void) =>
+    ipcRenderer.on('mail:purged', (_event, data) => callback(data)),
   onMergeUpdate: (callback: (data: unknown) => void) =>
     ipcRenderer.on('merge:update', (_event, data) => callback(data)),
 
