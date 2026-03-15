@@ -643,6 +643,70 @@ export interface ElectronAPI {
     } | null;
     error: string | null;
   }>;
+  coordinatorDispatch: (options: {
+    objective: string;
+    lead_name?: string;
+    model?: string;
+    worktree_path?: string;
+    branch_name?: string;
+    task_id?: string;
+    file_scope?: string;
+  }) => Promise<{
+    data: {
+      session: Session;
+      objective: string;
+      dispatch_message_id: string;
+    } | null;
+    error: string | null;
+  }>;
+  coordinatorDispatchedLeads: () => Promise<{
+    data: Array<Session & { objective?: string }> | null;
+    error: string | null;
+  }>;
+  coordinatorPollMail: () => Promise<{
+    data: {
+      messages_processed: Array<{
+        message_id: string;
+        from_agent: string;
+        type: string;
+        action_taken: string;
+      }>;
+      unread_count: number;
+      fleet_summary: {
+        active_agents: number;
+        stalled_agents: number;
+        completed_today: number;
+      };
+    } | null;
+    error: string | null;
+  }>;
+
+  coordinatorDecompose: (options?: { scope?: string; coordinatorSessionId?: string }) => Promise<{
+    data: {
+      streams: Array<{
+        groupId: string;
+        name: string;
+        description: string;
+        taskCount: number;
+        tasks: Array<{ id: string; title: string }>;
+      }>;
+      totalTasks: number;
+      scope: string;
+    } | null;
+    error: string | null;
+  }>;
+  coordinatorWorkStreams: () => Promise<{
+    data: Array<{
+      id: string;
+      name: string;
+      status: string;
+      total_tasks: number;
+      completed_tasks: number;
+      in_progress_tasks: number;
+      created_at: string;
+    }> | null;
+    error: string | null;
+  }>;
 
   agentOutput: (id: string) => Promise<{ data: string[] | null; error: string | null }>;
   agentWrite: (id: string, data: string) => Promise<{ data: boolean; error: string | null }>;

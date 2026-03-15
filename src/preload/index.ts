@@ -132,6 +132,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('coordinator:start', options),
   coordinatorStop: () => ipcRenderer.invoke('coordinator:stop'),
   coordinatorStatus: () => ipcRenderer.invoke('coordinator:status'),
+  coordinatorDispatch: (options: {
+    objective: string;
+    lead_name?: string;
+    model?: string;
+    worktree_path?: string;
+    branch_name?: string;
+    task_id?: string;
+    file_scope?: string;
+  }) => ipcRenderer.invoke('coordinator:dispatch', options),
+  coordinatorDispatchedLeads: () => ipcRenderer.invoke('coordinator:dispatched-leads'),
+  coordinatorPollMail: () => ipcRenderer.invoke('coordinator:poll-mail'),
+  coordinatorDecompose: (options?: { scope?: string; coordinatorSessionId?: string }) =>
+    ipcRenderer.invoke('coordinator:decompose', options),
+  coordinatorWorkStreams: () => ipcRenderer.invoke('coordinator:workStreams'),
 
   // Agent process management (node-pty)
   agentOutput: (id: string) => ipcRenderer.invoke('agent:output', id),
