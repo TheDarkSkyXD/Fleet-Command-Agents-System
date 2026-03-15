@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Close Issues with Summary & Dependency Management)
+
+#### Feature #118: Close issues with summary - PASSING
+- Added close summary dialog that prompts for summary text when changing status to 'closed'
+- Dialog includes textarea for summary/reason (optional) with confirm/cancel buttons
+- close_summary stored via existing issue:update IPC handler
+- Close summary displayed in IssueDetailModal when issue status is 'closed'
+- Added 'Completed' tab showing all closed issues with their close summaries
+- Completed tab loads issues filtered by status='closed' from database
+- Created DependencyManager component for issue detail modal (was referenced but missing)
+- Wired allIssues and onDependenciesChange props to IssueDetailModal
+
+#### Feature #119: Issue dependency management - PASSING
+- Enhanced DependencyManager to show both 'Blocked By' and 'Blocking' sections
+- Added issue:blocking IPC handler for reverse dependency lookup (which issues does this block)
+- issue:set-dependencies auto-sets status to 'blocked' when unresolved deps exist
+- issue:set-dependencies auto-sets status to 'open' when all deps are resolved
+- issue:update auto-unblocks dependent issues when an issue is closed
+- Issue cards display dependency count badge (red when blocked, grey otherwise)
+- Added issueBlocking preload bridge method and ElectronAPI type
+
+#### Files Created/Modified
+- MODIFIED: src/renderer/pages/TasksPage.tsx - Close dialog, completed tab, DependencyManager, dep badge
+- MODIFIED: src/main/ipc/handlers.ts - Auto-unblock logic, enhanced set-dependencies, issue:blocking handler
+- MODIFIED: src/preload/index.ts - issueBlocking bridge method
+- MODIFIED: src/shared/types/index.ts - issueBlocking ElectronAPI type
+
+#### Current Status
+- 173/366 features passing (added #118 and #119 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Issue-Agent Mapping & Debug Terminal)
 
 #### Feature #120: Issue-to-agent mapping - PASSING
