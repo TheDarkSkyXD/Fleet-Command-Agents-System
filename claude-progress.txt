@@ -2467,3 +2467,27 @@
 - 161/366 features passing (added #102 and #103 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Command Palette Context & Confirmation)
+
+#### Feature #109: Command palette context-sensitive commands - PASSING
+- Agent actions (Stop All, Nudge, Inspect) only appear when agents are running
+- Spawn Agent only appears when active project exists
+- Running agent count shown in Agent Actions group header
+- Empty Agent Actions group hidden when no contextual commands available
+- CommandContext fetched on palette open via agentRunningList IPC
+
+#### Feature #110: Command palette confirmation for destructive commands - PASSING
+- Destructive commands (Stop All Agents) show confirmation step before executing
+- Confirmation view: red alert icon, custom message, Cancel/Confirm buttons
+- Escape key cancels pending destructive action (returns to command list)
+- Destructive items tagged with red 'destructive' label in command list
+- Footer updates to show 'Confirm destructive action' during confirmation
+
+#### Files Modified
+- MODIFIED: src/renderer/components/CommandPalette.tsx
+
+#### Current Status
+- 165/366 features passing (added #109 and #110 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
