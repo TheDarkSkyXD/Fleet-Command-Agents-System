@@ -11,6 +11,12 @@ import {
   detectClaudeCli,
   getClaudeCliStatus,
 } from '../services/claudeCliService';
+import {
+  checkForUpdates,
+  downloadUpdate,
+  getUpdateStatus,
+  installUpdate,
+} from '../services/updateService';
 
 /**
  * Logged database prepare - wraps db.prepare() with SQL query logging.
@@ -1015,10 +1021,37 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // System channels
-  ipcMain.handle('update:check', () => {
-    log.info('[IPC] update:check - checking for updates');
-    return { data: { updateAvailable: false, currentVersion: '0.1.0' }, error: null };
+  // System channels - Auto-update via electron-updater (GitHub Releases API)
+  ipcMain.handle('update:check', async () => {
+    try {
+      log.info('[IPC] update:check - checking GitHub Releases for updates');
+      const status = await checkForUpdates();
+      return { data: status, error: null };
+    } catch (error) {
+      log.error('update:check failed:', error);
+      return { data: getUpdateStatus(), error: String(error) };
+    }
+  });
+
+  ipcMain.handle('update:status', () => {
+    return { data: getUpdateStatus(), error: null };
+  });
+
+  ipcMain.handle('update:download', async () => {
+    try {
+      log.info('[IPC] update:download - downloading update to app data');
+      const status = await downloadUpdate();
+      return { data: status, error: null };
+    } catch (error) {
+      log.error('update:download failed:', error);
+      return { data: getUpdateStatus(), error: String(error) };
+    }
+  });
+
+  ipcMain.handle('update:install', () => {
+    log.info('[IPC] update:install - installing update and restarting');
+    installUpdate();
+    return { data: true, error: null };
   });
 
   ipcMain.handle('doctor:run', () => {
@@ -1773,6 +1806,238 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('event:purge failed:', error);
       return { data: false, error: String(error) };
+    }
+  });
+
+  // ── Config Profiles ──────────────────────────────────────────────────
+
+  ipcMain.handle('profile:list', () => {
+    try {
+      const profiles = loggedPrepare('SELECT * FROM config_profiles ORDER BY name ASC').all();
+      return { data: profiles, error: null };
+    } catch (error) {
+      log.error('profile:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'profile:create',
+    (
+      _event,
+      profile: {
+        id: string;
+        name: string;
+        description?: string;
+        max_hierarchy_depth: number;
+        max_concurrent_agents: number;
+        max_agents_per_lead: number;
+        default_capability: string;
+        default_model: string;
+      },
+    ) => {
+      try {
+        // Check uniqueness
+        const existing = loggedPrepare('SELECT id FROM config_profiles WHERE name = ?').get(
+          profile.name,
+        );
+        if (existing) {
+          return { data: null, error: 'A profile with this name already exists' };
+        }
+
+        loggedPrepare(
+          `INSERT INTO config_profiles (id, name, description, max_hierarchy_depth, max_concurrent_agents, max_agents_per_lead, default_capability, default_model)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          profile.id,
+          profile.name,
+          profile.description ?? null,
+          profile.max_hierarchy_depth,
+          profile.max_concurrent_agents,
+          profile.max_agents_per_lead,
+          profile.default_capability,
+          profile.default_model,
+        );
+        const created = loggedPrepare('SELECT * FROM config_profiles WHERE id = ?').get(profile.id);
+        log.info(`[IPC] profile:create - created profile "${profile.name}"`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('profile:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('profile:get', (_event, id: string) => {
+    try {
+      const profile = loggedPrepare('SELECT * FROM config_profiles WHERE id = ?').get(id);
+      return { data: profile ?? null, error: null };
+    } catch (error) {
+      log.error('profile:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('profile:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      // Check name uniqueness if name is being updated
+      if (updates.name) {
+        const existing = loggedPrepare(
+          'SELECT id FROM config_profiles WHERE name = ? AND id != ?',
+        ).get(updates.name, id);
+        if (existing) {
+          return { data: null, error: 'A profile with this name already exists' };
+        }
+      }
+
+      const fields = Object.keys(updates)
+        .filter((k) => k !== 'id' && k !== 'created_at')
+        .map((k) => `${k} = ?`);
+      const values = Object.keys(updates)
+        .filter((k) => k !== 'id' && k !== 'created_at')
+        .map((k) => updates[k]);
+
+      if (fields.length === 0) {
+        return { data: null, error: 'No valid fields to update' };
+      }
+
+      fields.push("updated_at = datetime('now')");
+      loggedPrepare(`UPDATE config_profiles SET ${fields.join(', ')} WHERE id = ?`).run(
+        ...values,
+        id,
+      );
+
+      const updated = loggedPrepare('SELECT * FROM config_profiles WHERE id = ?').get(id);
+      log.info(`[IPC] profile:update - updated profile id=${id}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('profile:update failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('profile:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM config_profiles WHERE id = ?').run(id);
+      log.info(`[IPC] profile:delete - deleted profile id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('profile:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('profile:activate', (_event, id: string) => {
+    try {
+      const db = getDatabase();
+      db.transaction(() => {
+        loggedPrepare('UPDATE config_profiles SET is_active = 0').run();
+        loggedPrepare(
+          "UPDATE config_profiles SET is_active = 1, updated_at = datetime('now') WHERE id = ?",
+        ).run(id);
+      })();
+      const activated = loggedPrepare('SELECT * FROM config_profiles WHERE id = ?').get(id);
+      log.info(`[IPC] profile:activate - activated profile id=${id}`);
+      return { data: activated, error: null };
+    } catch (error) {
+      log.error('profile:activate failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('profile:get-active', () => {
+    try {
+      const profile = loggedPrepare('SELECT * FROM config_profiles WHERE is_active = 1').get();
+      return { data: profile ?? null, error: null };
+    } catch (error) {
+      log.error('profile:get-active failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ── Runs ──────────────────────────────────────────────────────────────
+
+  ipcMain.handle('run:start', () => {
+    try {
+      const id = `run-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      loggedPrepare('INSERT INTO runs (id, status, agent_count) VALUES (?, ?, ?)').run(
+        id,
+        'active',
+        0,
+      );
+      const run = loggedPrepare('SELECT * FROM runs WHERE id = ?').get(id);
+      log.info(`[IPC] run:start - INSERT new run into real database: id=${id}`);
+      return { data: run, error: null };
+    } catch (error) {
+      log.error('run:start failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('run:get-active', () => {
+    try {
+      const run = loggedPrepare(
+        "SELECT * FROM runs WHERE status = 'active' ORDER BY started_at DESC LIMIT 1",
+      ).get();
+
+      if (!run) {
+        return { data: null, error: null };
+      }
+
+      // Get count of sessions linked to this run
+      const typedRun = run as { id: string };
+      const agentCountRow = loggedPrepare(
+        'SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ?',
+      ).get(typedRun.id) as { cnt: number };
+
+      // Update agent_count in the run record
+      loggedPrepare('UPDATE runs SET agent_count = ? WHERE id = ?').run(
+        agentCountRow.cnt,
+        typedRun.id,
+      );
+
+      const updated = loggedPrepare('SELECT * FROM runs WHERE id = ?').get(typedRun.id);
+      log.info(`[IPC] run:get-active - SELECT active run from real database`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('run:get-active failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('run:list', () => {
+    try {
+      const runs = loggedPrepare('SELECT * FROM runs ORDER BY started_at DESC').all();
+      log.info(`[IPC] run:list - SELECT returned ${runs.length} runs from real database`);
+      return { data: runs, error: null };
+    } catch (error) {
+      log.error('run:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('run:stop', (_event, id: string) => {
+    try {
+      loggedPrepare(
+        "UPDATE runs SET status = 'completed', completed_at = datetime('now') WHERE id = ?",
+      ).run(id);
+      const run = loggedPrepare('SELECT * FROM runs WHERE id = ?').get(id);
+      log.info(`[IPC] run:stop - UPDATE run status to completed: id=${id}`);
+      return { data: run, error: null };
+    } catch (error) {
+      log.error('run:stop failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('run:get', (_event, id: string) => {
+    try {
+      const run = loggedPrepare('SELECT * FROM runs WHERE id = ?').get(id);
+      log.info(`[IPC] run:get - SELECT run from real database: id=${id}`);
+      return { data: run || null, error: null };
+    } catch (error) {
+      log.error('run:get failed:', error);
+      return { data: null, error: String(error) };
     }
   });
 

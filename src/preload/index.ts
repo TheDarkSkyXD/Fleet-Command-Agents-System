@@ -58,6 +58,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   issueDelete: (id: string) => ipcRenderer.invoke('issue:delete', id),
   issueClaim: (id: string, agentName: string) => ipcRenderer.invoke('issue:claim', id, agentName),
 
+  // Config Profiles
+  profileList: () => ipcRenderer.invoke('profile:list'),
+  profileCreate: (profile: {
+    id: string;
+    name: string;
+    description?: string;
+    max_hierarchy_depth: number;
+    max_concurrent_agents: number;
+    max_agents_per_lead: number;
+    default_capability: string;
+    default_model: string;
+  }) => ipcRenderer.invoke('profile:create', profile),
+  profileGet: (id: string) => ipcRenderer.invoke('profile:get', id),
+  profileUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('profile:update', id, updates),
+  profileDelete: (id: string) => ipcRenderer.invoke('profile:delete', id),
+  profileActivate: (id: string) => ipcRenderer.invoke('profile:activate', id),
+  profileGetActive: () => ipcRenderer.invoke('profile:get-active'),
+
   // Settings
   settingsGet: (key: string) => ipcRenderer.invoke('settings:get', key),
   settingsSet: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
@@ -141,8 +160,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   eventBySession: (sessionId: string) => ipcRenderer.invoke('event:by-session', sessionId),
   eventPurge: () => ipcRenderer.invoke('event:purge'),
 
-  // System
+  // Runs
+  runStart: () => ipcRenderer.invoke('run:start'),
+  runGetActive: () => ipcRenderer.invoke('run:get-active'),
+  runList: () => ipcRenderer.invoke('run:list'),
+  runStop: (id: string) => ipcRenderer.invoke('run:stop', id),
+  runGet: (id: string) => ipcRenderer.invoke('run:get', id),
+
+  // System - Auto Update
   updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateStatus: () => ipcRenderer.invoke('update:status'),
+  updateDownload: () => ipcRenderer.invoke('update:download'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
   doctorRun: () => ipcRenderer.invoke('doctor:run'),
 
   // Events (renderer -> main)
@@ -154,6 +183,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('mail:received', (_event, data) => callback(data)),
   onMergeUpdate: (callback: (data: unknown) => void) =>
     ipcRenderer.on('merge:update', (_event, data) => callback(data)),
+
+  // Update events (main -> renderer)
+  onUpdateStatus: (callback: (data: unknown) => void) =>
+    ipcRenderer.on('update:status', (_event, data) => callback(data)),
+  onUpdateDownloadProgress: (
+    callback: (data: {
+      percent: number;
+      transferred: number;
+      total: number;
+      bytesPerSecond: number;
+    }) => void,
+  ) => ipcRenderer.on('update:download-progress', (_event, data) => callback(data)),
+  onUpdateDownloaded: (
+    callback: (data: { version: string; releaseNotes: string | null }) => void,
+  ) => ipcRenderer.on('update:downloaded', (_event, data) => callback(data)),
+  onUpdateError: (callback: (data: { message: string }) => void) =>
+    ipcRenderer.on('update:error', (_event, data) => callback(data)),
 
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),

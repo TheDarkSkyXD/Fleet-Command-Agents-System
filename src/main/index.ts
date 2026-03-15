@@ -6,6 +6,7 @@ import { closeDatabase, initDatabase } from './db/database';
 import { registerIpcHandlers } from './ipc/handlers';
 import { agentProcessManager } from './services/agentProcessManager';
 import { type TrayIconStatus, generateTrayIcon } from './services/trayIconGenerator';
+import { checkForUpdates, initAutoUpdater } from './services/updateService';
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -273,6 +274,17 @@ app.whenReady().then(async () => {
   // Create window and tray (splash closes when main window is ready)
   createWindow();
   createTray();
+
+  // Initialize auto-updater and check for updates on startup (non-intrusive)
+  if (mainWindow) {
+    initAutoUpdater(mainWindow);
+    // Delay update check by 5 seconds to let the app finish loading
+    setTimeout(() => {
+      checkForUpdates().catch((err) => {
+        log.warn('[AutoUpdater] Startup update check failed (non-blocking):', err);
+      });
+    }, 5000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

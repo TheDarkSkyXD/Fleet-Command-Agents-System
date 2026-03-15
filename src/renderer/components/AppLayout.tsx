@@ -13,6 +13,7 @@ import { CommandPalette } from './CommandPalette';
 import { OnboardingTour } from './OnboardingTour';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
+import { UpdateBanner } from './UpdateBanner';
 
 export function AppLayout() {
   const [currentPage, setCurrentPage] = useState('agents');
@@ -39,6 +40,9 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
+      {/* Update banner - appears at top when update available */}
+      <UpdateBanner />
+
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}

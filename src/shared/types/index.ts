@@ -251,6 +251,21 @@ export interface AgentDefinition {
   updated_at: string;
 }
 
+// Configuration Profile types
+export interface ConfigProfile {
+  id: string;
+  name: string;
+  description: string | null;
+  max_hierarchy_depth: number;
+  max_concurrent_agents: number;
+  max_agents_per_lead: number;
+  default_capability: string;
+  default_model: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Tool stats aggregation
 export interface ToolStats {
   tool_name: string;
@@ -259,6 +274,22 @@ export interface ToolStats {
   min_duration_ms: number | null;
   max_duration_ms: number | null;
   total_duration_ms: number | null;
+}
+
+// Update status
+export interface UpdateStatus {
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseNotes: string | null;
+  releaseDate: string | null;
+  downloadProgress: number | null;
+  downloadedBytes: number | null;
+  totalBytes: number | null;
+  downloadSpeed: number | null;
+  isDownloading: boolean;
+  isDownloaded: boolean;
+  error: string | null;
 }
 
 // Electron API type for renderer process
@@ -478,6 +509,34 @@ export interface ElectronAPI {
   eventBySession: (sessionId: string) => Promise<{ data: Event[] | null; error: string | null }>;
   eventPurge: () => Promise<{ data: boolean; error: string | null }>;
 
+  // Config Profiles
+  profileList: () => Promise<{ data: ConfigProfile[] | null; error: string | null }>;
+  profileCreate: (profile: {
+    id: string;
+    name: string;
+    description?: string;
+    max_hierarchy_depth: number;
+    max_concurrent_agents: number;
+    max_agents_per_lead: number;
+    default_capability: string;
+    default_model: string;
+  }) => Promise<{ data: ConfigProfile | null; error: string | null }>;
+  profileGet: (id: string) => Promise<{ data: ConfigProfile | null; error: string | null }>;
+  profileUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: ConfigProfile | null; error: string | null }>;
+  profileDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  profileActivate: (id: string) => Promise<{ data: ConfigProfile | null; error: string | null }>;
+  profileGetActive: () => Promise<{ data: ConfigProfile | null; error: string | null }>;
+
+  // Runs
+  runStart: () => Promise<{ data: Run | null; error: string | null }>;
+  runGetActive: () => Promise<{ data: Run | null; error: string | null }>;
+  runList: () => Promise<{ data: Run[] | null; error: string | null }>;
+  runStop: (id: string) => Promise<{ data: Run | null; error: string | null }>;
+  runGet: (id: string) => Promise<{ data: Run | null; error: string | null }>;
+
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
   claudeStatus: () => Promise<{
@@ -493,12 +552,28 @@ export interface ElectronAPI {
     data: { found: boolean; path: string | null; version: string | null; authenticated: boolean };
     error: string | null;
   }>;
-  updateCheck: () => Promise<{ data: unknown; error: string | null }>;
+  updateCheck: () => Promise<{ data: UpdateStatus; error: string | null }>;
+  updateStatus: () => Promise<{ data: UpdateStatus; error: string | null }>;
+  updateDownload: () => Promise<{ data: UpdateStatus; error: string | null }>;
+  updateInstall: () => Promise<{ data: boolean; error: string | null }>;
   doctorRun: () => Promise<{ data: unknown; error: string | null }>;
   onAgentUpdate: (callback: (data: unknown) => void) => void;
   onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => void;
   onMailReceived: (callback: (data: unknown) => void) => void;
   onMergeUpdate: (callback: (data: unknown) => void) => void;
+  onUpdateStatus: (callback: (data: UpdateStatus) => void) => void;
+  onUpdateDownloadProgress: (
+    callback: (data: {
+      percent: number;
+      transferred: number;
+      total: number;
+      bytesPerSecond: number;
+    }) => void,
+  ) => void;
+  onUpdateDownloaded: (
+    callback: (data: { version: string; releaseNotes: string | null }) => void,
+  ) => void;
+  onUpdateError: (callback: (data: { message: string }) => void) => void;
   removeAllListeners: (channel: string) => void;
 }
 
