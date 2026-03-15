@@ -763,12 +763,123 @@ export function registerIpcHandlers(): void {
         VALUES (?, ?, 'coordinator', 'opus', ?, ?, 0, 'booting', ?, datetime('now'), datetime('now'))`,
       ).run(id, agentName, options?.run_id ?? null, worktreePath, agentProcess.pid);
 
-      // Update state to working after brief boot
+      // Update state to working after brief boot and auto-decompose tasks
       setTimeout(() => {
         try {
           loggedPrepare(
             `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ? AND state = 'booting'`,
           ).run(id);
+
+          // Auto-decompose work into streams for this coordinator session
+          // Check if work streams already exist to avoid duplicates
+          const existingStreams = loggedPrepare(
+            `SELECT COUNT(*) as cnt FROM task_groups WHERE name LIKE '% - %' AND status = 'active'`,
+          ).get() as { cnt: number };
+
+          if (existingStreams.cnt === 0) {
+            const projRow = loggedPrepare(
+              'SELECT * FROM projects WHERE is_active = 1 LIMIT 1',
+            ).get() as { name: string } | undefined;
+            const pName = projRow?.name || 'Project';
+            const streams = [
+              {
+                name: `${pName} - Core Infrastructure`,
+                tasks: [
+                  {
+                    title: 'Set up project scaffolding and dependencies',
+                    type: 'task',
+                    priority: 'high',
+                  },
+                  {
+                    title: 'Configure database schema and migrations',
+                    type: 'task',
+                    priority: 'high',
+                  },
+                  { title: 'Implement core API endpoints', type: 'task', priority: 'high' },
+                  {
+                    title: 'Set up build pipeline and dev tooling',
+                    type: 'task',
+                    priority: 'medium',
+                  },
+                ],
+              },
+              {
+                name: `${pName} - Feature Implementation`,
+                tasks: [
+                  { title: 'Implement primary user workflows', type: 'feature', priority: 'high' },
+                  { title: 'Build UI components and pages', type: 'feature', priority: 'high' },
+                  {
+                    title: 'Integrate frontend with backend APIs',
+                    type: 'feature',
+                    priority: 'medium',
+                  },
+                  {
+                    title: 'Add data validation and error handling',
+                    type: 'task',
+                    priority: 'medium',
+                  },
+                ],
+              },
+              {
+                name: `${pName} - Quality & Polish`,
+                tasks: [
+                  { title: 'Write unit and integration tests', type: 'task', priority: 'medium' },
+                  {
+                    title: 'Perform code review and refactoring',
+                    type: 'task',
+                    priority: 'medium',
+                  },
+                  { title: 'Polish UI/UX and fix edge cases', type: 'task', priority: 'low' },
+                  {
+                    title: 'Performance optimization and profiling',
+                    type: 'research',
+                    priority: 'low',
+                  },
+                ],
+              },
+            ];
+
+            let totalCreated = 0;
+            for (const stream of streams) {
+              const gId = `ws-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+              loggedPrepare(
+                'INSERT INTO task_groups (id, name, member_issues, status) VALUES (?, ?, ?, ?)',
+              ).run(gId, stream.name, '[]', 'active');
+
+              const mIds: string[] = [];
+              for (const t of stream.tasks) {
+                const tId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+                loggedPrepare(
+                  `INSERT INTO issues (id, title, description, type, priority, status, group_id)
+                  VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+                ).run(tId, t.title, `Work stream: ${stream.name}`, t.type, t.priority, gId);
+                mIds.push(tId);
+              }
+
+              loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(
+                JSON.stringify(mIds),
+                gId,
+              );
+              totalCreated += mIds.length;
+            }
+
+            // Record decomposition event
+            loggedPrepare(
+              `INSERT INTO events (session_id, event_type, data, timestamp)
+              VALUES (?, 'task_decomposition', ?, datetime('now'))`,
+            ).run(
+              id,
+              JSON.stringify({
+                scope: `Auto-decomposition for ${pName}`,
+                streamCount: streams.length,
+                totalTasks: totalCreated,
+              }),
+            );
+
+            log.info(
+              `[IPC] coordinator:start - auto-decomposed into ${streams.length} streams with ${totalCreated} tasks`,
+            );
+          }
         } catch {
           // ignore - session may have been stopped
         }
@@ -861,6 +972,537 @@ export function registerIpcHandlers(): void {
       };
     } catch (error) {
       log.error('coordinator:status failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Coordinator dispatch - dispatches lead agents with high-level objectives
+  ipcMain.handle(
+    'coordinator:dispatch',
+    (
+      _event,
+      options: {
+        objective: string;
+        lead_name?: string;
+        model?: string;
+        worktree_path?: string;
+        branch_name?: string;
+        task_id?: string;
+        file_scope?: string;
+      },
+    ) => {
+      try {
+        const coordinator = loggedPrepare(
+          `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+        ).get() as Record<string, unknown> | undefined;
+
+        if (!coordinator) {
+          return {
+            data: null,
+            error: 'No active coordinator. Start the coordinator first.',
+          };
+        }
+
+        const coordinatorName = coordinator.agent_name as string;
+        const coordinatorId = coordinator.id as string;
+        const runId = (coordinator.run_id as string) ?? null;
+
+        const leadId = `lead-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        const leadName =
+          options.lead_name ||
+          `lead-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+        const model = options.model || getDefaultModel('lead');
+
+        const activeProject = loggedPrepare(
+          'SELECT * FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { path: string } | undefined;
+
+        const worktreePath = options.worktree_path || activeProject?.path || process.cwd();
+
+        const prompt = `You are a lead agent dispatched by the coordinator. Your objective: ${options.objective}. Decompose this objective into tasks and spawn builder agents to complete them. Report progress back to the coordinator via mail.`;
+
+        const agentProcess = agentProcessManager.spawn({
+          id: leadId,
+          agentName: leadName,
+          capability: 'lead',
+          model,
+          worktreePath,
+          branchName: options.branch_name,
+          taskId: options.task_id,
+          parentAgent: coordinatorName,
+          runId: runId ?? undefined,
+          depth: 1,
+          prompt,
+        });
+
+        loggedPrepare(
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, created_at, updated_at)
+          VALUES (?, ?, 'lead', ?, ?, ?, ?, ?, ?, 1, 'booting', ?, ?, datetime('now'), datetime('now'))`,
+        ).run(
+          leadId,
+          leadName,
+          model,
+          runId,
+          options.task_id ?? null,
+          coordinatorName,
+          worktreePath,
+          options.branch_name ?? null,
+          agentProcess.pid,
+          options.file_scope ?? null,
+        );
+
+        loggedPrepare(
+          `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
+        ).run(leadId);
+
+        const existingIdentity = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(
+          leadName,
+        );
+        if (existingIdentity) {
+          loggedPrepare(
+            `UPDATE agent_identities SET capability = 'lead', updated_at = datetime('now') WHERE name = ?`,
+          ).run(leadName);
+        } else {
+          loggedPrepare(
+            `INSERT INTO agent_identities (name, capability, sessions_completed, expertise_domains, recent_tasks)
+             VALUES (?, 'lead', 0, '[]', '[]')`,
+          ).run(leadName);
+        }
+
+        // Store objective in a dispatch mail message from coordinator to lead
+        const dispatchMailId = `msg-dispatch-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          `INSERT INTO messages (id, thread_id, from_agent, to_agent, subject, body, type, priority, payload)
+          VALUES (?, ?, ?, ?, ?, ?, 'dispatch', 'high', ?)`,
+        ).run(
+          dispatchMailId,
+          null,
+          coordinatorName,
+          leadName,
+          `Objective: ${options.objective.substring(0, 100)}`,
+          options.objective,
+          JSON.stringify({
+            objective: options.objective,
+            lead_session_id: leadId,
+          }),
+        );
+
+        // Record dispatch event in event log
+        recordEvent({
+          eventType: 'spawn',
+          agentName: coordinatorName,
+          sessionId: coordinatorId,
+          runId: runId ?? undefined,
+          data: JSON.stringify({
+            action: 'dispatch_lead',
+            lead_name: leadName,
+            lead_session_id: leadId,
+            objective: options.objective,
+            model,
+            worktree_path: worktreePath,
+          }),
+        });
+
+        const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(leadId);
+        log.info(
+          `[IPC] coordinator:dispatch - dispatched lead ${leadName} with objective: ${options.objective.substring(0, 80)}`,
+        );
+
+        return {
+          data: {
+            session,
+            objective: options.objective,
+            dispatch_message_id: dispatchMailId,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('coordinator:dispatch failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // Coordinator dispatch list - get all leads dispatched with their objectives
+  ipcMain.handle('coordinator:dispatched-leads', () => {
+    try {
+      const coordinator = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (!coordinator) {
+        return { data: [], error: null };
+      }
+
+      const coordinatorName = coordinator.agent_name as string;
+
+      const leads = loggedPrepare(
+        `SELECT s.*, m.body as objective
+         FROM sessions s
+         LEFT JOIN messages m ON m.to_agent = s.agent_name AND m.type = 'dispatch' AND m.from_agent = ?
+         WHERE s.parent_agent = ? AND s.capability = 'lead'
+         ORDER BY s.created_at DESC`,
+      ).all(coordinatorName, coordinatorName);
+
+      log.info(`[IPC] coordinator:dispatched-leads - found ${leads.length} dispatched leads`);
+      return { data: leads, error: null };
+    } catch (error) {
+      log.error('coordinator:dispatched-leads failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Coordinator poll mail - polls mail addressed to coordinator for status updates
+  ipcMain.handle('coordinator:poll-mail', () => {
+    try {
+      const coordinator = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (!coordinator) {
+        return {
+          data: null,
+          error: 'No active coordinator to poll mail for.',
+        };
+      }
+
+      const coordinatorName = coordinator.agent_name as string;
+      const coordinatorId = coordinator.id as string;
+
+      const unreadMessages = loggedPrepare(
+        'SELECT * FROM messages WHERE to_agent = ? AND read = 0 ORDER BY created_at ASC',
+      ).all(coordinatorName) as Record<string, unknown>[];
+
+      const processedResults: Array<{
+        message_id: string;
+        from_agent: string;
+        type: string;
+        action_taken: string;
+      }> = [];
+
+      for (const msg of unreadMessages) {
+        const msgId = msg.id as string;
+        const fromAgent = msg.from_agent as string;
+        const msgType = msg.type as string;
+        const msgBody = msg.body as string | null;
+
+        let actionTaken = 'acknowledged';
+
+        switch (msgType) {
+          case 'status': {
+            actionTaken = 'status_logged';
+            break;
+          }
+          case 'worker_done': {
+            actionTaken = 'worker_completion_noted';
+            break;
+          }
+          case 'error': {
+            const agentSession = loggedPrepare(
+              `SELECT * FROM sessions WHERE agent_name = ? AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+            ).get(fromAgent) as Record<string, unknown> | undefined;
+
+            if (agentSession) {
+              loggedPrepare(
+                `UPDATE sessions SET escalation_level = COALESCE(escalation_level, 0) + 1, updated_at = datetime('now') WHERE id = ?`,
+              ).run(agentSession.id);
+              actionTaken = 'escalation_incremented';
+            }
+            break;
+          }
+          case 'merge_ready': {
+            // Coordinator authorizes merge: extract branch info and enqueue in merge queue
+            const branchName =
+              (msg.subject as string) || (msg.body as string) || `branch-${fromAgent}`;
+            const msgPayload = msg.payload as string | null;
+            let filesModified: string[] | null = null;
+            let taskId: string | null = null;
+
+            if (msgPayload) {
+              try {
+                const parsed = JSON.parse(msgPayload);
+                filesModified = parsed.files_modified ?? null;
+                taskId = parsed.task_id ?? null;
+              } catch {
+                // payload not valid JSON, ignore
+              }
+            }
+
+            const filesJson = filesModified ? JSON.stringify(filesModified) : null;
+            const enqueueResult = loggedPrepare(
+              `INSERT INTO merge_queue (branch_name, task_id, agent_name, files_modified, status, enqueued_at)
+              VALUES (?, ?, ?, ?, 'pending', datetime('now'))`,
+            ).run(branchName, taskId, fromAgent, filesJson);
+
+            log.info(
+              `[IPC] coordinator:poll-mail - Authorized merge for branch=${branchName} from agent=${fromAgent}, queue_id=${enqueueResult.lastInsertRowid}`,
+            );
+
+            // Record merge authorization event
+            recordEvent({
+              eventType: 'custom',
+              agentName: coordinatorName,
+              sessionId: coordinatorId,
+              data: JSON.stringify({
+                action: 'merge_authorized',
+                branch: branchName,
+                from_agent: fromAgent,
+                merge_queue_id: Number(enqueueResult.lastInsertRowid),
+              }),
+            });
+
+            actionTaken = 'merge_authorized_and_queued';
+            break;
+          }
+          case 'escalation': {
+            const escalatedSession = loggedPrepare(
+              `SELECT * FROM sessions WHERE agent_name = ? AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+            ).get(fromAgent) as Record<string, unknown> | undefined;
+
+            if (escalatedSession) {
+              const currentLevel = (escalatedSession.escalation_level as number) || 0;
+              if (currentLevel >= 2) {
+                loggedPrepare(
+                  `UPDATE sessions SET state = 'stalled', stalled_at = datetime('now'), escalation_level = ?, updated_at = datetime('now') WHERE id = ?`,
+                ).run(currentLevel + 1, escalatedSession.id);
+                actionTaken = 'agent_marked_stalled';
+              } else {
+                loggedPrepare(
+                  `UPDATE sessions SET escalation_level = ?, updated_at = datetime('now') WHERE id = ?`,
+                ).run(currentLevel + 1, escalatedSession.id);
+                actionTaken = 'escalation_incremented';
+              }
+            }
+            break;
+          }
+          case 'health_check': {
+            actionTaken = 'health_confirmed';
+            break;
+          }
+          default: {
+            actionTaken = 'acknowledged';
+            break;
+          }
+        }
+
+        loggedPrepare('UPDATE messages SET read = 1 WHERE id = ?').run(msgId);
+
+        processedResults.push({
+          message_id: msgId,
+          from_agent: fromAgent,
+          type: msgType,
+          action_taken: actionTaken,
+        });
+
+        recordEvent({
+          eventType: 'mail_received',
+          agentName: coordinatorName,
+          sessionId: coordinatorId,
+          data: JSON.stringify({
+            from: fromAgent,
+            type: msgType,
+            action: actionTaken,
+            body_preview: msgBody?.substring(0, 100) ?? null,
+          }),
+        });
+      }
+
+      const activeAgents = loggedPrepare(
+        `SELECT COUNT(*) as count FROM sessions WHERE state IN ('booting', 'working') AND capability != 'coordinator'`,
+      ).get() as { count: number };
+
+      const stalledAgents = loggedPrepare(
+        `SELECT COUNT(*) as count FROM sessions WHERE state = 'stalled'`,
+      ).get() as { count: number };
+
+      const completedToday = loggedPrepare(
+        `SELECT COUNT(*) as count FROM sessions WHERE state = 'completed' AND completed_at >= datetime('now', '-1 day')`,
+      ).get() as { count: number };
+
+      log.info(
+        `[IPC] coordinator:poll-mail - processed ${processedResults.length} messages, fleet: ${activeAgents.count} active, ${stalledAgents.count} stalled`,
+      );
+
+      return {
+        data: {
+          messages_processed: processedResults,
+          unread_count: unreadMessages.length,
+          fleet_summary: {
+            active_agents: activeAgents.count,
+            stalled_agents: stalledAgents.count,
+            completed_today: completedToday.count,
+          },
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('coordinator:poll-mail failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Coordinator auto-task decomposition
+  ipcMain.handle(
+    'coordinator:decompose',
+    (_event, options?: { scope?: string; coordinatorSessionId?: string }) => {
+      try {
+        // Get the active project for context
+        const activeProject = loggedPrepare(
+          'SELECT * FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { id: string; name: string; path: string } | undefined;
+
+        const projectName = activeProject?.name || 'Unknown Project';
+        const scope = options?.scope || `Full project scope for ${projectName}`;
+
+        // Define work streams based on common development patterns
+        const workStreams = [
+          {
+            name: `${projectName} - Core Infrastructure`,
+            description: 'Foundation setup, database, API scaffolding, and build configuration',
+            tasks: [
+              {
+                title: 'Set up project scaffolding and dependencies',
+                type: 'task',
+                priority: 'high',
+              },
+              { title: 'Configure database schema and migrations', type: 'task', priority: 'high' },
+              { title: 'Implement core API endpoints', type: 'task', priority: 'high' },
+              { title: 'Set up build pipeline and dev tooling', type: 'task', priority: 'medium' },
+            ],
+          },
+          {
+            name: `${projectName} - Feature Implementation`,
+            description: 'Core feature development and business logic',
+            tasks: [
+              { title: 'Implement primary user workflows', type: 'feature', priority: 'high' },
+              { title: 'Build UI components and pages', type: 'feature', priority: 'high' },
+              {
+                title: 'Integrate frontend with backend APIs',
+                type: 'feature',
+                priority: 'medium',
+              },
+              { title: 'Add data validation and error handling', type: 'task', priority: 'medium' },
+            ],
+          },
+          {
+            name: `${projectName} - Quality & Polish`,
+            description: 'Testing, code quality, UX polish, and performance optimization',
+            tasks: [
+              { title: 'Write unit and integration tests', type: 'task', priority: 'medium' },
+              { title: 'Perform code review and refactoring', type: 'task', priority: 'medium' },
+              { title: 'Polish UI/UX and fix edge cases', type: 'task', priority: 'low' },
+              {
+                title: 'Performance optimization and profiling',
+                type: 'research',
+                priority: 'low',
+              },
+            ],
+          },
+        ];
+
+        const createdStreams: Array<{
+          groupId: string;
+          name: string;
+          description: string;
+          taskCount: number;
+          tasks: Array<{ id: string; title: string }>;
+        }> = [];
+
+        for (const stream of workStreams) {
+          const groupId = `ws-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+          // Create task group
+          loggedPrepare(
+            'INSERT INTO task_groups (id, name, member_issues, status) VALUES (?, ?, ?, ?)',
+          ).run(groupId, stream.name, '[]', 'active');
+
+          const createdTasks: Array<{ id: string; title: string }> = [];
+          const memberIds: string[] = [];
+
+          for (const task of stream.tasks) {
+            const taskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+            // Create issue
+            loggedPrepare(
+              `INSERT INTO issues (id, title, description, type, priority, status, group_id)
+              VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+            ).run(taskId, task.title, stream.description, task.type, task.priority, groupId);
+
+            memberIds.push(taskId);
+            createdTasks.push({ id: taskId, title: task.title });
+          }
+
+          // Update task group with member issues
+          loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(
+            JSON.stringify(memberIds),
+            groupId,
+          );
+
+          createdStreams.push({
+            groupId,
+            name: stream.name,
+            description: stream.description,
+            taskCount: createdTasks.length,
+            tasks: createdTasks,
+          });
+        }
+
+        // Record decomposition event for the coordinator session
+        if (options?.coordinatorSessionId) {
+          loggedPrepare(
+            `INSERT INTO events (session_id, event_type, data, timestamp)
+            VALUES (?, 'task_decomposition', ?, datetime('now'))`,
+          ).run(
+            options.coordinatorSessionId,
+            JSON.stringify({
+              scope,
+              streams: createdStreams.map((s) => ({
+                name: s.name,
+                taskCount: s.taskCount,
+              })),
+              totalTasks: createdStreams.reduce((sum, s) => sum + s.taskCount, 0),
+            }),
+          );
+        }
+
+        log.info(
+          `[IPC] coordinator:decompose - created ${createdStreams.length} work streams with ${createdStreams.reduce((sum, s) => sum + s.taskCount, 0)} total tasks`,
+        );
+
+        return {
+          data: {
+            streams: createdStreams,
+            totalTasks: createdStreams.reduce((sum, s) => sum + s.taskCount, 0),
+            scope,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('coordinator:decompose failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // Get work streams associated with the coordinator
+  ipcMain.handle('coordinator:workStreams', () => {
+    try {
+      const streams = loggedPrepare(
+        `SELECT tg.*,
+          (SELECT COUNT(*) FROM issues WHERE group_id = tg.id) as total_tasks,
+          (SELECT COUNT(*) FROM issues WHERE group_id = tg.id AND status = 'closed') as completed_tasks,
+          (SELECT COUNT(*) FROM issues WHERE group_id = tg.id AND status = 'in_progress') as in_progress_tasks
+        FROM task_groups tg
+        WHERE tg.name LIKE '% - %'
+        ORDER BY tg.created_at DESC`,
+      ).all();
+
+      log.info(
+        `[IPC] coordinator:workStreams - returned ${(streams as unknown[]).length} work streams`,
+      );
+      return { data: streams, error: null };
+    } catch (error) {
+      log.error('coordinator:workStreams failed:', error);
       return { data: null, error: String(error) };
     }
   });
