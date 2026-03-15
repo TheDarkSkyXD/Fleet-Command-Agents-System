@@ -7000,7 +7000,7 @@ export function registerIpcHandlers(): void {
         }
 
         sql += ' ORDER BY created_at DESC';
-        sql += ` LIMIT ${filters?.limit ?? 500}`;
+        sql += ` LIMIT ${filters?.limit ?? 5000}`;
         if (filters?.offset) {
           sql += ` OFFSET ${filters.offset}`;
         }

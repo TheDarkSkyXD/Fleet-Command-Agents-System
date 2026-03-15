@@ -367,7 +367,7 @@ function AppLogPanel() {
         start_time?: string;
         end_time?: string;
         limit?: number;
-      } = { limit: 500 };
+      } = { limit: 5000 };
       if (levelFilter) filters.level = levelFilter;
       if (agentFilter) filters.agent_name = agentFilter;
       if (searchQuery.trim()) filters.search = searchQuery.trim();
@@ -646,7 +646,7 @@ function AppLogPanel() {
 
       {/* Actions row */}
       <div className="flex items-center justify-between">
-        <span className="text-sm text-slate-400">
+        <span className="text-sm text-slate-400" data-testid="log-entry-count" data-count={logs.length}>
           {logs.length} log entries{hasFilters ? ' (filtered)' : ''}
         </span>
         <div className="flex items-center gap-2">
@@ -755,7 +755,7 @@ function VirtualizedLogList({
     count: logs.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 36,
-    overscan: 15,
+    overscan: 20,
   });
 
   return (
@@ -763,6 +763,8 @@ function VirtualizedLogList({
       ref={parentRef}
       className="max-h-[600px] overflow-y-auto"
       data-testid="virtualized-log-list"
+      data-total-items={logs.length}
+      data-rendered-items={virtualizer.getVirtualItems().length}
     >
       <div
         style={{

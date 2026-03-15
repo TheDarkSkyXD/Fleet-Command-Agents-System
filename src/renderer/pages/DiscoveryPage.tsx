@@ -21,6 +21,16 @@ import {
 } from 'react-icons/fi';
 import type { DiscoveryCategory, DiscoveryFinding, DiscoveryScan } from '../../shared/types';
 
+/** Safely parse JSON with a fallback to prevent console errors */
+function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
+  if (!json) return fallback;
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 const DISCOVERY_CATEGORIES: {
   id: DiscoveryCategory;
   label: string;
@@ -189,7 +199,7 @@ export function DiscoveryPage() {
 
   const viewScanResults = async (scan: DiscoveryScan) => {
     setActiveScan(scan);
-    const categories = JSON.parse(scan.categories) as DiscoveryCategory[];
+    const categories = safeJsonParse<DiscoveryCategory[]>(scan.categories, []);
     if (categories.length > 0) {
       setSelectedResultCategory(categories[0]);
       const findingsResult = await window.electronAPI.discoveryFindings(scan.id, categories[0]);
@@ -223,7 +233,7 @@ export function DiscoveryPage() {
 
   const generateExpertiseFromScan = async (): Promise<number> => {
     if (!activeScan) return 0;
-    const categories = JSON.parse(activeScan.categories) as DiscoveryCategory[];
+    const categories = safeJsonParse<DiscoveryCategory[]>(activeScan.categories, []);
 
     // Map discovery category to expertise domain
     const domainMap: Record<DiscoveryCategory, string> = {
@@ -431,7 +441,7 @@ function DiscoverySetupView({
           <h2 className="mb-3 text-lg font-semibold text-slate-100">Previous Scans</h2>
           <div className="space-y-2">
             {scans.map((scan) => {
-              const categories = JSON.parse(scan.categories) as string[];
+              const categories = safeJsonParse<string[]>(scan.categories, []);
               return (
                 <div
                   key={scan.id}
@@ -488,8 +498,8 @@ function DiscoverySetupView({
 }
 
 function DiscoveryProgressView({ scan }: { scan: DiscoveryScan }) {
-  const categories = JSON.parse(scan.categories) as DiscoveryCategory[];
-  const progress: Record<string, string> = scan.progress ? JSON.parse(scan.progress) : {};
+  const categories = safeJsonParse<DiscoveryCategory[]>(scan.categories, []);
+  const progress: Record<string, string> = safeJsonParse<Record<string, string>>(scan.progress, {});
 
   const completedCount = Object.values(progress).filter((s) => s === 'completed').length;
   const runningCount = Object.values(progress).filter((s) => s === 'running').length;
@@ -655,7 +665,7 @@ function DiscoveryResultsView({
   onSelectCategory: (category: DiscoveryCategory) => void;
   onGenerateExpertise: () => Promise<number>;
 }) {
-  const categories = JSON.parse(scan.categories) as DiscoveryCategory[];
+  const categories = safeJsonParse<DiscoveryCategory[]>(scan.categories, []);
   const [generating, setGenerating] = useState(false);
   const [generatedCount, setGeneratedCount] = useState<number | null>(null);
 

@@ -1438,11 +1438,11 @@ function VirtualizedMailList({
     count: messages.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 80,
-    overscan: 10,
+    overscan: 15,
   });
 
   return (
-    <div ref={parentRef} className="flex-1 overflow-y-auto" data-testid="virtualized-mail-list" data-message-count={messages.length}>
+    <div ref={parentRef} className="flex-1 overflow-y-auto" data-testid="virtualized-mail-list" data-message-count={messages.length} data-rendered-items={virtualizer.getVirtualItems().length}>
       <div
         style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}
       >

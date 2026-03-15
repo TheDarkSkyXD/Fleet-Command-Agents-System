@@ -70,7 +70,10 @@ function HistoryEntryRow({
   onViewDiff: (id: number) => void;
   onRollback?: (id: number) => void;
 }) {
-  const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
+  let filesModified: string[] = [];
+  try {
+    filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
+  } catch { /* malformed JSON */ }
   const completedDate = entry.completed_at ? new Date(entry.completed_at) : null;
   const enqueuedDate = new Date(entry.enqueued_at);
 
@@ -450,7 +453,10 @@ function QueueEntryRow({
   previewResult?: PreviewResult | null;
   previewLoading?: boolean;
 }) {
-  const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
+  let filesModified: string[] = [];
+  try {
+    filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
+  } catch { /* malformed JSON */ }
   const isBlocked = entry.blocked === true;
   const dependsOnIds = parseDependsOn(entry.depends_on);
   const depEntries = dependsOnIds
