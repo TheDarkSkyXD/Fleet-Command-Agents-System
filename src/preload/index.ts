@@ -184,6 +184,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Worktrees
   worktreeList: (repoPath: string) => ipcRenderer.invoke('worktree:list', repoPath),
+  worktreeRemove: (repoPath: string, worktreePath: string) =>
+    ipcRenderer.invoke('worktree:remove', repoPath, worktreePath),
+  worktreeCleanCompleted: (repoPath: string) =>
+    ipcRenderer.invoke('worktree:clean-completed', repoPath),
+
+  // Project initialization
+  projectInitOverstory: (projectPath: string) =>
+    ipcRenderer.invoke('project:init-overstory', projectPath),
 
   // Metrics
   metricsList: () => ipcRenderer.invoke('metrics:list'),

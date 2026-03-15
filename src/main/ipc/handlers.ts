@@ -4051,6 +4051,165 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Project initialization - create .overstory/ directory structure
+  ipcMain.handle('project:init-overstory', async (_event, projectPath: string) => {
+    try {
+      const fs = await import('node:fs/promises');
+      const path = await import('node:path');
+      const overstoryDir = path.join(projectPath, '.overstory');
+
+      // Check if already initialized
+      try {
+        await fs.access(overstoryDir);
+        return { data: { initialized: true, alreadyExisted: true }, error: null };
+      } catch {
+        // Does not exist, proceed to create
+      }
+
+      // Create .overstory/ directory structure
+      await fs.mkdir(overstoryDir, { recursive: true });
+      await fs.mkdir(path.join(overstoryDir, 'agents'), { recursive: true });
+      await fs.mkdir(path.join(overstoryDir, 'logs'), { recursive: true });
+      await fs.mkdir(path.join(overstoryDir, 'worktrees'), { recursive: true });
+
+      // Create default config file
+      const config = {
+        version: 1,
+        project: {
+          name: path.basename(projectPath),
+          path: projectPath,
+        },
+        settings: {
+          maxConcurrentAgents: 5,
+          defaultModel: 'sonnet',
+          autoMerge: false,
+        },
+        created_at: new Date().toISOString(),
+      };
+      await fs.writeFile(
+        path.join(overstoryDir, 'config.json'),
+        JSON.stringify(config, null, 2),
+        'utf-8',
+      );
+
+      // Create agents registry file
+      await fs.writeFile(
+        path.join(overstoryDir, 'agents', 'registry.json'),
+        JSON.stringify({ agents: [], updated_at: new Date().toISOString() }, null, 2),
+        'utf-8',
+      );
+
+      // Create state file for tracking
+      await fs.writeFile(
+        path.join(overstoryDir, 'state.json'),
+        JSON.stringify(
+          {
+            status: 'initialized',
+            initialized_at: new Date().toISOString(),
+            last_activity: new Date().toISOString(),
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+
+      log.info(`[IPC] project:init-overstory - created .overstory/ directory in ${projectPath}`);
+      return { data: { initialized: true, alreadyExisted: false }, error: null };
+    } catch (error) {
+      log.error('project:init-overstory failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Worktree cleanup - remove individual or all completed worktrees
+  ipcMain.handle('worktree:remove', async (_event, repoPath: string, worktreePath: string) => {
+    try {
+      const simpleGit = (await import('simple-git')).default;
+      const git = simpleGit(repoPath);
+
+      // Remove the worktree using git worktree remove --force
+      await git.raw(['worktree', 'remove', worktreePath, '--force']);
+      log.info(`[IPC] worktree:remove - removed worktree ${worktreePath}`);
+      return { data: { removed: true, path: worktreePath }, error: null };
+    } catch (error) {
+      log.error('worktree:remove failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('worktree:clean-completed', async (_event, repoPath: string) => {
+    try {
+      const simpleGit = (await import('simple-git')).default;
+      const git = simpleGit(repoPath);
+
+      // List all worktrees
+      const result = await git.raw(['worktree', 'list', '--porcelain']);
+      const blocks = result.trim().split('\n\n');
+      const removed: string[] = [];
+      const errors: Array<{ path: string; error: string }> = [];
+
+      let isFirst = true;
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        const lines = block.trim().split('\n');
+        let wtPath = '';
+        let branch: string | null = null;
+
+        for (const line of lines) {
+          if (line.startsWith('worktree ')) wtPath = line.substring(9);
+          else if (line.startsWith('branch '))
+            branch = line.substring(7).replace('refs/heads/', '');
+        }
+
+        // Skip main worktree
+        if (isFirst) {
+          isFirst = false;
+          continue;
+        }
+        if (!wtPath) continue;
+
+        // Check if worktree has an active (non-completed) agent session
+        let hasActiveAgent = false;
+        try {
+          const session = loggedPrepare(
+            "SELECT agent_name FROM sessions WHERE worktree_path = ? AND state NOT IN ('completed', 'zombie', 'failed') LIMIT 1",
+          ).get(wtPath) as { agent_name: string } | undefined;
+          if (session) hasActiveAgent = true;
+        } catch {
+          /* ignore */
+        }
+
+        // Only remove worktrees that are NOT assigned to active agents
+        if (!hasActiveAgent) {
+          try {
+            await git.raw(['worktree', 'remove', wtPath, '--force']);
+            removed.push(wtPath);
+
+            // Also try to delete the branch if it exists
+            if (branch) {
+              try {
+                await git.raw(['branch', '-D', branch]);
+              } catch {
+                /* branch may not exist or be checked out elsewhere */
+              }
+            }
+          } catch (err) {
+            errors.push({ path: wtPath, error: String(err) });
+          }
+        }
+      }
+
+      log.info(
+        `[IPC] worktree:clean-completed - removed ${removed.length} worktrees, ${errors.length} errors`,
+      );
+      return { data: { removed, errors }, error: null };
+    } catch (error) {
+      log.error('worktree:clean-completed failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // Metrics channels - token usage tracking per agent session and model breakdown
   ipcMain.handle('metrics:list', () => {
     try {

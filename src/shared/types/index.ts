@@ -1015,6 +1015,20 @@ export interface ElectronAPI {
 
   // Worktrees
   worktreeList: (repoPath: string) => Promise<{ data: Worktree[] | null; error: string | null }>;
+  worktreeRemove: (
+    repoPath: string,
+    worktreePath: string,
+  ) => Promise<{ data: { removed: boolean; path: string } | null; error: string | null }>;
+  worktreeCleanCompleted: (repoPath: string) => Promise<{
+    data: { removed: string[]; errors: Array<{ path: string; error: string }> } | null;
+    error: string | null;
+  }>;
+
+  // Project initialization
+  projectInitOverstory: (projectPath: string) => Promise<{
+    data: { initialized: boolean; alreadyExisted: boolean } | null;
+    error: string | null;
+  }>;
 
   // Metrics
   metricsList: () => Promise<{ data: Metric[] | null; error: string | null }>;

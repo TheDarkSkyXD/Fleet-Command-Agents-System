@@ -39,21 +39,21 @@ function OutcomeBadge({ status }: { status: MergeStatus }) {
   if (status === 'merged') {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
-        <span>\u2714</span> Success
+        <span>{'\u2714'}</span> Success
       </span>
     );
   }
   if (status === 'failed') {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-400">
-        <span>\u2718</span> Failed
+        <span>{'\u2718'}</span> Failed
       </span>
     );
   }
   if (status === 'conflict') {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-400">
-        <span>\u26A0</span> Conflict
+        <span>{'\u26A0'}</span> Conflict
       </span>
     );
   }
@@ -85,7 +85,6 @@ function HistoryEntryRow({
     >
       <div className="flex items-start justify-between p-4">
         <div className="flex items-start gap-4 min-w-0 flex-1">
-          {/* Outcome icon */}
           <div
             className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg ${
               entry.status === 'merged'
@@ -97,9 +96,7 @@ function HistoryEntryRow({
           >
             {entry.status === 'merged' ? '\u2714' : entry.status === 'failed' ? '\u2718' : '\u26A0'}
           </div>
-
           <div className="min-w-0 flex-1">
-            {/* Branch name + outcome */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-sm text-slate-50 truncate">{entry.branch_name}</span>
               <OutcomeBadge status={entry.status} />
@@ -109,8 +106,6 @@ function HistoryEntryRow({
                 </span>
               )}
             </div>
-
-            {/* Tier badge (prominent) */}
             <div className="mt-2">
               {entry.resolved_tier ? (
                 <TierBadge tier={entry.resolved_tier} />
@@ -120,8 +115,6 @@ function HistoryEntryRow({
                 </span>
               )}
             </div>
-
-            {/* Metadata row */}
             <div className="mt-2 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
               {entry.agent_name && (
                 <span className="inline-flex items-center gap-1">
@@ -139,8 +132,6 @@ function HistoryEntryRow({
                 </span>
               )}
             </div>
-
-            {/* Timestamps */}
             <div className="mt-1.5 flex items-center gap-4 text-xs text-slate-500">
               <span title={enqueuedDate.toLocaleString()}>
                 Enqueued: {enqueuedDate.toLocaleDateString()}{' '}
@@ -155,8 +146,6 @@ function HistoryEntryRow({
             </div>
           </div>
         </div>
-
-        {/* Actions */}
         <div className="shrink-0 ml-4 flex items-center gap-2">
           <button
             type="button"
@@ -214,6 +203,15 @@ function StatusBadge({ status }: { status: MergeStatus }) {
   );
 }
 
+function BlockedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/20 px-2.5 py-0.5 text-xs font-medium text-orange-400">
+      <span className="h-2 w-2 rounded-full bg-orange-400" />
+      Blocked
+    </span>
+  );
+}
+
 function EnqueueDialog({
   open,
   onClose,
@@ -257,6 +255,10 @@ function EnqueueDialog({
   const toggleDep = (id: number) => {
     setSelectedDeps((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   };
+
+  const availableDeps = existingEntries.filter(
+    (e) => e.status === 'pending' || e.status === 'merging',
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -302,33 +304,38 @@ function EnqueueDialog({
               className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-          {existingEntries.length > 0 && (
+          {availableDeps.length > 0 && (
             <div>
-              <span className="block text-sm font-medium text-slate-300 mb-1">
-                Dependencies (optional)
-              </span>
+              <label
+                htmlFor="depends-on-list"
+                className="block text-sm font-medium text-slate-300 mb-1"
+              >
+                Depends On (optional)
+              </label>
               <p className="text-xs text-slate-500 mb-2">
-                Select entries that must be merged before this branch
+                Select merges that must complete before this one can proceed.
               </p>
-              <div className="max-h-32 overflow-y-auto rounded-md border border-slate-600 bg-slate-900 p-2 space-y-1">
-                {existingEntries
-                  .filter((e) => e.status !== 'merged' && e.status !== 'failed')
-                  .map((e) => (
-                    <label
-                      key={e.id}
-                      className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:bg-slate-800 rounded p-1"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedDeps.includes(e.id)}
-                        onChange={() => toggleDep(e.id)}
-                        className="rounded border-slate-600 bg-slate-800"
-                      />
-                      <span className="font-mono truncate">
-                        #{e.id} {e.branch_name}
-                      </span>
-                    </label>
-                  ))}
+              <div
+                id="depends-on-list"
+                className="max-h-32 overflow-y-auto space-y-1 rounded-md border border-slate-600 bg-slate-900 p-2"
+              >
+                {availableDeps.map((dep) => (
+                  <label
+                    key={dep.id}
+                    className="flex items-center gap-2 rounded px-2 py-1 hover:bg-slate-800 cursor-pointer text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedDeps.includes(dep.id)}
+                      onChange={() => toggleDep(dep.id)}
+                      className="rounded border-slate-500 bg-slate-800 text-blue-500 focus:ring-blue-500"
+                    />
+                    <span className="font-mono text-xs text-slate-300 truncate">
+                      #{dep.id} {dep.branch_name}
+                    </span>
+                    <StatusBadge status={dep.status} />
+                  </label>
+                ))}
               </div>
             </div>
           )}
@@ -359,9 +366,19 @@ interface PreviewResult {
   conflicts: string[];
 }
 
+function parseDependsOn(dependsOn: string | null): number[] {
+  if (!dependsOn) return [];
+  try {
+    return JSON.parse(dependsOn) as number[];
+  } catch {
+    return [];
+  }
+}
+
 function QueueEntryRow({
   entry,
   position,
+  allEntries,
   onExecute,
   onComplete,
   onFail,
@@ -370,13 +387,13 @@ function QueueEntryRow({
   onAutoResolve,
   onAiResolve,
   onReimagine,
-  onRollback,
   onPreview,
   previewResult,
   previewLoading,
 }: {
   entry: MergeQueueEntry;
   position: number;
+  allEntries: MergeQueueEntry[];
   onExecute: (id: number) => void;
   onComplete: (id: number) => void;
   onFail: (id: number) => void;
@@ -385,26 +402,24 @@ function QueueEntryRow({
   onAutoResolve?: (id: number) => void;
   onAiResolve?: (id: number) => void;
   onReimagine?: (id: number) => void;
-  onRollback?: (id: number) => void;
   onPreview?: (id: number) => void;
   previewResult?: PreviewResult | null;
   previewLoading?: boolean;
 }) {
   const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
   const isBlocked = entry.blocked === true;
-  const dependsOn = entry.depends_on
-    ? (() => {
-        try {
-          return JSON.parse(entry.depends_on) as number[];
-        } catch {
-          return [];
-        }
-      })()
-    : [];
+  const dependsOnIds = parseDependsOn(entry.depends_on);
+  const depEntries = dependsOnIds
+    .map((id) => allEntries.find((e) => e.id === id))
+    .filter(Boolean) as MergeQueueEntry[];
 
   return (
     <div
-      className={`rounded-lg border bg-slate-800/50 hover:bg-slate-800 transition-colors ${isBlocked ? 'border-orange-700/40 opacity-75' : 'border-slate-700'}`}
+      className={`rounded-lg border transition-colors ${
+        isBlocked
+          ? 'border-orange-700/40 bg-orange-900/10 hover:bg-orange-900/15'
+          : 'border-slate-700 bg-slate-800/50 hover:bg-slate-800'
+      }`}
     >
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-4">
@@ -415,31 +430,41 @@ function QueueEntryRow({
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm text-slate-50">{entry.branch_name}</span>
               <StatusBadge status={entry.status} />
-              {entry.rolled_back === 1 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-400">
-                  {'\u21A9'} Rolled Back
-                </span>
-              )}
-              {isBlocked && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/15 px-2 py-0.5 text-xs font-medium text-orange-400">
-                  {'\u23F3'} Waiting on deps
-                </span>
-              )}
+              {isBlocked && <BlockedBadge />}
             </div>
             <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
               {entry.agent_name && <span>Agent: {entry.agent_name}</span>}
               {entry.task_id && <span>Task: {entry.task_id}</span>}
               {entry.resolved_tier && <span>Tier: {entry.resolved_tier}</span>}
-              {dependsOn.length > 0 && (
-                <span className="text-orange-400/70">
-                  Depends on: {dependsOn.map((id) => `#${id}`).join(', ')}
-                </span>
-              )}
               <span>Enqueued: {new Date(entry.enqueued_at).toLocaleString()}</span>
             </div>
             {filesModified.length > 0 && (
               <div className="mt-1 text-xs text-slate-500">
                 {filesModified.length} file{filesModified.length !== 1 ? 's' : ''} modified
+              </div>
+            )}
+            {depEntries.length > 0 && (
+              <div className="mt-1.5 flex items-center gap-1 text-xs text-slate-500">
+                <span className="text-slate-400">Depends on:</span>
+                {depEntries.map((dep) => (
+                  <span
+                    key={dep.id}
+                    className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono ${
+                      dep.status === 'failed'
+                        ? 'bg-red-500/15 text-red-400'
+                        : dep.status === 'merged'
+                          ? 'bg-emerald-500/15 text-emerald-400'
+                          : 'bg-slate-700 text-slate-300'
+                    }`}
+                  >
+                    #{dep.id}
+                  </span>
+                ))}
+              </div>
+            )}
+            {isBlocked && (
+              <div className="mt-1.5 text-xs text-orange-400/80">
+                Blocked: a dependency has failed. Resolve or remove the failed merge to unblock.
               </div>
             )}
           </div>
@@ -469,6 +494,16 @@ function QueueEntryRow({
               type="button"
               onClick={() => onExecute(entry.id)}
               className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 transition-colors"
+            >
+              Merge
+            </button>
+          )}
+          {entry.status === 'pending' && isBlocked && (
+            <button
+              type="button"
+              disabled
+              className="rounded-md bg-slate-600 px-3 py-1.5 text-xs font-medium text-slate-400 cursor-not-allowed opacity-50"
+              title="Blocked by failed dependency"
             >
               Merge
             </button>
@@ -504,20 +539,6 @@ function QueueEntryRow({
               Reimagine
             </button>
           )}
-          {(entry.status === 'failed' || entry.status === 'merged') &&
-            entry.rolled_back !== 1 &&
-            entry.pre_merge_commit &&
-            onRollback && (
-              <button
-                type="button"
-                onClick={() => onRollback(entry.id)}
-                data-testid={`rollback-${entry.id}`}
-                className="rounded-md border border-sky-600/50 bg-sky-600/10 px-3 py-1.5 text-xs font-medium text-sky-400 hover:bg-sky-600/20 transition-colors"
-                title="Restore target branch to pre-merge state"
-              >
-                Rollback
-              </button>
-            )}
           {entry.status === 'merging' && (
             <>
               <button
@@ -549,7 +570,6 @@ function QueueEntryRow({
           )}
         </div>
       </div>
-      {/* Dry-run preview result */}
       {previewResult && (
         <div
           data-testid={`preview-result-${entry.id}`}
@@ -591,6 +611,81 @@ function QueueEntryRow({
   );
 }
 
+function TargetBranchSelector({
+  targetBranch,
+  onChangeTarget,
+}: {
+  targetBranch: string;
+  onChangeTarget: (branch: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [inputValue, setInputValue] = useState(targetBranch);
+
+  const handleSave = () => {
+    onChangeTarget(inputValue.trim());
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') {
+      setInputValue(targetBranch);
+      setEditing(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-slate-400 whitespace-nowrap">Target branch:</span>
+      {editing ? (
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleSave}
+            placeholder="main"
+            // biome-ignore lint/a11y/noAutofocus: intentional focus for inline edit
+            autoFocus
+            className="w-40 rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            onClick={handleSave}
+            className="rounded px-2 py-1 text-xs text-emerald-400 hover:bg-emerald-600/20 transition-colors"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setInputValue(targetBranch);
+              setEditing(false);
+            }}
+            className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-700 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setInputValue(targetBranch);
+            setEditing(true);
+          }}
+          className="inline-flex items-center gap-1.5 rounded-md border border-slate-600 bg-slate-800 px-2.5 py-1 text-xs font-mono text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors"
+          title="Click to change merge target branch"
+        >
+          {targetBranch || '(current branch)'}
+          <span className="text-slate-500">&#9998;</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function MergeQueuePage() {
   const {
     queue,
@@ -616,10 +711,16 @@ export function MergeQueuePage() {
   const [diffLoading, setDiffLoading] = useState(false);
   const [previewResults, setPreviewResults] = useState<Record<number, PreviewResult>>({});
   const [previewLoadingId, setPreviewLoadingId] = useState<number | null>(null);
+  const [targetBranch, setTargetBranch] = useState('');
 
   useEffect(() => {
     fetchQueue();
     fetchHistory();
+    window.electronAPI.mergeGetTargetBranch().then((result) => {
+      if (!result.error && result.data) {
+        setTargetBranch(result.data);
+      }
+    });
   }, [fetchQueue, fetchHistory]);
 
   const allEntries = [...queue, ...history];
@@ -628,6 +729,7 @@ export function MergeQueuePage() {
   const mergedCount = allEntries.filter((e) => e.status === 'merged').length;
   const conflictCount = allEntries.filter((e) => e.status === 'conflict').length;
   const failedCount = allEntries.filter((e) => e.status === 'failed').length;
+  const blockedCount = queue.filter((e) => e.blocked === true).length;
 
   const handleEnqueue = async (entry: {
     branch_name: string;
@@ -640,7 +742,7 @@ export function MergeQueuePage() {
   };
 
   const handleExecute = async (id: number) => {
-    await execute(id);
+    await execute(id, undefined, targetBranch || undefined);
   };
 
   const handleComplete = async (id: number) => {
@@ -656,19 +758,24 @@ export function MergeQueuePage() {
   };
 
   const handleAutoResolve = async (id: number) => {
-    await autoResolve(id);
+    await autoResolve(id, undefined, targetBranch || undefined);
   };
 
   const handleAiResolve = async (id: number) => {
-    await aiResolve(id);
+    await aiResolve(id, undefined, targetBranch || undefined);
   };
 
   const handleReimagine = async (id: number) => {
-    await reimagine(id);
+    await reimagine(id, undefined, targetBranch || undefined);
   };
 
   const handleRollback = async (id: number) => {
     await rollback(id);
+  };
+
+  const handleChangeTargetBranch = async (branch: string) => {
+    setTargetBranch(branch);
+    await window.electronAPI.mergeSetTargetBranch(branch);
   };
 
   const handlePreview = async (id: number) => {
@@ -701,7 +808,6 @@ export function MergeQueuePage() {
         const result = await window.electronAPI.mergeDiff(id);
         if (result.error) {
           console.error('Failed to get diff:', result.error);
-          // Show a sample diff as fallback when git diff fails (e.g., branch not found locally)
           setDiffData({
             diff: '',
             branchName:
@@ -725,7 +831,15 @@ export function MergeQueuePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-50">Merge Queue</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-50">Merge Queue</h1>
+          <div className="mt-2">
+            <TargetBranchSelector
+              targetBranch={targetBranch}
+              onChangeTarget={handleChangeTargetBranch}
+            />
+          </div>
+        </div>
         <button
           type="button"
           onClick={() => setShowEnqueue(true)}
@@ -736,7 +850,7 @@ export function MergeQueuePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-6 gap-4">
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
           <div className="text-2xl font-bold text-slate-300">{pendingCount}</div>
           <div className="text-xs text-slate-400 mt-1">Pending</div>
@@ -756,6 +870,10 @@ export function MergeQueuePage() {
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
           <div className="text-2xl font-bold text-red-400">{failedCount}</div>
           <div className="text-xs text-slate-400 mt-1">Failed</div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+          <div className="text-2xl font-bold text-orange-400">{blockedCount}</div>
+          <div className="text-xs text-slate-400 mt-1">Blocked</div>
         </div>
       </div>
 
@@ -810,6 +928,7 @@ export function MergeQueuePage() {
                 key={entry.id}
                 entry={entry}
                 position={index + 1}
+                allEntries={allEntries}
                 onExecute={handleExecute}
                 onComplete={handleComplete}
                 onFail={handleFail}
@@ -818,7 +937,6 @@ export function MergeQueuePage() {
                 onAutoResolve={handleAutoResolve}
                 onAiResolve={handleAiResolve}
                 onReimagine={handleReimagine}
-                onRollback={handleRollback}
                 onPreview={handlePreview}
                 previewResult={previewResults[entry.id] || null}
                 previewLoading={previewLoadingId === entry.id}
@@ -833,7 +951,6 @@ export function MergeQueuePage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* History tier summary */}
           <div className="flex items-center gap-4 text-xs text-slate-400 pb-2 border-b border-slate-700/50">
             <span className="font-medium text-slate-300">
               {history.length} merge{history.length !== 1 ? 's' : ''} total
