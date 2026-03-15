@@ -79,7 +79,7 @@ interface GroupProgress {
   blocked: number;
 }
 
-type ActiveTab = 'issues' | 'groups' | 'ready';
+type ActiveTab = 'issues' | 'groups' | 'ready' | 'completed';
 
 export function TasksPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('issues');
@@ -112,6 +112,14 @@ export function TasksPage() {
   const [addingIssueToGroup, setAddingIssueToGroup] = useState<string | null>(null);
   const [selectedIssueForGroup, setSelectedIssueForGroup] = useState<string>('');
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+
+  // Close with summary state
+  const [closingIssueId, setClosingIssueId] = useState<string | null>(null);
+  const [closeSummary, setCloseSummary] = useState('');
+  const [closingInProgress, setClosingInProgress] = useState(false);
+  // Completed issues
+  const [completedIssues, setCompletedIssues] = useState<Issue[]>([]);
+  const [completedLoading, setCompletedLoading] = useState(false);
 
   const loadIssues = useCallback(async () => {
     try {
@@ -335,6 +343,67 @@ export function TasksPage() {
   const getTypeInfo = (type: IssueType) =>
     issueTypes.find((t) => t.value === type) || issueTypes[0];
 
+  // Load completed (closed) issues
+  const loadCompletedIssues = useCallback(async () => {
+    setCompletedLoading(true);
+    try {
+      const result = await window.electronAPI.issueList({ status: 'closed' });
+      if (result.data) {
+        setCompletedIssues(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to load completed issues:', err);
+    } finally {
+      setCompletedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'completed') {
+      loadCompletedIssues();
+    }
+  }, [activeTab, loadCompletedIssues]);
+
+  // Close issue with summary
+  const handleCloseWithSummary = async () => {
+    if (!closingIssueId) return;
+    setClosingInProgress(true);
+    try {
+      const result = await window.electronAPI.issueUpdate(closingIssueId, {
+        status: 'closed',
+        close_summary: closeSummary.trim() || null,
+      });
+      if (result.data) {
+        setIssues((prev) =>
+          prev.map((i) => (i.id === closingIssueId ? (result.data as Issue) : i)),
+        );
+      }
+      setClosingIssueId(null);
+      setCloseSummary('');
+    } catch (err) {
+      console.error('Failed to close issue:', err);
+    } finally {
+      setClosingInProgress(false);
+    }
+  };
+
+  // Wrapper for status changes that intercepts "closed" to prompt for summary
+  const handleStatusChangeWithClose = async (id: string, newStatus: IssueStatus) => {
+    if (newStatus === 'closed') {
+      setClosingIssueId(id);
+      setCloseSummary('');
+      return;
+    }
+    try {
+      const result = await window.electronAPI.issueUpdate(id, { status: newStatus });
+      if (result.data) {
+        setIssues((prev) => prev.map((i) => (i.id === id ? (result.data as Issue) : i)));
+      }
+    } catch (err) {
+      console.error('Failed to update issue status:', err);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -402,6 +471,21 @@ export function TasksPage() {
           data-testid="tab-ready-queue"
         >
           Ready Queue ({readyIssues.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('completed')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'completed'
+              ? 'border-green-500 text-green-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+          data-testid="tab-completed"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <FiCheckCircle size={14} />
+            Completed ({completedIssues.length})
+          </span>
         </button>
       </div>
 
@@ -659,18 +743,18 @@ export function TasksPage() {
               getPriorityInfo={getPriorityInfo}
               getTypeInfo={getTypeInfo}
               onClose={() => setSelectedIssueId(null)}
-              onStatusChange={async (id, newStatus) => {
+              onStatusChange={handleStatusChangeWithClose}
+              allIssues={issues}
+              onDependenciesChange={async (id, depIds) => {
                 try {
-                  const result = await window.electronAPI.issueUpdate(id, {
-                    status: newStatus,
-                  });
+                  const result = await window.electronAPI.issueSetDependencies(id, depIds);
                   if (result.data) {
                     setIssues((prev) =>
                       prev.map((i) => (i.id === id ? (result.data as Issue) : i)),
                     );
                   }
                 } catch (err) {
-                  console.error('Failed to update issue status:', err);
+                  console.error('Failed to update dependencies:', err);
                 }
               }}
             />
@@ -1032,6 +1116,163 @@ export function TasksPage() {
           )}
         </>
       )}
+
+      {/* Completed Tab */}
+      {activeTab === 'completed' && (
+        <>
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+            <p className="text-sm text-green-300">
+              <FiCheckCircle className="inline mr-1.5 -mt-0.5" size={14} />
+              Completed issues — closed with a summary of what was done.
+            </p>
+          </div>
+
+          {completedLoading ? (
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
+              <FiLoader className="mx-auto mb-2 animate-spin" size={24} />
+              <p>Loading completed issues...</p>
+            </div>
+          ) : completedIssues.length === 0 ? (
+            <div
+              className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400"
+              data-testid="completed-empty"
+            >
+              <p className="text-lg mb-2">No completed issues</p>
+              <p className="text-sm">Issues will appear here once they are closed with a summary</p>
+            </div>
+          ) : (
+            <div className="space-y-2" data-testid="completed-issues-list">
+              {completedIssues.map((issue) => {
+                const typeInfo = getTypeInfo(issue.type);
+                const priorityInfo = getPriorityInfo(issue.priority);
+                const PriorityIcon = priorityInfo.icon;
+                return (
+                  <div
+                    key={issue.id}
+                    className="rounded-lg border border-slate-700 bg-slate-800 p-4 hover:border-green-500/50 transition-colors"
+                    data-testid={`completed-issue-${issue.id}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <FiCheckCircle size={16} className="text-green-400 flex-shrink-0" />
+                          <h3 className="font-medium text-slate-100 truncate">{issue.title}</h3>
+                        </div>
+                        {issue.close_summary && (
+                          <div
+                            className="mt-2 ml-6 rounded border border-green-500/20 bg-green-500/5 px-3 py-2"
+                            data-testid={`close-summary-${issue.id}`}
+                          >
+                            <span className="text-xs font-medium text-green-400 uppercase tracking-wider block mb-1">
+                              Close Summary
+                            </span>
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap">
+                              {issue.close_summary}
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 mt-2 ml-6 text-xs text-slate-500">
+                          <span className={typeInfo.color}>{typeInfo.label}</span>
+                          <span className={`inline-flex items-center gap-1 ${priorityInfo.color}`}>
+                            <PriorityIcon size={11} />
+                            {priorityInfo.label}
+                          </span>
+                          {issue.assigned_agent && (
+                            <span className="inline-flex items-center gap-1 text-amber-400">
+                              <FiUser size={11} />
+                              {issue.assigned_agent}
+                            </span>
+                          )}
+                          {issue.closed_at && (
+                            <span className="inline-flex items-center gap-1 text-green-400">
+                              <FiClock size={11} />
+                              Closed: {new Date(issue.closed_at).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Close Issue with Summary Dialog */}
+      {closingIssueId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-800 p-6 shadow-xl"
+            data-testid="close-issue-dialog"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-50">Close Issue</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setClosingIssueId(null);
+                  setCloseSummary('');
+                }}
+                className="rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+              >
+                <FiX size={18} />
+              </button>
+            </div>
+            <div className="mb-2">
+              <p className="text-sm text-slate-400">
+                Closing:{' '}
+                <span className="text-slate-200 font-medium">
+                  {issues.find((i) => i.id === closingIssueId)?.title || closingIssueId}
+                </span>
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                {/* biome-ignore lint/a11y/noLabelWithoutControl: textarea follows */}
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Summary / Reason <span className="text-slate-500">(optional)</span>
+                </label>
+                <textarea
+                  value={closeSummary}
+                  onChange={(e) => setCloseSummary(e.target.value)}
+                  placeholder="Describe what was done or why this issue is being closed..."
+                  className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none resize-y"
+                  rows={4}
+                  data-testid="close-summary-input"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClosingIssueId(null);
+                    setCloseSummary('');
+                  }}
+                  className="rounded-md px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseWithSummary}
+                  disabled={closingInProgress}
+                  className="flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50 transition-colors"
+                  data-testid="confirm-close-btn"
+                >
+                  {closingInProgress ? (
+                    <FiLoader size={14} className="animate-spin" />
+                  ) : (
+                    <FiCheckCircle size={14} />
+                  )}
+                  Close Issue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1235,6 +1476,112 @@ function FilterSelect({
   );
 }
 
+function DependencyManager({
+  issue,
+  allIssues,
+  statusConfig: statuses,
+  onDependenciesChange,
+}: {
+  issue: Issue;
+  allIssues: Issue[];
+  statusConfig: Record<
+    IssueStatus,
+    { label: string; icon: typeof FiCircle; color: string; bg: string }
+  >;
+  onDependenciesChange: (id: string, depIds: string[]) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const deps: string[] = (() => {
+    try {
+      return JSON.parse(issue.dependencies || '[]');
+    } catch {
+      return [];
+    }
+  })();
+
+  const depIssues = deps
+    .map((depId) => allIssues.find((i) => i.id === depId))
+    .filter(Boolean) as Issue[];
+
+  const availableIssues = allIssues.filter((i) => i.id !== issue.id && !deps.includes(i.id));
+
+  return (
+    <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+          Dependencies ({deps.length})
+        </span>
+        <button
+          type="button"
+          onClick={() => setAdding(!adding)}
+          className="rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+          title="Add dependency"
+        >
+          {adding ? <FiX size={14} /> : <FiPlus size={14} />}
+        </button>
+      </div>
+
+      {adding && availableIssues.length > 0 && (
+        <div className="mb-3 max-h-32 overflow-y-auto rounded border border-slate-600 bg-slate-800">
+          {availableIssues.map((i) => {
+            const st = statuses[i.status];
+            return (
+              <button
+                key={i.id}
+                type="button"
+                onClick={() => {
+                  onDependenciesChange(issue.id, [...deps, i.id]);
+                  setAdding(false);
+                }}
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+              >
+                <st.icon size={12} className={st.color} />
+                <span className="text-slate-300 truncate">{i.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {depIssues.length === 0 ? (
+        <p className="text-sm text-slate-500 italic">No dependencies</p>
+      ) : (
+        <div className="space-y-1">
+          {depIssues.map((dep) => {
+            const st = statuses[dep.status];
+            const StIcon = st.icon;
+            return (
+              <div
+                key={dep.id}
+                className="flex items-center justify-between rounded px-2 py-1 bg-slate-800/50"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <StIcon size={12} className={st.color} />
+                  <span className="text-sm text-slate-300 truncate">{dep.title}</span>
+                  <span className={`text-[10px] ${st.color}`}>{st.label}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onDependenciesChange(
+                      issue.id,
+                      deps.filter((d) => d !== dep.id),
+                    )
+                  }
+                  className="rounded p-0.5 text-slate-500 hover:text-red-400 transition-colors"
+                  title="Remove dependency"
+                >
+                  <FiX size={12} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function IssueDetailModal({
   issue,
   statusConfig: statuses,
@@ -1423,6 +1770,21 @@ function IssueDetailModal({
               )}
             </div>
           </div>
+
+          {/* Close Summary (shown when issue is closed) */}
+          {issue.status === 'closed' && issue.close_summary && (
+            <div
+              className="rounded-lg border border-green-500/20 bg-green-500/5 p-4"
+              data-testid="issue-detail-close-summary"
+            >
+              <span className="block text-xs font-medium text-green-400 uppercase tracking-wider mb-2">
+                Close Summary
+              </span>
+              <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                {issue.close_summary}
+              </p>
+            </div>
+          )}
 
           {/* Dependencies */}
           <DependencyManager
