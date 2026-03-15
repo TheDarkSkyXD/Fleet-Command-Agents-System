@@ -246,10 +246,21 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
           <FiFolder className="h-3 w-3 text-blue-400" />
           {activeProject ? activeProject.name : 'No Project'}
         </span>
-        <span className="flex items-center gap-1.5" data-testid="status-bar-agent-count">
+        <span
+          className="flex items-center gap-1.5"
+          data-testid="status-bar-agent-count"
+          title={
+            activeRun
+              ? `${activeRun.agent_count} agent(s) currently running\nRun started: ${new Date(activeRun.started_at).toLocaleString()}`
+              : 'No agents currently running'
+          }
+        >
           {activeRun ? (
             <>
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span
+                className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"
+                title="Run active — agents are working"
+              />
               <span className="text-slate-300">Agents: {activeRun.agent_count}</span>
             </>
           ) : (

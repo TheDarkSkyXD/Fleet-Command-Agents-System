@@ -94,6 +94,26 @@ const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> 
   zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
+/** Human-readable state descriptions for hover tooltips */
+const STATE_TOOLTIPS: Record<string, string> = {
+  booting: 'Agent is starting up and initializing',
+  working: 'Agent is actively processing tasks',
+  completed: 'Agent has finished all assigned work',
+  stalled: 'Agent appears stuck or unresponsive',
+  zombie: 'Agent process is dead but session remains',
+};
+
+/** Human-readable capability descriptions for hover tooltips */
+const CAPABILITY_TOOLTIPS: Record<string, string> = {
+  scout: 'Explores codebase and gathers information',
+  builder: 'Writes and modifies code to implement features',
+  reviewer: 'Reviews code changes for quality and correctness',
+  lead: 'Coordinates and delegates work to other agents',
+  merger: 'Handles git merge operations and conflict resolution',
+  coordinator: 'Orchestrates the entire agent swarm',
+  monitor: 'Watches for issues and reports anomalies',
+};
+
 type DetailTab = 'terminal' | 'logs' | 'identity' | 'files' | 'mail' | 'performance' | 'gates';
 
 const TABS: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
@@ -209,6 +229,7 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
                 <div className="flex items-center gap-2 mt-1">
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${CAPABILITY_COLORS[capability] || 'bg-slate-500/20 text-slate-400'}`}
+                    title={CAPABILITY_TOOLTIPS[capability] || capability}
                   >
                     {capability.charAt(0).toUpperCase() + capability.slice(1)}
                   </span>
@@ -311,10 +332,12 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
                   <div className="flex items-center gap-2">
                     <div
                       className={`h-2 w-2 rounded-full ${STATE_DOT_COLORS[s.state] || 'bg-slate-400'}`}
+                      title={STATE_TOOLTIPS[s.state] || s.state}
                     />
                     <span className="text-sm text-slate-300 font-mono">{s.id.slice(0, 12)}...</span>
                     <span
                       className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${STATE_COLORS[s.state] || ''}`}
+                      title={STATE_TOOLTIPS[s.state] || s.state}
                     >
                       {s.state}
                     </span>
@@ -850,6 +873,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             {/* State indicator with icon */}
             <div
               className={`flex items-center ${STATE_ICONS[session.state]?.className || 'text-slate-400'}`}
+              title={STATE_TOOLTIPS[session.state] || session.state}
             >
               {STATE_ICONS[session.state]?.icon || (
                 <div
@@ -864,6 +888,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             {/* Capability badge */}
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${CAPABILITY_COLORS[session.capability] || 'bg-slate-500/20 text-slate-400'}`}
+              title={CAPABILITY_TOOLTIPS[session.capability] || session.capability}
             >
               {session.capability}
             </span>
@@ -871,6 +896,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             {/* State badge with icon */}
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[session.state] || ''}`}
+              title={STATE_TOOLTIPS[session.state] || session.state}
             >
               {STATE_ICONS[session.state]?.icon}
               {session.state}

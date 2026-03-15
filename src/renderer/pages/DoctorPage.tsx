@@ -112,9 +112,15 @@ export function DoctorPage() {
           }`}
         >
           {result.allPassing ? (
-            <FiCheckCircle className="h-6 w-6 text-emerald-400" />
+            <FiCheckCircle
+              className="h-6 w-6 text-emerald-400"
+              title="All system health checks are passing"
+            />
           ) : (
-            <FiXCircle className="h-6 w-6 text-amber-400" />
+            <FiXCircle
+              className="h-6 w-6 text-amber-400"
+              title={`${totalCount - passCount} health check(s) need attention`}
+            />
           )}
           <div className="flex-1">
             <div
@@ -217,6 +223,7 @@ function DoctorCheckCard({
         className={`flex h-10 w-10 items-center justify-center rounded-lg ${
           isPassing ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'
         }`}
+        title={`${check.name}: ${isPassing ? 'Healthy' : 'Failed'}${check.detail ? ` — ${check.detail}` : ''}`}
       >
         {checkIcons[check.name] || <FiActivity className="h-5 w-5" />}
       </div>
@@ -259,6 +266,11 @@ function DoctorCheckCard({
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
           isPassing ? 'bg-emerald-900/40 text-emerald-300' : 'bg-red-900/40 text-red-300'
         }`}
+        title={
+          isPassing
+            ? `${check.name} check passed${check.version ? ` (v${check.version})` : ''}`
+            : `${check.name} check failed${check.fixable ? ' — auto-fix available' : ''}${check.detail ? `: ${check.detail}` : ''}`
+        }
       >
         {isPassing ? (
           <FiCheckCircle className="h-3.5 w-3.5" />
