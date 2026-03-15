@@ -5142,3 +5142,30 @@
 - 352/366 features passing (added #351 and #352 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Performance Optimization & Console Error Prevention)
+
+#### Feature #346: Page load performance with many agents - PASSING
+- Fixed missing useVirtualizer import from @tanstack/react-virtual (would cause ReferenceError)
+- Memoized AgentCard with React.memo to prevent unnecessary re-renders from 1s uptime tick
+- Added VirtualizedCardList component for card view using @tanstack/react-virtual
+- Table view already had VirtualizedTableBody with virtualization
+- Added data-testid="agents-page" with data-agent-count, data-testid="virtualized-card-list"
+
+#### Feature #348: No console errors during normal operation - PASSING
+- Added safeJsonParse utility to DiscoveryPage, replaced 6 unprotected JSON.parse calls
+- Wrapped 2 unprotected JSON.parse calls in MergeQueuePage with try/catch
+- Verified all other renderer pages' JSON.parse calls already have error handling
+- Verified all async event handlers have try/catch protection
+- Verified ErrorBoundary wraps all pages in AppLayout
+- All console.error calls are in catch blocks only (error conditions, not normal usage)
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - useVirtualizer import, React.memo AgentCard, VirtualizedCardList, data-testid
+- MODIFIED: src/renderer/pages/DiscoveryPage.tsx - safeJsonParse utility, 6 JSON.parse -> safeJsonParse
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - 2 JSON.parse wrapped in try/catch
+
+#### Current Status
+- 346/366 features passing (added #346 and #348 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
