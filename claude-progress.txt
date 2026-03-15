@@ -1,5 +1,42 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Stale & Zombie Agent Detection)
+
+#### Feature #131: Stale agent detection - PASSING
+- WatchdogService already implemented in backend with configurable stale threshold (default 5min)
+- Agents with no output activity beyond stale threshold get state='stalled', escalation_level=1
+- Added Watchdog tab in Settings page with configurable thresholds:
+  - Enable/disable toggle
+  - Check interval (5-300 seconds)
+  - Stale threshold (1-60 minutes)
+  - Zombie threshold (2-120 minutes)
+- Enhanced AgentsPage table view: stalled agents show amber alert icon with duration
+- Enhanced AgentsPage card view: stalled agents show amber alert with duration
+- Settings apply to running daemon via watchdog:configure IPC
+- Escalation timeline preview shows warning → nudge → escalate → terminate stages
+
+#### Feature #132: Zombie agent detection - PASSING
+- Agents with no activity beyond zombie threshold (default 15min) get state='zombie', escalation_level=4
+- Watchdog terminates zombie agents via tree-kill process termination
+- watchdog_terminate events recorded in events table
+- Escalation mail sent to coordinator at Level 3 before termination
+- Red styling applied consistently across all views:
+  - Table view: red state badge + pulsing ZOMBIE label with FiZap icon
+  - Card view: red state badge + pulsing ZOMBIE label with FiZap icon
+  - Agent detail page: red state dot and badge
+  - Hierarchy tree: red status indicator
+- Zombie threshold configurable via Watchdog settings tab
+
+#### Files Created/Modified
+- MODIFIED: src/renderer/stores/settingsStore.ts - Added watchdog settings (enabled, interval, stale/zombie thresholds)
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Added Watchdog tab with threshold controls and escalation timeline
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Added stale/zombie alert indicators in table and card views
+
+#### Current Status
+- 56/366 features passing (added #131, #132)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (App Log Viewer & NDJSON Import)
 
 #### Feature #125: App log viewer with level filtering - PASSING
