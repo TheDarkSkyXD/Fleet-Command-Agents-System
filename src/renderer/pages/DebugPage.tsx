@@ -1,3 +1,7 @@
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Terminal } from '@xterm/xterm';
+import '@xterm/xterm/css/xterm.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FiActivity,
@@ -22,14 +26,14 @@ import {
 } from 'react-icons/fi';
 import type { AppLogEntry, Event, LogLevel, ToolStats } from '../../shared/types';
 
-type DebugTab = 'events' | 'tool-stats' | 'logs';
+type DebugTab = 'terminal' | 'events' | 'tool-stats' | 'logs';
 
 export function DebugPage() {
-  const [activeTab, setActiveTab] = useState<DebugTab>('logs');
+  const [activeTab, setActiveTab] = useState<DebugTab>('terminal');
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
+    <div className={activeTab === 'terminal' ? 'flex flex-col h-full' : ''}>
+      <div className="mb-6 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <FiTerminal className="h-7 w-7 text-cyan-400" />
           <h1 className="text-2xl font-bold text-slate-50">Debug</h1>
@@ -37,7 +41,19 @@ export function DebugPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 rounded-lg bg-slate-800 p-1">
+      <div className="mb-6 flex gap-1 rounded-lg bg-slate-800 p-1 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTab('terminal')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'terminal'
+              ? 'bg-slate-700 text-cyan-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <FiTerminal className="h-4 w-4" />
+          Terminal
+        </button>
         <button
           type="button"
           onClick={() => setActiveTab('logs')}
@@ -76,13 +92,217 @@ export function DebugPage() {
         </button>
       </div>
 
-      {activeTab === 'logs' ? (
+      {activeTab === 'terminal' ? (
+        <DebugTerminalPanel />
+      ) : activeTab === 'logs' ? (
         <AppLogPanel />
       ) : activeTab === 'tool-stats' ? (
         <ToolStatsPanel />
       ) : (
         <EventLogPanel />
       )}
+    </div>
+  );
+}
+
+// ── Debug Terminal Panel (Feature #124) ──────────────────────────────
+
+function DebugTerminalPanel() {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [shellPid, setShellPid] = useState<number | null>(null);
+
+  // Spawn shell and initialize xterm
+  useEffect(() => {
+    if (!terminalRef.current) return;
+
+    const term = new Terminal({
+      theme: {
+        background: '#0f172a',
+        foreground: '#f8fafc',
+        cursor: '#60a5fa',
+        cursorAccent: '#0f172a',
+        selectionBackground: '#334155',
+        selectionForeground: '#f8fafc',
+        black: '#1e293b',
+        red: '#ef4444',
+        green: '#22c55e',
+        yellow: '#eab308',
+        blue: '#3b82f6',
+        magenta: '#a855f7',
+        cyan: '#06b6d4',
+        white: '#f1f5f9',
+        brightBlack: '#475569',
+        brightRed: '#f87171',
+        brightGreen: '#4ade80',
+        brightYellow: '#facc15',
+        brightBlue: '#60a5fa',
+        brightMagenta: '#c084fc',
+        brightCyan: '#22d3ee',
+        brightWhite: '#ffffff',
+      },
+      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+      fontSize: 13,
+      lineHeight: 1.3,
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      scrollback: 5000,
+      allowProposedApi: true,
+      convertEol: true,
+    });
+
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon((_event, uri) => {
+      window.open(uri, '_blank');
+    });
+
+    term.loadAddon(fitAddon);
+    term.loadAddon(webLinksAddon);
+    term.open(terminalRef.current);
+
+    try {
+      fitAddon.fit();
+    } catch {
+      // Ignore initial fit errors
+    }
+
+    xtermRef.current = term;
+    fitAddonRef.current = fitAddon;
+
+    // Send user input to the debug shell pty
+    term.onData((data) => {
+      window.electronAPI.debugShellWrite(data);
+    });
+
+    // Resize handler
+    const resizeObserver = new ResizeObserver(() => {
+      try {
+        fitAddon.fit();
+        if (xtermRef.current) {
+          const { cols, rows } = xtermRef.current;
+          window.electronAPI.debugShellResize(cols, rows);
+        }
+      } catch {
+        // Ignore resize errors
+      }
+    });
+
+    resizeObserver.observe(terminalRef.current);
+
+    // Spawn the debug shell
+    const spawnShell = async () => {
+      try {
+        const result = await window.electronAPI.debugShellSpawn();
+        if (result.data) {
+          setShellPid(result.data.pid);
+          setIsRunning(true);
+
+          // Load existing output buffer
+          const outputResult = await window.electronAPI.debugShellOutput();
+          if (outputResult.data && outputResult.data.length > 0) {
+            for (const line of outputResult.data) {
+              term.write(line);
+            }
+            term.scrollToBottom();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to spawn debug shell:', err);
+      }
+    };
+
+    spawnShell();
+
+    // Subscribe to live output
+    const handleOutput = (data: { data: string }) => {
+      if (xtermRef.current) {
+        xtermRef.current.write(data.data);
+      }
+    };
+
+    window.electronAPI.onDebugShellOutput(handleOutput);
+
+    return () => {
+      resizeObserver.disconnect();
+      term.dispose();
+      xtermRef.current = null;
+      fitAddonRef.current = null;
+      window.electronAPI.removeAllListeners('debug:shell-output');
+    };
+  }, []);
+
+  const handleKill = async () => {
+    await window.electronAPI.debugShellKill();
+    setIsRunning(false);
+    setShellPid(null);
+    if (xtermRef.current) {
+      xtermRef.current.writeln('\r\n\x1b[31m[Shell terminated]\x1b[0m');
+    }
+  };
+
+  const handleRestart = async () => {
+    await window.electronAPI.debugShellKill();
+    if (xtermRef.current) {
+      xtermRef.current.clear();
+    }
+    try {
+      const result = await window.electronAPI.debugShellSpawn();
+      if (result.data) {
+        setShellPid(result.data.pid);
+        setIsRunning(true);
+      }
+    } catch (err) {
+      console.error('Failed to restart debug shell:', err);
+    }
+  };
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0" data-testid="debug-terminal-panel">
+      {/* Terminal toolbar */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-t-lg flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <div
+            className={`h-2 w-2 rounded-full ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`}
+          />
+          <span className="text-xs text-slate-400">
+            {isRunning ? `Shell (PID: ${shellPid})` : 'Not running'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleRestart}
+            className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+            title="Restart shell"
+          >
+            <FiRefreshCw className="h-3.5 w-3.5" />
+            Restart
+          </button>
+          {isRunning && (
+            <button
+              type="button"
+              onClick={handleKill}
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-900/30 transition-colors"
+              title="Kill shell"
+            >
+              <FiSquare className="h-3.5 w-3.5" />
+              Kill
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Terminal container */}
+      <div className="flex-1 min-h-0 border border-t-0 border-slate-700 rounded-b-lg overflow-hidden">
+        <div
+          ref={terminalRef}
+          className="h-full w-full"
+          style={{ padding: '4px' }}
+          data-testid="debug-terminal"
+        />
+      </div>
     </div>
   );
 }

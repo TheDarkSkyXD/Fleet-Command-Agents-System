@@ -81,6 +81,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   issueSetDependencies: (id: string, dependencyIds: string[]) =>
     ipcRenderer.invoke('issue:set-dependencies', id, dependencyIds),
   issueReadyQueue: () => ipcRenderer.invoke('issue:ready-queue'),
+  issueBlocking: (id: string) => ipcRenderer.invoke('issue:blocking', id),
   issueByAgent: (agentName: string) => ipcRenderer.invoke('issue:by-agent', agentName),
 
   // Task Groups
@@ -512,6 +513,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Window management
   windowSetTitle: (title: string) => ipcRenderer.invoke('window:setTitle', title),
+
+  // Debug Shell Terminal
+  debugShellSpawn: () => ipcRenderer.invoke('debug:shell-spawn'),
+  debugShellWrite: (data: string) => ipcRenderer.invoke('debug:shell-write', data),
+  debugShellResize: (cols: number, rows: number) =>
+    ipcRenderer.invoke('debug:shell-resize', cols, rows),
+  debugShellOutput: () => ipcRenderer.invoke('debug:shell-output'),
+  debugShellKill: () => ipcRenderer.invoke('debug:shell-kill'),
+  onDebugShellOutput: (callback: (data: { data: string }) => void) =>
+    ipcRenderer.on('debug:shell-output', (_event, data) => callback(data)),
 
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),

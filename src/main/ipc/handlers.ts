@@ -2,6 +2,7 @@ import { exec, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as nodePty from 'node-pty';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
@@ -2904,6 +2905,38 @@ export function registerIpcHandlers(): void {
         }
       }
 
+      // Auto-unblock dependent issues when this issue is closed
+      if (updates.status === 'closed') {
+        const allRows = loggedPrepare('SELECT id, dependencies, status FROM issues').all() as Array<{
+          id: string;
+          dependencies: string | null;
+          status: string;
+        }>;
+        const statusMap = new Map<string, string>();
+        for (const row of allRows) {
+          statusMap.set(row.id, row.status);
+        }
+        statusMap.set(id, 'closed');
+
+        for (const row of allRows) {
+          if (row.id === id || row.status !== 'blocked') continue;
+          let depIds: string[] = [];
+          try {
+            depIds = JSON.parse(row.dependencies || '[]');
+          } catch {
+            continue;
+          }
+          if (!depIds.includes(id)) continue;
+          const allResolved = depIds.every((depId) => statusMap.get(depId) === 'closed');
+          if (allResolved) {
+            loggedPrepare(
+              "UPDATE issues SET status = 'open', updated_at = datetime('now') WHERE id = ?",
+            ).run(row.id);
+            log.info(`[IPC] issue:update - Auto-unblocked issue ${row.id} (all deps resolved)`);
+          }
+        }
+      }
+
       return { data: updated, error: null };
     } catch (error) {
       log.error('issue:update failed:', error);
@@ -2957,16 +2990,69 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('issue:set-dependencies', (_event, id: string, dependencyIds: string[]) => {
     try {
       const depsJson = JSON.stringify(dependencyIds);
-      loggedPrepare(
-        "UPDATE issues SET dependencies = ?, updated_at = datetime('now') WHERE id = ?",
-      ).run(depsJson, id);
+      // Check if any dependencies are unresolved
+      let shouldBlock = false;
+      if (dependencyIds.length > 0) {
+        const placeholders = dependencyIds.map(() => '?').join(',');
+        const closedCount = loggedPrepare(
+          `SELECT COUNT(*) as cnt FROM issues WHERE id IN (${placeholders}) AND status = 'closed'`,
+        ).get(...dependencyIds) as { cnt: number };
+        shouldBlock = closedCount.cnt < dependencyIds.length;
+      }
+      // Update dependencies and auto-set blocked status
+      const currentIssue = loggedPrepare('SELECT status FROM issues WHERE id = ?').get(id) as
+        | { status: string }
+        | undefined;
+      if (shouldBlock && currentIssue && currentIssue.status === 'open') {
+        loggedPrepare(
+          "UPDATE issues SET dependencies = ?, status = 'blocked', updated_at = datetime('now') WHERE id = ?",
+        ).run(depsJson, id);
+      } else if (
+        !shouldBlock &&
+        currentIssue &&
+        currentIssue.status === 'blocked'
+      ) {
+        loggedPrepare(
+          "UPDATE issues SET dependencies = ?, status = 'open', updated_at = datetime('now') WHERE id = ?",
+        ).run(depsJson, id);
+      } else {
+        loggedPrepare(
+          "UPDATE issues SET dependencies = ?, updated_at = datetime('now') WHERE id = ?",
+        ).run(depsJson, id);
+      }
       const updated = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id);
       log.info(
-        `[IPC] issue:set-dependencies - SET ${dependencyIds.length} dependencies for issue ${id}`,
+        `[IPC] issue:set-dependencies - SET ${dependencyIds.length} dependencies for issue ${id}, blocked=${shouldBlock}`,
       );
       return { data: updated, error: null };
     } catch (error) {
       log.error('issue:set-dependencies failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Get issues that this issue is blocking (reverse dependency lookup)
+  ipcMain.handle('issue:blocking', (_event, id: string) => {
+    try {
+      const allIssues = loggedPrepare('SELECT id, title, status, dependencies FROM issues').all() as Array<{
+        id: string;
+        title: string;
+        status: string;
+        dependencies: string | null;
+      }>;
+      const blocking = allIssues.filter((issue) => {
+        if (!issue.dependencies) return false;
+        try {
+          const depIds = JSON.parse(issue.dependencies) as string[];
+          return depIds.includes(id);
+        } catch {
+          return false;
+        }
+      });
+      log.info(`[IPC] issue:blocking - Issue ${id} blocks ${blocking.length} issues`);
+      return { data: blocking, error: null };
+    } catch (error) {
+      log.error('issue:blocking failed:', error);
       return { data: null, error: String(error) };
     }
   });
@@ -6721,6 +6807,95 @@ export function registerIpcHandlers(): void {
       return { data: true, error: null };
     } catch (error) {
       log.error('window:setTitle failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  // ── Debug Shell Terminal ──────────────────────────────────────────────
+  let debugShellPty: nodePty.IPty | null = null;
+  const debugShellOutputBuffer: string[] = [];
+  const DEBUG_SHELL_MAX_BUFFER = 5000;
+
+  ipcMain.handle('debug:shell-spawn', () => {
+    try {
+      if (debugShellPty) {
+        return { data: { pid: debugShellPty.pid, alreadyRunning: true }, error: null };
+      }
+      const shellCmd =
+        process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
+      debugShellPty = nodePty.spawn(shellCmd, [], {
+        name: 'xterm-color',
+        cols: 120,
+        rows: 40,
+        cwd: process.cwd(),
+        env: process.env as Record<string, string>,
+      });
+      debugShellOutputBuffer.length = 0;
+      debugShellPty.onData((data: string) => {
+        debugShellOutputBuffer.push(data);
+        if (debugShellOutputBuffer.length > DEBUG_SHELL_MAX_BUFFER) {
+          debugShellOutputBuffer.splice(0, debugShellOutputBuffer.length - DEBUG_SHELL_MAX_BUFFER);
+        }
+        const windows = BrowserWindow.getAllWindows();
+        for (const win of windows) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('debug:shell-output', { data });
+          }
+        }
+      });
+      debugShellPty.onExit(({ exitCode }: { exitCode: number }) => {
+        log.info(`[Debug Shell] exited with code ${exitCode}`);
+        debugShellPty = null;
+      });
+      log.info(`[Debug Shell] Spawned: ${shellCmd}, PID: ${debugShellPty.pid}`);
+      return { data: { pid: debugShellPty.pid, alreadyRunning: false }, error: null };
+    } catch (error) {
+      log.error('debug:shell-spawn failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('debug:shell-write', (_event, data: string) => {
+    try {
+      if (!debugShellPty) return { data: false, error: 'No debug shell running' };
+      debugShellPty.write(data);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('debug:shell-write failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('debug:shell-resize', (_event, cols: number, rows: number) => {
+    try {
+      if (!debugShellPty) return { data: false, error: 'No debug shell running' };
+      debugShellPty.resize(cols, rows);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('debug:shell-resize failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('debug:shell-output', () => {
+    try {
+      return { data: debugShellOutputBuffer, error: null };
+    } catch (error) {
+      log.error('debug:shell-output failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('debug:shell-kill', () => {
+    try {
+      if (!debugShellPty) return { data: false, error: 'No debug shell running' };
+      debugShellPty.kill();
+      debugShellPty = null;
+      debugShellOutputBuffer.length = 0;
+      log.info('[Debug Shell] Shell killed');
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('debug:shell-kill failed:', error);
       return { data: false, error: String(error) };
     }
   });

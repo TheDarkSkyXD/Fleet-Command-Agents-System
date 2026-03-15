@@ -947,6 +947,12 @@ export interface ElectronAPI {
     dependencyIds: string[],
   ) => Promise<{ data: Issue | null; error: string | null }>;
   issueReadyQueue: () => Promise<{ data: Issue[] | null; error: string | null }>;
+  issueBlocking: (
+    id: string,
+  ) => Promise<{
+    data: Array<{ id: string; title: string; status: string; dependencies: string | null }> | null;
+    error: string | null;
+  }>;
   issueByAgent: (agentName: string) => Promise<{ data: Issue[] | null; error: string | null }>;
 
   // Task Groups
@@ -1434,6 +1440,21 @@ export interface ElectronAPI {
   ) => void;
   // Window management
   windowSetTitle: (title: string) => Promise<{ data: boolean; error: string | null }>;
+
+  // Debug Shell Terminal
+  debugShellSpawn: () => Promise<{
+    data: { pid: number; alreadyRunning: boolean } | null;
+    error: string | null;
+  }>;
+  debugShellWrite: (data: string) => Promise<{ data: boolean; error: string | null }>;
+  debugShellResize: (
+    cols: number,
+    rows: number,
+  ) => Promise<{ data: boolean; error: string | null }>;
+  debugShellOutput: () => Promise<{ data: string[] | null; error: string | null }>;
+  debugShellKill: () => Promise<{ data: boolean; error: string | null }>;
+  onDebugShellOutput: (callback: (data: { data: string }) => void) => void;
+
   removeAllListeners: (channel: string) => void;
 }
 
