@@ -1,5 +1,50 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Node-pty Agent Spawning & Scout Agent)
+
+#### Feature #28: Node-pty process spawning for agents - PASSING
+- Created src/main/services/agentProcessManager.ts - full node-pty process manager
+- AgentProcessManager class: spawn, stop, stopAll, write, resize, getOutput methods
+- Spawns Claude CLI via node-pty with --dangerously-skip-permissions --output-format stream-json
+- Model flag passed per agent (--model haiku/sonnet/opus)
+- PID tracked in both process manager Map and SQLite sessions table
+- Terminal output buffered (max 1000 lines) and broadcast to renderer via IPC
+- Process cleanup uses tree-kill for clean process tree termination
+- Environment stripped of CLAUDECODE/CLAUDE_CODE_ENTRYPOINT vars before spawn
+- Updated agent:spawn IPC handler to create real pty process + DB record
+- Updated agent:stop and agent:stop-all to kill pty processes before DB update
+- Added IPC channels: agent:output, agent:write, agent:resize, agent:process-info, agent:running-list
+- Updated preload bridge and shared types with new API methods
+- All agents stopped on app quit via before-quit handler
+
+#### Feature #33: Spawn scout agent - PASSING
+- Created src/renderer/pages/AgentsPage.tsx - full agents page with spawn dialog
+- Spawn dialog with capability selector (7 types: scout, builder, reviewer, lead, merger, coordinator, monitor)
+- Scout defaults to haiku model automatically
+- Model picker with haiku/sonnet/opus options
+- Warning shown when model differs from capability default
+- Agent name auto-generated if not provided (e.g. "swift-scout-42")
+- Optional task ID and initial prompt fields
+- Active agents displayed as cards with state indicator, capability badge, PID, model, uptime
+- Stop individual agents or stop-all button
+- Completed agents shown in separate section
+- Integrated AgentsPage into AppLayout replacing placeholder agents view
+- Capability color coding: scout=purple, builder=blue, reviewer=cyan, lead=amber, merger=emerald, coordinator=rose, monitor=teal
+
+#### Files Created/Modified
+- NEW: src/main/services/agentProcessManager.ts - Node-pty process manager singleton
+- NEW: src/renderer/pages/AgentsPage.tsx - Full agents page with spawn dialog
+- MODIFIED: src/main/ipc/handlers.ts - Real pty spawning + new agent process IPC channels
+- MODIFIED: src/main/index.ts - Import agentProcessManager, stop all on quit
+- MODIFIED: src/preload/index.ts - Added agent process management bridge methods
+- MODIFIED: src/shared/types/index.ts - Added AgentSpawnRequest, AgentProcessInfo, new API methods
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated AgentsPage
+
+#### Current Status
+- 21/366 features passing (added #28, #33)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Multi-Project & Worktree Manager)
 
 #### Feature #94: Multi-project support - PASSING
