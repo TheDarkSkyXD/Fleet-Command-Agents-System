@@ -1,5 +1,35 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Loading States & Button Disabled During Processing)
+
+#### Feature #290: Loading states during data fetch - PASSING
+- Created reusable LoadingSpinner and LoadingSkeleton components (src/renderer/components/LoadingSpinner.tsx)
+- Fixed WorktreesPage flash of empty content by initializing loading state to true (was false)
+- Verified all data-heavy pages have proper loading indicators: AgentsPage (skeletons), TasksPage (spinner + skeletons), MailPage (skeleton), MetricsPage (spinner), WorktreesPage (spinner), NotificationsPage (loading text), SettingsPage (loading), ExpertisePage (timeline/records loading)
+- No flash of empty content - loading state transitions smoothly to data display
+
+#### Feature #306: Button disabled during processing - PASSING
+- MailPage: Added markingAllRead state - mark-all-read button disabled with spinning icon during processing
+- MailPage: Added purging state - all purge buttons (by age, by agent, purge all) disabled during any purge operation
+- MailPage: Purge-by-agent button text changes to "Purging..." during operation
+- MailPage: Purge All button text changes to "Purging..." during operation
+- AgentsPage: Added isOpeningSpawnDialog state - spawn button disabled with spinner + "Loading..." text during runtime fetch
+- Existing patterns already correct: spawn confirm (isSpawning), stop confirm (isStopping), create issue/group (creating), coordinator dispatch (isDispatching), mail send (sending)
+- All buttons use disabled:opacity-50 disabled:cursor-not-allowed for consistent styling
+
+#### Files Created
+- NEW: src/renderer/components/LoadingSpinner.tsx - Reusable LoadingSpinner and LoadingSkeleton components
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MailPage.tsx - Added markingAllRead/purging states, disabled buttons during processing
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Added isOpeningSpawnDialog state, spawn button loading indicator
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Changed loading initial state from false to true
+
+#### Current Status
+- 289/366 features passing (added #290 and #306 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Form Validation & Error Recovery)
 
 #### Feature #289: Invalid input rejection with clear messages - PASSING
