@@ -118,7 +118,10 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
               <span className="relative">
                 <Icon size={18} />
                 {item.id === 'mail' && mailUnreadCount > 0 && collapsed && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white">
+                  <span
+                    className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-0.5 text-[10px] font-bold text-white shadow-lg shadow-blue-500/30"
+                    data-testid="mail-unread-badge"
+                  >
                     {mailUnreadCount > 99 ? '99+' : mailUnreadCount}
                   </span>
                 )}
@@ -127,7 +130,10 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
                 <span className="flex flex-1 items-center justify-between">
                   <span>{item.label}</span>
                   {item.id === 'mail' && mailUnreadCount > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    <span
+                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white shadow-lg shadow-blue-500/30"
+                      data-testid="mail-unread-badge"
+                    >
                       {mailUnreadCount > 99 ? '99+' : mailUnreadCount}
                     </span>
                   )}
