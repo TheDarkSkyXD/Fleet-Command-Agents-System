@@ -1980,3 +1980,30 @@
 - 135/366 features passing (added #65 and #66 this session)
 - All code passes Biome lint and Vite build
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Coordinator Activity Log & Mail Outbox)
+
+#### Feature #62: Coordinator output viewer - PASSING
+- Added coordinator:activity-log IPC handler aggregating events, mail, and dispatch records from SQLite
+- Added preload bridge method and ElectronAPI type definition
+- Added collapsible Activity Log section to CoordinatorPanel
+- Log entries show source icons (mail/dispatch/event), color-coded severity, timestamps
+- Auto-refreshes every 3 seconds alongside other coordinator data
+
+#### Feature #71: Mail outbox view - PASSING
+- Renamed 'sent' tab to 'Outbox' with FiSend icon
+- Outbox view emphasizes recipient (To: agent in green) with sender as secondary text
+- Full date/time timestamps in outbox (month, day, hour, minute) vs relative time in other tabs
+- Timestamp hover shows full locale string
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added coordinator:activity-log IPC handler
+- MODIFIED: src/preload/index.ts - Added coordinatorActivityLog bridge method
+- MODIFIED: src/shared/types/index.ts - Added coordinatorActivityLog to ElectronAPI
+- MODIFIED: src/renderer/components/CoordinatorPanel.tsx - Added activity log viewer UI
+- MODIFIED: src/renderer/pages/MailPage.tsx - Outbox tab with recipient emphasis
+
+#### Current Status
+- 135/366 features passing (added #62 and #71 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
