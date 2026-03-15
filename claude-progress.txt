@@ -1,5 +1,24 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Window State & Tray Menu Verification)
+
+#### Feature #11: Window state persistence across restart - PASSING
+- Already implemented in src/main/index.ts
+- electron-window-state imported, windowStateKeeper with defaults 1400x900
+- BrowserWindow uses saved x/y/width/height from state
+- mainWindowState.manage(mainWindow) tracks changes for persistence
+
+#### Feature #14: System tray right-click menu - PASSING
+- Already implemented in src/main/index.ts
+- updateTrayMenu builds context menu: Show/Hide, Active Agents count, Quit
+- Menu updates every 5 seconds with live agent count
+- createTray sets up initial menu on app start
+
+#### Current Status
+- 106/366 features passing (added #11 and #14 this session)
+- Both features were already fully implemented, just needed verification
+- Code passes Biome lint; pre-existing TS errors unrelated to these features
+
 ### Session: 2026-03-14 (Dark Theme & Sidebar Mini-Icon)
 
 #### Feature #10: Dark theme applied globally - PASSING
