@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiActivity,
+  FiAlertTriangle,
   FiChevronDown,
   FiChevronUp,
   FiCpu,
@@ -123,6 +124,86 @@ function formatUptime(createdAt: string): string {
   return `${minutes}m ${seconds}s`;
 }
 
+/** Confirmation dialog for stopping agents */
+function StopConfirmDialog({
+  title,
+  message,
+  agentName,
+  agentCount,
+  isStopping,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  message: string;
+  agentName?: string;
+  agentCount?: number;
+  isStopping: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div
+        className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-800 shadow-2xl"
+        data-testid="stop-confirm-dialog"
+      >
+        <div className="flex items-center gap-3 border-b border-slate-700 px-6 py-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20">
+            <FiAlertTriangle className="h-5 w-5 text-red-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-50">{title}</h2>
+            {agentName && <p className="text-sm text-slate-400 font-mono">{agentName}</p>}
+          </div>
+        </div>
+        <div className="px-6 py-4">
+          <p className="text-sm text-slate-300">{message}</p>
+          {agentCount !== undefined && agentCount > 0 && (
+            <div className="mt-3 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+              <p className="text-sm text-red-400 font-medium">
+                {agentCount} active agent{agentCount !== 1 ? 's' : ''} will be terminated
+              </p>
+            </div>
+          )}
+          <p className="mt-3 text-xs text-slate-500">
+            The agent process will be killed via tree-kill. This action cannot be undone.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-slate-700 px-6 py-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isStopping}
+            className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isStopping}
+            className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            data-testid="stop-confirm-button"
+          >
+            {isStopping ? (
+              <>
+                <FiActivity className="h-4 w-4 animate-spin" />
+                Stopping...
+              </>
+            ) : (
+              <>
+                <FiSquare className="h-4 w-4" />
+                {agentCount !== undefined ? 'Stop All Agents' : 'Stop Agent'}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Skeleton rows for table loading state */
 function AgentTableSkeleton() {
   return (
@@ -202,6 +283,14 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [spawnPrompt, setSpawnPrompt] = useState('');
   const [isSpawning, setIsSpawning] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
+
+  // Stop confirmation dialog state
+  const [stopConfirm, setStopConfirm] = useState<{
+    type: 'single' | 'all';
+    sessionId?: string;
+    agentName?: string;
+  } | null>(null);
+  const [isStopping, setIsStopping] = useState(false);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -307,28 +396,39 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     }
   };
 
-  const handleStop = useCallback(
-    async (sessionId: string) => {
-      try {
-        await window.electronAPI.agentStop(sessionId);
-        await loadSessions();
-        await loadRunningProcesses();
-      } catch (err) {
-        setError(String(err));
-      }
-    },
-    [loadSessions, loadRunningProcesses],
-  );
+  // Show confirmation dialog before stopping a single agent
+  const requestStopAgent = useCallback((sessionId: string, agentName: string) => {
+    setStopConfirm({ type: 'single', sessionId, agentName });
+  }, []);
 
-  const handleStopAll = async () => {
+  // Show confirmation dialog before stopping all agents
+  const requestStopAll = useCallback(() => {
+    setStopConfirm({ type: 'all' });
+  }, []);
+
+  // Actually perform the stop after confirmation
+  const confirmStop = useCallback(async () => {
+    if (!stopConfirm) return;
+    setIsStopping(true);
     try {
-      await window.electronAPI.agentStopAll();
+      if (stopConfirm.type === 'single' && stopConfirm.sessionId) {
+        await window.electronAPI.agentStop(stopConfirm.sessionId);
+      } else {
+        await window.electronAPI.agentStopAll();
+      }
       await loadSessions();
       await loadRunningProcesses();
     } catch (err) {
       setError(String(err));
+    } finally {
+      setIsStopping(false);
+      setStopConfirm(null);
     }
-  };
+  }, [stopConfirm, loadSessions, loadRunningProcesses]);
+
+  const cancelStop = useCallback(() => {
+    setStopConfirm(null);
+  }, []);
 
   // Table columns definition
   const columns = useMemo<ColumnDef<Session>[]>(
@@ -433,7 +533,10 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           return (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); handleStop(row.original.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                requestStopAgent(row.original.id, row.original.agent_name);
+              }}
               className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
               title="Stop agent"
             >
@@ -443,7 +546,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         },
       },
     ],
-    [runningProcesses, handleStop],
+    [runningProcesses, requestStopAgent],
   );
 
   const table = useReactTable({
@@ -481,7 +584,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           {activeSessions.length > 0 && (
             <button
               type="button"
-              onClick={handleStopAll}
+              onClick={requestStopAll}
               className="flex items-center gap-2 rounded-md bg-red-600/20 border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-600/30 transition-colors"
             >
               <FiSquare className="h-4 w-4" />
@@ -696,7 +799,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                         key={session.id}
                         session={session}
                         processInfo={proc}
-                        onStop={() => handleStop(session.id)}
+                        onStop={() => requestStopAgent(session.id, session.agent_name)}
                         onSelect={() => onSelectAgent?.(session.id)}
                       />
                     );
@@ -770,6 +873,30 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           onClose={() => setShowSpawnDialog(false)}
         />
       )}
+
+      {/* Stop Confirmation Dialog - Individual Agent */}
+      {stopConfirm?.type === 'single' && (
+        <StopConfirmDialog
+          title="Stop Agent"
+          message="Are you sure you want to stop this agent? Any in-progress work will be interrupted and the agent process will be terminated."
+          agentName={stopConfirm.agentName}
+          isStopping={isStopping}
+          onConfirm={confirmStop}
+          onCancel={cancelStop}
+        />
+      )}
+
+      {/* Stop Confirmation Dialog - All Agents */}
+      {stopConfirm?.type === 'all' && (
+        <StopConfirmDialog
+          title="Stop All Agents"
+          message="Are you sure you want to stop all running agents? All in-progress work will be interrupted and all agent processes will be terminated."
+          agentCount={activeSessions.length}
+          isStopping={isStopping}
+          onConfirm={confirmStop}
+          onCancel={cancelStop}
+        />
+      )}
     </div>
   );
 }
@@ -789,7 +916,9 @@ function AgentCard({
     <div
       className="rounded-lg border border-slate-700 bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors"
       onClick={onSelect}
-      onKeyDown={(e) => { if (e.key === 'Enter') onSelect?.(); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSelect?.();
+      }}
       tabIndex={0}
       role="button"
     >
@@ -835,7 +964,10 @@ function AgentCard({
           {/* Stop button */}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onStop(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onStop();
+            }}
             className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
             title="Stop agent"
           >
