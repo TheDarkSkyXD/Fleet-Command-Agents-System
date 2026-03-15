@@ -5224,3 +5224,31 @@
 - 355/366 features passing (added #355 and #356 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Session Branch Tracking & File-Scoped Expertise)
+
+#### Feature #357: Session branch tracking for merge target - PASSING
+- Added session_branch column to runs table via migration
+- Updated run:start IPC handler to detect current git branch via simple-git
+- Auto-sets mergeTargetBranch in app_settings when a run starts
+- MergeQueuePage falls back to active run session_branch when no target set
+- Updated Run interface with session_branch field
+
+#### Feature #358: File-scoped expertise queries - PASSING
+- Added source_file filter to expertise:list IPC handler
+- Added new expertise:by-file IPC handler for dedicated file queries
+- Added expertiseByFile to preload and ElectronAPI type
+- Added file filter input (data-testid: expertise-file-filter) to ExpertisePage
+- Added idx_expertise_source_file database index
+
+#### Files Modified
+- src/main/db/database.ts - session_branch migration, source_file index
+- src/main/ipc/handlers.ts - run:start async with branch detection, expertise:by-file handler, source_file filter
+- src/preload/index.ts - expertiseByFile method, source_file in list filters
+- src/shared/types/index.ts - Run.session_branch, ElectronAPI.expertiseByFile
+- src/renderer/pages/ExpertisePage.tsx - fileFilter state, file filter input UI
+
+#### Current Status
+- 355/366 features passing (added #357 and #358 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
