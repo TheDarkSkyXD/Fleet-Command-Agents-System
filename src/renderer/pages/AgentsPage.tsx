@@ -313,9 +313,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     loadActiveProject();
   }, []);
 
+  // Bulk selection state
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
+
   // Stop confirmation dialog state
   const [stopConfirm, setStopConfirm] = useState<{
-    type: 'single' | 'all';
+    type: 'single' | 'all' | 'bulk';
     sessionId?: string;
     agentName?: string;
   } | null>(null);
@@ -455,6 +458,15 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     try {
       if (stopConfirm.type === 'single' && stopConfirm.sessionId) {
         await window.electronAPI.agentStop(stopConfirm.sessionId);
+      } else if (stopConfirm.type === 'bulk') {
+        // Stop selected agents one by one
+        const promises = Array.from(selectedAgents).map((id) =>
+          window.electronAPI.agentStop(id).catch((err: unknown) => {
+            console.error(`Failed to stop agent ${id}:`, err);
+          }),
+        );
+        await Promise.all(promises);
+        setSelectedAgents(new Set());
       } else {
         await window.electronAPI.agentStopAll();
       }
@@ -466,11 +478,53 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       setIsStopping(false);
       setStopConfirm(null);
     }
-  }, [stopConfirm, loadSessions, loadRunningProcesses]);
+  }, [stopConfirm, selectedAgents, loadSessions, loadRunningProcesses]);
 
   const cancelStop = useCallback(() => {
     setStopConfirm(null);
   }, []);
+
+  // Bulk selection handlers
+  const toggleAgentSelection = useCallback((sessionId: string) => {
+    setSelectedAgents((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    const activeIds = activeSessions.map((s) => s.id);
+    setSelectedAgents((prev) => {
+      const allSelected = activeIds.every((id) => prev.has(id));
+      if (allSelected) {
+        return new Set();
+      }
+      return new Set(activeIds);
+    });
+  }, [activeSessions]);
+
+  const requestBulkStop = useCallback(() => {
+    if (selectedAgents.size === 0) return;
+    setStopConfirm({ type: 'bulk' });
+  }, [selectedAgents.size]);
+
+  // Clear selection when sessions change (remove stale selections)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear stale selections
+  useEffect(() => {
+    setSelectedAgents((prev) => {
+      const sessionIds = new Set(sessions.map((s) => s.id));
+      const cleaned = new Set<string>();
+      for (const id of prev) {
+        if (sessionIds.has(id)) cleaned.add(id);
+      }
+      return cleaned.size !== prev.size ? cleaned : prev;
+    });
+  }, [sessions]);
 
   const handleNudgeAgent = useCallback(
     async (sessionId: string) => {
@@ -487,6 +541,40 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   // Table columns definition
   const columns = useMemo<ColumnDef<Session>[]>(
     () => [
+      {
+        id: 'select',
+        header: () => (
+          <input
+            type="checkbox"
+            checked={activeSessions.length > 0 && activeSessions.every((s) => selectedAgents.has(s.id))}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleSelectAll();
+            }}
+            className="h-4 w-4 rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-500"
+            title="Select all agents"
+            data-testid="select-all-checkbox"
+          />
+        ),
+        size: 36,
+        enableSorting: false,
+        cell: ({ row }) => {
+          if (row.original.state === 'completed') return null;
+          return (
+            <input
+              type="checkbox"
+              checked={selectedAgents.has(row.original.id)}
+              onChange={(e) => {
+                e.stopPropagation();
+                toggleAgentSelection(row.original.id);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="h-4 w-4 rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-500"
+              data-testid={`select-agent-${row.original.id}`}
+            />
+          );
+        },
+      },
       {
         id: 'state_indicator',
         header: '',
@@ -653,7 +741,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         },
       },
     ],
-    [runningProcesses, requestStopAgent, handleNudgeAgent],
+    [runningProcesses, requestStopAgent, handleNudgeAgent, selectedAgents, activeSessions, toggleSelectAll, toggleAgentSelection],
   );
 
   const table = useReactTable({
@@ -699,7 +787,18 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           </p>
         </div>
         <div className="flex gap-2">
-          {activeSessions.length > 0 && (
+          {selectedAgents.size > 0 && (
+            <button
+              type="button"
+              onClick={requestBulkStop}
+              className="flex items-center gap-2 rounded-md bg-red-600/20 border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-600/30 transition-colors"
+              data-testid="bulk-stop-button"
+            >
+              <FiSquare className="h-4 w-4" />
+              Stop Selected ({selectedAgents.size})
+            </button>
+          )}
+          {activeSessions.length > 0 && selectedAgents.size === 0 && (
             <button
               type="button"
               onClick={requestStopAll}
@@ -936,6 +1035,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                         session={session}
                         processInfo={proc}
                         childCount={childCountMap[session.agent_name] || 0}
+                        isSelected={selectedAgents.has(session.id)}
+                        onToggleSelect={() => toggleAgentSelection(session.id)}
                         onStop={() => requestStopAgent(session.id, session.agent_name)}
                         onNudge={() => handleNudgeAgent(session.id)}
                         onSelect={() => onSelectAgent?.(session.id)}
@@ -1046,6 +1147,18 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           onCancel={cancelStop}
         />
       )}
+
+      {/* Stop Confirmation Dialog - Bulk Selected Agents */}
+      {stopConfirm?.type === 'bulk' && (
+        <StopConfirmDialog
+          title="Stop Selected Agents"
+          message="Are you sure you want to stop the selected agents? Their in-progress work will be interrupted and their processes will be terminated."
+          agentCount={selectedAgents.size}
+          isStopping={isStopping}
+          onConfirm={confirmStop}
+          onCancel={cancelStop}
+        />
+      )}
     </div>
   );
 }
@@ -1072,6 +1185,8 @@ function AgentCard({
   session,
   processInfo,
   childCount,
+  isSelected,
+  onToggleSelect,
   onStop,
   onNudge,
   onSelect,
@@ -1079,6 +1194,8 @@ function AgentCard({
   session: Session;
   processInfo?: AgentProcessInfo;
   childCount?: number;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
   onStop: () => void;
   onNudge: () => void;
   onSelect?: () => void;
@@ -1088,7 +1205,7 @@ function AgentCard({
 
   return (
     <div
-      className={`rounded-lg border border-slate-700 border-l-[3px] ${borderAccent} bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors`}
+      className={`rounded-lg border border-l-[3px] ${borderAccent} bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors ${isSelected ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-700'}`}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onSelect?.();
@@ -1099,6 +1216,21 @@ function AgentCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          {/* Selection checkbox */}
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={!!isSelected}
+              onChange={(e) => {
+                e.stopPropagation();
+                onToggleSelect();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="h-4 w-4 rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-500"
+              data-testid={`select-agent-card-${session.id}`}
+            />
+          )}
+
           {/* State indicator with icon */}
           <div
             className={`flex items-center ${STATE_ICONS[session.state]?.className || 'text-slate-400'}`}
