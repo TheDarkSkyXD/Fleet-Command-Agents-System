@@ -5019,6 +5019,98 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle('metrics:by-capability', () => {
+    try {
+      const breakdown = loggedPrepare(`
+        SELECT
+          capability,
+          COUNT(*) as session_count,
+          SUM(input_tokens) as total_input_tokens,
+          SUM(output_tokens) as total_output_tokens,
+          SUM(cache_read_tokens) as total_cache_read_tokens,
+          SUM(cache_creation_tokens) as total_cache_creation_tokens,
+          SUM(estimated_cost) as total_cost,
+          SUM(duration_ms) as total_duration_ms
+        FROM metrics
+        WHERE capability IS NOT NULL
+        GROUP BY capability
+        ORDER BY total_input_tokens DESC
+      `).all();
+      log.info(
+        `[IPC] metrics:by-capability - aggregated token usage by ${breakdown.length} capabilities from real database`,
+      );
+      return { data: breakdown, error: null };
+    } catch (error) {
+      log.error('metrics:by-capability failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('metrics:export', async (_event, format: 'csv' | 'json') => {
+    try {
+      const metrics = loggedPrepare(`
+        SELECT * FROM metrics ORDER BY completed_at DESC
+      `).all() as Array<Record<string, unknown>>;
+
+      let content: string;
+      let defaultExt: string;
+
+      if (format === 'json') {
+        content = JSON.stringify(metrics, null, 2);
+        defaultExt = 'json';
+      } else {
+        // CSV format
+        if (metrics.length === 0) {
+          content = '';
+        } else {
+          const headers = Object.keys(metrics[0]);
+          const rows = metrics.map((row) =>
+            headers
+              .map((h) => {
+                const val = row[h];
+                if (val == null) return '';
+                const str = String(val);
+                // Escape CSV fields containing commas, quotes, or newlines
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                  return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+              })
+              .join(','),
+          );
+          content = [headers.join(','), ...rows].join('\n');
+        }
+        defaultExt = 'csv';
+      }
+
+      const { dialog } = require('electron');
+      const result = await dialog.showSaveDialog({
+        title: `Export Metrics as ${format.toUpperCase()}`,
+        defaultPath: `fleet-metrics-export.${defaultExt}`,
+        filters: [
+          format === 'json'
+            ? { name: 'JSON Files', extensions: ['json'] }
+            : { name: 'CSV Files', extensions: ['csv'] },
+        ],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { data: null, error: null };
+      }
+
+      const fs = require('node:fs');
+      fs.writeFileSync(result.filePath, content, 'utf-8');
+
+      log.info(
+        `[IPC] metrics:export - exported ${metrics.length} metrics to ${result.filePath} as ${format}`,
+      );
+      return { data: { filePath: result.filePath }, error: null };
+    } catch (error) {
+      log.error('metrics:export failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   ipcMain.handle('metrics:summary', () => {
     try {
       const summary = loggedPrepare(`

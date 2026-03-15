@@ -25,6 +25,7 @@ import {
 } from 'react-icons/fi';
 import type {
   AgentIdentity,
+  AgentPerformanceHistory,
   AgentProcessInfo,
   Event,
   Issue,
@@ -91,7 +92,7 @@ const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> 
   zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
-type DetailTab = 'terminal' | 'logs' | 'identity' | 'files' | 'mail';
+type DetailTab = 'terminal' | 'logs' | 'identity' | 'files' | 'mail' | 'performance';
 
 const TABS: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
   { id: 'terminal', label: 'Terminal', icon: <FiTerminal className="h-4 w-4" /> },
@@ -99,6 +100,7 @@ const TABS: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
   { id: 'identity', label: 'Identity/CV', icon: <FiUser className="h-4 w-4" /> },
   { id: 'files', label: 'Files Changed', icon: <FiHash className="h-4 w-4" /> },
   { id: 'mail', label: 'Mail', icon: <FiMail className="h-4 w-4" /> },
+  { id: 'performance', label: 'Performance', icon: <FiActivity className="h-4 w-4" /> },
 ];
 
 function formatUptime(createdAt: string): string {
@@ -1002,6 +1004,216 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
         )}
         {activeTab === 'files' && <AgentFilesTab session={session} />}
         {activeTab === 'mail' && <AgentMailTab agentName={session.agent_name} />}
+        {activeTab === 'performance' && <AgentPerformanceTab agentName={session.agent_name} />}
+      </div>
+    </div>
+  );
+}
+
+// ── Agent Performance Tab ──────────────────────────────────────────────
+
+function formatDurationMs(ms: number): string {
+  if (ms <= 0) return '—';
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
+function formatSessionDuration(createdAt: string, completedAt: string | null): string {
+  if (!completedAt) return 'In progress';
+  const dur = new Date(completedAt).getTime() - new Date(createdAt).getTime();
+  return formatDurationMs(dur);
+}
+
+function AgentPerformanceTab({ agentName }: { agentName: string }) {
+  const [perfData, setPerfData] = useState<AgentPerformanceHistory | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const result = await window.electronAPI.agentPerformanceHistory(agentName);
+        if (!mounted) return;
+        if (result.error) {
+          setError(result.error);
+        } else {
+          setPerfData(result.data);
+        }
+      } catch (err) {
+        if (mounted) setError(String(err));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [agentName]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-slate-400">
+        <FiLoader className="h-5 w-5 animate-spin mr-2" />
+        Loading performance data...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-400">
+        <FiAlertTriangle className="h-5 w-5 mr-2" />
+        {error}
+      </div>
+    );
+  }
+
+  if (!perfData || perfData.totalSessions === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-slate-500">
+        No session history for this agent yet.
+      </div>
+    );
+  }
+
+  const { totalSessions, completedCount, failedCount, successRate, avgDurationMs, sessions } =
+    perfData;
+  const inProgressCount = sessions.filter(
+    (s) => s.state === 'booting' || s.state === 'working',
+  ).length;
+
+  return (
+    <div className="h-full overflow-y-auto p-4 space-y-6" data-testid="agent-performance-tab">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="performance-stats">
+        <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Sessions</div>
+          <div className="text-2xl font-bold text-slate-200 tabular-nums">{totalSessions}</div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Success Rate</div>
+          <div className="text-2xl font-bold tabular-nums" data-testid="success-rate">
+            <span
+              className={
+                successRate >= 80
+                  ? 'text-emerald-400'
+                  : successRate >= 50
+                    ? 'text-amber-400'
+                    : 'text-red-400'
+              }
+            >
+              {successRate}%
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                successRate >= 80
+                  ? 'bg-emerald-500'
+                  : successRate >= 50
+                    ? 'bg-amber-500'
+                    : 'bg-red-500'
+              }`}
+              style={{ width: `${successRate}%` }}
+            />
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Avg Duration</div>
+          <div
+            className="text-2xl font-bold text-slate-200 tabular-nums"
+            data-testid="avg-duration"
+          >
+            {formatDurationMs(avgDurationMs)}
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Breakdown</div>
+          <div className="flex items-center gap-3 text-sm mt-1">
+            <span className="flex items-center gap-1 text-emerald-400">
+              <FiCheckCircle className="h-3.5 w-3.5" />
+              {completedCount}
+            </span>
+            <span className="flex items-center gap-1 text-red-400">
+              <FiAlertTriangle className="h-3.5 w-3.5" />
+              {failedCount}
+            </span>
+            {inProgressCount > 0 && (
+              <span className="flex items-center gap-1 text-blue-400">
+                <FiLoader className="h-3.5 w-3.5" />
+                {inProgressCount}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Session History Table */}
+      <div>
+        <h3 className="text-sm font-medium text-slate-300 mb-3">Task Completion History</h3>
+        <div
+          className="rounded-lg border border-slate-700 overflow-hidden"
+          data-testid="task-completion-history"
+        >
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-800/80 text-slate-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-2.5 font-medium">Session</th>
+                <th className="text-left px-4 py-2.5 font-medium">Capability</th>
+                <th className="text-left px-4 py-2.5 font-medium">Model</th>
+                <th className="text-left px-4 py-2.5 font-medium">Task</th>
+                <th className="text-left px-4 py-2.5 font-medium">State</th>
+                <th className="text-left px-4 py-2.5 font-medium">Duration</th>
+                <th className="text-left px-4 py-2.5 font-medium">Started</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {sessions.map((s) => (
+                <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
+                  <td className="px-4 py-2 text-slate-300 font-mono" title={s.id}>
+                    {s.id.substring(0, 12)}...
+                  </td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs border ${
+                        CAPABILITY_COLORS[s.capability] ||
+                        'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                      }`}
+                    >
+                      {s.capability}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-slate-400">{s.model || '—'}</td>
+                  <td className="px-4 py-2 text-slate-400 font-mono">{s.task_id || '—'}</td>
+                  <td className="px-4 py-2">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          STATE_DOT_COLORS[s.state] || 'bg-slate-400'
+                        }`}
+                      />
+                      <span className={STATE_COLORS[s.state] ? 'text-slate-300' : 'text-slate-400'}>
+                        {s.state}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-slate-400 tabular-nums">
+                    {formatSessionDuration(s.created_at, s.completed_at)}
+                  </td>
+                  <td className="px-4 py-2 text-slate-500">
+                    {new Date(s.created_at).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

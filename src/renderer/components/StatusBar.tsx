@@ -9,6 +9,8 @@ import {
   FiPlay,
   FiSquare,
   FiStar,
+  FiUsers,
+  FiXCircle,
 } from 'react-icons/fi';
 import type { ConfigProfile } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
@@ -387,53 +389,105 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
 
           {showRunHistory && (
             <div
-              className="absolute bottom-full right-0 mb-1 w-80 rounded-lg border border-slate-700 bg-slate-800 shadow-xl z-50 py-1 max-h-64 overflow-y-auto"
+              className="absolute bottom-full right-0 mb-1 w-96 rounded-lg border border-slate-700 bg-slate-800 shadow-xl z-50 py-1 max-h-80 overflow-y-auto"
               data-testid="run-history-dropdown"
             >
-              <div className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                Run History
+              <div className="flex items-center justify-between px-3 py-1.5">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Run History
+                </span>
+                <span className="text-xs text-slate-600">
+                  {runs.length} run{runs.length !== 1 ? 's' : ''}
+                </span>
               </div>
               {runs.length === 0 ? (
-                <div className="px-3 py-3 text-xs text-slate-500 text-center">No runs yet</div>
+                <div className="px-3 py-6 text-xs text-slate-500 text-center">
+                  <FiList className="h-5 w-5 mx-auto mb-2 text-slate-600" />
+                  No runs yet. Start a run to see history.
+                </div>
               ) : (
-                runs.map((run) => (
-                  <div
-                    key={run.id}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-700 transition-colors"
-                    data-testid={`run-history-item-${run.id}`}
-                  >
-                    {run.status === 'active' ? (
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    ) : run.status === 'completed' ? (
-                      <FiCheckCircle className="h-3 w-3 text-blue-400 shrink-0" />
-                    ) : (
-                      <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
-                    )}
-                    <span className="truncate text-slate-300" title={run.id}>
-                      {run.id.substring(0, 16)}...
-                    </span>
-                    <span
-                      className={`ml-auto shrink-0 ${
-                        run.status === 'active'
-                          ? 'text-emerald-400'
-                          : run.status === 'completed'
-                            ? 'text-blue-400'
-                            : 'text-red-400'
-                      }`}
+                runs.map((run) => {
+                  const startDate = new Date(run.started_at);
+                  const endDate = run.completed_at ? new Date(run.completed_at) : null;
+                  const durationMs = endDate
+                    ? endDate.getTime() - startDate.getTime()
+                    : Date.now() - startDate.getTime();
+                  const durationMin = Math.floor(durationMs / 60000);
+                  const durationSec = Math.floor((durationMs % 60000) / 1000);
+                  const durationStr =
+                    durationMin > 0 ? `${durationMin}m ${durationSec}s` : `${durationSec}s`;
+
+                  return (
+                    <div
+                      key={run.id}
+                      className="px-3 py-2 hover:bg-slate-700/50 transition-colors border-b border-slate-700/30 last:border-0"
+                      data-testid={`run-history-item-${run.id}`}
                     >
-                      {run.status}
-                    </span>
-                    {run.completed_at && (
-                      <span
-                        className="text-slate-500 shrink-0 flex items-center gap-0.5"
-                        title={`Completed: ${run.completed_at}`}
-                      >
-                        <FiClock className="h-2.5 w-2.5" />
-                        {new Date(run.completed_at).toLocaleTimeString()}
-                      </span>
-                    )}
-                  </div>
-                ))
+                      {/* Row 1: Status icon + ID + status badge */}
+                      <div className="flex items-center gap-2 mb-1">
+                        {run.status === 'active' ? (
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        ) : run.status === 'completed' ? (
+                          <FiCheckCircle className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                        ) : (
+                          <FiXCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                        )}
+                        <span className="text-xs font-mono text-slate-300 truncate" title={run.id}>
+                          {run.id.substring(0, 12)}
+                        </span>
+                        <span
+                          className={`ml-auto text-xs font-medium px-1.5 py-0.5 rounded ${
+                            run.status === 'active'
+                              ? 'bg-emerald-500/10 text-emerald-400'
+                              : run.status === 'completed'
+                                ? 'bg-blue-500/10 text-blue-400'
+                                : 'bg-red-500/10 text-red-400'
+                          }`}
+                        >
+                          {run.status}
+                        </span>
+                      </div>
+                      {/* Row 2: Start time, end time, duration, agent count */}
+                      <div className="flex items-center gap-3 text-[10px] text-slate-500 ml-5">
+                        <span
+                          className="flex items-center gap-0.5"
+                          title={`Started: ${startDate.toLocaleString()}`}
+                        >
+                          <FiPlay className="h-2.5 w-2.5" />
+                          {startDate.toLocaleString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        {endDate && (
+                          <span
+                            className="flex items-center gap-0.5"
+                            title={`Ended: ${endDate.toLocaleString()}`}
+                          >
+                            <FiSquare className="h-2.5 w-2.5" />
+                            {endDate.toLocaleString(undefined, {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-0.5" title="Duration">
+                          <FiClock className="h-2.5 w-2.5" />
+                          {durationStr}
+                        </span>
+                        <span
+                          className="flex items-center gap-0.5 ml-auto"
+                          title={`${run.agent_count} agent${run.agent_count !== 1 ? 's' : ''}`}
+                        >
+                          <FiUsers className="h-2.5 w-2.5" />
+                          {run.agent_count} agent{run.agent_count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           )}

@@ -1142,6 +1142,14 @@ export interface ElectronAPI {
     updates: Record<string, unknown>,
   ) => Promise<{ data: Metric | null; error: string | null }>;
   metricsDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  metricsByCapability: () => Promise<{
+    data: CapabilityBreakdown[] | null;
+    error: string | null;
+  }>;
+  metricsExport: (format: 'csv' | 'json') => Promise<{
+    data: { filePath: string } | null;
+    error: string | null;
+  }>;
 
   // App Logs
   appLogList: (filters?: {

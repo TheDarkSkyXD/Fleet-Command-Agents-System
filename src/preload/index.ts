@@ -244,6 +244,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   metricsUpdate: (id: string, updates: Record<string, unknown>) =>
     ipcRenderer.invoke('metrics:update', id, updates),
   metricsDelete: (id: string) => ipcRenderer.invoke('metrics:delete', id),
+  metricsByCapability: () => ipcRenderer.invoke('metrics:by-capability'),
+  metricsExport: (format: 'csv' | 'json') => ipcRenderer.invoke('metrics:export', format),
 
   // Events
   eventList: (filters?: { eventType?: string; agentName?: string; limit?: number }) =>
