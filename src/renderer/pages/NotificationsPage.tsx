@@ -12,6 +12,7 @@ import {
   FiUsers,
   FiX,
 } from 'react-icons/fi';
+import { formatAbsoluteTime } from '../components/RelativeTime';
 
 interface NotificationRecord {
   id: number;
@@ -322,6 +323,7 @@ export function NotificationsPage() {
                   <span
                     className="whitespace-nowrap text-xs text-slate-500"
                     data-testid={`notification-time-${notification.id}`}
+                    title={formatAbsoluteTime(notification.created_at)}
                   >
                     {formatTimestamp(notification.created_at)}
                   </span>

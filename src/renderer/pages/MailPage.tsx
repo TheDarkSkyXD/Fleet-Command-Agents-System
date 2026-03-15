@@ -18,6 +18,7 @@ import {
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { Message, MessagePriority, MessageType } from '../../shared/types';
 import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
+import { formatAbsoluteTime } from '../components/RelativeTime';
 
 type MailTab = 'inbox' | 'outbox' | 'all';
 
@@ -817,7 +818,7 @@ export function MailPage() {
                           )}
                           <span
                             className="flex-shrink-0 text-xs text-slate-500"
-                            title={new Date(msg.created_at).toLocaleString()}
+                            title={formatAbsoluteTime(msg.created_at)}
                           >
                             {activeTab === 'outbox'
                               ? new Date(msg.created_at).toLocaleString([], {
@@ -835,6 +836,7 @@ export function MailPage() {
                           className={`mt-0.5 truncate text-sm ${
                             msg.read === 0 ? 'font-medium text-slate-200' : 'text-slate-400'
                           }`}
+                          title={msg.subject || '(no subject)'}
                         >
                           {msg.subject || '(no subject)'}
                         </p>

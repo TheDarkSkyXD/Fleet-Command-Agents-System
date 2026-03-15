@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Project } from '../../shared/types';
+import { formatAbsoluteTime } from '../components/RelativeTime';
 import { useProjectStore } from '../stores/projectStore';
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -41,20 +42,27 @@ function ProjectCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-slate-50 truncate">{project.name}</span>
+            <span className="text-lg font-semibold text-slate-50 truncate" title={project.name}>
+              {project.name}
+            </span>
             {isActive && (
               <span className="inline-flex items-center rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400 border border-blue-500/30">
                 Active
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-slate-400 font-mono truncate">{project.path}</p>
+          <p className="mt-1 text-sm text-slate-400 font-mono truncate" title={project.path}>
+            {project.path}
+          </p>
           {project.description && (
             <p className="mt-2 text-sm text-slate-500 line-clamp-2">{project.description}</p>
           )}
         </div>
         <div className="shrink-0 text-right">
-          <span className="text-xs text-slate-500">
+          <span
+            className="text-xs text-slate-500"
+            title={project.last_opened_at ? formatAbsoluteTime(project.last_opened_at) : undefined}
+          >
             {formatRelativeTime(project.last_opened_at)}
           </span>
         </div>

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import {
   FiAlertTriangle,
   FiCheck,
@@ -16,6 +15,7 @@ import {
   FiX,
   FiXCircle,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type {
   Hook,
   HookDeployResult,
@@ -24,6 +24,7 @@ import type {
   Project,
   Worktree,
 } from '../../shared/types';
+import { formatAbsoluteTime } from '../components/RelativeTime';
 
 const HOOK_TYPES: { type: HookType; label: string; description: string }[] = [
   {
@@ -242,7 +243,9 @@ function HookEventLog() {
                     </span>
                   </div>
                   <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-                    <span>{formatTime(event.created_at)}</span>
+                    <span title={formatAbsoluteTime(event.created_at)}>
+                      {formatTime(event.created_at)}
+                    </span>
                     {event.agent_name && <span>Agent: {event.agent_name}</span>}
                     {event.worktree && (
                       <span className="truncate max-w-[200px]" title={event.worktree}>
@@ -754,7 +757,9 @@ export function HooksPage() {
                     <span className="text-sm font-medium text-slate-200">
                       {wt.branch || 'detached'}
                     </span>
-                    <p className="truncate text-xs text-slate-500">{wt.path}</p>
+                    <p className="truncate text-xs text-slate-500" title={wt.path}>
+                      {wt.path}
+                    </p>
                   </div>
                   <span
                     className={`rounded px-2 py-0.5 text-xs ${
@@ -803,7 +808,7 @@ export function HooksPage() {
                   }`}
                 >
                   {r.success ? <FiCheck size={14} /> : <FiXCircle size={14} />}
-                  <span className="flex-1 truncate">
+                  <span className="flex-1 truncate" title={`${r.hookId} → ${r.worktree}`}>
                     {r.hookId} → {r.worktree}
                   </span>
                   {r.error && <span className="text-xs text-red-400">{r.error}</span>}
@@ -981,7 +986,10 @@ export function HooksPage() {
                             </span>
                           </div>
                           {hook.description && (
-                            <p className="mt-0.5 text-xs text-slate-500 truncate">
+                            <p
+                              className="mt-0.5 text-xs text-slate-500 truncate"
+                              title={hook.description}
+                            >
                               {hook.description}
                             </p>
                           )}

@@ -102,7 +102,15 @@ function formatEventTime(dateStr: string): string {
 }
 
 function formatFullTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString();
+  return new Date(dateStr).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  });
 }
 
 export function EventFeedPage() {
@@ -337,14 +345,20 @@ export function EventFeedPage() {
 
                     {/* Agent name */}
                     {event.agent_name && (
-                      <span className="truncate text-xs font-medium text-slate-300">
+                      <span
+                        className="truncate text-xs font-medium text-slate-300"
+                        title={event.agent_name}
+                      >
                         {event.agent_name}
                       </span>
                     )}
 
                     {/* Tool name */}
                     {event.tool_name && (
-                      <span className="truncate rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
+                      <span
+                        className="truncate rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400"
+                        title={event.tool_name}
+                      >
                         {event.tool_name}
                       </span>
                     )}
@@ -368,7 +382,9 @@ export function EventFeedPage() {
 
                   {/* Data payload */}
                   {event.data && (
-                    <p className="mt-0.5 truncate text-xs text-slate-400">{event.data}</p>
+                    <p className="mt-0.5 truncate text-xs text-slate-400" title={event.data}>
+                      {event.data}
+                    </p>
                   )}
                 </div>
               </div>

@@ -19,6 +19,7 @@ import type {
   ExpertiseRecord,
   ExpertiseType,
 } from '../../shared/types';
+import { formatAbsoluteTime } from '../components/RelativeTime';
 
 const EXPERTISE_TYPES: ExpertiseType[] = [
   'convention',
@@ -554,7 +555,7 @@ export function ExpertisePage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-slate-100 truncate">
+                        <span className="font-medium text-slate-100 truncate" title={record.title}>
                           <HighlightedText text={record.title} query={globalSearchQuery} />
                         </span>
                         <DomainBadge domain={record.domain} />
@@ -936,6 +937,7 @@ export function ExpertisePage() {
                                   : 'bg-slate-700 text-slate-400'
                             }`}
                             data-testid={`staleness-badge-${domain.domain}`}
+                            title={lastUpdated ? formatAbsoluteTime(lastUpdated) : undefined}
                           >
                             <FiClock size={11} />
                             {timeAgo}
@@ -1022,7 +1024,7 @@ export function ExpertisePage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-slate-100 truncate">
+                        <span className="font-medium text-slate-100 truncate" title={record.title}>
                           <HighlightedText text={record.title} query={searchQuery} />
                         </span>
                         <TypeBadge type={record.type} />
