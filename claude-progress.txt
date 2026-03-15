@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Tool Allowlist & File Scope Enforcement)
+
+#### Feature #267: Scouts cannot write files - PASSING
+- Added tool allowlist enforcement to guardEnforcementService.enforceToolCall()
+- isToolAllowed() helper checks tool name against role's allowlist (exact + qualified matches)
+- Scout's allowlist ['Read', 'Grep', 'Glob', 'Bash (read-only)', 'WebSearch'] blocks Write/Edit
+- Violations recorded as tool_allowlist type with appropriate severity (warning for write tools)
+- Added ToolAllowlistTester UI component on GuardRulesPage with dropdown and test button
+- Added guardRule:check-tool IPC handler for programmatic validation
+- Added preload bridge and ElectronAPI types
+
+#### Feature #268: Builder file scope enforcement - PASSING
+- Added validateFileScope() method to guardEnforcementService
+- Supports exact file matches, directory matches, and glob wildcard patterns
+- File scope checked for WRITE_TOOLS (Write, Edit, NotebookEdit) only
+- agentProcessManager passes fileScope from spawnOptions to enforceToolCall
+- Violations recorded as file_scope type with warning severity
+- Added guardRule:check-file-scope IPC handler, preload bridge, and ElectronAPI types
+
+#### Files Modified
+- MODIFIED: src/main/services/guardEnforcementService.ts - Tool allowlist enforcement, file scope validation, WRITE_TOOLS constant
+- MODIFIED: src/main/services/agentProcessManager.ts - Pass fileScope to enforceToolCall
+- MODIFIED: src/main/ipc/handlers.ts - check-tool and check-file-scope IPC handlers
+- MODIFIED: src/preload/index.ts - guardCheckTool, guardCheckFileScope bridges
+- MODIFIED: src/shared/types/index.ts - ElectronAPI types for new bridges
+- MODIFIED: src/renderer/pages/GuardRulesPage.tsx - ToolAllowlistTester component
+
+#### Current Status
+- 267/366 features passing (added #267 and #268 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Sensitive Operations Confirmation & IPC Security)
 
 #### Feature #271: Sensitive operations require confirmation - PASSING
