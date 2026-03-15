@@ -4976,3 +4976,28 @@
 - 335/366 features passing (added #334 and #366 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Concurrent Spawns & Deleted Agent View)
+
+#### Feature #340: Concurrent agent spawns don't corrupt database - PASSING
+- Verified existing infrastructure handles concurrent spawns safely:
+  - WAL mode enabled (journal_mode = WAL) at database init
+  - busy_timeout = 5000ms handles SQLite lock contention
+  - AgentOperationLock class serializes async spawn/stop operations
+  - Database transactions wrap INSERT + state UPDATE + identity UPSERT atomically
+  - PRIMARY KEY on sessions.id ensures all agent records are distinct
+- No additional code changes needed - infrastructure was already solid
+
+#### Feature #341: Viewing deleted agent gracefully handles missing data - PASSING
+- Verified existing handling (implemented in Feature #302):
+  - agent:detail IPC handler returns { data: null, error: null } for non-existent agents
+  - AgentDetailPage loadSession detects this and sets notFound = true
+  - 404 UI renders with agent ID display and back button
+  - data-testid attributes: agent-not-found, agent-not-found-id, agent-not-found-back-button
+  - No crash or console errors on missing/deleted agents
+- No additional code changes needed
+
+#### Current Status
+- 341/366 features passing (added #340 and #341 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
