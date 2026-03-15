@@ -3,6 +3,7 @@ import log from 'electron-log';
 import * as nodePty from 'node-pty';
 import { getDatabase } from '../db/database';
 import { detectClaudeCli } from './claudeCliService';
+import { guardEnforcementService } from './guardEnforcementService';
 import { notificationService } from './notificationService';
 import { runtimeRegistry } from './runtimeRegistry';
 import { type StreamJsonEvent, StreamJsonParser } from './streamJsonParser';
@@ -692,6 +693,56 @@ class AgentProcessManager {
       }
       if (typeof usage.cache_creation_input_tokens === 'number') {
         agent.tokenUsage.cacheCreationTokens += usage.cache_creation_input_tokens;
+      }
+    }
+
+    // Guard enforcement: check tool_use events against guard rules
+    if (event.type === 'tool_use') {
+      const toolEvent = event as {
+        type: 'tool_use';
+        name: string;
+        input?: Record<string, unknown>;
+      };
+      if (toolEvent.name) {
+        const result = guardEnforcementService.enforceToolCall(
+          agent.agentName,
+          agent.capability,
+          toolEvent.name,
+          toolEvent.input,
+          agent.spawnOptions.worktreePath,
+        );
+        if (!result.allowed) {
+          // Broadcast the violation to the renderer for real-time display
+          this.broadcastAgentEvent(agent.id, 'guard_violation', {
+            toolName: toolEvent.name,
+            violation: result.violation,
+            capability: agent.capability,
+          });
+        }
+      }
+    }
+
+    // Also check content_block_start with tool_use type for streaming format
+    if (event.type === 'content_block_start') {
+      const blockEvent = event as {
+        type: 'content_block_start';
+        content_block?: { type: string; name?: string; input?: Record<string, unknown> };
+      };
+      if (blockEvent.content_block?.type === 'tool_use' && blockEvent.content_block.name) {
+        const result = guardEnforcementService.enforceToolCall(
+          agent.agentName,
+          agent.capability,
+          blockEvent.content_block.name,
+          blockEvent.content_block.input,
+          agent.spawnOptions.worktreePath,
+        );
+        if (!result.allowed) {
+          this.broadcastAgentEvent(agent.id, 'guard_violation', {
+            toolName: blockEvent.content_block.name,
+            violation: result.violation,
+            capability: agent.capability,
+          });
+        }
       }
     }
 

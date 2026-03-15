@@ -17,6 +17,7 @@ import {
   detectClaudeCli,
   getClaudeCliStatus,
 } from '../services/claudeCliService';
+import { guardEnforcementService } from '../services/guardEnforcementService';
 import {
   aiResolveConflicts,
   autoResolveConflicts,
@@ -201,8 +202,26 @@ export function registerIpcHandlers(): void {
   // Agent channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle('agent:list', () => {
     try {
-      const sessions = loggedPrepare('SELECT * FROM sessions ORDER BY created_at DESC').all();
-      log.info(`[IPC] agent:list - SELECT returned ${sessions.length} sessions from real database`);
+      // Filter sessions by active project for data isolation between projects
+      const activeProject = loggedPrepare(
+        'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
+      ).get() as { id: string } | undefined;
+
+      let sessions: unknown[];
+      if (activeProject) {
+        // Show sessions belonging to this project, plus legacy sessions without project_id
+        sessions = loggedPrepare(
+          'SELECT * FROM sessions WHERE project_id = ? OR project_id IS NULL ORDER BY created_at DESC',
+        ).all(activeProject.id);
+        log.info(
+          `[IPC] agent:list - SELECT returned ${sessions.length} sessions for project ${activeProject.id}`,
+        );
+      } else {
+        sessions = loggedPrepare('SELECT * FROM sessions ORDER BY created_at DESC').all();
+        log.info(
+          `[IPC] agent:list - SELECT returned ${sessions.length} sessions (no active project)`,
+        );
+      }
       return { data: sessions, error: null };
     } catch (error) {
       log.error('agent:list failed:', error);
@@ -364,10 +383,15 @@ export function registerIpcHandlers(): void {
           options.id,
         );
 
-        // Insert session record into database with PID, model, file_scope, and transcript_path
+        // Get active project ID for data isolation
+        const spawnActiveProject = loggedPrepare(
+          'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { id: string } | undefined;
+
+        // Insert session record into database with PID, model, file_scope, transcript_path, and project_id
         loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, transcript_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?, ?)`,
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, transcript_path, project_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?, ?, ?)`,
         ).run(
           options.id,
           options.agent_name,
@@ -382,6 +406,7 @@ export function registerIpcHandlers(): void {
           agentProcess.pid,
           options.file_scope ?? null,
           transcriptPath,
+          spawnActiveProject?.id ?? null,
         );
 
         // Transition to 'working' state after successful spawn
@@ -3281,9 +3306,7 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('issue:delete', (_event, id: string) => {
-    const validation = validateIpcParams('issue:delete', { id }, [
-      { name: 'id', type: 'string' },
-    ]);
+    const validation = validateIpcParams('issue:delete', { id }, [{ name: 'id', type: 'string' }]);
     if (!validation.valid) return { data: false, error: validation.error };
     try {
       loggedPrepare('DELETE FROM issues WHERE id = ?').run(id);
@@ -4921,9 +4944,7 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('project:get', (_event, id: string) => {
-    const validation = validateIpcParams('project:get', { id }, [
-      { name: 'id', type: 'string' },
-    ]);
+    const validation = validateIpcParams('project:get', { id }, [{ name: 'id', type: 'string' }]);
     if (!validation.valid) return { data: null, error: validation.error };
     try {
       const project = loggedPrepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -6165,9 +6186,9 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('run:progress', (_event, runId: string) => {
     try {
-      const total = loggedPrepare(
-        'SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ?',
-      ).get(runId) as { cnt: number };
+      const total = loggedPrepare('SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ?').get(
+        runId,
+      ) as { cnt: number };
       const completed = loggedPrepare(
         "SELECT COUNT(*) as cnt FROM sessions WHERE run_id = ? AND state = 'completed'",
       ).get(runId) as { cnt: number };
@@ -6831,6 +6852,8 @@ export function registerIpcHandlers(): void {
         );
 
         const updated = loggedPrepare('SELECT * FROM agent_definitions WHERE role = ?').get(role);
+        // Clear guard enforcement cache so changes take effect immediately
+        guardEnforcementService.clearCache();
         log.info(`[IPC] guardRule:update - UPDATE guard rules for role=${role}`);
         return { data: updated, error: null };
       } catch (error) {
