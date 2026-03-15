@@ -33,6 +33,7 @@ import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
 import { useProjectStore } from '../stores/projectStore';
+import { DEFAULT_MODEL_DEFAULTS, useSettingsStore } from '../stores/settingsStore';
 
 /** Default model per capability */
 const CAPABILITY_DEFAULTS: Record<
@@ -362,13 +363,20 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Update model when capability changes
+  // Update model when capability changes (use settings-based defaults)
+  const { settings: appSettings } = useSettingsStore();
   useEffect(() => {
-    const defaults = CAPABILITY_DEFAULTS[spawnCapability];
-    if (defaults) {
-      setSpawnModel(defaults.model);
+    const modelDefaults = appSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS;
+    const settingsModel = modelDefaults[spawnCapability as keyof typeof modelDefaults];
+    if (settingsModel) {
+      setSpawnModel(settingsModel);
+    } else {
+      const defaults = CAPABILITY_DEFAULTS[spawnCapability];
+      if (defaults) {
+        setSpawnModel(defaults.model);
+      }
     }
-  }, [spawnCapability]);
+  }, [spawnCapability, appSettings.modelDefaultsPerCapability]);
 
   // Apply capability filter as a column filter
   useEffect(() => {
@@ -384,7 +392,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
 
   const openSpawnDialog = () => {
     setSpawnCapability('scout');
-    setSpawnModel('haiku');
+    const modelDefaults = appSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS;
+    setSpawnModel(modelDefaults.scout || 'haiku');
     setSpawnName('');
     setSpawnTaskId('');
     setSpawnFileScope('');
@@ -1110,7 +1119,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           error={spawnError}
           onCapabilityChange={(cap) => {
             setSpawnCapability(cap);
-            setSpawnModel(CAPABILITY_DEFAULTS[cap].model);
+            const modelDefaults = appSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS;
+            setSpawnModel(modelDefaults[cap as keyof typeof modelDefaults] || CAPABILITY_DEFAULTS[cap].model);
           }}
           onModelChange={setSpawnModel}
           onNameChange={setSpawnName}
@@ -1410,6 +1420,8 @@ function SpawnDialog({
   onClose: () => void;
 }) {
   const capabilityInfo = CAPABILITY_DEFAULTS[capability];
+  const { settings: spawnSettings } = useSettingsStore();
+  const configuredDefault = (spawnSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS)[capability as keyof typeof DEFAULT_MODEL_DEFAULTS] ?? capabilityInfo.model;
   const [showTreePicker, setShowTreePicker] = useState(capability === 'builder');
   const [scopeOverlaps, setScopeOverlaps] = useState<ScopeOverlap[]>([]);
   const [checkingOverlaps, setCheckingOverlaps] = useState(false);
@@ -1511,9 +1523,9 @@ function SpawnDialog({
                 </button>
               ))}
             </div>
-            {model !== capabilityInfo.model && (
+            {model !== configuredDefault && (
               <p className="mt-1 text-xs text-amber-400">
-                Default for {capability} is {capabilityInfo.model}
+                Default for {capability} is {configuredDefault}
               </p>
             )}
           </div>

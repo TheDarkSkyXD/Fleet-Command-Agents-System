@@ -1,10 +1,53 @@
 import { create } from 'zustand';
 
+export interface ModelDefaultsPerCapability {
+  scout: string;
+  builder: string;
+  reviewer: string;
+  lead: string;
+  merger: string;
+  coordinator: string;
+  monitor: string;
+}
+
+export const DEFAULT_MODEL_DEFAULTS: ModelDefaultsPerCapability = {
+  scout: 'haiku',
+  builder: 'sonnet',
+  reviewer: 'sonnet',
+  lead: 'opus',
+  merger: 'sonnet',
+  coordinator: 'opus',
+  monitor: 'haiku',
+};
+
+export interface NotificationPreferences {
+  agent_completed: boolean;
+  agent_stalled: boolean;
+  agent_zombie: boolean;
+  agent_error: boolean;
+  merge_ready: boolean;
+  merge_failed: boolean;
+  health_alert: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  agent_completed: true,
+  agent_stalled: true,
+  agent_zombie: true,
+  agent_error: true,
+  merge_ready: true,
+  merge_failed: true,
+  health_alert: true,
+};
+
 export interface AppSettings {
   // Agent settings
   maxHierarchyDepth: number;
   maxConcurrentAgents: number;
   maxAgentsPerLead: number;
+
+  // Model defaults per capability
+  modelDefaultsPerCapability: ModelDefaultsPerCapability;
 
   // Watchdog settings
   watchdogEnabled: boolean;
@@ -24,6 +67,9 @@ export interface AppSettings {
 
   // Setup
   setupCompleted: boolean;
+
+  // Notification preferences
+  notificationPreferences: NotificationPreferences;
 }
 
 export type AccentColorKey =
@@ -126,6 +172,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxHierarchyDepth: 2,
   maxConcurrentAgents: 10,
   maxAgentsPerLead: 5,
+  modelDefaultsPerCapability: { ...DEFAULT_MODEL_DEFAULTS },
   watchdogEnabled: true,
   watchdogIntervalMs: 30000,
   watchdogStaleThresholdMs: 300000,
