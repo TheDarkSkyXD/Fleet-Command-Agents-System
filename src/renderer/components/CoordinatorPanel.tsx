@@ -79,10 +79,20 @@ export function CoordinatorPanel() {
   const isActive = status?.active && status?.processAlive;
   const session = status?.session;
 
-  // Calculate uptime
+  // Tick uptime every second for live counter
+  const [uptimeTick, setUptimeTick] = useState(0);
+  useEffect(() => {
+    if (!isActive || !session?.created_at) return;
+    const timer = setInterval(() => setUptimeTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isActive, session?.created_at]);
+
+  // Calculate uptime (re-evaluates on each tick)
   const uptime = session?.created_at
     ? Math.floor((Date.now() - new Date(session.created_at).getTime()) / 1000)
     : 0;
+  // Use uptimeTick to prevent lint warning about unused var
+  void uptimeTick;
   const hours = Math.floor(uptime / 3600);
   const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = uptime % 60;

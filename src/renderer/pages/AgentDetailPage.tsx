@@ -11,15 +11,24 @@ import {
   FiCpu,
   FiFile,
   FiHash,
+  FiInbox,
   FiLayers,
   FiLoader,
   FiMail,
+  FiSend,
   FiSquare,
   FiTerminal,
+  FiTool,
   FiUser,
   FiZap,
 } from 'react-icons/fi';
-import type { AgentIdentity, AgentProcessInfo, Session } from '../../shared/types';
+import type {
+  AgentIdentity,
+  AgentProcessInfo,
+  Event,
+  Message,
+  Session,
+} from '../../shared/types';
 import { AgentTerminal } from '../components/AgentTerminal';
 
 const CAPABILITY_COLORS: Record<string, string> = {
@@ -326,6 +335,346 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
   );
 }
 
+// ── Event Type Styling ─────────────────────────────────────────
+
+const EVENT_TYPE_STYLES: Record<string, { bg: string; icon: React.ReactNode }> = {
+  tool_start: {
+    bg: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+    icon: <FiTool className="h-3.5 w-3.5" />,
+  },
+  tool_end: {
+    bg: 'bg-green-500/15 text-green-400 border-green-500/30',
+    icon: <FiCheckCircle className="h-3.5 w-3.5" />,
+  },
+  session_start: {
+    bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    icon: <FiActivity className="h-3.5 w-3.5" />,
+  },
+  session_end: {
+    bg: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
+    icon: <FiSquare className="h-3.5 w-3.5" />,
+  },
+  spawn: {
+    bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+    icon: <FiZap className="h-3.5 w-3.5" />,
+  },
+  error: {
+    bg: 'bg-red-500/15 text-red-400 border-red-500/30',
+    icon: <FiAlertTriangle className="h-3.5 w-3.5" />,
+  },
+  mail_sent: {
+    bg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    icon: <FiSend className="h-3.5 w-3.5" />,
+  },
+  mail_received: {
+    bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    icon: <FiInbox className="h-3.5 w-3.5" />,
+  },
+  custom: {
+    bg: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+    icon: <FiHash className="h-3.5 w-3.5" />,
+  },
+};
+
+const LOG_LEVEL_COLORS: Record<string, string> = {
+  debug: 'text-slate-500',
+  info: 'text-slate-300',
+  warn: 'text-amber-400',
+  error: 'text-red-400',
+};
+
+// ── Agent Logs Tab ────────────────────────────────────────────
+
+function AgentLogsTab({ agentName }: { agentName: string }) {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('all');
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const result = await window.electronAPI.eventList({
+          agentName,
+          limit: 200,
+        });
+        if (result.data) setEvents(result.data);
+      } catch {
+        // Events may not exist
+      }
+      setLoading(false);
+    }
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [agentName]);
+
+  const filteredEvents = filter === 'all' ? events : events.filter((e) => e.event_type === filter);
+
+  if (loading && events.length === 0) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 h-full overflow-y-auto space-y-3">
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {['all', 'tool_start', 'tool_end', 'spawn', 'error', 'session_start', 'session_end'].map(
+          (f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                filter === f
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                  : 'bg-slate-700/50 text-slate-400 border border-slate-600/30 hover:bg-slate-700'
+              }`}
+            >
+              {f === 'all' ? 'All' : f.replace('_', ' ')}
+            </button>
+          ),
+        )}
+      </div>
+
+      {/* Events list */}
+      {filteredEvents.length === 0 ? (
+        <div className="text-center py-8 text-slate-500">
+          <FiFile className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p>No log entries found for this agent</p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {filteredEvents.map((event) => {
+            const style = EVENT_TYPE_STYLES[event.event_type] || EVENT_TYPE_STYLES.custom;
+            const levelColor = LOG_LEVEL_COLORS[event.level] || 'text-slate-300';
+            return (
+              <div
+                key={event.id}
+                className="flex items-start gap-3 rounded-md bg-slate-800/60 border border-slate-700/50 px-3 py-2 text-sm"
+              >
+                <div className={`mt-0.5 ${style.bg} rounded p-1`}>{style.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-medium ${levelColor}`}>
+                      {event.event_type.replace('_', ' ')}
+                    </span>
+                    {event.tool_name && (
+                      <span className="text-xs text-slate-400 font-mono bg-slate-700/50 rounded px-1.5 py-0.5">
+                        {event.tool_name}
+                      </span>
+                    )}
+                    {event.tool_duration_ms != null && (
+                      <span className="text-xs text-slate-500">{event.tool_duration_ms}ms</span>
+                    )}
+                  </div>
+                  {event.data && (
+                    <p className="text-xs text-slate-500 mt-0.5 truncate max-w-lg">{event.data}</p>
+                  )}
+                </div>
+                <span className="text-xs text-slate-600 whitespace-nowrap flex-shrink-0">
+                  {new Date(event.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Files Changed Tab ─────────────────────────────────────────
+
+function AgentFilesTab({ session }: { session: Session }) {
+  const fileScope = (() => {
+    try {
+      return JSON.parse(session.file_scope || '[]') as string[];
+    } catch {
+      return [];
+    }
+  })();
+
+  return (
+    <div className="p-4 h-full overflow-y-auto">
+      <div className="space-y-4">
+        {/* File scope section */}
+        <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-5">
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <FiFile className="h-4 w-4 text-blue-400" />
+            Assigned File Scope
+          </h3>
+          {fileScope.length > 0 ? (
+            <div className="space-y-1">
+              {fileScope.map((file) => (
+                <div
+                  key={file}
+                  className="flex items-center gap-2 rounded-md bg-slate-700/40 px-3 py-2 text-sm font-mono text-slate-300"
+                >
+                  <FiFile className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
+                  {file}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 italic">
+              No file scope assigned. This agent can modify any files.
+            </p>
+          )}
+        </div>
+
+        {/* Worktree info */}
+        {session.worktree_path && (
+          <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-5">
+            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <FiHash className="h-4 w-4 text-emerald-400" />
+              Worktree
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500">Path:</span>
+                <span className="font-mono text-slate-300">{session.worktree_path}</span>
+              </div>
+              {session.branch_name && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Branch:</span>
+                  <span className="font-mono text-emerald-400">{session.branch_name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Mail Tab ──────────────────────────────────────────────────
+
+const MAIL_TYPE_COLORS: Record<string, string> = {
+  status: 'bg-blue-500/15 text-blue-400',
+  question: 'bg-purple-500/15 text-purple-400',
+  result: 'bg-green-500/15 text-green-400',
+  error: 'bg-red-500/15 text-red-400',
+  worker_done: 'bg-emerald-500/15 text-emerald-400',
+  merge_ready: 'bg-cyan-500/15 text-cyan-400',
+  merged: 'bg-teal-500/15 text-teal-400',
+  merge_failed: 'bg-rose-500/15 text-rose-400',
+  escalation: 'bg-amber-500/15 text-amber-400',
+  health_check: 'bg-indigo-500/15 text-indigo-400',
+  dispatch: 'bg-violet-500/15 text-violet-400',
+  assign: 'bg-orange-500/15 text-orange-400',
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  low: 'text-slate-500',
+  normal: 'text-slate-400',
+  high: 'text-amber-400',
+  urgent: 'text-red-400 font-semibold',
+};
+
+function AgentMailTab({ agentName }: { agentName: string }) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const result = await window.electronAPI.mailList({ agent: agentName, limit: 100 });
+        if (result.data) setMessages(result.data);
+      } catch {
+        // Mail may not exist
+      }
+      setLoading(false);
+    }
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [agentName]);
+
+  if (loading && messages.length === 0) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 h-full overflow-y-auto">
+      {messages.length === 0 ? (
+        <div className="text-center py-8 text-slate-500">
+          <FiMail className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p>No mail messages for this agent</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {messages.map((msg) => {
+            const isExpanded = expandedId === msg.id;
+            const isSender = msg.from_agent === agentName;
+            return (
+              <div
+                key={msg.id}
+                className="rounded-lg border border-slate-700/50 bg-slate-800/60 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isExpanded ? null : msg.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800 transition-colors"
+                >
+                  {isSender ? (
+                    <FiSend className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                  ) : (
+                    <FiInbox className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-200 truncate">
+                        {msg.subject || '(no subject)'}
+                      </span>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${MAIL_TYPE_COLORS[msg.type] || 'bg-slate-500/15 text-slate-400'}`}
+                      >
+                        {msg.type}
+                      </span>
+                      {msg.priority !== 'normal' && (
+                        <span className={`text-xs ${PRIORITY_COLORS[msg.priority]}`}>
+                          {msg.priority}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {isSender ? `To: ${msg.to_agent}` : `From: ${msg.from_agent}`}
+                      {' · '}
+                      {new Date(msg.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  {!msg.read && !isSender && (
+                    <div className="h-2 w-2 rounded-full bg-blue-400 flex-shrink-0" />
+                  )}
+                </button>
+                {isExpanded && msg.body && (
+                  <div className="px-4 pb-3 border-t border-slate-700/50">
+                    <pre className="text-sm text-slate-300 whitespace-pre-wrap mt-2 font-mono bg-slate-900/50 rounded-md p-3">
+                      {msg.body}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────
 
 interface AgentDetailPageProps {
@@ -552,24 +901,12 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       {/* Tab content */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {activeTab === 'terminal' && <AgentTerminal agentId={agentId} isRunning={isRunning} />}
-        {activeTab === 'logs' && (
-          <div className="p-6 text-slate-400">
-            <p>Agent log viewer - coming soon</p>
-          </div>
-        )}
+        {activeTab === 'logs' && <AgentLogsTab agentName={session.agent_name} />}
         {activeTab === 'identity' && (
           <AgentCVCard agentName={session.agent_name} currentSession={session} />
         )}
-        {activeTab === 'files' && (
-          <div className="p-6 text-slate-400">
-            <p>Files changed by this agent - coming soon</p>
-          </div>
-        )}
-        {activeTab === 'mail' && (
-          <div className="p-6 text-slate-400">
-            <p>Agent mail messages - coming soon</p>
-          </div>
-        )}
+        {activeTab === 'files' && <AgentFilesTab session={session} />}
+        {activeTab === 'mail' && <AgentMailTab agentName={session.agent_name} />}
       </div>
     </div>
   );

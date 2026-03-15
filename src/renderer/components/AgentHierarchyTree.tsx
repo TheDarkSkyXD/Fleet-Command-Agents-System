@@ -1,10 +1,15 @@
 import React from 'react';
 import {
+  FiActivity,
+  FiAlertTriangle,
+  FiCheckCircle,
   FiChevronDown,
   FiChevronRight,
   FiCpu,
+  FiLoader,
   FiUser,
   FiUsers,
+  FiZap,
 } from 'react-icons/fi';
 import type { AgentState, Session } from '../../shared/types';
 
@@ -62,6 +67,15 @@ const capabilityIcon: Record<string, React.ReactNode> = {
   reviewer: <FiCpu className="h-4 w-4" />,
   merger: <FiCpu className="h-4 w-4" />,
   monitor: <FiCpu className="h-4 w-4" />,
+};
+
+/** State-specific icons for visual distinction */
+const stateIcon: Record<AgentState, React.ReactNode> = {
+  booting: <FiLoader className="h-3 w-3 animate-spin" />,
+  working: <FiActivity className="h-3 w-3" />,
+  completed: <FiCheckCircle className="h-3 w-3" />,
+  stalled: <FiAlertTriangle className="h-3 w-3" />,
+  zombie: <FiZap className="h-3 w-3" />,
 };
 
 function buildTree(sessions: Session[]): TreeNode[] {
@@ -200,13 +214,10 @@ function TreeNodeComponent({
             <span className="w-[18px] flex-shrink-0" />
           )}
 
-          {/* Status dot with pulse animation */}
-          <span className="relative flex-shrink-0">
-            <span className={`block h-2.5 w-2.5 rounded-full ${dotBg}`} />
-            {pulse && (
-              <span
-                className={`absolute inset-0 rounded-full ${dotBg} opacity-40 ${pulse}`}
-              />
+          {/* State icon with animation */}
+          <span className={`flex-shrink-0 ${textColor} ${pulse}`}>
+            {stateIcon[session.state] || (
+              <span className={`block h-2.5 w-2.5 rounded-full ${dotBg}`} />
             )}
           </span>
 
@@ -279,13 +290,13 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
     );
   }
 
-  // Legend
-  const legendItems = [
-    { color: 'bg-emerald-400', label: 'Working' },
-    { color: 'bg-sky-400', label: 'Booting' },
-    { color: 'bg-amber-400', label: 'Stalled' },
-    { color: 'bg-red-400', label: 'Zombie' },
-    { color: 'bg-slate-400', label: 'Completed' },
+  // Legend with state icons
+  const legendItems: { state: AgentState; label: string; textColor: string }[] = [
+    { state: 'working', label: 'Working', textColor: 'text-emerald-400' },
+    { state: 'booting', label: 'Booting', textColor: 'text-sky-400' },
+    { state: 'stalled', label: 'Stalled', textColor: 'text-amber-400' },
+    { state: 'zombie', label: 'Zombie', textColor: 'text-red-400' },
+    { state: 'completed', label: 'Completed', textColor: 'text-slate-400' },
   ];
 
   return (
@@ -298,7 +309,7 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
         <div className="flex items-center gap-3">
           {legendItems.map((item) => (
             <div key={item.label} className="flex items-center gap-1">
-              <span className={`h-2 w-2 rounded-full ${item.color}`} />
+              <span className={`${item.textColor}`}>{stateIcon[item.state]}</span>
               <span className="text-xs text-slate-500">{item.label}</span>
             </div>
           ))}

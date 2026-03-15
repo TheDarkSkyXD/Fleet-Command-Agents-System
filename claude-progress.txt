@@ -1780,3 +1780,32 @@
 - 115/366 features passing (added #25 and #26 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Hierarchy Depth and Relationship Tracking)
+
+#### Feature #48: Hierarchy depth enforcement - PASSING
+- Added depth validation in agent:spawn IPC handler before spawning process
+- Reads maxHierarchyDepth from app_settings table (SQLite), defaults to 2
+- If requested depth exceeds max, returns error message and rejects spawn
+- Error displayed in spawn dialog via existing setSpawnError handling
+- Configurable via Settings page (maxHierarchyDepth setting already exists)
+
+#### Feature #50: Agent relationship tracking - PASSING
+- Added agent:children IPC handler - queries sessions by parent_agent field
+- Added agent:hierarchy IPC handler - full hierarchy tree with recursive CTE
+  - Subtree mode: get agent plus all descendants recursively
+  - Full mode: get all active roots plus childMap for tree rendering
+- Added preload bridge methods: agentChildren, agentHierarchy
+- Added ElectronAPI type definitions for both new methods
+- Sessions table already tracks parent_agent and depth fields
+- AgentsPage already computes childCountMap for display
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Depth enforcement plus 2 hierarchy IPC handlers
+- MODIFIED: src/preload/index.ts - agentChildren, agentHierarchy bridge methods
+- MODIFIED: src/shared/types/index.ts - ElectronAPI type additions
+
+#### Current Status
+- 121/366 features passing (added #48 and #50 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
