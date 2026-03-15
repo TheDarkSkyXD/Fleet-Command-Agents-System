@@ -256,6 +256,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   appLogImportNdjson: (ndjsonContent: string) =>
     ipcRenderer.invoke('appLog:import-ndjson', ndjsonContent),
 
+  // Discovery
+  discoveryList: () => ipcRenderer.invoke('discovery:list'),
+  discoveryGet: (id: string) => ipcRenderer.invoke('discovery:get', id),
+  discoveryStart: (options: { id: string; categories: string[]; project_id?: string }) =>
+    ipcRenderer.invoke('discovery:start', options),
+  discoveryComplete: (id: string) => ipcRenderer.invoke('discovery:complete', id),
+  discoveryDelete: (id: string) => ipcRenderer.invoke('discovery:delete', id),
+  discoveryUpdateProgress: (id: string, progress: Record<string, string>) =>
+    ipcRenderer.invoke('discovery:update-progress', id, progress),
+  discoveryFindings: (scanId: string, category?: string) =>
+    ipcRenderer.invoke('discovery:findings', scanId, category),
+  discoveryAddFinding: (finding: {
+    id: string;
+    scan_id: string;
+    category: string;
+    title: string;
+    description: string;
+    file_path?: string;
+    line_number?: number;
+    severity?: string;
+  }) => ipcRenderer.invoke('discovery:add-finding', finding),
+
   // Expertise
   expertiseList: (filters?: {
     domain?: string;

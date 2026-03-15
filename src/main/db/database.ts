@@ -215,6 +215,57 @@ export async function initDatabase(): Promise<void> {
       data TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS discovery_scans (
+      id TEXT PRIMARY KEY,
+      project_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'running', 'completed', 'failed')),
+      categories TEXT NOT NULL,
+      progress TEXT,
+      started_at TEXT,
+      completed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS discovery_findings (
+      id TEXT PRIMARY KEY,
+      scan_id TEXT NOT NULL,
+      category TEXT NOT NULL CHECK(category IN ('architecture', 'dependencies', 'testing', 'apis', 'config', 'conventions')),
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      file_path TEXT,
+      line_number INTEGER,
+      severity TEXT NOT NULL DEFAULT 'info' CHECK(severity IN ('info', 'warning', 'important')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS guard_violations (
+      id TEXT PRIMARY KEY,
+      agent_name TEXT NOT NULL,
+      capability TEXT NOT NULL,
+      rule_type TEXT NOT NULL CHECK(rule_type IN ('tool_allowlist', 'bash_restriction', 'file_scope')),
+      violation TEXT NOT NULL,
+      tool_attempted TEXT,
+      command_attempted TEXT,
+      file_attempted TEXT,
+      severity TEXT NOT NULL DEFAULT 'warning' CHECK(severity IN ('info', 'warning', 'critical')),
+      acknowledged INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS expertise_records (
+      id TEXT PRIMARY KEY,
+      domain TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'convention' CHECK(type IN ('convention', 'pattern', 'failure', 'decision', 'reference', 'guide')),
+      classification TEXT NOT NULL DEFAULT 'tactical' CHECK(classification IN ('foundational', 'tactical', 'observational')),
+      agent_name TEXT,
+      source_file TEXT,
+      tags TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Create indexes for common queries
@@ -238,6 +289,19 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_app_logs_level ON app_logs(level);
     CREATE INDEX IF NOT EXISTS idx_app_logs_agent ON app_logs(agent_name);
     CREATE INDEX IF NOT EXISTS idx_app_logs_created ON app_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_discovery_scans_status ON discovery_scans(status);
+    CREATE INDEX IF NOT EXISTS idx_discovery_scans_project ON discovery_scans(project_id);
+    CREATE INDEX IF NOT EXISTS idx_discovery_findings_scan ON discovery_findings(scan_id);
+    CREATE INDEX IF NOT EXISTS idx_discovery_findings_category ON discovery_findings(category);
+    CREATE INDEX IF NOT EXISTS idx_guard_violations_agent ON guard_violations(agent_name);
+    CREATE INDEX IF NOT EXISTS idx_guard_violations_capability ON guard_violations(capability);
+    CREATE INDEX IF NOT EXISTS idx_guard_violations_type ON guard_violations(rule_type);
+    CREATE INDEX IF NOT EXISTS idx_guard_violations_severity ON guard_violations(severity);
+    CREATE INDEX IF NOT EXISTS idx_guard_violations_created ON guard_violations(created_at);
+    CREATE INDEX IF NOT EXISTS idx_expertise_domain ON expertise_records(domain);
+    CREATE INDEX IF NOT EXISTS idx_expertise_type ON expertise_records(type);
+    CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);
+    CREATE INDEX IF NOT EXISTS idx_expertise_agent ON expertise_records(agent_name);
   `);
 
   // Seed default agent definitions if table is empty

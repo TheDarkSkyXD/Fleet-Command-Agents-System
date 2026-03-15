@@ -326,6 +326,24 @@ export interface ExpertiseDomainSummary {
   types: Record<string, number>;
 }
 
+// Guard violation types
+export type GuardRuleType = 'tool_allowlist' | 'bash_restriction' | 'file_scope';
+export type GuardViolationSeverity = 'info' | 'warning' | 'critical';
+
+export interface GuardViolation {
+  id: string;
+  agent_name: string;
+  capability: string;
+  rule_type: GuardRuleType;
+  violation: string;
+  tool_attempted: string | null;
+  command_attempted: string | null;
+  file_attempted: string | null;
+  severity: GuardViolationSeverity;
+  acknowledged: number;
+  created_at: string;
+}
+
 // Discovery types
 export type DiscoveryCategory = 'architecture' | 'dependencies' | 'testing' | 'apis' | 'config' | 'conventions';
 export type DiscoveryScanStatus = 'pending' | 'running' | 'completed' | 'failed';
@@ -744,6 +762,51 @@ export interface ElectronAPI {
     line_number?: number;
     severity?: string;
   }) => Promise<{ data: DiscoveryFinding | null; error: string | null }>;
+
+  // Guard Rules
+  guardRuleGet: (role: string) => Promise<{
+    data: {
+      role: string;
+      display_name: string;
+      tool_allowlist: string | null;
+      bash_restrictions: string | null;
+      file_scope: string | null;
+    } | null;
+    error: string | null;
+  }>;
+  guardRuleUpdate: (
+    role: string,
+    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string },
+  ) => Promise<{ data: AgentDefinition | null; error: string | null }>;
+  guardViolationList: (filters?: {
+    capability?: string;
+    rule_type?: string;
+    severity?: string;
+    acknowledged?: boolean;
+    limit?: number;
+  }) => Promise<{ data: GuardViolation[] | null; error: string | null }>;
+  guardViolationCreate: (violation: {
+    id: string;
+    agent_name: string;
+    capability: string;
+    rule_type: string;
+    violation: string;
+    tool_attempted?: string;
+    command_attempted?: string;
+    file_attempted?: string;
+    severity?: string;
+  }) => Promise<{ data: GuardViolation | null; error: string | null }>;
+  guardViolationAcknowledge: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  guardViolationPurge: () => Promise<{ data: boolean; error: string | null }>;
+  guardViolationStats: () => Promise<{
+    data: {
+      total: number;
+      unacknowledged: number;
+      by_type: Record<string, number>;
+      by_severity: Record<string, number>;
+    } | null;
+    error: string | null;
+  }>;
 
   // Checkpoints
   checkpointList: () => Promise<{ data: Checkpoint[] | null; error: string | null }>;

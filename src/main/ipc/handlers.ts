@@ -2415,6 +2415,160 @@ export function registerIpcHandlers(): void {
   });
 
   // ==========================================
+  // Discovery Scans
+  // ==========================================
+
+  ipcMain.handle('discovery:list', () => {
+    try {
+      const rows = loggedPrepare('SELECT * FROM discovery_scans ORDER BY created_at DESC').all();
+      return { data: rows, error: null };
+    } catch (error) {
+      log.error('[Discovery] List error:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('discovery:get', (_event, id: string) => {
+    try {
+      const row = loggedPrepare('SELECT * FROM discovery_scans WHERE id = ?').get(id);
+      return { data: row || null, error: null };
+    } catch (error) {
+      log.error('[Discovery] Get error:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'discovery:start',
+    (
+      _event,
+      options: { id: string; categories: string[]; project_id?: string },
+    ) => {
+      try {
+        const now = new Date().toISOString();
+        const initialProgress: Record<string, string> = {};
+        for (const cat of options.categories) {
+          initialProgress[cat] = 'pending';
+        }
+        loggedPrepare(
+          `INSERT INTO discovery_scans (id, project_id, status, categories, progress, started_at)
+           VALUES (?, ?, 'running', ?, ?, ?)`,
+        ).run(
+          options.id,
+          options.project_id ?? null,
+          JSON.stringify(options.categories),
+          JSON.stringify(initialProgress),
+          now,
+        );
+        const row = loggedPrepare('SELECT * FROM discovery_scans WHERE id = ?').get(options.id);
+        return { data: row, error: null };
+      } catch (error) {
+        log.error('[Discovery] Start error:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('discovery:complete', (_event, id: string) => {
+    try {
+      const now = new Date().toISOString();
+      loggedPrepare(
+        `UPDATE discovery_scans SET status = 'completed', completed_at = ? WHERE id = ?`,
+      ).run(now, id);
+      const row = loggedPrepare('SELECT * FROM discovery_scans WHERE id = ?').get(id);
+      return { data: row, error: null };
+    } catch (error) {
+      log.error('[Discovery] Complete error:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('discovery:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM discovery_findings WHERE scan_id = ?').run(id);
+      loggedPrepare('DELETE FROM discovery_scans WHERE id = ?').run(id);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('[Discovery] Delete error:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'discovery:update-progress',
+    (_event, id: string, progress: Record<string, string>) => {
+      try {
+        loggedPrepare(
+          `UPDATE discovery_scans SET progress = ? WHERE id = ?`,
+        ).run(JSON.stringify(progress), id);
+        const row = loggedPrepare('SELECT * FROM discovery_scans WHERE id = ?').get(id);
+        return { data: row, error: null };
+      } catch (error) {
+        log.error('[Discovery] Update progress error:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'discovery:findings',
+    (_event, scanId: string, category?: string) => {
+      try {
+        let sql = 'SELECT * FROM discovery_findings WHERE scan_id = ?';
+        const params: unknown[] = [scanId];
+        if (category) {
+          sql += ' AND category = ?';
+          params.push(category);
+        }
+        sql += ' ORDER BY severity DESC, created_at ASC';
+        const rows = loggedPrepare(sql).all(...params);
+        return { data: rows, error: null };
+      } catch (error) {
+        log.error('[Discovery] Findings error:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'discovery:add-finding',
+    (
+      _event,
+      finding: {
+        id: string;
+        scan_id: string;
+        category: string;
+        title: string;
+        description: string;
+        file_path?: string;
+        line_number?: number;
+        severity?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          `INSERT INTO discovery_findings (id, scan_id, category, title, description, file_path, line_number, severity)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          finding.id,
+          finding.scan_id,
+          finding.category,
+          finding.title,
+          finding.description,
+          finding.file_path ?? null,
+          finding.line_number ?? null,
+          finding.severity ?? 'info',
+        );
+        const row = loggedPrepare('SELECT * FROM discovery_findings WHERE id = ?').get(finding.id);
+        return { data: row, error: null };
+      } catch (error) {
+        log.error('[Discovery] Add finding error:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ==========================================
   // Expertise Records
   // ==========================================
 
