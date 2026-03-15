@@ -256,14 +256,14 @@ function DebugTerminalPanel() {
       }
     };
 
-    window.electronAPI.onDebugShellOutput(handleOutput);
+    const unsubShellOutput = window.electronAPI.onDebugShellOutput(handleOutput);
 
     return () => {
       resizeObserver.disconnect();
       term.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
-      window.electronAPI.removeAllListeners('debug:shell-output');
+      unsubShellOutput();
     };
   }, []);
 

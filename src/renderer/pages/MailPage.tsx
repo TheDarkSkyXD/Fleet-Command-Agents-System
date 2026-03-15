@@ -222,20 +222,19 @@ export function MailPage() {
   useEffect(() => {
     loadMessages();
     // Listen for real-time mail events
-    const handler = () => {
+    const unsubReceived = window.electronAPI.onMailReceived(() => {
       loadMessages();
-    };
-    window.electronAPI.onMailReceived(handler);
+    });
     // Listen for purge events to refresh all views (inbox, outbox, badge, search)
-    window.electronAPI.onMailPurged(() => {
+    const unsubPurged = window.electronAPI.onMailPurged(() => {
       loadMessages();
     });
     // Poll every 10s for updates
     const interval = setInterval(() => loadMessages(), 10000);
     return () => {
       clearInterval(interval);
-      window.electronAPI.removeAllListeners('mail:received');
-      window.electronAPI.removeAllListeners('mail:purged');
+      unsubReceived();
+      unsubPurged();
     };
   }, [loadMessages]);
 

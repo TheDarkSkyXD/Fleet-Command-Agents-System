@@ -2795,16 +2795,16 @@ function UpdateSettings() {
       setStatus((prev) => (prev ? { ...prev, error: data.message, isDownloading: false } : null));
     };
 
-    window.electronAPI.onUpdateStatus(handleStatus);
-    window.electronAPI.onUpdateDownloadProgress(handleDownloadProgress);
-    window.electronAPI.onUpdateDownloaded(handleDownloaded);
-    window.electronAPI.onUpdateError(handleError);
+    const unsubStatus = window.electronAPI.onUpdateStatus(handleStatus);
+    const unsubProgress = window.electronAPI.onUpdateDownloadProgress(handleDownloadProgress);
+    const unsubDownloaded = window.electronAPI.onUpdateDownloaded(handleDownloaded);
+    const unsubError = window.electronAPI.onUpdateError(handleError);
 
     return () => {
-      window.electronAPI.removeAllListeners('update:status');
-      window.electronAPI.removeAllListeners('update:download-progress');
-      window.electronAPI.removeAllListeners('update:downloaded');
-      window.electronAPI.removeAllListeners('update:error');
+      unsubStatus();
+      unsubProgress();
+      unsubDownloaded();
+      unsubError();
     };
   }, []);
 

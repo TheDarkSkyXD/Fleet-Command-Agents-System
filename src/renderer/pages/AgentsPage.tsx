@@ -11,7 +11,8 @@ import {
 } from '@tanstack/react-table';
 import { formatDateTime } from '../lib/dateFormatting';
 import { motion } from 'framer-motion';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   FiActivity,
   FiAlertTriangle,
@@ -1650,7 +1651,7 @@ const MODEL_COLORS: Record<string, string> = {
   opus: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
 };
 
-function AgentCard({
+const AgentCard = memo(function AgentCard({
   session,
   processInfo,
   childCount,
@@ -1873,7 +1874,7 @@ function AgentCard({
       })()}
     </div>
   );
-}
+});
 
 /** Zod schema for agent spawn form validation */
 const spawnFormSchema = z.object({

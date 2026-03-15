@@ -1684,15 +1684,15 @@ export interface ElectronAPI {
     domains: string,
   ) => Promise<{ data: AgentIdentity | null; error: string | null }>;
 
-  onAgentUpdate: (callback: (data: unknown) => void) => void;
-  onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => void;
+  onAgentUpdate: (callback: (data: unknown) => void) => () => void;
+  onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => () => void;
   onAgentParsedEvent: (
     callback: (data: { agentId: string; event: Record<string, unknown> }) => void,
-  ) => void;
-  onMailReceived: (callback: (data: unknown) => void) => void;
-  onMailPurged: (callback: (data: { deleted: number }) => void) => void;
-  onMergeUpdate: (callback: (data: unknown) => void) => void;
-  onUpdateStatus: (callback: (data: UpdateStatus) => void) => void;
+  ) => () => void;
+  onMailReceived: (callback: (data: unknown) => void) => () => void;
+  onMailPurged: (callback: (data: { deleted: number }) => void) => () => void;
+  onMergeUpdate: (callback: (data: unknown) => void) => () => void;
+  onUpdateStatus: (callback: (data: UpdateStatus) => void) => () => void;
   onUpdateDownloadProgress: (
     callback: (data: {
       percent: number;
@@ -1700,22 +1700,22 @@ export interface ElectronAPI {
       total: number;
       bytesPerSecond: number;
     }) => void,
-  ) => void;
+  ) => () => void;
   onUpdateDownloaded: (
     callback: (data: { version: string; releaseNotes: string | null }) => void,
-  ) => void;
-  onUpdateError: (callback: (data: { message: string }) => void) => void;
+  ) => () => void;
+  onUpdateError: (callback: (data: { message: string }) => void) => () => void;
   onWatchdogUpdate: (
     callback: (data: {
       checkCount: number;
       timestamp: string;
       results: WatchdogCheckResult[];
     }) => void,
-  ) => void;
-  onWatchdogTriageResult: (callback: (data: TriageResult) => void) => void;
-  onWatchdogPatrolResult: (callback: (data: PatrolResult) => void) => void;
+  ) => () => void;
+  onWatchdogTriageResult: (callback: (data: TriageResult) => void) => () => void;
+  onWatchdogPatrolResult: (callback: (data: PatrolResult) => void) => () => void;
   // Notification navigation events (main -> renderer)
-  onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => void;
+  onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => () => void;
   // Notification event broadcast (main -> renderer, for in-app toasts)
   onNotificationEvent: (
     callback: (data: {
@@ -1725,9 +1725,9 @@ export interface ElectronAPI {
       agentName: string | null;
       timestamp: string;
     }) => void,
-  ) => void;
+  ) => () => void;
   // Project switch event for data isolation
-  onProjectSwitched: (callback: (data: { projectId: string; project: unknown }) => void) => void;
+  onProjectSwitched: (callback: (data: { projectId: string; project: unknown }) => void) => () => void;
   // Notification history
   notificationHistory: (filters?: {
     event_type?: string;
@@ -1789,7 +1789,7 @@ export interface ElectronAPI {
   ) => Promise<{ data: boolean; error: string | null }>;
   debugShellOutput: () => Promise<{ data: string[] | null; error: string | null }>;
   debugShellKill: () => Promise<{ data: boolean; error: string | null }>;
-  onDebugShellOutput: (callback: (data: { data: string }) => void) => void;
+  onDebugShellOutput: (callback: (data: { data: string }) => void) => () => void;
 
   // Orphaned process detection
   orphanDetect: () => Promise<{ data: OrphanedProcess[] | null; error: string | null }>;

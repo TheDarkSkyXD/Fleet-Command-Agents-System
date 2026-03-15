@@ -174,10 +174,10 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
       }
     };
 
-    window.electronAPI.onAgentOutput(handleOutput);
+    const unsubOutput = window.electronAPI.onAgentOutput(handleOutput);
 
     return () => {
-      window.electronAPI.removeAllListeners('agent:output');
+      unsubOutput();
     };
   }, [agentId, autoScroll]);
 
