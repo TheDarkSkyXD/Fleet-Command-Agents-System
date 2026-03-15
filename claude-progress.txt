@@ -2664,3 +2664,41 @@
 - 179/366 features passing (added #126 and #127 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Desktop Notifications & Model Defaults)
+
+#### Feature #133: Desktop notifications for stuck agents - PASSING
+- Integrated notificationService into watchdogService
+- Level 1 (stalled): triggers notifyAgentStalled desktop notification
+- Level 4 (zombie/terminate): triggers notifyAgentZombie desktop notification
+- Dead process detection: triggers notifyAgentError with process details
+- Notification click navigates to agent detail page via IPC (notification:navigate-to-agent)
+- Added onNotificationNavigateToAgent preload bridge and ElectronAPI type
+- AppLayout listens for navigation event, looks up agent by name, navigates to detail view
+
+#### Feature #136: Claude model defaults per capability - PASSING
+- Added ModelDefaultsPerCapability type and DEFAULT_MODEL_DEFAULTS to settingsStore
+- Defaults: scout=haiku, builder=sonnet, reviewer=sonnet, lead=opus, merger=sonnet, coordinator=opus, monitor=haiku
+- Added modelDefaultsPerCapability to AppSettings interface and DEFAULT_SETTINGS
+- Added "Model Defaults Per Capability" UI section in Settings > Agents tab
+- Each capability has a dropdown selector (haiku/sonnet/opus) with capability-colored label
+- Spawn dialog reads settings-based defaults instead of hardcoded CAPABILITY_DEFAULTS
+- openSpawnDialog uses settings default for initial model selection
+- onCapabilityChange in spawn dialog uses settings defaults
+- "Default for X is Y" hint text in spawn dialog reflects configured defaults
+- Reset button resets model defaults along with other agent settings
+
+#### Files Modified
+- MODIFIED: src/main/services/watchdogService.ts - Import and call notificationService
+- MODIFIED: src/main/services/notificationService.ts - Added navigateToAgent method
+- MODIFIED: src/preload/index.ts - Added onNotificationNavigateToAgent bridge
+- MODIFIED: src/shared/types/index.ts - Added onNotificationNavigateToAgent to ElectronAPI
+- MODIFIED: src/renderer/components/AppLayout.tsx - Listen for notification navigation
+- MODIFIED: src/renderer/stores/settingsStore.ts - ModelDefaultsPerCapability type and defaults
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Model defaults UI section
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Settings-based model defaults in spawn dialog
+
+#### Current Status
+- 181/366 features passing (added #133 and #136 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
