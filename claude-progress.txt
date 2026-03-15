@@ -1,5 +1,29 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (App Preview Dev Server)
+
+#### Feature #365: Run app preview to see agent changes - PASSING
+- Added "Preview" tab to DebugPage with AppPreviewPanel component
+- Backend IPC handlers: app:preview-start, app:preview-stop, app:preview-status, app:preview-output, app:preview-open-browser
+- app:preview-start spawns dev server (npm run dev / npm start / npm run serve) via node-pty in active project directory
+- Auto-detects dev server URL from terminal output (localhost/127.0.0.1 patterns)
+- Embedded iframe shows the built application when URL is detected
+- Terminal output panel shows dev server logs with xterm.js (read-only, green theme)
+- Controls: Start/Stop server, Open in Browser, Refresh preview, Toggle terminal visibility
+- Status indicator with running/stopped state and URL display
+- Preload bridge methods and ElectronAPI type definitions added
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - 5 new IPC handlers for app preview
+- MODIFIED: src/preload/index.ts - 7 new bridge methods (start, stop, status, output, openBrowser, onOutput, onExit)
+- MODIFIED: src/shared/types/index.ts - ElectronAPI type definitions for preview methods
+- MODIFIED: src/renderer/pages/DebugPage.tsx - Preview tab + AppPreviewPanel component
+
+#### Current Status
+- 362/366 features passing (added #365 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (IPC Listener Cleanup & Export Definitions)
 
 #### Feature #342: Rapid page navigation doesn't cause errors - PASSING
