@@ -54,7 +54,11 @@ function formatDuration(startedAt: string): string {
   return `${seconds}s`;
 }
 
-export function StatusBar() {
+interface StatusBarProps {
+  onNavigate?: (page: string) => void;
+}
+
+export function StatusBar({ onNavigate }: StatusBarProps) {
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
@@ -158,13 +162,15 @@ export function StatusBar() {
         </span>
       </div>
       <div className="flex items-center gap-4">
-        <span
-          className="flex items-center gap-1 cursor-default"
+        <button
+          type="button"
+          className="flex items-center gap-1 cursor-pointer rounded px-1.5 py-0.5 hover:bg-slate-800 transition-colors"
           data-testid="status-bar-cli"
+          onClick={() => onNavigate?.('settings')}
           title={
             cliStatus
-              ? `Path: ${cliStatus.path || 'N/A'}\nVersion: ${cliStatus.version || 'N/A'}\nAuth: ${cliStatus.authenticated ? 'Yes' : 'No'}`
-              : 'Checking CLI status...'
+              ? `Path: ${cliStatus.path || 'N/A'}\nVersion: ${cliStatus.version || 'N/A'}\nAuth: ${cliStatus.authenticated ? 'Yes' : 'No'}\nClick to open settings`
+              : 'Checking CLI status... Click to open settings'
           }
         >
           <span className={`h-2 w-2 rounded-full ${indicator.color}`} />
@@ -172,7 +178,7 @@ export function StatusBar() {
           {cliStatus?.version && cliState === 'ready' && (
             <span className="text-slate-500 ml-1">v{cliStatus.version}</span>
           )}
-        </span>
+        </button>
 
         {/* Run controls */}
         {activeRun ? (

@@ -75,7 +75,7 @@ export function AppLayout() {
 
       {/* Status bar */}
       <ErrorBoundary sectionName="Status bar">
-        <StatusBar />
+        <StatusBar onNavigate={handleNavigate} />
       </ErrorBoundary>
 
       {/* Command Palette (Ctrl+K / Cmd+K) */}
