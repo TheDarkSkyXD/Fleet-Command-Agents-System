@@ -1,5 +1,27 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Form Dirty Tracking & 404 Deep Links)
+
+#### Feature #300: Refresh mid-form preserves or warns - PASSING
+- Verified existing beforeunload handler in AppLayout + useNavigationGuard dialog
+- Added useFormDirtyTracking to AgentDefinitionsPage (definition editor tracks content vs originalContent)
+- Other form pages (MailPage, TasksPage, WelcomePage, PromptsPage) already had tracking from concurrent agent session
+- Global dirty form registry (useUnsavedChanges.ts) powers both browser beforeunload and in-app navigation guard
+
+#### Feature #301: Deep link to deleted entity shows 404 - PASSING
+- Verified AgentDetailPage has comprehensive notFound state with 404 badge, error message, agent ID display
+- Verified PageContent default case shows 404 for invalid page routes
+- All pages wrapped in ErrorBoundary for crash protection
+- Deep links to deleted/non-existent agents show proper UI, app never crashes
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentDefinitionsPage.tsx - Added useFormDirtyTracking for definition editor
+
+#### Current Status
+- 299/366 features passing (added #300 and #301 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Unsaved Changes Guard & Single Instance Lock)
 
 #### Feature #298: Form state preserved on accidental navigation - PASSING
