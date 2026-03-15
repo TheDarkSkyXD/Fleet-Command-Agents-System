@@ -231,13 +231,29 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
         </div>
       </div>
 
-      {/* Terminal container */}
-      <div
-        ref={terminalRef}
-        className="flex-1 min-h-0"
-        style={{ padding: '4px' }}
-        data-testid="agent-terminal"
-      />
+      {/* Terminal container with floating scroll-to-bottom button */}
+      <div className="flex-1 min-h-0 relative">
+        <div
+          ref={terminalRef}
+          className="h-full w-full"
+          style={{ padding: '4px' }}
+          data-testid="agent-terminal"
+        />
+
+        {/* Floating scroll-to-bottom button */}
+        {!isAtBottom && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500 transition-all hover:scale-105 active:scale-95"
+            title="Scroll to bottom"
+            data-testid="scroll-to-bottom-button"
+          >
+            <FiArrowDown className="h-4 w-4" />
+            <span className="text-xs">Bottom</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
