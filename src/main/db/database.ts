@@ -48,7 +48,8 @@ export async function initDatabase(): Promise<void> {
       stalled_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      completed_at TEXT
+      completed_at TEXT,
+      file_scope TEXT
     );
 
     CREATE TABLE IF NOT EXISTS runs (
@@ -358,6 +359,13 @@ export async function initDatabase(): Promise<void> {
     db.prepare('SELECT model FROM sessions LIMIT 1').get();
   } catch {
     db.exec('ALTER TABLE sessions ADD COLUMN model TEXT');
+  }
+
+  // Migration: add file_scope column to sessions if not present
+  try {
+    db.prepare('SELECT file_scope FROM sessions LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE sessions ADD COLUMN file_scope TEXT');
   }
 
   // Seed default agent definitions if table is empty

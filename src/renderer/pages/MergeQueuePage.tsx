@@ -3,10 +3,10 @@ import type { MergeQueueEntry, MergeStatus } from '../../shared/types';
 import { useMergeStore } from '../stores/mergeStore';
 
 const STATUS_COLORS: Record<MergeStatus, string> = {
-  pending: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
-  merging: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  pending: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+  merging: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   merged: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  conflict: 'bg-red-500/20 text-red-400 border-red-500/30',
+  conflict: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   failed: 'bg-red-500/20 text-red-300 border-red-500/30',
 };
 
@@ -24,7 +24,7 @@ function StatusBadge({ status }: { status: MergeStatus }) {
       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[status]}`}
     >
       {status === 'merging' && (
-        <span className="mr-1.5 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+        <span className="mr-1.5 h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
       )}
       {STATUS_LABELS[status]}
     </span>
