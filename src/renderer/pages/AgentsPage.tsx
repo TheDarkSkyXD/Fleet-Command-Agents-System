@@ -2061,7 +2061,7 @@ function SpawnDialog({
           {/* Model picker */}
           <div>
             <span className="block text-sm font-medium text-slate-300 mb-2">Model</span>
-            <div className="flex gap-2" data-testid="spawn-model-picker">
+            <div className="flex gap-2" data-testid="spawn-model-picker" data-default-model={configuredDefault}>
               {MODELS.map((m) => (
                 <button
                   key={m}
@@ -2090,7 +2090,7 @@ function SpawnDialog({
           <div>
             <label htmlFor="spawn-name" className="block text-sm font-medium text-slate-300 mb-1">
               Name{' '}
-              <span className="text-slate-500 font-normal">
+              <span className="text-slate-500 font-normal" data-testid="spawn-name-hint">
                 (optional, auto-generated if empty)
               </span>
             </label>

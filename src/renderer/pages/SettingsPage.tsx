@@ -1271,13 +1271,15 @@ function AgentSettings() {
           description="Maximum number of agents that can run simultaneously."
           error={errors.maxConcurrentAgents}
         >
-          <ValidatedNumberInput
-            value={settings.maxConcurrentAgents}
-            min={1}
-            max={50}
-            onChange={(v) => handleChange('maxConcurrentAgents', v)}
-            hasError={!!errors.maxConcurrentAgents}
-          />
+          <div data-testid="setting-max-concurrent-agents" data-default-value="10">
+            <ValidatedNumberInput
+              value={settings.maxConcurrentAgents}
+              min={1}
+              max={50}
+              onChange={(v) => handleChange('maxConcurrentAgents', v)}
+              hasError={!!errors.maxConcurrentAgents}
+            />
+          </div>
         </SettingRow>
 
         {/* Max Agents Per Lead */}
@@ -1286,13 +1288,15 @@ function AgentSettings() {
           description="Maximum number of worker agents a single lead can manage."
           error={errors.maxAgentsPerLead}
         >
-          <ValidatedNumberInput
-            value={settings.maxAgentsPerLead}
-            min={1}
-            max={20}
-            onChange={(v) => handleChange('maxAgentsPerLead', v)}
-            hasError={!!errors.maxAgentsPerLead}
-          />
+          <div data-testid="setting-max-agents-per-lead" data-default-value="5">
+            <ValidatedNumberInput
+              value={settings.maxAgentsPerLead}
+              min={1}
+              max={20}
+              onChange={(v) => handleChange('maxAgentsPerLead', v)}
+              hasError={!!errors.maxAgentsPerLead}
+            />
+          </div>
         </SettingRow>
       </div>
 
