@@ -1,5 +1,28 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Dark Theme & Sidebar Mini-Icon)
+
+#### Feature #10: Dark theme applied globally - PASSING
+- Verified dark theme comprehensively applied across entire app
+- Root layout: bg-slate-950 text-slate-50
+- Body CSS: #0f172a (slate-900) background, #f8fafc (slate-50) text
+- 373 occurrences of dark slate background classes across 20+ files
+- 346+ occurrences of dark border/secondary text classes
+- Custom dark scrollbar styling, color-scheme: dark on :root
+- No white/light backgrounds found anywhere in app
+
+#### Feature #18: Sidebar mini-icon mode when collapsed - PASSING
+- Already fully implemented in Sidebar.tsx
+- Collapsed state (w-16) shows only centered icons via justify-center
+- Text labels hidden with conditional rendering {!collapsed && <span>}
+- Native tooltip via title attribute shows label on icon hover
+- Smooth transition-all duration-200 animation
+
+#### Current Status
+- 103/366 features passing (added #10 and #18 this session)
+- All code passes Biome lint
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Doctor Page & Auto-Fix)
 
 #### Feature #205: Doctor dependencies check - PASSING
@@ -1516,4 +1539,31 @@
 #### Current Status
 - 93/366 features passing (added #135 and #253 this session)
 - All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
+### Session: 2026-03-14 (Expertise Create & Timeline)
+
+#### Feature #163: Record new expertise entry - PASSING
+- Already fully implemented: create form with type selector (6 types), classification selector (3 classifications)
+- Domain, title, content fields with validation
+- Optional agent_name, source_file, tags fields
+- Save calls expertiseCreate IPC, refreshes domain and record lists
+
+#### Feature #166: Expertise timeline - PASSING
+- Added Domains/Timeline tab switcher to ExpertisePage
+- Timeline loads all records sorted by created_at descending (newest first)
+- Date grouping with date headers (weekday, month, day, year)
+- Each entry shows title, domain badge, type badge, classification badge
+- Recording agent shown with FiUser icon (or 'Manual entry' if no agent)
+- Timestamps displayed via toLocaleTimeString
+- Click entry to expand and see full record content, source file, tags
+- Vertical timeline line with color-coded dots matching type colors
+- Timeline refreshes when new records are created
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/ExpertisePage.tsx - Added timeline tab, FiClock/FiUser icons, timeline state/loading
+
+#### Current Status
+- 96/366 features passing (added #163 and #166 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
