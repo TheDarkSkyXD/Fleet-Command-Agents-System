@@ -1455,3 +1455,30 @@
 - 91/366 features passing (added #122 and #123 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Theme Customization & Zod Validation)
+
+#### Feature #135: Dark theme color palette customization - PASSING
+- Added Theme tab to Settings page with 8 accent color options
+- Colors: blue, purple, emerald, amber, rose, cyan, orange, indigo
+- CSS custom properties on :root (--accent-primary, --accent-hover, etc.)
+- Live preview shows button, link, badge, border, input with selected accent
+- Settings tab bar uses accent color for active tab indicator
+- Color persists to SQLite via settingsStore, applied on app load
+
+#### Feature #253: Inline Zod validation on settings forms - PASSING
+- Added Zod schema for agent settings (maxHierarchyDepth, maxConcurrentAgents, maxAgentsPerLead)
+- ValidatedNumberInput component allows raw input without clamping
+- Inline error messages with red text and warning icon below setting label
+- Errors clear when valid values entered, invalid values not persisted
+- SettingRow component enhanced with optional error prop
+
+#### Files Modified
+- MODIFIED: src/renderer/stores/settingsStore.ts - Added accentColor to AppSettings, ACCENT_COLORS map, applyAccentColor()
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Added ThemeSettings tab, Zod schemas, ValidatedNumberInput
+- MODIFIED: src/renderer/styles/globals.css - Added CSS custom properties and accent utility classes
+
+#### Current Status
+- 93/366 features passing (added #135 and #253 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
