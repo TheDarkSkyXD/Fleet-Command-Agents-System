@@ -1,5 +1,5 @@
 import { Command } from 'cmdk';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiActivity,
   FiAnchor,
@@ -7,17 +7,23 @@ import {
   FiBook,
   FiBookOpen,
   FiCheckSquare,
+  FiClock,
+  FiEye,
   FiFileText,
   FiFolder,
   FiGitBranch,
   FiGitMerge,
   FiHeart,
   FiMail,
+  FiPlay,
   FiSearch,
   FiSettings,
   FiShield,
+  FiSquare,
   FiTerminal,
+  FiTrash2,
   FiUsers,
+  FiZap,
 } from 'react-icons/fi';
 import { useProjectStore } from '../stores/projectStore';
 
@@ -25,7 +31,75 @@ interface CommandPaletteProps {
   onNavigate: (page: string) => void;
 }
 
-const navigationItems = [
+interface CommandItem {
+  id: string;
+  label: string;
+  keywords: string[];
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  group: string;
+  action?: () => void | Promise<void>;
+  /** If provided, item only shows when this returns true */
+  contextCheck?: (ctx: CommandContext) => boolean;
+}
+
+interface CommandContext {
+  hasActiveProject: boolean;
+  hasRunningAgents: boolean;
+  runningAgentCount: number;
+}
+
+interface RecentAction {
+  id: string;
+  label: string;
+  group: string;
+  timestamp: number;
+}
+
+const RECENT_ACTIONS_KEY = 'fleet-command-recent-actions';
+const MAX_RECENT_ACTIONS = 50;
+
+function loadRecentActions(): RecentAction[] {
+  try {
+    const stored = localStorage.getItem(RECENT_ACTIONS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed.slice(0, MAX_RECENT_ACTIONS);
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return [];
+}
+
+function saveRecentActions(actions: RecentAction[]): void {
+  try {
+    localStorage.setItem(RECENT_ACTIONS_KEY, JSON.stringify(actions.slice(0, MAX_RECENT_ACTIONS)));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function addRecentAction(action: RecentAction): RecentAction[] {
+  const existing = loadRecentActions();
+  // Remove duplicate if exists
+  const filtered = existing.filter((a) => a.id !== action.id);
+  // Add to front
+  const updated = [{ ...action, timestamp: Date.now() }, ...filtered].slice(0, MAX_RECENT_ACTIONS);
+  saveRecentActions(updated);
+  return updated;
+}
+
+function clearRecentActions(): void {
+  try {
+    localStorage.removeItem(RECENT_ACTIONS_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+const navigationItems: CommandItem[] = [
   {
     id: 'agents',
     label: 'Go to Agents',
@@ -184,34 +258,128 @@ function fuzzyScore(query: string, text: string): number {
 }
 
 /**
- * Custom filter for cmdk that checks label and keywords with smart ranking.
- * Returns a score 0-1 for ranking results.
+ * Builds a lookup map from label to item for custom filter.
  */
-function customFilter(value: string, search: string): number {
-  if (!search) return 1;
-
-  // value is the Command.Item value prop (the label)
-  const labelScore = fuzzyScore(search, value);
-
-  // Also check against the item id/keywords by looking up the item
-  const item = navigationItems.find((i) => i.label === value);
-  let keywordScore = 0;
-  if (item) {
-    // Check page id directly
-    keywordScore = Math.max(keywordScore, fuzzyScore(search, item.id));
-    // Check all keywords
-    for (const kw of item.keywords) {
-      keywordScore = Math.max(keywordScore, fuzzyScore(search, kw));
-    }
+function buildItemLookup(items: CommandItem[]): Map<string, CommandItem> {
+  const map = new Map<string, CommandItem>();
+  for (const item of items) {
+    map.set(item.label, item);
   }
-
-  // Return the best score between label and keywords
-  return Math.max(labelScore, keywordScore);
+  return map;
 }
 
 export function CommandPalette({ onNavigate }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
+  const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
+  const [commandContext, setCommandContext] = useState<CommandContext>({
+    hasActiveProject: false,
+    hasRunningAgents: false,
+    runningAgentCount: 0,
+  });
   const { activeProject } = useProjectStore();
+
+  // Load recent actions and context when palette opens
+  useEffect(() => {
+    if (open) {
+      setRecentActions(loadRecentActions());
+      // Fetch running agents for context-sensitive commands
+      window.electronAPI
+        .agentRunningList()
+        .then((result) => {
+          const agents = result?.data ?? [];
+          setCommandContext({
+            hasActiveProject: !!activeProject,
+            hasRunningAgents: agents.length > 0,
+            runningAgentCount: agents.length,
+          });
+        })
+        .catch(() => {
+          setCommandContext((prev) => ({
+            ...prev,
+            hasActiveProject: !!activeProject,
+          }));
+        });
+    }
+  }, [open, activeProject]);
+
+  // Agent action items - defined inside component to access onNavigate
+  const agentActionItems: CommandItem[] = useMemo(
+    () => [
+      {
+        id: 'action-spawn-agent',
+        label: 'Spawn Agent',
+        keywords: ['spawn', 'start', 'launch', 'create', 'new agent', 'run'],
+        icon: FiPlay,
+        group: 'Agent Actions',
+        action: () => {
+          onNavigate('agents');
+        },
+      },
+      {
+        id: 'action-stop-all-agents',
+        label: 'Stop All Agents',
+        keywords: ['stop', 'kill', 'terminate', 'halt', 'shutdown', 'stop all'],
+        icon: FiSquare,
+        group: 'Agent Actions',
+        action: async () => {
+          try {
+            await window.electronAPI.agentStopAll();
+          } catch {
+            // silently fail
+          }
+        },
+      },
+      {
+        id: 'action-nudge-agent',
+        label: 'Nudge Agent',
+        keywords: ['nudge', 'poke', 'wake', 'prompt', 'remind'],
+        icon: FiZap,
+        group: 'Agent Actions',
+        action: () => {
+          onNavigate('agents');
+        },
+      },
+      {
+        id: 'action-inspect-agent',
+        label: 'Inspect Agent',
+        keywords: ['inspect', 'view', 'detail', 'info', 'status', 'examine'],
+        icon: FiEye,
+        group: 'Agent Actions',
+        action: () => {
+          onNavigate('agents');
+        },
+      },
+    ],
+    [onNavigate],
+  );
+
+  // All items combined for filter lookup
+  const allItems = useMemo(() => [...navigationItems, ...agentActionItems], [agentActionItems]);
+
+  const itemLookup = useMemo(() => buildItemLookup(allItems), [allItems]);
+
+  /**
+   * Custom filter for cmdk that checks label and keywords with smart ranking.
+   */
+  const customFilter = useCallback(
+    (value: string, search: string): number => {
+      if (!search) return 1;
+
+      const labelScore = fuzzyScore(search, value);
+
+      const item = itemLookup.get(value);
+      let keywordScore = 0;
+      if (item) {
+        keywordScore = Math.max(keywordScore, fuzzyScore(search, item.id));
+        for (const kw of item.keywords) {
+          keywordScore = Math.max(keywordScore, fuzzyScore(search, kw));
+        }
+      }
+
+      return Math.max(labelScore, keywordScore);
+    },
+    [itemLookup],
+  );
 
   // Toggle the command palette with Ctrl+K / Cmd+K
   useEffect(() => {
@@ -228,12 +396,33 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
   }, []);
 
   const handleSelect = useCallback(
-    (itemId: string) => {
-      onNavigate(itemId);
+    (item: CommandItem) => {
+      // Record this action in recent history
+      const recentAction: RecentAction = {
+        id: item.id,
+        label: item.label,
+        group: item.group,
+        timestamp: Date.now(),
+      };
+      const updated = addRecentAction(recentAction);
+      setRecentActions(updated);
+
+      // Execute the action
+      if (item.action) {
+        item.action();
+      } else {
+        // Navigation item
+        onNavigate(item.id);
+      }
       setOpen(false);
     },
     [onNavigate],
   );
+
+  const handleClearRecent = useCallback(() => {
+    clearRecentActions();
+    setRecentActions([]);
+  }, []);
 
   if (!open) return null;
 
@@ -292,6 +481,68 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
             No results found.
           </Command.Empty>
 
+          {/* Recent Actions */}
+          {recentActions.length > 0 && (
+            <Command.Group heading="Recent" className="mb-2">
+              <div className="flex items-center justify-between px-2 pb-1 pt-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Recent
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClearRecent();
+                  }}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-700 hover:text-slate-300 transition-colors"
+                >
+                  <FiTrash2 size={10} />
+                  Clear
+                </button>
+              </div>
+              {recentActions.slice(0, 5).map((recent) => {
+                const matchedItem = allItems.find((i) => i.id === recent.id);
+                if (!matchedItem) return null;
+                const Icon = matchedItem.icon;
+                return (
+                  <Command.Item
+                    key={`recent-${recent.id}`}
+                    value={`Recent: ${matchedItem.label}`}
+                    onSelect={() => handleSelect(matchedItem)}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 data-[selected=true]:bg-slate-700 data-[selected=true]:text-slate-50"
+                  >
+                    <FiClock size={14} className="shrink-0 text-slate-500" />
+                    <Icon size={16} className="shrink-0 text-slate-400" />
+                    <span>{matchedItem.label}</span>
+                    <span className="ml-auto text-[10px] text-slate-600">{recent.group}</span>
+                  </Command.Item>
+                );
+              })}
+            </Command.Group>
+          )}
+
+          {/* Agent Actions */}
+          <Command.Group heading="Agent Actions" className="mb-2">
+            <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Agent Actions
+            </div>
+            {agentActionItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Command.Item
+                  key={item.id}
+                  value={item.label}
+                  onSelect={() => handleSelect(item)}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 data-[selected=true]:bg-slate-700 data-[selected=true]:text-slate-50"
+                >
+                  <Icon size={16} className="shrink-0 text-amber-400" />
+                  <span>{item.label}</span>
+                </Command.Item>
+              );
+            })}
+          </Command.Group>
+
+          {/* Navigation */}
           <Command.Group heading="Navigation" className="mb-2">
             <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Navigation
@@ -302,7 +553,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                 <Command.Item
                   key={item.id}
                   value={item.label}
-                  onSelect={() => handleSelect(item.id)}
+                  onSelect={() => handleSelect(item)}
                   className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 data-[selected=true]:bg-slate-700 data-[selected=true]:text-slate-50"
                 >
                   <Icon size={16} className="shrink-0 text-slate-400" />
