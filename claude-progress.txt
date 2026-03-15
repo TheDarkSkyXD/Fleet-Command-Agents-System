@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Coordinator Start & Stop)
+
+#### Feature #55: Start coordinator agent at project root - PASSING
+- Created coordinator:start IPC handler that spawns persistent coordinator via node-pty
+- Uses active project path as working directory, falls back to process.cwd()
+- Sends default coordinator prompt (monitor fleet, decompose tasks, dispatch leads, authorize merges)
+- Creates session record in SQLite with capability='coordinator', depth=0
+- Prevents duplicate coordinators (checks for existing active session + process liveness)
+- Auto-transitions from booting to working state after 3 seconds
+- Built CoordinatorPanel component with start button, status indicator, uptime, dispatched count, PID
+
+#### Feature #56: Stop coordinator with graceful shutdown - PASSING
+- Created coordinator:stop IPC handler using tree-kill SIGTERM (fallback SIGKILL)
+- Stop button shows styled confirmation dialog with warning icon
+- Dialog explains: workers continue independently, no new dispatches, fleet coordination stops
+- On confirm: terminates process gracefully, updates session to 'completed' with timestamp
+- coordinator:status IPC checks process liveness, auto-cleans dead sessions
+- UI refreshes via 3-second polling to reflect state changes
+
+#### Files Created/Modified
+- NEW: src/renderer/components/CoordinatorPanel.tsx - Coordinator panel with start/stop/status
+- MODIFIED: src/main/ipc/handlers.ts - Added coordinator:start, coordinator:stop, coordinator:status IPC handlers
+- MODIFIED: src/preload/index.ts - Added coordinator bridge methods
+- MODIFIED: src/shared/types/index.ts - Added coordinator methods to ElectronAPI interface
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Integrated CoordinatorPanel
+
+#### Current Status
+- 27/366 features passing (added #55 and #56 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Mail Page - Send & Inbox)
 
 #### Feature #63: Send message between agents - PASSING
