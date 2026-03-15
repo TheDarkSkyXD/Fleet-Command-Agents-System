@@ -1,5 +1,28 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Stop Agent Confirmation Dialogs)
+
+#### Feature #39: Stop individual agent with confirmation - PASSING
+- Created StopConfirmDialog component with FiAlertTriangle warning icon
+- Dialog shows agent name in monospace font, warning message about process termination
+- Cancel button dismisses dialog, Confirm button triggers agentStop IPC
+- Loading spinner shown during stop operation (isStopping state)
+- Stop button in both table and card views now opens confirmation instead of stopping immediately
+
+#### Feature #40: Stop all agents with confirmation - PASSING
+- Stop All button now opens StopConfirmDialog with agent count display
+- Red warning box shows "X active agents will be terminated"
+- Confirm button calls agentStopAll IPC to terminate all processes via tree-kill
+- Dialog shows singular/plural text based on count
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Added StopConfirmDialog, stopConfirm state, requestStopAgent/requestStopAll/confirmStop/cancelStop handlers
+
+#### Current Status
+- 35/366 features passing (added #39 and #40 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Event Store Tracking & Tool Stats)
 
 #### Feature #129: Event store tracking - PASSING
