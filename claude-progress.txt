@@ -4053,3 +4053,34 @@
 - 267/366 features passing (added #269 and #270 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Tracker Closure Guards & Sidebar Navigation)
+
+#### Feature #273: Agent tracker closure guards - PASSING
+- Added validateTrackerClosure method to guardEnforcementService
+- Validates that the closing agent matches the issue's assigned_agent
+- issue:update IPC handler accepts optional closingAgent parameter
+- When closingAgent is provided with status='closed', ownership is verified
+- Violations recorded as 'tracker_closure' rule_type in guard_violations table
+- DB migration extends CHECK constraint to include 'tracker_closure'
+- Preload and ElectronAPI types updated for optional closingAgent parameter
+- UI/operator closures (no closingAgent provided) remain unrestricted
+
+#### Feature #274: Sidebar navigation routes correctly - PASSING
+- Verified all 18 sidebar nav items have matching PageContent switch cases
+- Each navItem id maps to correct page component
+- handleNavigate updates currentPage state and pushes browser history
+- Active page highlighted with blue styling
+- All pages wrapped in ErrorBoundary components
+
+#### Files Modified
+- MODIFIED: src/main/services/guardEnforcementService.ts - validateTrackerClosure, recordTrackerClosureViolation methods
+- MODIFIED: src/main/db/database.ts - Migration to extend guard_violations CHECK constraint
+- MODIFIED: src/main/ipc/handlers.ts - Tracker closure guard in issue:update handler
+- MODIFIED: src/preload/index.ts - Optional closingAgent parameter on issueUpdate
+- MODIFIED: src/shared/types/index.ts - ElectronAPI issueUpdate type updated
+
+#### Current Status
+- 269/366 features passing (added #273 and #274 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
