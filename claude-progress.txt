@@ -1,5 +1,40 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Doctor Page & Auto-Fix)
+
+#### Feature #205: Doctor dependencies check - PASSING
+- Enhanced doctor:run IPC handler to check 4 dependencies: Database, Node.js, Claude CLI, Git
+- Database: checks SQLite connectivity and session count
+- Node.js: checks process.version meets v18+ requirement
+- Claude CLI: uses detectClaudeCli() service for binary detection and auth status
+- Git: uses execSync('git --version') to verify availability
+- Created DoctorPage.tsx with health check UI, pass/fail status cards with version info
+- Added Doctor nav item (FiActivity icon) to Sidebar and AppLayout routing
+
+#### Feature #208: Doctor auto-fix for fixable issues - PASSING
+- Added fixable flag and fixAction description to each doctor check
+- Database fix: runs WAL checkpoint and reconnects
+- Claude CLI fix: clears detection cache, re-scans PATH with forceRefresh
+- Node.js and Git are not auto-fixable (require manual installation)
+- Auto-Fix button on each failed fixable check card
+- Fix All button in summary banner to fix all fixable issues sequentially
+- After fix, checks automatically re-run to verify resolution
+- Fix result message displayed with success/failure styling
+- Added doctor:fix IPC handler, DoctorFixResult type, doctorFix preload bridge
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/DoctorPage.tsx - Full doctor page with checks and auto-fix
+- MODIFIED: src/main/ipc/handlers.ts - Enhanced doctor:run + added doctor:fix IPC handler
+- MODIFIED: src/shared/types/index.ts - Added DoctorCheck, DoctorResult, DoctorFixResult types
+- MODIFIED: src/preload/index.ts - Added doctorFix bridge method
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Doctor nav item
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added DoctorPage routing
+
+#### Current Status
+- 100/366 features passing (added #205 and #208 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Merge Conflict Resolution Tiers 2 & 3)
 
 #### Feature #85: Tier 2 auto-resolve conflicts - PASSING
