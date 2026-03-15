@@ -8,6 +8,7 @@ import {
   FiCalendar,
   FiCheckCircle,
   FiClock,
+  FiCopy,
   FiCpu,
   FiFile,
   FiHash,
@@ -24,6 +25,7 @@ import {
   FiUser,
   FiZap,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type {
   AgentIdentity,
   AgentPerformanceHistory,
@@ -828,8 +830,20 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
           <FiArrowLeft className="h-4 w-4" />
           Back to Agents
         </button>
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
-          {error}
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400 flex items-center justify-between gap-2">
+          <span>{error}</span>
+          <button
+            type="button"
+            data-testid="copy-error-agent-detail"
+            onClick={() => {
+              navigator.clipboard.writeText(error);
+              toast.success('Error message copied to clipboard');
+            }}
+            className="shrink-0 p-1 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+            title="Copy error message"
+          >
+            <FiCopy size={14} />
+          </button>
         </div>
       </div>
     );
@@ -1097,9 +1111,21 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-400">
-        <FiAlertTriangle className="h-5 w-5 mr-2" />
-        {error}
+      <div className="flex items-center justify-center h-full text-red-400 gap-2">
+        <FiAlertTriangle className="h-5 w-5" />
+        <span>{error}</span>
+        <button
+          type="button"
+          data-testid="copy-error-performance"
+          onClick={() => {
+            navigator.clipboard.writeText(error);
+            toast.success('Error message copied to clipboard');
+          }}
+          className="p-1 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+          title="Copy error message"
+        >
+          <FiCopy size={14} />
+        </button>
       </div>
     );
   }

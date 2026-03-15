@@ -4,6 +4,7 @@ import {
   FiAlertTriangle,
   FiBell,
   FiCheckCircle,
+  FiCopy,
   FiFilter,
   FiGitMerge,
   FiHeart,
@@ -12,6 +13,7 @@ import {
   FiUsers,
   FiX,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import { formatAbsoluteTime } from '../components/RelativeTime';
 
 interface NotificationRecord {
@@ -320,13 +322,32 @@ export function NotificationsPage() {
                     </div>
                     <p className="text-sm text-slate-300">{notification.body}</p>
                   </div>
-                  <span
-                    className="whitespace-nowrap text-xs text-slate-500"
-                    data-testid={`notification-time-${notification.id}`}
-                    title={formatAbsoluteTime(notification.created_at)}
-                  >
-                    {formatTimestamp(notification.created_at)}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(notification.event_type === 'agent_error' ||
+                      notification.event_type === 'merge_failed' ||
+                      notification.event_type === 'health_alert') && (
+                      <button
+                        type="button"
+                        data-testid={`copy-error-notification-${notification.id}`}
+                        onClick={() => {
+                          const text = `${notification.title}: ${notification.body}`;
+                          navigator.clipboard.writeText(text);
+                          toast.success('Error message copied to clipboard');
+                        }}
+                        className="p-1 rounded text-red-400/40 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+                        title="Copy error message"
+                      >
+                        <FiCopy size={13} />
+                      </button>
+                    )}
+                    <span
+                      className="whitespace-nowrap text-xs text-slate-500"
+                      data-testid={`notification-time-${notification.id}`}
+                      title={formatAbsoluteTime(notification.created_at)}
+                    >
+                      {formatTimestamp(notification.created_at)}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

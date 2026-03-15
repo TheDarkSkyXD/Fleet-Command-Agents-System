@@ -3,6 +3,7 @@ import {
   FiAlertTriangle,
   FiCheck,
   FiCode,
+  FiCopy,
   FiExternalLink,
   FiFolder,
   FiFolderPlus,
@@ -378,7 +379,21 @@ export function WorktreesPage() {
           ) : (
             <FiFolder size={16} />
           )}
-          {overstoryStatus.message}
+          <span className="flex-1">{overstoryStatus.message}</span>
+          {overstoryStatus.type === 'error' && (
+            <button
+              type="button"
+              data-testid="copy-error-overstory"
+              onClick={() => {
+                navigator.clipboard.writeText(overstoryStatus.message);
+                toast.success('Error message copied to clipboard');
+              }}
+              className="shrink-0 p-0.5 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+              title="Copy error message"
+            >
+              <FiCopy size={13} />
+            </button>
+          )}
         </div>
       )}
 
@@ -392,7 +407,21 @@ export function WorktreesPage() {
           }`}
         >
           {cleanResult.type === 'success' ? <FiCheck size={16} /> : <FiAlertTriangle size={16} />}
-          {cleanResult.message}
+          <span className="flex-1">{cleanResult.message}</span>
+          {cleanResult.type === 'error' && (
+            <button
+              type="button"
+              data-testid="copy-error-clean-result"
+              onClick={() => {
+                navigator.clipboard.writeText(cleanResult.message);
+                toast.success('Error message copied to clipboard');
+              }}
+              className="shrink-0 p-0.5 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+              title="Copy error message"
+            >
+              <FiCopy size={13} />
+            </button>
+          )}
         </div>
       )}
 
@@ -408,8 +437,24 @@ export function WorktreesPage() {
 
       {activeProject && error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400 text-sm">
-          <p className="font-medium mb-1">Failed to load worktrees</p>
-          <p className="text-red-400/70">{error}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-medium mb-1">Failed to load worktrees</p>
+              <p className="text-red-400/70">{error}</p>
+            </div>
+            <button
+              type="button"
+              data-testid="copy-error-worktrees"
+              onClick={() => {
+                navigator.clipboard.writeText(error);
+                toast.success('Error message copied to clipboard');
+              }}
+              className="shrink-0 p-1 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+              title="Copy error message"
+            >
+              <FiCopy size={14} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -452,6 +497,21 @@ export function WorktreesPage() {
                     >
                       {wt.branch || '(detached HEAD)'}
                     </span>
+                    {wt.branch && (
+                      <button
+                        type="button"
+                        data-testid={`copy-branch-${wt.branch}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(wt.branch || '');
+                          toast.success('Branch name copied to clipboard');
+                        }}
+                        className="shrink-0 p-0.5 rounded text-slate-500 hover:text-blue-400 hover:bg-blue-500/20 transition-colors"
+                        title="Copy branch name"
+                      >
+                        <FiCopy size={13} />
+                      </button>
+                    )}
                     {wt.isMain && (
                       <span className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30">
                         main
