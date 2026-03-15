@@ -1245,6 +1245,18 @@ function AgentSettings() {
     }
   };
 
+  /** Handle non-numeric text errors from ValidatedNumberInput */
+  const handleNonNumericError = (
+    key: 'maxHierarchyDepth' | 'maxConcurrentAgents' | 'maxAgentsPerLead',
+    error: string | null,
+  ) => {
+    if (error) {
+      setErrors((prev) => ({ ...prev, [key]: error }));
+    }
+    // If null (cleared), only clear if the current error was a non-numeric error
+    // (Zod range errors are handled by handleChange)
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
@@ -1262,6 +1274,7 @@ function AgentSettings() {
             max={10}
             onChange={(v) => handleChange('maxHierarchyDepth', v)}
             hasError={!!errors.maxHierarchyDepth}
+            onNonNumericError={(err) => handleNonNumericError('maxHierarchyDepth', err)}
           />
         </SettingRow>
 
@@ -1278,6 +1291,7 @@ function AgentSettings() {
               max={50}
               onChange={(v) => handleChange('maxConcurrentAgents', v)}
               hasError={!!errors.maxConcurrentAgents}
+              onNonNumericError={(err) => handleNonNumericError('maxConcurrentAgents', err)}
             />
           </div>
         </SettingRow>
@@ -1295,6 +1309,7 @@ function AgentSettings() {
               max={20}
               onChange={(v) => handleChange('maxAgentsPerLead', v)}
               hasError={!!errors.maxAgentsPerLead}
+              onNonNumericError={(err) => handleNonNumericError('maxAgentsPerLead', err)}
             />
           </div>
         </SettingRow>
@@ -1602,43 +1617,114 @@ function NumberInput({
   min,
   max,
   onChange,
+  onError,
 }: {
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
+  /** Called with error message or null to report validation state */
+  onError?: (error: string | null) => void;
 }) {
+  const [rawValue, setRawValue] = useState(String(value));
+  const [inputError, setInputError] = useState<string | null>(null);
+
+  // Sync rawValue when value prop changes externally
+  useEffect(() => {
+    setRawValue(String(value));
+  }, [value]);
+
+  const handleChange = (text: string) => {
+    setRawValue(text);
+
+    if (text.trim() === '') {
+      const err = 'A number is required';
+      setInputError(err);
+      onError?.(err);
+      return;
+    }
+
+    const parsed = Number.parseInt(text, 10);
+
+    if (Number.isNaN(parsed) || String(parsed) !== text.trim()) {
+      const err = 'Must be a valid whole number';
+      setInputError(err);
+      onError?.(err);
+      return;
+    }
+
+    if (parsed < min) {
+      const err = `Minimum is ${min}`;
+      setInputError(err);
+      onError?.(err);
+      onChange(parsed);
+      return;
+    }
+
+    if (parsed > max) {
+      const err = `Maximum is ${max}`;
+      setInputError(err);
+      onError?.(err);
+      onChange(parsed);
+      return;
+    }
+
+    setInputError(null);
+    onError?.(null);
+    onChange(parsed);
+  };
+
+  const borderClass = inputError
+    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+    : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500';
+
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(min, value - 1))}
-        disabled={value <= min}
-        className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        -
-      </button>
-      <input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        onChange={(e) => {
-          const parsed = Number.parseInt(e.target.value, 10);
-          if (!Number.isNaN(parsed)) {
-            onChange(Math.min(max, Math.max(min, parsed)));
-          }
-        }}
-        className="w-16 rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-center text-sm text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-      />
-      <button
-        type="button"
-        onClick={() => onChange(Math.min(max, value + 1))}
-        disabled={value >= max}
-        className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        +
-      </button>
+    <div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const next = Math.max(min, value - 1);
+            setRawValue(String(next));
+            setInputError(null);
+            onError?.(null);
+            onChange(next);
+          }}
+          disabled={value <= min}
+          className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          -
+        </button>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={rawValue}
+          onChange={(e) => handleChange(e.target.value)}
+          className={`w-16 rounded-md border bg-slate-700 px-2 py-1 text-center text-sm text-slate-100 focus:outline-none focus:ring-1 ${borderClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+          data-testid="number-input"
+          aria-invalid={!!inputError}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const next = Math.min(max, value + 1);
+            setRawValue(String(next));
+            setInputError(null);
+            onError?.(null);
+            onChange(next);
+          }}
+          disabled={value >= max}
+          className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          +
+        </button>
+      </div>
+      {inputError && (
+        <p className="mt-1 text-xs text-red-400" data-testid="number-input-error">
+          {inputError}
+        </p>
+      )}
     </div>
   );
 }
@@ -1650,14 +1736,18 @@ function ValidatedNumberInput({
   max,
   onChange,
   hasError,
+  onNonNumericError,
 }: {
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
   hasError?: boolean;
+  /** Called when non-numeric text is entered; null clears the error */
+  onNonNumericError?: (error: string | null) => void;
 }) {
   const [rawValue, setRawValue] = useState(String(value));
+  const [localNonNumericError, setLocalNonNumericError] = useState(false);
 
   // Sync rawValue when value prop changes (e.g., from reset)
   useEffect(() => {
@@ -1666,13 +1756,31 @@ function ValidatedNumberInput({
 
   const handleRawChange = (text: string) => {
     setRawValue(text);
-    const parsed = Number.parseInt(text, 10);
-    if (!Number.isNaN(parsed)) {
-      onChange(parsed); // Let Zod validate - don't clamp
+
+    // Empty field
+    if (text.trim() === '') {
+      setLocalNonNumericError(true);
+      onNonNumericError?.('A number is required');
+      return;
     }
+
+    const parsed = Number.parseInt(text, 10);
+
+    // Non-numeric text (e.g., "abc", "1.2.3")
+    if (Number.isNaN(parsed) || String(parsed) !== text.trim()) {
+      setLocalNonNumericError(true);
+      onNonNumericError?.('Must be a valid whole number');
+      return;
+    }
+
+    // Valid number - clear non-numeric error and let Zod validate range
+    setLocalNonNumericError(false);
+    onNonNumericError?.(null);
+    onChange(parsed); // Let Zod validate - don't clamp
   };
 
-  const borderClass = hasError
+  const showError = hasError || localNonNumericError;
+  const borderClass = showError
     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
     : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500';
 
@@ -1683,31 +1791,46 @@ function ValidatedNumberInput({
         onClick={() => {
           const next = Math.max(min, value - 1);
           setRawValue(String(next));
+          setLocalNonNumericError(false);
+          onNonNumericError?.(null);
           onChange(next);
         }}
         disabled={value <= min}
         className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        data-testid="numeric-decrement"
       >
         -
       </button>
       <input
-        type="number"
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
         value={rawValue}
-        min={min}
-        max={max}
         onChange={(e) => handleRawChange(e.target.value)}
+        onPaste={(e) => {
+          const pasted = e.clipboardData.getData('text');
+          if (!/^-?\d+$/.test(pasted.trim())) {
+            e.preventDefault();
+            setLocalNonNumericError(true);
+            onNonNumericError?.('Must be a valid whole number');
+          }
+        }}
         className={`w-16 rounded-md border bg-slate-700 px-2 py-1 text-center text-sm text-slate-100 focus:outline-none focus:ring-1 ${borderClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
         data-testid="validated-number-input"
+        aria-invalid={showError}
       />
       <button
         type="button"
         onClick={() => {
           const next = Math.min(max, value + 1);
           setRawValue(String(next));
+          setLocalNonNumericError(false);
+          onNonNumericError?.(null);
           onChange(next);
         }}
         disabled={value >= max}
         className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        data-testid="numeric-increment"
       >
         +
       </button>

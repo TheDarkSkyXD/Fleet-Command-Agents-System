@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import type { Issue, IssuePriority, IssueStatus, IssueType, TaskGroup } from '../../shared/types';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { handleIpcError } from '../lib/ipcErrorHandler';
+import { useFilterStore } from '../stores/filterStore';
 
 // ID generator (simple nanoid-like)
 function generateId(prefix: string): string {
@@ -88,17 +89,23 @@ type ActiveTab = 'issues' | 'groups' | 'ready' | 'completed';
 type ViewMode = 'list' | 'kanban';
 
 export function TasksPage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('issues');
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const { tasksFilters, setTasksFilters } = useFilterStore();
+  const [activeTab, setActiveTab] = useState<ActiveTab>(tasksFilters.activeTab);
+  const [viewMode, setViewMode] = useState<ViewMode>(tasksFilters.viewMode);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [readyIssues, setReadyIssues] = useState<Issue[]>([]);
   const [readyLoading, setReadyLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string>('');
-  const [filterPriority, setFilterPriority] = useState<string>('');
-  const [filterType, setFilterType] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>(tasksFilters.filterStatus);
+  const [filterPriority, setFilterPriority] = useState<string>(tasksFilters.filterPriority);
+  const [filterType, setFilterType] = useState<string>(tasksFilters.filterType);
+
+  // Sync filter state back to store on changes
+  useEffect(() => {
+    setTasksFilters({ activeTab, viewMode, filterStatus, filterPriority, filterType });
+  }, [activeTab, viewMode, filterStatus, filterPriority, filterType, setTasksFilters]);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimAgent, setClaimAgent] = useState('');
   const [form, setForm] = useState<CreateIssueForm>({
@@ -121,6 +128,10 @@ export function TasksPage() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
   const [renameGroupName, setRenameGroupName] = useState('');
+
+  // Form validation error state
+  const [issueTitleError, setIssueTitleError] = useState<string | null>(null);
+  const [groupNameError, setGroupNameError] = useState<string | null>(null);
 
   // Track form dirty state for beforeunload warning
   const isIssueFormDirty = useMemo(
@@ -220,7 +231,11 @@ export function TasksPage() {
   }, [activeTab, loadReadyQueue]);
 
   const handleCreate = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim()) {
+      setIssueTitleError('Title is required');
+      return;
+    }
+    setIssueTitleError(null);
     // Ref-based guard prevents duplicate submissions (back+resubmit, rapid clicks)
     if (createLockRef.current) return;
     createLockRef.current = true;
@@ -293,7 +308,11 @@ export function TasksPage() {
 
   // Task Group handlers
   const handleCreateGroup = async () => {
-    if (!groupName.trim()) return;
+    if (!groupName.trim()) {
+      setGroupNameError('Group name is required');
+      return;
+    }
+    setGroupNameError(null);
     setCreatingGroup(true);
     try {
       const result = await window.electronAPI.taskGroupCreate({
@@ -713,12 +732,20 @@ export function TasksPage() {
                       id="issue-title"
                       type="text"
                       value={form.title}
-                      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, title: e.target.value }));
+                        if (e.target.value.trim()) setIssueTitleError(null);
+                      }}
                       placeholder="Issue title..."
-                      className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className={`w-full rounded-md border ${issueTitleError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'} bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-1`}
                       // biome-ignore lint/a11y/noAutofocus: intentional for modal/inline input UX
                       autoFocus
                     />
+                    {issueTitleError && (
+                      <p className="mt-1 text-xs text-red-400" data-testid="issue-title-error">
+                        {issueTitleError}
+                      </p>
+                    )}
                   </div>
 
                   {/* Type & Priority row */}
@@ -932,15 +959,23 @@ export function TasksPage() {
                       id="group-name"
                       type="text"
                       value={groupName}
-                      onChange={(e) => setGroupName(e.target.value)}
+                      onChange={(e) => {
+                        setGroupName(e.target.value);
+                        if (e.target.value.trim()) setGroupNameError(null);
+                      }}
                       placeholder="e.g., Sprint 1 Tasks, Auth Module..."
-                      className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className={`w-full rounded-md border ${groupNameError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'} bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-1`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleCreateGroup();
                       }}
                       // biome-ignore lint/a11y/noAutofocus: intentional for modal/inline input UX
                       autoFocus
                     />
+                    {groupNameError && (
+                      <p className="mt-1 text-xs text-red-400" data-testid="group-name-error">
+                        {groupNameError}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-3 pt-2">
