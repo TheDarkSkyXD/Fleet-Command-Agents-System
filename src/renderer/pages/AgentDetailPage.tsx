@@ -586,7 +586,7 @@ function AgentMailTab({ agentName }: { agentName: string }) {
     async function load() {
       setLoading(true);
       try {
-        const result = await window.electronAPI.mailList({ agent: agentName, limit: 100 });
+        const result = await window.electronAPI.mailList({ agent: agentName });
         if (result.data) setMessages(result.data);
       } catch {
         // Mail may not exist
