@@ -4,7 +4,9 @@ import {
   FiCheckCircle,
   FiChevronLeft,
   FiCircle,
+  FiClipboard,
   FiCornerUpLeft,
+  FiEye,
   FiFilter,
   FiInbox,
   FiMail,
@@ -16,8 +18,10 @@ import {
   FiX,
 } from 'react-icons/fi';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { toast } from 'sonner';
 import type { Message, MessagePriority, MessageType } from '../../shared/types';
 import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
+import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { formatAbsoluteTime } from '../components/RelativeTime';
 
 type MailTab = 'inbox' | 'outbox' | 'all';
@@ -390,6 +394,42 @@ export function MailPage() {
     setShowThread(false);
   };
 
+  // Context menu for right-click on messages
+  const msgContextMenu = useContextMenu();
+
+  const handleMessageContextMenu = useCallback(
+    (e: React.MouseEvent, msg: Message) => {
+      const items: ContextMenuItem[] = [
+        {
+          id: 'reply',
+          label: 'Reply',
+          icon: <FiCornerUpLeft className="h-3.5 w-3.5" />,
+          onClick: () => handleReply(msg),
+        },
+        {
+          id: 'mark-read',
+          label: 'Mark as Read',
+          icon: <FiEye className="h-3.5 w-3.5" />,
+          onClick: () => handleMarkRead(msg),
+          disabled: msg.read !== 0,
+        },
+        { id: 'sep-1', label: '', separator: true, onClick: () => {} },
+        {
+          id: 'copy-content',
+          label: 'Copy Content',
+          icon: <FiClipboard className="h-3.5 w-3.5" />,
+          onClick: () => {
+            const content = msg.body || msg.subject || '';
+            navigator.clipboard.writeText(content);
+            toast.success('Message content copied to clipboard');
+          },
+        },
+      ];
+      msgContextMenu.show(e, items);
+    },
+    [handleReply, handleMarkRead, msgContextMenu],
+  );
+
   // Filter messages by tab
   const filteredMessages = messages.filter(() => {
     // All tabs show all messages for now since we don't have a "current agent" concept
@@ -729,8 +769,42 @@ export function MailPage() {
           <Panel defaultSize={selectedMessage || showCompose ? 40 : 100} minSize={25}>
             <div className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
               {loading && messages.length === 0 ? (
-                <div className="flex flex-1 items-center justify-center text-slate-500">
-                  <FiRefreshCw className="mr-2 animate-spin" /> Loading messages...
+                <div className="flex-1 overflow-hidden" data-testid="mail-skeleton">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={`skeleton-${
+                        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows
+                        i
+                      }`}
+                      className="flex w-full items-start gap-3 border-b border-b-slate-700/50 px-4 py-3 animate-pulse"
+                    >
+                      <div className="mt-1.5 flex-shrink-0">
+                        <div className="h-2 w-2 rounded-full bg-slate-700" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-3.5 w-24 rounded bg-slate-700" />
+                            <div className="h-3 w-8 rounded bg-slate-700/50" />
+                            <div className="h-3.5 w-20 rounded bg-slate-700" />
+                          </div>
+                          <div className="h-3 w-12 rounded bg-slate-700/50" />
+                        </div>
+                        <div
+                          className="mt-2 h-3.5 rounded bg-slate-700/70"
+                          style={{ width: `${65 + (i % 3) * 10}%` }}
+                        />
+                        <div
+                          className="mt-1.5 h-3 rounded bg-slate-700/40"
+                          style={{ width: `${70 + (i % 4) * 8}%` }}
+                        />
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="h-4 w-14 rounded-full bg-slate-700/50" />
+                          <div className="h-4 w-16 rounded-full bg-slate-700/40" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : sortedMessages.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-500">
@@ -760,6 +834,7 @@ export function MailPage() {
                       type="button"
                       key={msg.id}
                       onClick={() => handleSelectMessage(msg)}
+                      onContextMenu={(e) => handleMessageContextMenu(e, msg)}
                       className={`flex w-full cursor-pointer items-start gap-3 border-b px-4 py-3 text-left transition-colors hover:bg-slate-700/50 ${
                         selectedMessage?.id === msg.id ? 'bg-slate-700/70' : ''
                       } ${msg.read === 0 ? 'bg-slate-800' : 'bg-slate-800/30'} ${
@@ -1331,6 +1406,9 @@ export function MailPage() {
           )}
         </PanelGroup>
       </div>
+
+      {/* Right-click context menu */}
+      <ContextMenu menu={msgContextMenu.menu} onClose={msgContextMenu.hide} />
     </div>
   );
 }
