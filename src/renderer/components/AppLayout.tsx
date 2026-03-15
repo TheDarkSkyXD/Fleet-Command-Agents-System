@@ -4,6 +4,7 @@ import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
 import { DebugPage } from '../pages/DebugPage';
 import { DiscoveryPage } from '../pages/DiscoveryPage';
+import { DoctorPage } from '../pages/DoctorPage';
 import { ExpertisePage } from '../pages/ExpertisePage';
 import { GuardRulesPage } from '../pages/GuardRulesPage';
 import { HooksPage } from '../pages/HooksPage';
@@ -189,6 +190,12 @@ function PageContent({
       return (
         <ErrorBoundary sectionName="Settings">
           <SettingsPage />
+        </ErrorBoundary>
+      );
+    case 'doctor':
+      return (
+        <ErrorBoundary sectionName="Doctor">
+          <DoctorPage />
         </ErrorBoundary>
       );
     case 'debug':

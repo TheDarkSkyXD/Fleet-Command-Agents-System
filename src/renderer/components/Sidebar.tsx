@@ -1,4 +1,5 @@
 import {
+  FiActivity,
   FiAnchor,
   FiBarChart2,
   FiBook,
@@ -38,6 +39,7 @@ const navItems = [
   { id: 'prompts', label: 'Prompts', icon: FiFileText },
   { id: 'expertise', label: 'Expertise', icon: FiBook },
   { id: 'metrics', label: 'Metrics', icon: FiBarChart2 },
+  { id: 'doctor', label: 'Doctor', icon: FiActivity },
   { id: 'debug', label: 'Debug', icon: FiTerminal },
   { id: 'settings', label: 'Settings', icon: FiSettings },
 ];
