@@ -1,23 +1,31 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FiActivity,
+  FiAlertTriangle,
   FiBarChart2,
+  FiCalendar,
   FiClock,
+  FiFileText,
+  FiFilter,
   FiHash,
+  FiInfo,
   FiPlay,
   FiRefreshCw,
+  FiSearch,
   FiSquare,
   FiTerminal,
   FiTrash2,
   FiTrendingUp,
+  FiUpload,
+  FiXCircle,
   FiZap,
 } from 'react-icons/fi';
-import type { Event, ToolStats } from '../../shared/types';
+import type { AppLogEntry, Event, LogLevel, ToolStats } from '../../shared/types';
 
-type DebugTab = 'events' | 'tool-stats';
+type DebugTab = 'events' | 'tool-stats' | 'logs';
 
 export function DebugPage() {
-  const [activeTab, setActiveTab] = useState<DebugTab>('tool-stats');
+  const [activeTab, setActiveTab] = useState<DebugTab>('logs');
 
   return (
     <div>
@@ -30,6 +38,18 @@ export function DebugPage() {
 
       {/* Tabs */}
       <div className="mb-6 flex gap-1 rounded-lg bg-slate-800 p-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab('logs')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'logs'
+              ? 'bg-slate-700 text-cyan-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <FiFileText className="h-4 w-4" />
+          Logs
+        </button>
         <button
           type="button"
           onClick={() => setActiveTab('tool-stats')}
@@ -56,10 +76,531 @@ export function DebugPage() {
         </button>
       </div>
 
-      {activeTab === 'tool-stats' ? <ToolStatsPanel /> : <EventLogPanel />}
+      {activeTab === 'logs' ? (
+        <AppLogPanel />
+      ) : activeTab === 'tool-stats' ? (
+        <ToolStatsPanel />
+      ) : (
+        <EventLogPanel />
+      )}
     </div>
   );
 }
+
+// ── App Log Panel (Feature #125 + #128) ──────────────────────────────
+
+function AppLogPanel() {
+  const [logs, setLogs] = useState<AppLogEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [levelFilter, setLevelFilter] = useState<string>('');
+  const [agentFilter, setAgentFilter] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+  const [agents, setAgents] = useState<string[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadLogs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const filters: {
+        level?: string;
+        agent_name?: string;
+        search?: string;
+        start_time?: string;
+        end_time?: string;
+        limit?: number;
+      } = { limit: 500 };
+      if (levelFilter) filters.level = levelFilter;
+      if (agentFilter) filters.agent_name = agentFilter;
+      if (searchQuery) filters.search = searchQuery;
+      if (startTime) filters.start_time = startTime;
+      if (endTime) filters.end_time = endTime;
+
+      const result = await window.electronAPI.appLogList(filters);
+      if (result.data) {
+        setLogs(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load app logs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [levelFilter, agentFilter, searchQuery, startTime, endTime]);
+
+  const loadAgents = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.appLogAgents();
+      if (result.data) {
+        setAgents(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load agents:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLogs();
+    loadAgents();
+  }, [loadLogs, loadAgents]);
+
+  const handlePurge = async () => {
+    if (!confirm('Delete all application logs? This cannot be undone.')) return;
+    try {
+      await window.electronAPI.appLogPurge();
+      setLogs([]);
+      setStatusMessage('All logs purged');
+      setTimeout(() => setStatusMessage(''), 3000);
+    } catch (error) {
+      console.error('Failed to purge logs:', error);
+    }
+  };
+
+  const handleCreateTestLog = async () => {
+    try {
+      const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+      for (const level of levels) {
+        await window.electronAPI.appLogCreate({
+          level,
+          message: `Test ${level} log entry at ${new Date().toISOString()}`,
+          source: 'debug-page',
+          agent_name: null as unknown as undefined,
+          data: JSON.stringify({ test: true, level, timestamp: Date.now() }),
+        });
+      }
+      setStatusMessage('Created 4 test log entries');
+      setTimeout(() => setStatusMessage(''), 3000);
+      loadLogs();
+    } catch (error) {
+      console.error('Failed to create test log:', error);
+    }
+  };
+
+  const handleImportNdjson = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const content = await file.text();
+      const result = await window.electronAPI.appLogImportNdjson(content);
+      if (result.data) {
+        setStatusMessage(`Imported ${result.data.imported} log entries from ${file.name}`);
+        setTimeout(() => setStatusMessage(''), 5000);
+        loadLogs();
+        loadAgents();
+      } else {
+        setStatusMessage(`Import failed: ${result.error}`);
+        setTimeout(() => setStatusMessage(''), 5000);
+      }
+    } catch (error) {
+      console.error('Failed to import NDJSON:', error);
+      setStatusMessage('Import failed');
+      setTimeout(() => setStatusMessage(''), 3000);
+    }
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleClearFilters = () => {
+    setLevelFilter('');
+    setAgentFilter('');
+    setSearchQuery('');
+    setStartTime('');
+    setEndTime('');
+  };
+
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const hasFilters = levelFilter || agentFilter || searchQuery || startTime || endTime;
+
+  const levelCounts = {
+    debug: logs.filter((l) => l.level === 'debug').length,
+    info: logs.filter((l) => l.level === 'info').length,
+    warn: logs.filter((l) => l.level === 'warn').length,
+    error: logs.filter((l) => l.level === 'error').length,
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Status message */}
+      {statusMessage && (
+        <div className="rounded-md bg-blue-900/50 border border-blue-700 px-4 py-2 text-sm text-blue-200">
+          {statusMessage}
+        </div>
+      )}
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-4 gap-3">
+        <button
+          type="button"
+          onClick={() => setLevelFilter(levelFilter === 'debug' ? '' : 'debug')}
+          className={`rounded-lg border p-3 text-left transition-colors ${
+            levelFilter === 'debug'
+              ? 'border-slate-500 bg-slate-700'
+              : 'border-slate-700 bg-slate-800 hover:bg-slate-750'
+          }`}
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <FiTerminal className="h-3.5 w-3.5 text-slate-400" />
+            Debug
+          </div>
+          <div className="mt-1 text-xl font-bold text-slate-300">{levelCounts.debug}</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setLevelFilter(levelFilter === 'info' ? '' : 'info')}
+          className={`rounded-lg border p-3 text-left transition-colors ${
+            levelFilter === 'info'
+              ? 'border-blue-500 bg-blue-900/30'
+              : 'border-slate-700 bg-slate-800 hover:bg-slate-750'
+          }`}
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <FiInfo className="h-3.5 w-3.5 text-blue-400" />
+            Info
+          </div>
+          <div className="mt-1 text-xl font-bold text-blue-400">{levelCounts.info}</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setLevelFilter(levelFilter === 'warn' ? '' : 'warn')}
+          className={`rounded-lg border p-3 text-left transition-colors ${
+            levelFilter === 'warn'
+              ? 'border-amber-500 bg-amber-900/30'
+              : 'border-slate-700 bg-slate-800 hover:bg-slate-750'
+          }`}
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <FiAlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+            Warn
+          </div>
+          <div className="mt-1 text-xl font-bold text-amber-400">{levelCounts.warn}</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setLevelFilter(levelFilter === 'error' ? '' : 'error')}
+          className={`rounded-lg border p-3 text-left transition-colors ${
+            levelFilter === 'error'
+              ? 'border-red-500 bg-red-900/30'
+              : 'border-slate-700 bg-slate-800 hover:bg-slate-750'
+          }`}
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <FiXCircle className="h-3.5 w-3.5 text-red-400" />
+            Error
+          </div>
+          <div className="mt-1 text-xl font-bold text-red-400">{levelCounts.error}</div>
+        </button>
+      </div>
+
+      {/* Filters row */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search logs by keyword..."
+            className="w-full rounded-md border border-slate-600 bg-slate-800 py-1.5 pl-10 pr-3 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+          />
+        </div>
+
+        {/* Level filter */}
+        <div className="flex items-center gap-1.5">
+          <FiFilter className="h-3.5 w-3.5 text-slate-500" />
+          <select
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
+          >
+            <option value="">All Levels</option>
+            <option value="debug">Debug</option>
+            <option value="info">Info</option>
+            <option value="warn">Warn</option>
+            <option value="error">Error</option>
+          </select>
+        </div>
+
+        {/* Agent filter */}
+        <select
+          value={agentFilter}
+          onChange={(e) => setAgentFilter(e.target.value)}
+          className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
+        >
+          <option value="">All Agents</option>
+          {agents.map((agent) => (
+            <option key={agent} value={agent}>
+              {agent}
+            </option>
+          ))}
+        </select>
+
+        {/* Time range */}
+        <div className="flex items-center gap-1.5">
+          <FiCalendar className="h-3.5 w-3.5 text-slate-500" />
+          <input
+            type="datetime-local"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
+            title="Start time"
+          />
+          <span className="text-xs text-slate-500">to</span>
+          <input
+            type="datetime-local"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
+            title="End time"
+          />
+        </div>
+
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="flex items-center gap-1 rounded-md bg-slate-700 px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-600 transition-colors"
+          >
+            <FiXCircle className="h-3 w-3" />
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Actions row */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-slate-400">
+          {logs.length} log entries{hasFilters ? ' (filtered)' : ''}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCreateTestLog}
+            className="flex items-center gap-2 rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-600 transition-colors"
+          >
+            <FiZap className="h-3.5 w-3.5" />
+            Add Test Logs
+          </button>
+          <label className="flex cursor-pointer items-center gap-2 rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-600 transition-colors">
+            <FiUpload className="h-3.5 w-3.5" />
+            Import NDJSON
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".ndjson,.jsonl,.log,.txt,.json"
+              onChange={handleImportNdjson}
+              className="hidden"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={loadLogs}
+            className="flex items-center gap-2 rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-600 transition-colors"
+          >
+            <FiRefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={handlePurge}
+            className="flex items-center gap-2 rounded-md bg-red-900/50 px-3 py-1.5 text-sm text-red-300 hover:bg-red-800/50 transition-colors"
+          >
+            <FiTrash2 className="h-3.5 w-3.5" />
+            Purge All
+          </button>
+        </div>
+      </div>
+
+      {/* Log entries */}
+      {isLoading ? (
+        <LogSkeleton />
+      ) : logs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+          <FiFileText className="mb-3 h-12 w-12" />
+          <p className="text-lg font-medium">No log entries</p>
+          <p className="mt-1 text-sm">
+            {hasFilters
+              ? 'No logs match the current filters. Try adjusting or clearing filters.'
+              : 'Application logs will appear here. Click "Add Test Logs" to create sample entries, or "Import NDJSON" to load log files.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1 max-h-[600px] overflow-y-auto">
+          {logs.map((entry) => (
+            <LogEntryRow
+              key={entry.id}
+              entry={entry}
+              expanded={expandedIds.has(entry.id)}
+              onToggle={() => toggleExpand(entry.id)}
+              searchQuery={searchQuery}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LogEntryRow({
+  entry,
+  expanded,
+  onToggle,
+  searchQuery,
+}: {
+  entry: AppLogEntry;
+  expanded: boolean;
+  onToggle: () => void;
+  searchQuery: string;
+}) {
+  const levelColors: Record<string, string> = {
+    debug: 'text-slate-400',
+    info: 'text-blue-400',
+    warn: 'text-amber-400',
+    error: 'text-red-400',
+  };
+
+  const levelBgColors: Record<string, string> = {
+    debug: 'bg-slate-700 text-slate-300',
+    info: 'bg-blue-900/50 text-blue-300',
+    warn: 'bg-amber-900/50 text-amber-300',
+    error: 'bg-red-900/50 text-red-300',
+  };
+
+  const levelIcons: Record<string, React.ReactNode> = {
+    debug: <FiTerminal className={`h-3.5 w-3.5 ${levelColors[entry.level]}`} />,
+    info: <FiInfo className={`h-3.5 w-3.5 ${levelColors[entry.level]}`} />,
+    warn: <FiAlertTriangle className={`h-3.5 w-3.5 ${levelColors[entry.level]}`} />,
+    error: <FiXCircle className={`h-3.5 w-3.5 ${levelColors[entry.level]}`} />,
+  };
+
+  // Highlight search matches in message
+  const highlightMessage = (text: string) => {
+    if (!searchQuery) return text;
+    const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+    return parts.map((part) => {
+      const key = `${part}-${Math.random().toString(36).slice(2, 8)}`;
+      return part.toLowerCase() === searchQuery.toLowerCase() ? (
+        <mark key={key} className="bg-yellow-500/30 text-yellow-200 rounded px-0.5">
+          {part}
+        </mark>
+      ) : (
+        part
+      );
+    });
+  };
+
+  return (
+    <div
+      className={`rounded-md border overflow-hidden ${
+        entry.level === 'error'
+          ? 'border-red-800/50 bg-red-950/20'
+          : entry.level === 'warn'
+            ? 'border-amber-800/30 bg-amber-950/10'
+            : 'border-slate-700/50 bg-slate-800'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-slate-750 transition-colors"
+      >
+        {levelIcons[entry.level] || levelIcons.info}
+        <span
+          className={`rounded px-2 py-0.5 text-xs font-medium uppercase ${levelBgColors[entry.level] ?? levelBgColors.info}`}
+        >
+          {entry.level}
+        </span>
+        <span className="flex-1 truncate text-sm text-slate-200 font-mono">
+          {highlightMessage(entry.message)}
+        </span>
+        {entry.agent_name && (
+          <span className="rounded bg-purple-900/50 px-2 py-0.5 text-xs text-purple-300">
+            {entry.agent_name}
+          </span>
+        )}
+        {entry.source && (
+          <span className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-400">
+            {entry.source}
+          </span>
+        )}
+        <span className="text-xs text-slate-500 whitespace-nowrap">
+          {new Date(entry.created_at).toLocaleTimeString()}
+        </span>
+      </button>
+      {expanded && (
+        <div className="border-t border-slate-700/50 bg-slate-900/50 px-4 py-3 text-xs space-y-2">
+          <div className="grid grid-cols-2 gap-2 text-slate-400">
+            <div>
+              <span className="text-slate-500">ID:</span> {entry.id}
+            </div>
+            <div>
+              <span className="text-slate-500">Timestamp:</span>{' '}
+              {new Date(entry.created_at).toLocaleString()}
+            </div>
+            <div>
+              <span className="text-slate-500">Level:</span>{' '}
+              <span className={levelColors[entry.level]}>{entry.level}</span>
+            </div>
+            <div>
+              <span className="text-slate-500">Source:</span> {entry.source ?? '—'}
+            </div>
+            <div>
+              <span className="text-slate-500">Agent:</span> {entry.agent_name ?? '—'}
+            </div>
+          </div>
+          <div>
+            <span className="text-slate-500">Message:</span>
+            <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300 whitespace-pre-wrap">
+              {entry.message}
+            </pre>
+          </div>
+          {entry.data && (
+            <div>
+              <span className="text-slate-500">Data (NDJSON):</span>
+              <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300 whitespace-pre-wrap">
+                {tryFormatJson(entry.data)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LogSkeleton() {
+  return (
+    <div className="space-y-1">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 rounded-md border border-slate-700/50 bg-slate-800 px-4 py-2.5 animate-pulse"
+        >
+          <div className="h-4 w-4 rounded bg-slate-700" />
+          <div className="h-5 w-14 rounded bg-slate-700" />
+          <div className="h-4 flex-1 rounded bg-slate-700" />
+          <div className="h-4 w-16 rounded bg-slate-700" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Tool Stats Panel ─────────────────────────────────────────────────
 
 function ToolStatsPanel() {
   const [toolStats, setToolStats] = useState<ToolStats[]>([]);

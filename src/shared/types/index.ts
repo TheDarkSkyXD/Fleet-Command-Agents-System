@@ -276,6 +276,17 @@ export interface ToolStats {
   total_duration_ms: number | null;
 }
 
+// App log entry
+export interface AppLogEntry {
+  id: number;
+  level: LogLevel;
+  message: string;
+  source: string | null;
+  agent_name: string | null;
+  data: string | null;
+  created_at: string;
+}
+
 // Update status
 export interface UpdateStatus {
   updateAvailable: boolean;
@@ -488,6 +499,29 @@ export interface ElectronAPI {
     updates: Record<string, unknown>,
   ) => Promise<{ data: Metric | null; error: string | null }>;
   metricsDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+
+  // App Logs
+  appLogList: (filters?: {
+    level?: string;
+    agent_name?: string;
+    search?: string;
+    start_time?: string;
+    end_time?: string;
+    limit?: number;
+    offset?: number;
+  }) => Promise<{ data: AppLogEntry[] | null; error: string | null }>;
+  appLogCreate: (entry: {
+    level: string;
+    message: string;
+    source?: string;
+    agent_name?: string;
+    data?: string;
+  }) => Promise<{ data: boolean; error: string | null }>;
+  appLogAgents: () => Promise<{ data: string[] | null; error: string | null }>;
+  appLogPurge: () => Promise<{ data: boolean; error: string | null }>;
+  appLogImportNdjson: (
+    ndjsonContent: string,
+  ) => Promise<{ data: { imported: number } | null; error: string | null }>;
 
   // Events
   eventList: (filters?: { eventType?: string; agentName?: string; limit?: number }) => Promise<{

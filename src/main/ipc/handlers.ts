@@ -2185,6 +2185,161 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // ── App Logs ──────────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    'appLog:list',
+    (
+      _event,
+      filters?: {
+        level?: string;
+        agent_name?: string;
+        search?: string;
+        start_time?: string;
+        end_time?: string;
+        limit?: number;
+        offset?: number;
+      },
+    ) => {
+      try {
+        let sql = 'SELECT * FROM app_logs WHERE 1=1';
+        const params: unknown[] = [];
+
+        if (filters?.level) {
+          sql += ' AND level = ?';
+          params.push(filters.level);
+        }
+        if (filters?.agent_name) {
+          sql += ' AND agent_name = ?';
+          params.push(filters.agent_name);
+        }
+        if (filters?.search) {
+          sql += ' AND (message LIKE ? OR data LIKE ? OR source LIKE ?)';
+          const searchPattern = `%${filters.search}%`;
+          params.push(searchPattern, searchPattern, searchPattern);
+        }
+        if (filters?.start_time) {
+          sql += ' AND created_at >= ?';
+          params.push(filters.start_time);
+        }
+        if (filters?.end_time) {
+          sql += ' AND created_at <= ?';
+          params.push(filters.end_time);
+        }
+
+        sql += ' ORDER BY created_at DESC';
+        sql += ` LIMIT ${filters?.limit ?? 500}`;
+        if (filters?.offset) {
+          sql += ` OFFSET ${filters.offset}`;
+        }
+
+        const logs = loggedPrepare(sql).all(...params);
+        return { data: logs, error: null };
+      } catch (error) {
+        log.error('appLog:list failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'appLog:create',
+    (
+      _event,
+      entry: {
+        level: string;
+        message: string;
+        source?: string;
+        agent_name?: string;
+        data?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          'INSERT INTO app_logs (level, message, source, agent_name, data) VALUES (?, ?, ?, ?, ?)',
+        ).run(
+          entry.level || 'info',
+          entry.message,
+          entry.source || null,
+          entry.agent_name || null,
+          entry.data || null,
+        );
+        return { data: true, error: null };
+      } catch (error) {
+        log.error('appLog:create failed:', error);
+        return { data: false, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('appLog:agents', () => {
+    try {
+      const agents = loggedPrepare(
+        'SELECT DISTINCT agent_name FROM app_logs WHERE agent_name IS NOT NULL ORDER BY agent_name',
+      ).all() as { agent_name: string }[];
+      return { data: agents.map((a) => a.agent_name), error: null };
+    } catch (error) {
+      log.error('appLog:agents failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('appLog:purge', () => {
+    try {
+      loggedPrepare('DELETE FROM app_logs').run();
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('appLog:purge failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('appLog:import-ndjson', (_event, ndjsonContent: string) => {
+    try {
+      const db = getDatabase();
+      const insertStmt = db.prepare(
+        'INSERT INTO app_logs (level, message, source, agent_name, data, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      );
+      const lines = ndjsonContent.split('\n').filter((line) => line.trim());
+      let imported = 0;
+
+      const insertMany = db.transaction(() => {
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            const level = entry.level || entry.severity || 'info';
+            const normalizedLevel = ['debug', 'info', 'warn', 'error'].includes(level.toLowerCase())
+              ? level.toLowerCase()
+              : 'info';
+            const message = entry.message || entry.msg || entry.text || JSON.stringify(entry);
+            const source = entry.source || entry.logger || entry.module || null;
+            const agentName = entry.agent_name || entry.agentName || entry.agent || null;
+            const timestamp =
+              entry.timestamp ||
+              entry.time ||
+              entry.created_at ||
+              entry.ts ||
+              new Date().toISOString();
+            // Store the full original JSON in data for reference
+            const data = JSON.stringify(entry);
+
+            insertStmt.run(normalizedLevel, message, source, agentName, data, timestamp);
+            imported++;
+          } catch {
+            // Skip malformed lines
+          }
+        }
+      });
+
+      insertMany();
+      log.info(`[IPC] appLog:import-ndjson - imported ${imported} log entries`);
+      return { data: { imported }, error: null };
+    } catch (error) {
+      log.error('appLog:import-ndjson failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   log.info(
     'IPC handlers registered - all database handlers use real SQLite queries via loggedPrepare()',
   );

@@ -234,6 +234,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => void,
   ) => ipcRenderer.on('watchdog:update', (_event, data) => callback(data)),
 
+  // App Logs
+  appLogList: (filters?: {
+    level?: string;
+    agent_name?: string;
+    search?: string;
+    start_time?: string;
+    end_time?: string;
+    limit?: number;
+    offset?: number;
+  }) => ipcRenderer.invoke('appLog:list', filters),
+  appLogCreate: (entry: {
+    level: string;
+    message: string;
+    source?: string;
+    agent_name?: string;
+    data?: string;
+  }) => ipcRenderer.invoke('appLog:create', entry),
+  appLogAgents: () => ipcRenderer.invoke('appLog:agents'),
+  appLogPurge: () => ipcRenderer.invoke('appLog:purge'),
+  appLogImportNdjson: (ndjsonContent: string) =>
+    ipcRenderer.invoke('appLog:import-ndjson', ndjsonContent),
+
   // Notifications
   notificationSend: (options: {
     title: string;

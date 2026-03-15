@@ -205,6 +205,16 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS app_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      level TEXT NOT NULL DEFAULT 'info' CHECK(level IN ('debug', 'info', 'warn', 'error')),
+      message TEXT NOT NULL,
+      source TEXT,
+      agent_name TEXT,
+      data TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Create indexes for common queries
@@ -225,6 +235,9 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_projects_path ON projects(path);
     CREATE INDEX IF NOT EXISTS idx_config_profiles_name ON config_profiles(name);
     CREATE INDEX IF NOT EXISTS idx_config_profiles_active ON config_profiles(is_active);
+    CREATE INDEX IF NOT EXISTS idx_app_logs_level ON app_logs(level);
+    CREATE INDEX IF NOT EXISTS idx_app_logs_agent ON app_logs(agent_name);
+    CREATE INDEX IF NOT EXISTS idx_app_logs_created ON app_logs(created_at);
   `);
 
   // Seed default agent definitions if table is empty
