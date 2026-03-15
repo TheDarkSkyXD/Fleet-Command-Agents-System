@@ -3259,3 +3259,32 @@
 - 211/366 features passing (added #189 and #191 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Nuclear Cleanup Page)
+
+#### Feature #203: Nuclear cleanup wipe sessions database - PASSING
+- Created NuclearCleanupPage with danger zone UI and warning banner
+- Wipe Sessions card with confirmation dialog before executing
+- Calls cleanupExecute({target: sessions}) to DELETE FROM sessions table
+- Shows success/error result with color-coded feedback
+- data-testid attributes for all interactive elements
+
+#### Feature #204: Nuclear cleanup clean all worktrees - PASSING
+- Clean All Worktrees card with worktree list preview
+- Force checkbox to enable removal of unmerged branches
+- Confirmation dialog with force option toggle
+- Iterates all non-main worktrees: worktreeForceRemove for unmerged+force, worktreeRemove for merged
+- Reports removed count and any errors encountered
+- Skips unmerged worktrees when force not enabled with clear messaging
+
+#### Files Created
+- NEW: src/renderer/pages/NuclearCleanupPage.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added cleanup nav item with FiZap icon
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added cleanup route and NuclearCleanupPage import
+
+#### Current Status
+- 217/366 features passing (added #203 and #204 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
