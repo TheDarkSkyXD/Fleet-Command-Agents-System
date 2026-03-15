@@ -1,5 +1,28 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Delete Data Removal & Mail CRUD)
+
+#### Feature #283: Delete data verify removal from all views - PASSING
+- Backend issue:delete now cleans up task group member_issues JSON references
+- TasksPage handleDelete removes deleted issue from readyIssues and refreshes group progress
+- MailPage purgeByAge/purgeByAgent now clear selectedMessage to prevent stale display
+- Verified all existing delete flows properly cascade across views
+
+#### Feature #284: CRUD operations on messages - PASSING
+- Verified complete CRUD cycle: mail:send (create), mail:list/thread (read), mail:read/mark-all-read (update), mail:purge (delete)
+- Read status persists in SQLite database (read INTEGER column)
+- All operations have proper preload bridges and error handling
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - issue:delete cleanup of task group member_issues
+- MODIFIED: src/renderer/pages/TasksPage.tsx - handleDelete updates ready queue and group progress
+- MODIFIED: src/renderer/pages/MailPage.tsx - Purge operations clear selectedMessage
+
+#### Current Status
+- 281/366 features passing (added #283 and #284 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Navigation State & Data Persistence)
 
 #### Feature #281: Navigation with agents running maintains state - PASSING
