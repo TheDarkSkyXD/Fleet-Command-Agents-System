@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FiAlertCircle,
   FiAlertTriangle,
@@ -139,6 +139,11 @@ export function TasksPage() {
   const [closingIssueId, setClosingIssueId] = useState<string | null>(null);
   const [closeSummary, setCloseSummary] = useState('');
   const [closingInProgress, setClosingInProgress] = useState(false);
+  // Guards against rapid delete/stop clicks
+  const deleteLockRef = useRef<Set<string>>(new Set());
+  const deleteGroupLockRef = useRef<Set<string>>(new Set());
+  // Guard against form resubmission (back+resubmit prevention)
+  const createLockRef = useRef(false);
   // Completed issues
   const [completedIssues, setCompletedIssues] = useState<Issue[]>([]);
   const [completedLoading, setCompletedLoading] = useState(false);
@@ -216,6 +221,9 @@ export function TasksPage() {
 
   const handleCreate = async () => {
     if (!form.title.trim()) return;
+    // Ref-based guard prevents duplicate submissions (back+resubmit, rapid clicks)
+    if (createLockRef.current) return;
+    createLockRef.current = true;
     setCreating(true);
     try {
       const result = await window.electronAPI.issueCreate({
@@ -235,10 +243,14 @@ export function TasksPage() {
       handleIpcError(err, { context: 'creating issue' });
     } finally {
       setCreating(false);
+      createLockRef.current = false;
     }
   };
 
   const handleDelete = async (id: string) => {
+    // Guard against rapid delete clicks on same item
+    if (deleteLockRef.current.has(id)) return;
+    deleteLockRef.current.add(id);
     try {
       // Find the issue before deletion to check group membership
       const deletedIssue = issues.find((i) => i.id === id);
@@ -260,6 +272,8 @@ export function TasksPage() {
       }
     } catch (err) {
       handleIpcError(err, { context: 'deleting issue' });
+    } finally {
+      deleteLockRef.current.delete(id);
     }
   };
 
@@ -309,6 +323,9 @@ export function TasksPage() {
   };
 
   const handleDeleteGroup = async (id: string) => {
+    // Guard against rapid delete clicks on same group
+    if (deleteGroupLockRef.current.has(id)) return;
+    deleteGroupLockRef.current.add(id);
     try {
       await window.electronAPI.taskGroupDelete(id);
       setGroups((prev) => prev.filter((g) => g.id !== id));
@@ -319,6 +336,8 @@ export function TasksPage() {
       });
     } catch (err) {
       console.error('Failed to delete group:', err);
+    } finally {
+      deleteGroupLockRef.current.delete(id);
     }
   };
 

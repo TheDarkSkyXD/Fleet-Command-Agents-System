@@ -505,6 +505,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     agentName?: string;
   } | null>(null);
   const [isStopping, setIsStopping] = useState(false);
+  const stopLockRef = useRef(false); // Guard against rapid stop clicks
 
   const loadSessions = useCallback(async () => {
     try {
@@ -689,6 +690,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   // Actually perform the stop after confirmation
   const confirmStop = useCallback(async () => {
     if (!stopConfirm) return;
+    // Ref-based guard against rapid double-clicks (prevents race conditions from React batching)
+    if (stopLockRef.current) return;
+    stopLockRef.current = true;
     setIsStopping(true);
     try {
       if (stopConfirm.type === 'single' && stopConfirm.sessionId) {
@@ -719,6 +723,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     } finally {
       setIsStopping(false);
       setStopConfirm(null);
+      stopLockRef.current = false;
     }
   }, [stopConfirm, selectedAgents, loadSessions, loadRunningProcesses]);
 
