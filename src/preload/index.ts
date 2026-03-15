@@ -262,7 +262,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   metricsExport: (format: 'csv' | 'json') => ipcRenderer.invoke('metrics:export', format),
 
   // Events
-  eventList: (filters?: { eventType?: string; agentName?: string; limit?: number }) =>
+  eventList: (filters?: { eventType?: string; agentName?: string; runId?: string; limit?: number }) =>
     ipcRenderer.invoke('event:list', filters),
   eventCreate: (eventData: {
     event_type: string;

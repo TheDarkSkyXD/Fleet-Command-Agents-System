@@ -2269,6 +2269,7 @@ export function registerIpcHandlers(): void {
         type?: string;
         priority?: string;
         agent?: string;
+        runId?: string;
       },
     ) => {
       try {
@@ -2297,6 +2298,13 @@ export function registerIpcHandlers(): void {
           const agentTerm = `%${filters.agent}%`;
           conditions.push('(from_agent LIKE ? OR to_agent LIKE ?)');
           params.push(agentTerm, agentTerm);
+        }
+        if (filters?.runId) {
+          // Filter mail by agents that belong to sessions in the specified run
+          conditions.push(
+            '(from_agent IN (SELECT DISTINCT agent_name FROM sessions WHERE run_id = ?) OR to_agent IN (SELECT DISTINCT agent_name FROM sessions WHERE run_id = ?))',
+          );
+          params.push(filters.runId, filters.runId);
         }
 
         let query = 'SELECT * FROM messages';
@@ -6227,7 +6235,7 @@ export function registerIpcHandlers(): void {
   // Event channels - event store tracking for tool usage, sessions, mail
   ipcMain.handle(
     'event:list',
-    (_event, filters?: { eventType?: string; agentName?: string; limit?: number }) => {
+    (_event, filters?: { eventType?: string; agentName?: string; runId?: string; limit?: number }) => {
       try {
         let query = 'SELECT * FROM events';
         const conditions: string[] = [];
@@ -6240,6 +6248,10 @@ export function registerIpcHandlers(): void {
         if (filters?.agentName) {
           conditions.push('agent_name = ?');
           params.push(filters.agentName);
+        }
+        if (filters?.runId) {
+          conditions.push('run_id = ?');
+          params.push(filters.runId);
         }
         if (conditions.length > 0) {
           query += ` WHERE ${conditions.join(' AND ')}`;

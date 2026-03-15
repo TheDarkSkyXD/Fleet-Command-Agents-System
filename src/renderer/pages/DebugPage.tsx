@@ -25,13 +25,17 @@ import {
   FiTrash2,
   FiTrendingUp,
   FiUpload,
+  FiExternalLink,
+  FiEye,
+  FiGlobe,
+  FiStopCircle,
   FiXCircle,
   FiZap,
 } from 'react-icons/fi';
 import type { AppLogEntry, Event, LogLevel, ToolStats } from '../../shared/types';
 import { formatTimeOnly, formatDateTime, formatAbsoluteDateTime } from '../lib/dateFormatting';
 
-type DebugTab = 'terminal' | 'events' | 'tool-stats' | 'logs' | 'timeline' | 'errors';
+type DebugTab = 'terminal' | 'events' | 'tool-stats' | 'logs' | 'timeline' | 'errors' | 'preview';
 
 export function DebugPage() {
   const [activeTab, setActiveTab] = useState<DebugTab>('terminal');
@@ -119,6 +123,19 @@ export function DebugPage() {
           <FiAlertTriangle className="h-4 w-4" />
           Errors
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('preview')}
+          data-testid="debug-tab-preview"
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'preview'
+              ? 'bg-slate-700 text-green-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <FiEye className="h-4 w-4" />
+          Preview
+        </button>
       </div>
 
       {activeTab === 'terminal' ? (
@@ -131,6 +148,8 @@ export function DebugPage() {
         <TimelinePanel />
       ) : activeTab === 'errors' ? (
         <ErrorAggregationPanel />
+      ) : activeTab === 'preview' ? (
+        <AppPreviewPanel />
       ) : (
         <EventLogPanel />
       )}
@@ -1938,4 +1957,302 @@ function tryFormatJson(str: string): string {
   } catch {
     return str;
   }
+}
+
+// ── App Preview Panel (Feature #365) ──────────────────────────────────
+
+function AppPreviewPanel() {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [projectPath, setProjectPath] = useState<string | null>(null);
+  const [showTerminal, setShowTerminal] = useState(true);
+
+  // Check initial status and set up terminal
+  useEffect(() => {
+    if (!terminalRef.current) return;
+
+    const term = new Terminal({
+      theme: {
+        background: '#0f172a',
+        foreground: '#f8fafc',
+        cursor: '#34d399',
+        cursorAccent: '#0f172a',
+        selectionBackground: '#334155',
+        black: '#1e293b',
+        red: '#f87171',
+        green: '#34d399',
+        yellow: '#fbbf24',
+        blue: '#60a5fa',
+        magenta: '#c084fc',
+        cyan: '#22d3ee',
+        white: '#f8fafc',
+      },
+      fontSize: 13,
+      fontFamily: 'JetBrains Mono, Cascadia Code, Consolas, monospace',
+      scrollback: 5000,
+      cursorBlink: false,
+      disableStdin: true,
+    });
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon();
+    term.loadAddon(fitAddon);
+    term.loadAddon(webLinksAddon);
+    term.open(terminalRef.current);
+    fitAddon.fit();
+    xtermRef.current = term;
+    fitAddonRef.current = fitAddon;
+
+    // Check if preview is already running
+    window.electronAPI.appPreviewStatus().then((result) => {
+      if (result.data?.running) {
+        setIsRunning(true);
+        setPreviewUrl(result.data.url);
+        setProjectPath(result.data.projectPath);
+        // Load existing output buffer
+        window.electronAPI.appPreviewOutput().then((outputResult) => {
+          if (outputResult.data) {
+            for (const line of outputResult.data) {
+              term.write(line);
+            }
+          }
+        });
+      }
+    });
+
+    // Listen for output
+    const removeOutputListener = window.electronAPI.onAppPreviewOutput((payload) => {
+      term.write(payload.data);
+      // Check for URL in output
+      const urlMatch = payload.data.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d+/);
+      if (urlMatch) {
+        const detected = urlMatch[0].replace('0.0.0.0', 'localhost');
+        setPreviewUrl(detected);
+      }
+    });
+
+    const removeExitListener = window.electronAPI.onAppPreviewExit(({ exitCode }) => {
+      term.writeln(`\r\n\x1b[33m[Preview] Process exited with code ${exitCode}\x1b[0m`);
+      setIsRunning(false);
+      setIsStarting(false);
+      setPreviewUrl(null);
+    });
+
+    // Handle resize
+    const resizeObserver = new ResizeObserver(() => {
+      try {
+        fitAddon.fit();
+      } catch {
+        // ignore
+      }
+    });
+    resizeObserver.observe(terminalRef.current);
+
+    return () => {
+      removeOutputListener();
+      removeExitListener();
+      resizeObserver.disconnect();
+      term.dispose();
+      xtermRef.current = null;
+      fitAddonRef.current = null;
+    };
+  }, []);
+
+  const handleStart = useCallback(async () => {
+    setIsStarting(true);
+    if (xtermRef.current) {
+      xtermRef.current.clear();
+      xtermRef.current.writeln('\x1b[32m[Preview] Starting dev server...\x1b[0m');
+    }
+    try {
+      const result = await window.electronAPI.appPreviewStart();
+      if (result.error) {
+        toast.error(`Failed to start preview: ${result.error}`);
+        if (xtermRef.current) {
+          xtermRef.current.writeln(`\x1b[31m[Error] ${result.error}\x1b[0m`);
+        }
+        setIsStarting(false);
+        return;
+      }
+      if (result.data) {
+        setIsRunning(true);
+        setProjectPath(result.data.projectPath);
+        if (result.data.alreadyRunning) {
+          toast.success('Preview server is already running');
+          setPreviewUrl(result.data.url);
+        } else {
+          toast.success('Preview server started');
+        }
+      }
+    } catch (err) {
+      toast.error(`Failed to start preview: ${String(err)}`);
+    }
+    setIsStarting(false);
+  }, []);
+
+  const handleStop = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.appPreviewStop();
+      if (result.error) {
+        toast.error(`Failed to stop preview: ${result.error}`);
+        return;
+      }
+      setIsRunning(false);
+      setPreviewUrl(null);
+      setProjectPath(null);
+      if (xtermRef.current) {
+        xtermRef.current.writeln('\x1b[33m[Preview] Server stopped\x1b[0m');
+      }
+      toast.success('Preview server stopped');
+    } catch (err) {
+      toast.error(`Failed to stop preview: ${String(err)}`);
+    }
+  }, []);
+
+  const handleOpenBrowser = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.appPreviewOpenBrowser();
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success('Opened preview in browser');
+    } catch (err) {
+      toast.error(`Failed to open browser: ${String(err)}`);
+    }
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-4" data-testid="app-preview-panel">
+      {/* Header with controls */}
+      <div className="flex items-center justify-between rounded-lg bg-slate-800 p-4">
+        <div className="flex items-center gap-3">
+          <FiGlobe className="h-5 w-5 text-green-400" />
+          <div>
+            <h3 className="text-sm font-semibold text-slate-50">App Preview</h3>
+            <p className="text-xs text-slate-400">
+              {projectPath
+                ? `Project: ${projectPath.split(/[\\/]/).pop()}`
+                : 'Run the dev server to preview agent changes'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isRunning ? (
+            <>
+              <button
+                type="button"
+                onClick={handleOpenBrowser}
+                disabled={!previewUrl}
+                data-testid="preview-open-browser"
+                className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={previewUrl || 'Waiting for URL...'}
+              >
+                <FiExternalLink className="h-3.5 w-3.5" />
+                Open in Browser
+              </button>
+              <button
+                type="button"
+                onClick={handleStop}
+                data-testid="preview-stop-btn"
+                className="flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-500"
+              >
+                <FiStopCircle className="h-3.5 w-3.5" />
+                Stop Server
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={isStarting}
+              data-testid="preview-start-btn"
+              className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-500 disabled:opacity-50"
+            >
+              <FiPlay className="h-3.5 w-3.5" />
+              {isStarting ? 'Starting...' : 'Run Preview'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Status bar */}
+      <div className="flex items-center gap-4 rounded-lg bg-slate-800/50 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <div
+            className={`h-2 w-2 rounded-full ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`}
+            data-testid="preview-status-indicator"
+            data-running={isRunning}
+          />
+          <span className="text-xs text-slate-400">
+            {isRunning ? 'Server Running' : 'Server Stopped'}
+          </span>
+        </div>
+        {previewUrl && (
+          <div className="flex items-center gap-2" data-testid="preview-url-display">
+            <FiGlobe className="h-3.5 w-3.5 text-green-400" />
+            <span className="text-xs font-mono text-green-400">{previewUrl}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowTerminal((prev) => !prev)}
+          className="ml-auto text-xs text-slate-400 hover:text-slate-200 transition-colors"
+          data-testid="preview-toggle-terminal"
+        >
+          {showTerminal ? 'Hide' : 'Show'} Terminal Output
+        </button>
+      </div>
+
+      {/* Preview area */}
+      <div className="flex-1 flex flex-col gap-4">
+        {/* Embedded webview when URL is available */}
+        {previewUrl && (
+          <div className="rounded-lg border border-slate-700 overflow-hidden" data-testid="preview-webview-container">
+            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 border-b border-slate-700">
+              <FiGlobe className="h-3.5 w-3.5 text-green-400" />
+              <span className="text-xs font-mono text-slate-400 truncate">{previewUrl}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const iframe = document.getElementById('preview-iframe') as HTMLIFrameElement | null;
+                  if (iframe) {
+                    iframe.src = previewUrl;
+                  }
+                }}
+                data-testid="preview-refresh-btn"
+                className="ml-auto text-xs text-slate-400 hover:text-slate-200"
+                title="Refresh preview"
+              >
+                <FiRefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <iframe
+              id="preview-iframe"
+              src={previewUrl}
+              title="App Preview"
+              className="w-full bg-white"
+              style={{ height: showTerminal ? '350px' : '600px' }}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              data-testid="preview-iframe"
+            />
+          </div>
+        )}
+
+        {/* Terminal output */}
+        {showTerminal && (
+          <div
+            className="rounded-lg border border-slate-700 overflow-hidden"
+            style={{ height: previewUrl ? '200px' : '500px' }}
+            data-testid="preview-terminal"
+          >
+            <div ref={terminalRef} className="h-full" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
