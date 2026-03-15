@@ -67,6 +67,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
   claudeDetect: (options?: { forceRefresh?: boolean }) =>
     ipcRenderer.invoke('claude:detect', options),
 
+  // Agent Definitions
+  agentDefList: () => ipcRenderer.invoke('agentDef:list'),
+  agentDefGet: (role: string) => ipcRenderer.invoke('agentDef:get', role),
+  agentDefImport: (
+    definitions: Array<{
+      role: string;
+      display_name: string;
+      description: string;
+      capabilities: string;
+      default_model: string;
+      tool_allowlist?: string;
+      bash_restrictions?: string;
+      file_scope?: string;
+    }>,
+  ) => ipcRenderer.invoke('agentDef:import', definitions),
+  agentDefExport: (roles?: string[]) => ipcRenderer.invoke('agentDef:export', roles),
+
+  // Agent process management (node-pty)
+  agentOutput: (id: string) => ipcRenderer.invoke('agent:output', id),
+  agentWrite: (id: string, data: string) => ipcRenderer.invoke('agent:write', id, data),
+  agentResize: (id: string, cols: number, rows: number) =>
+    ipcRenderer.invoke('agent:resize', id, cols, rows),
+  agentProcessInfo: (id: string) => ipcRenderer.invoke('agent:process-info', id),
+  agentRunningList: () => ipcRenderer.invoke('agent:running-list'),
+
+  // Projects
+  projectList: () => ipcRenderer.invoke('project:list'),
+  projectCreate: (project: { id: string; name: string; path: string; description?: string }) =>
+    ipcRenderer.invoke('project:create', project),
+  projectGet: (id: string) => ipcRenderer.invoke('project:get', id),
+  projectUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('project:update', id, updates),
+  projectDelete: (id: string) => ipcRenderer.invoke('project:delete', id),
+  projectSwitch: (id: string) => ipcRenderer.invoke('project:switch', id),
+  projectGetActive: () => ipcRenderer.invoke('project:get-active'),
+
+  // Worktrees
+  worktreeList: (repoPath: string) => ipcRenderer.invoke('worktree:list', repoPath),
+
   // System
   updateCheck: () => ipcRenderer.invoke('update:check'),
   doctorRun: () => ipcRenderer.invoke('doctor:run'),
@@ -74,6 +113,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Events (renderer -> main)
   onAgentUpdate: (callback: (data: unknown) => void) =>
     ipcRenderer.on('agent:update', (_event, data) => callback(data)),
+  onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) =>
+    ipcRenderer.on('agent:output', (_event, data) => callback(data)),
   onMailReceived: (callback: (data: unknown) => void) =>
     ipcRenderer.on('mail:received', (_event, data) => callback(data)),
   onMergeUpdate: (callback: (data: unknown) => void) =>

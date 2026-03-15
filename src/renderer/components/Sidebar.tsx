@@ -1,13 +1,16 @@
 import {
+  FiBookOpen,
   FiCheckSquare,
   FiChevronLeft,
   FiChevronRight,
+  FiGitBranch,
   FiGitMerge,
   FiMail,
   FiSettings,
   FiTerminal,
   FiUsers,
 } from 'react-icons/fi';
+import { ProjectSwitcher } from './ProjectSwitcher';
 
 interface SidebarProps {
   currentPage: string;
@@ -20,6 +23,8 @@ const navItems = [
   { id: 'agents', label: 'Agents', icon: FiUsers },
   { id: 'mail', label: 'Mail', icon: FiMail },
   { id: 'merge', label: 'Merge', icon: FiGitMerge },
+  { id: 'worktrees', label: 'Worktrees', icon: FiGitBranch },
+  { id: 'definitions', label: 'Definitions', icon: FiBookOpen },
   { id: 'tasks', label: 'Tasks', icon: FiCheckSquare },
   { id: 'debug', label: 'Debug', icon: FiTerminal },
   { id: 'settings', label: 'Settings', icon: FiSettings },
@@ -45,6 +50,11 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
         >
           {collapsed ? <FiChevronRight size={16} /> : <FiChevronLeft size={16} />}
         </button>
+      </div>
+
+      {/* Project Switcher */}
+      <div className="pt-2">
+        <ProjectSwitcher collapsed={collapsed} />
       </div>
 
       {/* Navigation */}

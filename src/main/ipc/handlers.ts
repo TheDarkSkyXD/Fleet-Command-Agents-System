@@ -2,6 +2,11 @@ import { ipcMain } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
 import {
+  type AgentCapability,
+  agentProcessManager,
+  getDefaultModel,
+} from '../services/agentProcessManager';
+import {
   clearClaudeCliCache,
   detectClaudeCli,
   getClaudeCliStatus,
@@ -121,18 +126,39 @@ export function registerIpcHandlers(): void {
         id: string;
         agent_name: string;
         capability: string;
+        model?: string;
         run_id?: string;
         task_id?: string;
         parent_agent?: string;
         worktree_path?: string;
         branch_name?: string;
         depth?: number;
+        prompt?: string;
       },
     ) => {
       try {
+        const capability = options.capability as AgentCapability;
+        const model = options.model || getDefaultModel(capability);
+
+        // Spawn the actual node-pty process via AgentProcessManager
+        const agentProcess = agentProcessManager.spawn({
+          id: options.id,
+          agentName: options.agent_name,
+          capability,
+          model,
+          worktreePath: options.worktree_path,
+          branchName: options.branch_name,
+          taskId: options.task_id,
+          parentAgent: options.parent_agent,
+          runId: options.run_id,
+          depth: options.depth,
+          prompt: options.prompt,
+        });
+
+        // Insert session record into database with PID
         loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting')`,
+          `INSERT INTO sessions (id, agent_name, capability, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?)`,
         ).run(
           options.id,
           options.agent_name,
@@ -143,12 +169,22 @@ export function registerIpcHandlers(): void {
           options.worktree_path ?? null,
           options.branch_name ?? null,
           options.depth ?? 0,
+          agentProcess.pid,
         );
+
+        // Transition to 'working' state after successful spawn
+        loggedPrepare(
+          `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
+        ).run(options.id);
+
         const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(options.id);
         log.info(
-          `[IPC] agent:spawn - INSERT session into real database: ${options.agent_name} (${options.capability})`,
+          `[IPC] agent:spawn - spawned node-pty process: ${options.agent_name} (${options.capability}), model=${model}, PID=${agentProcess.pid}`,
         );
-        return { data: session, error: null };
+        return {
+          data: { ...(session as Record<string, unknown>), model, pid: agentProcess.pid },
+          error: null,
+        };
       } catch (error) {
         log.error('agent:spawn failed:', error);
         return { data: null, error: String(error) };
@@ -156,14 +192,17 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  ipcMain.handle('agent:stop', (_event, agentId: string) => {
+  ipcMain.handle('agent:stop', async (_event, agentId: string) => {
     try {
+      // Kill the node-pty process
+      await agentProcessManager.stop(agentId);
+
       loggedPrepare(
         `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
         WHERE id = ? AND state NOT IN ('completed')`,
       ).run(agentId);
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(agentId);
-      log.info(`[IPC] agent:stop - UPDATE session in real database: ${agentId}`);
+      log.info(`[IPC] agent:stop - stopped pty process and updated session: ${agentId}`);
       return { data: session, error: null };
     } catch (error) {
       log.error('agent:stop failed:', error);
@@ -171,14 +210,19 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('agent:stop-all', () => {
+  ipcMain.handle('agent:stop-all', async () => {
     try {
+      // Kill all node-pty processes first
+      const processesKilled = await agentProcessManager.stopAll();
+
       const result = loggedPrepare(
         `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
         WHERE state NOT IN ('completed')`,
       ).run();
-      log.info(`[IPC] agent:stop-all - UPDATE in real database: ${result.changes} agents stopped`);
-      return { data: { stopped: result.changes }, error: null };
+      log.info(
+        `[IPC] agent:stop-all - killed ${processesKilled} pty processes, updated ${result.changes} sessions`,
+      );
+      return { data: { stopped: result.changes, processesKilled }, error: null };
     } catch (error) {
       log.error('agent:stop-all failed:', error);
       return { data: null, error: String(error) };
@@ -804,6 +848,380 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('cleanup:execute failed:', error);
       return { data: false, error: String(error) };
+    }
+  });
+
+  // Agent process channels - node-pty management
+  ipcMain.handle('agent:output', (_event, agentId: string) => {
+    try {
+      const output = agentProcessManager.getOutput(agentId);
+      return { data: output, error: null };
+    } catch (error) {
+      log.error('agent:output failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('agent:write', (_event, agentId: string, data: string) => {
+    try {
+      const success = agentProcessManager.write(agentId, data);
+      return { data: success, error: null };
+    } catch (error) {
+      log.error('agent:write failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('agent:resize', (_event, agentId: string, cols: number, rows: number) => {
+    try {
+      const success = agentProcessManager.resize(agentId, cols, rows);
+      return { data: success, error: null };
+    } catch (error) {
+      log.error('agent:resize failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('agent:process-info', (_event, agentId: string) => {
+    try {
+      const proc = agentProcessManager.get(agentId);
+      if (!proc) {
+        return { data: null, error: null };
+      }
+      return {
+        data: {
+          id: proc.id,
+          agentName: proc.agentName,
+          capability: proc.capability,
+          model: proc.model,
+          pid: proc.pid,
+          isRunning: proc.isRunning,
+          createdAt: proc.createdAt.toISOString(),
+          outputLines: proc.outputBuffer.length,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('agent:process-info failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('agent:running-list', () => {
+    try {
+      const agents = agentProcessManager.getAll().map((a) => ({
+        id: a.id,
+        agentName: a.agentName,
+        capability: a.capability,
+        model: a.model,
+        pid: a.pid,
+        isRunning: a.isRunning,
+        createdAt: a.createdAt.toISOString(),
+      }));
+      return { data: agents, error: null };
+    } catch (error) {
+      log.error('agent:running-list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Agent Definition channels - CRUD + import/export for agent role definitions
+  ipcMain.handle('agentDef:list', () => {
+    try {
+      const defs = loggedPrepare('SELECT * FROM agent_definitions ORDER BY role ASC').all();
+      log.info(
+        `[IPC] agentDef:list - SELECT returned ${defs.length} definitions from real database`,
+      );
+      return { data: defs, error: null };
+    } catch (error) {
+      log.error('agentDef:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('agentDef:get', (_event, role: string) => {
+    try {
+      const def = loggedPrepare('SELECT * FROM agent_definitions WHERE role = ?').get(role);
+      log.info(`[IPC] agentDef:get - SELECT definition from real database: role=${role}`);
+      return { data: def || null, error: null };
+    } catch (error) {
+      log.error('agentDef:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'agentDef:import',
+    (
+      _event,
+      definitions: Array<{
+        role: string;
+        display_name: string;
+        description: string;
+        capabilities: string;
+        default_model: string;
+        tool_allowlist?: string;
+        bash_restrictions?: string;
+        file_scope?: string;
+      }>,
+    ) => {
+      try {
+        const upsert = loggedPrepare(`
+          INSERT OR REPLACE INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `);
+        let imported = 0;
+        for (const def of definitions) {
+          upsert.run(
+            def.role,
+            def.display_name,
+            def.description,
+            def.capabilities,
+            def.default_model,
+            def.tool_allowlist ?? null,
+            def.bash_restrictions ?? null,
+            def.file_scope ?? null,
+          );
+          imported++;
+        }
+        log.info(`[IPC] agentDef:import - imported ${imported} definitions into real database`);
+        const allDefs = loggedPrepare('SELECT * FROM agent_definitions ORDER BY role ASC').all();
+        return { data: allDefs, error: null, imported };
+      } catch (error) {
+        log.error('agentDef:import failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('agentDef:export', (_event, roles?: string[]) => {
+    try {
+      let defs: unknown[];
+      if (roles && roles.length > 0) {
+        const placeholders = roles.map(() => '?').join(',');
+        defs = loggedPrepare(
+          `SELECT * FROM agent_definitions WHERE role IN (${placeholders}) ORDER BY role ASC`,
+        ).all(...roles);
+      } else {
+        defs = loggedPrepare('SELECT * FROM agent_definitions ORDER BY role ASC').all();
+      }
+      log.info(`[IPC] agentDef:export - exported ${defs.length} definitions from real database`);
+      return { data: defs, error: null };
+    } catch (error) {
+      log.error('agentDef:export failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Project channels - all use real SQLite queries via loggedPrepare
+  ipcMain.handle('project:list', () => {
+    try {
+      const projects = loggedPrepare(
+        'SELECT * FROM projects ORDER BY last_opened_at DESC, created_at DESC',
+      ).all();
+      log.info(
+        `[IPC] project:list - SELECT returned ${projects.length} projects from real database`,
+      );
+      return { data: projects, error: null };
+    } catch (error) {
+      log.error('project:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'project:create',
+    (
+      _event,
+      project: {
+        id: string;
+        name: string;
+        path: string;
+        description?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare('INSERT INTO projects (id, name, path, description) VALUES (?, ?, ?, ?)').run(
+          project.id,
+          project.name,
+          project.path,
+          project.description ?? null,
+        );
+        const created = loggedPrepare('SELECT * FROM projects WHERE id = ?').get(project.id);
+        log.info(`[IPC] project:create - INSERT project into real database: ${project.name}`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('project:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('project:get', (_event, id: string) => {
+    try {
+      const project = loggedPrepare('SELECT * FROM projects WHERE id = ?').get(id);
+      log.info(`[IPC] project:get - SELECT project from real database: id=${id}`);
+      return { data: project || null, error: null };
+    } catch (error) {
+      log.error('project:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('project:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      const allowedFields = ['name', 'path', 'description'];
+      const setClauses: string[] = [];
+      const params: unknown[] = [];
+      for (const [key, value] of Object.entries(updates)) {
+        if (allowedFields.includes(key)) {
+          setClauses.push(`${key} = ?`);
+          params.push(value);
+        }
+      }
+      if (setClauses.length === 0) {
+        return { data: null, error: 'No valid fields to update' };
+      }
+      setClauses.push("updated_at = datetime('now')");
+      params.push(id);
+      loggedPrepare(`UPDATE projects SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
+      const updated = loggedPrepare('SELECT * FROM projects WHERE id = ?').get(id);
+      log.info(`[IPC] project:update - UPDATE project in real database: id=${id}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('project:update failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('project:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM projects WHERE id = ?').run(id);
+      log.info(`[IPC] project:delete - DELETE project from real database: id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('project:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('project:switch', (_event, id: string) => {
+    try {
+      loggedPrepare('UPDATE projects SET is_active = 0').run();
+      loggedPrepare(
+        "UPDATE projects SET is_active = 1, last_opened_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+      ).run(id);
+      const project = loggedPrepare('SELECT * FROM projects WHERE id = ?').get(id);
+      log.info(`[IPC] project:switch - switched active project in real database: id=${id}`);
+      return { data: project, error: null };
+    } catch (error) {
+      log.error('project:switch failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('project:get-active', () => {
+    try {
+      const project = loggedPrepare('SELECT * FROM projects WHERE is_active = 1 LIMIT 1').get();
+      log.info(`[IPC] project:get-active - SELECT active project: ${project ? 'found' : 'none'}`);
+      return { data: project || null, error: null };
+    } catch (error) {
+      log.error('project:get-active failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Worktree channels - use simple-git for real git worktree listing
+  ipcMain.handle('worktree:list', async (_event, repoPath: string) => {
+    try {
+      const simpleGit = (await import('simple-git')).default;
+      const git = simpleGit(repoPath);
+      const result = await git.raw(['worktree', 'list', '--porcelain']);
+      const worktrees: Array<{
+        path: string;
+        branch: string | null;
+        headCommit: string | null;
+        headCommitShort: string | null;
+        headMessage: string | null;
+        isMain: boolean;
+        isBare: boolean;
+        agentName: string | null;
+        status: 'clean' | 'dirty' | 'unknown';
+      }> = [];
+
+      const blocks = result.trim().split('\n\n');
+      let isFirst = true;
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        const lines = block.trim().split('\n');
+        let wtPath = '';
+        let head = '';
+        let branch: string | null = null;
+        let bare = false;
+
+        for (const line of lines) {
+          if (line.startsWith('worktree ')) wtPath = line.substring(9);
+          else if (line.startsWith('HEAD ')) head = line.substring(5);
+          else if (line.startsWith('branch '))
+            branch = line.substring(7).replace('refs/heads/', '');
+          else if (line === 'bare') bare = true;
+        }
+        if (!wtPath) continue;
+
+        let headMessage: string | null = null;
+        try {
+          const logResult = await git.raw(['log', '-1', '--format=%s', head]);
+          headMessage = logResult.trim() || null;
+        } catch {
+          /* ignore */
+        }
+
+        let status: 'clean' | 'dirty' | 'unknown' = 'unknown';
+        try {
+          const wtGit = simpleGit(wtPath);
+          const statusResult = await wtGit.status();
+          status = statusResult.isClean() ? 'clean' : 'dirty';
+        } catch {
+          /* ignore */
+        }
+
+        let agentName: string | null = null;
+        if (branch) {
+          const match = branch.match(
+            /^(scout|builder|reviewer|lead|merger|coordinator|monitor)-([^/]+)/,
+          );
+          if (match) agentName = `${match[1]}-${match[2]}`;
+        }
+        if (!agentName) {
+          try {
+            const session = loggedPrepare(
+              "SELECT agent_name FROM sessions WHERE worktree_path = ? AND state NOT IN ('completed') LIMIT 1",
+            ).get(wtPath) as { agent_name: string } | undefined;
+            if (session) agentName = session.agent_name;
+          } catch {
+            /* ignore */
+          }
+        }
+
+        worktrees.push({
+          path: wtPath,
+          branch,
+          headCommit: head || null,
+          headCommitShort: head ? head.substring(0, 7) : null,
+          headMessage,
+          isMain: isFirst,
+          isBare: bare,
+          agentName,
+          status,
+        });
+        isFirst = false;
+      }
+
+      log.info(`[IPC] worktree:list - found ${worktrees.length} worktrees in ${repoPath}`);
+      return { data: worktrees, error: null };
+    } catch (error) {
+      log.error('worktree:list failed:', error);
+      return { data: null, error: String(error) };
     }
   });
 

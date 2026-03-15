@@ -189,6 +189,45 @@ export interface Issue {
   closed_at: string | null;
 }
 
+// Project types
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  description: string | null;
+  is_active: number;
+  last_opened_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Worktree types
+export interface Worktree {
+  path: string;
+  branch: string | null;
+  headCommit: string | null;
+  headCommitShort: string | null;
+  headMessage: string | null;
+  isMain: boolean;
+  isBare: boolean;
+  agentName: string | null;
+  status: 'clean' | 'dirty' | 'unknown';
+}
+
+// Agent Definition types
+export interface AgentDefinition {
+  role: string;
+  display_name: string;
+  description: string;
+  capabilities: string; // JSON array
+  default_model: string;
+  tool_allowlist: string | null; // JSON array
+  bash_restrictions: string | null; // JSON array
+  file_scope: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Electron API type for renderer process
 // Health check response
 export interface HealthCheckResponse {
@@ -212,17 +251,55 @@ export interface DbStatusResponse {
   error?: string;
 }
 
+// Agent spawn options for the renderer
+export interface AgentSpawnRequest {
+  id: string;
+  agent_name: string;
+  capability: AgentCapability;
+  model?: string;
+  run_id?: string;
+  task_id?: string;
+  parent_agent?: string;
+  worktree_path?: string;
+  branch_name?: string;
+  depth?: number;
+  prompt?: string;
+}
+
+// Running agent process info from main process
+export interface AgentProcessInfo {
+  id: string;
+  agentName: string;
+  capability: AgentCapability;
+  model: string;
+  pid: number;
+  isRunning: boolean;
+  createdAt: string;
+  outputLines?: number;
+}
+
 export interface ElectronAPI {
   healthCheck: () => Promise<HealthCheckResponse>;
   dbStatus: () => Promise<DbStatusResponse>;
   agentList: () => Promise<{ data: Session[] | null; error: string | null }>;
   agentDetail: (id: string) => Promise<{ data: Session | null; error: string | null }>;
   agentSpawn: (
-    options: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: string | null }>;
+    options: AgentSpawnRequest,
+  ) => Promise<{ data: (Session & { model: string; pid: number }) | null; error: string | null }>;
   agentStop: (name: string) => Promise<{ data: unknown; error: string | null }>;
   agentStopAll: () => Promise<{ data: unknown; error: string | null }>;
   agentNudge: (name: string) => Promise<{ data: unknown; error: string | null }>;
+  agentOutput: (id: string) => Promise<{ data: string[] | null; error: string | null }>;
+  agentWrite: (id: string, data: string) => Promise<{ data: boolean; error: string | null }>;
+  agentResize: (
+    id: string,
+    cols: number,
+    rows: number,
+  ) => Promise<{ data: boolean; error: string | null }>;
+  agentProcessInfo: (
+    id: string,
+  ) => Promise<{ data: AgentProcessInfo | null; error: string | null }>;
+  agentRunningList: () => Promise<{ data: AgentProcessInfo[] | null; error: string | null }>;
   mailList: (
     filters?: Record<string, unknown>,
   ) => Promise<{ data: Message[] | null; error: string | null }>;
@@ -277,6 +354,45 @@ export interface ElectronAPI {
     agentName: string,
   ) => Promise<{ data: Issue | null; error: string | null }>;
 
+  // Agent Definitions
+  agentDefList: () => Promise<{ data: AgentDefinition[] | null; error: string | null }>;
+  agentDefGet: (role: string) => Promise<{ data: AgentDefinition | null; error: string | null }>;
+  agentDefImport: (
+    definitions: Array<{
+      role: string;
+      display_name: string;
+      description: string;
+      capabilities: string;
+      default_model: string;
+      tool_allowlist?: string;
+      bash_restrictions?: string;
+      file_scope?: string;
+    }>,
+  ) => Promise<{ data: AgentDefinition[] | null; error: string | null; imported?: number }>;
+  agentDefExport: (
+    roles?: string[],
+  ) => Promise<{ data: AgentDefinition[] | null; error: string | null }>;
+
+  // Projects
+  projectList: () => Promise<{ data: Project[] | null; error: string | null }>;
+  projectCreate: (project: {
+    id: string;
+    name: string;
+    path: string;
+    description?: string;
+  }) => Promise<{ data: Project | null; error: string | null }>;
+  projectGet: (id: string) => Promise<{ data: Project | null; error: string | null }>;
+  projectUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: Project | null; error: string | null }>;
+  projectDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  projectSwitch: (id: string) => Promise<{ data: Project | null; error: string | null }>;
+  projectGetActive: () => Promise<{ data: Project | null; error: string | null }>;
+
+  // Worktrees
+  worktreeList: (repoPath: string) => Promise<{ data: Worktree[] | null; error: string | null }>;
+
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
   claudeStatus: () => Promise<{
@@ -295,6 +411,7 @@ export interface ElectronAPI {
   updateCheck: () => Promise<{ data: unknown; error: string | null }>;
   doctorRun: () => Promise<{ data: unknown; error: string | null }>;
   onAgentUpdate: (callback: (data: unknown) => void) => void;
+  onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => void;
   onMailReceived: (callback: (data: unknown) => void) => void;
   onMergeUpdate: (callback: (data: unknown) => void) => void;
   removeAllListeners: (channel: string) => void;

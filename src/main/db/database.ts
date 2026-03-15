@@ -167,6 +167,30 @@ export async function initDatabase(): Promise<void> {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS agent_definitions (
+      role TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      capabilities TEXT NOT NULL,
+      default_model TEXT NOT NULL,
+      tool_allowlist TEXT,
+      bash_restrictions TEXT,
+      file_scope TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
+      description TEXT,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      last_opened_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Create indexes for common queries
@@ -183,7 +207,183 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
     CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority);
     CREATE INDEX IF NOT EXISTS idx_issues_assigned ON issues(assigned_agent);
+    CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_active);
+    CREATE INDEX IF NOT EXISTS idx_projects_path ON projects(path);
   `);
+
+  // Seed default agent definitions if table is empty
+  const defCount = db.prepare('SELECT COUNT(*) as cnt FROM agent_definitions').get() as {
+    cnt: number;
+  };
+  if (defCount.cnt === 0) {
+    const seedDefs = [
+      {
+        role: 'scout',
+        display_name: 'Scout',
+        description:
+          'Read-only exploration agent. Scouts analyze codebases, search for patterns, read documentation, and report findings without modifying any files.',
+        capabilities: JSON.stringify([
+          'read_files',
+          'search_code',
+          'grep',
+          'glob',
+          'web_search',
+          'analyze_structure',
+        ]),
+        default_model: 'haiku',
+        tool_allowlist: JSON.stringify(['Read', 'Grep', 'Glob', 'Bash (read-only)', 'WebSearch']),
+        bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'no git reset']),
+        file_scope: 'read-only (entire project)',
+      },
+      {
+        role: 'builder',
+        display_name: 'Builder',
+        description:
+          'Implementation agent. Builders write code, create files, modify existing code, and implement features within their assigned file scope.',
+        capabilities: JSON.stringify([
+          'read_files',
+          'write_files',
+          'edit_files',
+          'run_tests',
+          'lint',
+          'build',
+        ]),
+        default_model: 'sonnet',
+        tool_allowlist: JSON.stringify(['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash']),
+        bash_restrictions: JSON.stringify([
+          'no git push',
+          'no git reset --hard',
+          'confined to worktree',
+        ]),
+        file_scope: 'assigned files only',
+      },
+      {
+        role: 'reviewer',
+        display_name: 'Reviewer',
+        description:
+          'Validation agent. Reviewers inspect code changes, run tests, check for bugs, verify feature completeness, and provide feedback.',
+        capabilities: JSON.stringify([
+          'read_files',
+          'search_code',
+          'run_tests',
+          'lint',
+          'diff_review',
+          'provide_feedback',
+        ]),
+        default_model: 'sonnet',
+        tool_allowlist: JSON.stringify([
+          'Read',
+          'Grep',
+          'Glob',
+          'Bash (read-only + tests)',
+          'Diff',
+        ]),
+        bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'test execution only']),
+        file_scope: 'read-only (entire project)',
+      },
+      {
+        role: 'lead',
+        display_name: 'Lead',
+        description:
+          'Team coordination + implementation agent. Leads decompose tasks, dispatch workers, monitor progress, and can also write code when needed.',
+        capabilities: JSON.stringify([
+          'read_files',
+          'write_files',
+          'spawn_agents',
+          'assign_tasks',
+          'monitor_health',
+          'send_mail',
+        ]),
+        default_model: 'opus',
+        tool_allowlist: JSON.stringify([
+          'Read',
+          'Write',
+          'Edit',
+          'Grep',
+          'Glob',
+          'Bash',
+          'AgentSpawn',
+          'Mail',
+        ]),
+        bash_restrictions: JSON.stringify(['no git push to main', 'no git reset --hard']),
+        file_scope: 'full project access',
+      },
+      {
+        role: 'merger',
+        display_name: 'Merger',
+        description:
+          'Branch integration agent. Mergers handle git merge operations, resolve conflicts, and ensure clean integration of feature branches.',
+        capabilities: JSON.stringify([
+          'read_files',
+          'write_files',
+          'git_merge',
+          'conflict_resolution',
+          'diff_review',
+        ]),
+        default_model: 'sonnet',
+        tool_allowlist: JSON.stringify(['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash', 'Git']),
+        bash_restrictions: JSON.stringify(['no git push --force', 'merge operations only']),
+        file_scope: 'merge-scoped files',
+      },
+      {
+        role: 'coordinator',
+        display_name: 'Coordinator',
+        description:
+          'Top-level orchestration agent. Coordinators analyze project scope, decompose work into streams, dispatch lead agents, and oversee the entire fleet.',
+        capabilities: JSON.stringify([
+          'spawn_agents',
+          'assign_tasks',
+          'monitor_fleet',
+          'send_mail',
+          'authorize_merges',
+          'task_decomposition',
+        ]),
+        default_model: 'opus',
+        tool_allowlist: JSON.stringify([
+          'Read',
+          'Grep',
+          'Glob',
+          'Bash (read-only)',
+          'AgentSpawn',
+          'Mail',
+          'MergeAuthorize',
+        ]),
+        bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'read-only + spawn']),
+        file_scope: 'read-only (entire project)',
+      },
+      {
+        role: 'monitor',
+        display_name: 'Monitor',
+        description:
+          'Health monitoring agent. Monitors track agent liveness, detect stalled or zombie processes, send health check pings, and escalate issues.',
+        capabilities: JSON.stringify([
+          'monitor_health',
+          'send_mail',
+          'detect_stalls',
+          'check_processes',
+          'escalate_issues',
+        ]),
+        default_model: 'haiku',
+        tool_allowlist: JSON.stringify(['Read', 'Grep', 'Bash (read-only)', 'Mail', 'HealthCheck']),
+        bash_restrictions: JSON.stringify([
+          'no file writes',
+          'no git operations',
+          'monitoring only',
+        ]),
+        file_scope: 'read-only (logs and status)',
+      },
+    ];
+
+    const insertDef = db.prepare(`
+      INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope)
+      VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope)
+    `);
+
+    for (const def of seedDefs) {
+      insertDef.run(def);
+    }
+    log.info('Seeded 7 default agent definitions');
+  }
 
   log.info('Database schema applied successfully');
 }
