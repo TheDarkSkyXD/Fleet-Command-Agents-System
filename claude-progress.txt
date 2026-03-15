@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Spawn Dialog File Scope & Onboarding Tour)
+
+#### Feature #38: Agent spawn dialog UI - PASSING
+- Added file_scope field to AgentSpawnRequest type
+- Added file scope input to spawn dialog with glob pattern placeholder (e.g. src/components/**)
+- Helper text explains the field restricts which files the agent can modify
+- Added data-testid attributes to all key dialog elements (spawn-dialog, spawn-agent-button, spawn-capability-selector, spawn-model-picker, spawn-name-input, spawn-task-id-input, spawn-file-scope)
+- All required fields verified: name, capability (7 types), model picker, file scope, task ID, spawn/cancel buttons, dark theme
+
+#### Feature #249: Onboarding tour agent spawning tooltip - PASSING
+- Created OnboardingTour component (src/renderer/components/OnboardingTour.tsx)
+- Guided tooltip points to spawn agent button with title "Spawn Your First Agent"
+- Explains how to spawn agents (capability, model, file scope)
+- Shows only on first launch (localStorage flag: fleet-command-onboarding-completed)
+- SVG mask overlay with cutout highlighting the target element
+- Animated blue pulse ring around target element
+- Dismiss via X button, backdrop click, or "Got it!" button
+- Step counter (1 of N) and extensible step system
+- Integrated into AppLayout, only shows on agents page
+- Exported resetOnboardingTour() utility function
+
+#### Files Created/Modified
+- NEW: src/renderer/components/OnboardingTour.tsx - Onboarding tour with guided tooltips
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Added file scope field + data-testid attributes
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated OnboardingTour
+- MODIFIED: src/shared/types/index.ts - Added file_scope to AgentSpawnRequest
+
+#### Current Status
+- 34/366 features passing (added #38 and #249)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Token Usage Metrics)
 
 #### Feature #183: Token usage tracking per agent session - PASSING
