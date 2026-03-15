@@ -147,6 +147,22 @@ export async function initDatabase(): Promise<void> {
       timestamp TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS issues (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      type TEXT NOT NULL DEFAULT 'task' CHECK(type IN ('task', 'bug', 'feature', 'research', 'spike')),
+      priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('critical', 'high', 'medium', 'low')),
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'closed', 'blocked')),
+      assigned_agent TEXT,
+      group_id TEXT,
+      dependencies TEXT,
+      close_summary TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      closed_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -164,6 +180,9 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
     CREATE INDEX IF NOT EXISTS idx_merge_queue_status ON merge_queue(status);
     CREATE INDEX IF NOT EXISTS idx_metrics_agent ON metrics(agent_name);
+    CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
+    CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority);
+    CREATE INDEX IF NOT EXISTS idx_issues_assigned ON issues(assigned_agent);
   `);
 
   log.info('Database schema applied successfully');

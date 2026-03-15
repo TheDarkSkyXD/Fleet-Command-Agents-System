@@ -168,6 +168,27 @@ export interface Checkpoint {
   timestamp: string;
 }
 
+// Issue types
+export type IssueType = 'task' | 'bug' | 'feature' | 'research' | 'spike';
+export type IssuePriority = 'critical' | 'high' | 'medium' | 'low';
+export type IssueStatus = 'open' | 'in_progress' | 'closed' | 'blocked';
+
+export interface Issue {
+  id: string;
+  title: string;
+  description: string | null;
+  type: IssueType;
+  priority: IssuePriority;
+  status: IssueStatus;
+  assigned_agent: string | null;
+  group_id: string | null;
+  dependencies: string | null;
+  close_summary: string | null;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+}
+
 // Electron API type for renderer process
 // Health check response
 export interface HealthCheckResponse {
@@ -212,9 +233,46 @@ export interface ElectronAPI {
     options?: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: string | null }>;
   mergeQueue: () => Promise<{ data: MergeQueueEntry[] | null; error: string | null }>;
-  mergeExecute: (id: number) => Promise<{ data: unknown; error: string | null }>;
+  mergeEnqueue: (entry: {
+    branch_name: string;
+    task_id?: string;
+    agent_name?: string;
+    files_modified?: string[];
+  }) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
+  mergeNext: () => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
+  mergeExecute: (id: number) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
+  mergeComplete: (
+    id: number,
+    resolvedTier: string,
+  ) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
+  mergeFail: (id: number) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
+  mergeConflict: (id: number) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergePreview: (id: number) => Promise<{ data: unknown; error: string | null }>;
-  mergeHistory: () => Promise<{ data: unknown; error: string | null }>;
+  mergeHistory: () => Promise<{ data: MergeQueueEntry[] | null; error: string | null }>;
+  mergeRemove: (id: number) => Promise<{ data: boolean; error: string | null }>;
+  // Issues
+  issueList: (filters?: { status?: string; priority?: string; type?: string }) => Promise<{
+    data: Issue[] | null;
+    error: string | null;
+  }>;
+  issueCreate: (issue: {
+    id: string;
+    title: string;
+    description?: string;
+    type: string;
+    priority: string;
+  }) => Promise<{ data: Issue | null; error: string | null }>;
+  issueGet: (id: string) => Promise<{ data: Issue | null; error: string | null }>;
+  issueUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: Issue | null; error: string | null }>;
+  issueDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  issueClaim: (
+    id: string,
+    agentName: string,
+  ) => Promise<{ data: Issue | null; error: string | null }>;
+
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
   claudeStatus: () => Promise<{ data: unknown; error: string | null }>;

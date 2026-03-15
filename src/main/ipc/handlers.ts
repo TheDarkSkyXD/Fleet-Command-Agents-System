@@ -308,6 +308,8 @@ export function registerIpcHandlers(): void {
   );
 
   // Merge channels - all use real SQLite queries via loggedPrepare
+
+  // List all merge queue entries ordered by enqueue time (FIFO)
   ipcMain.handle('merge:queue', () => {
     try {
       const queue = loggedPrepare('SELECT * FROM merge_queue ORDER BY enqueued_at ASC').all();
@@ -319,6 +321,55 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Enqueue a branch for merging (FIFO - enqueued_at tracks order)
+  ipcMain.handle(
+    'merge:enqueue',
+    (
+      _event,
+      entry: {
+        branch_name: string;
+        task_id?: string;
+        agent_name?: string;
+        files_modified?: string[];
+      },
+    ) => {
+      try {
+        const filesJson = entry.files_modified ? JSON.stringify(entry.files_modified) : null;
+        const result = loggedPrepare(
+          `INSERT INTO merge_queue (branch_name, task_id, agent_name, files_modified, status, enqueued_at)
+          VALUES (?, ?, ?, ?, 'pending', datetime('now'))`,
+        ).run(entry.branch_name, entry.task_id ?? null, entry.agent_name ?? null, filesJson);
+        const inserted = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(
+          result.lastInsertRowid,
+        );
+        log.info(
+          `[IPC] merge:enqueue - INSERT into real database: branch=${entry.branch_name}, id=${result.lastInsertRowid}`,
+        );
+        return { data: inserted, error: null };
+      } catch (error) {
+        log.error('merge:enqueue failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // Get the next pending entry in FIFO order
+  ipcMain.handle('merge:next', () => {
+    try {
+      const next = loggedPrepare(
+        "SELECT * FROM merge_queue WHERE status = 'pending' ORDER BY enqueued_at ASC LIMIT 1",
+      ).get();
+      log.info(
+        `[IPC] merge:next - SELECT next pending from real database: ${next ? `id=${(next as { id: number }).id}` : 'none'}`,
+      );
+      return { data: next ?? null, error: null };
+    } catch (error) {
+      log.error('merge:next failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Execute merge - marks the entry as 'merging'
   ipcMain.handle('merge:execute', (_event, id: number) => {
     try {
       loggedPrepare("UPDATE merge_queue SET status = 'merging' WHERE id = ?").run(id);
@@ -331,6 +382,51 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Complete a merge with a resolution tier
+  ipcMain.handle('merge:complete', (_event, id: number, resolvedTier: string) => {
+    try {
+      loggedPrepare("UPDATE merge_queue SET status = 'merged', resolved_tier = ? WHERE id = ?").run(
+        resolvedTier,
+        id,
+      );
+      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+      log.info(
+        `[IPC] merge:complete - UPDATE merge in real database: id=${id}, tier=${resolvedTier}`,
+      );
+      return { data: entry, error: null };
+    } catch (error) {
+      log.error('merge:complete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Mark a merge as failed
+  ipcMain.handle('merge:fail', (_event, id: number) => {
+    try {
+      loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+      log.info(`[IPC] merge:fail - UPDATE merge in real database: id=${id}`);
+      return { data: entry, error: null };
+    } catch (error) {
+      log.error('merge:fail failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Mark a merge as having conflicts
+  ipcMain.handle('merge:conflict', (_event, id: number) => {
+    try {
+      loggedPrepare("UPDATE merge_queue SET status = 'conflict' WHERE id = ?").run(id);
+      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+      log.info(`[IPC] merge:conflict - UPDATE merge in real database: id=${id}`);
+      return { data: entry, error: null };
+    } catch (error) {
+      log.error('merge:conflict failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Preview a merge (dry-run)
   ipcMain.handle('merge:preview', (_event, id: number) => {
     try {
       const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
@@ -342,10 +438,11 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Get merge history (completed and failed entries)
   ipcMain.handle('merge:history', () => {
     try {
       const history = loggedPrepare(
-        "SELECT * FROM merge_queue WHERE status IN ('merged', 'failed') ORDER BY enqueued_at DESC",
+        "SELECT * FROM merge_queue WHERE status IN ('merged', 'failed', 'conflict') ORDER BY enqueued_at DESC",
       ).all();
       log.info(
         `[IPC] merge:history - SELECT returned ${history.length} entries from real database`,
@@ -353,6 +450,148 @@ export function registerIpcHandlers(): void {
       return { data: history, error: null };
     } catch (error) {
       log.error('merge:history failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Remove a merge queue entry
+  ipcMain.handle('merge:remove', (_event, id: number) => {
+    try {
+      loggedPrepare('DELETE FROM merge_queue WHERE id = ?').run(id);
+      log.info(`[IPC] merge:remove - DELETE merge from real database: id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('merge:remove failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  // Issue channels - all use real SQLite queries via loggedPrepare
+  ipcMain.handle('issue:list', (_event, filters?: { status?: string; priority?: string; type?: string }) => {
+    try {
+      const conditions: string[] = [];
+      const params: string[] = [];
+      if (filters?.status) {
+        conditions.push('status = ?');
+        params.push(filters.status);
+      }
+      if (filters?.priority) {
+        conditions.push('priority = ?');
+        params.push(filters.priority);
+      }
+      if (filters?.type) {
+        conditions.push('type = ?');
+        params.push(filters.type);
+      }
+      let query = 'SELECT * FROM issues';
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(' AND ')}`;
+      }
+      query += ' ORDER BY created_at DESC';
+      const issues = loggedPrepare(query).all(...params);
+      log.info(`[IPC] issue:list - SELECT returned ${issues.length} issues from real database`);
+      return { data: issues, error: null };
+    } catch (error) {
+      log.error('issue:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'issue:create',
+    (
+      _event,
+      issue: {
+        id: string;
+        title: string;
+        description?: string;
+        type: string;
+        priority: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          `INSERT INTO issues (id, title, description, type, priority, status)
+          VALUES (?, ?, ?, ?, ?, 'open')`,
+        ).run(
+          issue.id,
+          issue.title,
+          issue.description ?? null,
+          issue.type,
+          issue.priority,
+        );
+        const created = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(issue.id);
+        log.info(`[IPC] issue:create - INSERT issue into real database: ${issue.title}`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('issue:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('issue:get', (_event, id: string) => {
+    try {
+      const issue = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id);
+      log.info(`[IPC] issue:get - SELECT issue from real database: id=${id}`);
+      return { data: issue || null, error: null };
+    } catch (error) {
+      log.error('issue:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('issue:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      const allowedFields = ['title', 'description', 'type', 'priority', 'status', 'assigned_agent', 'group_id', 'close_summary'];
+      const setClauses: string[] = [];
+      const params: unknown[] = [];
+      for (const [key, value] of Object.entries(updates)) {
+        if (allowedFields.includes(key)) {
+          setClauses.push(`${key} = ?`);
+          params.push(value);
+        }
+      }
+      if (setClauses.length === 0) {
+        return { data: null, error: 'No valid fields to update' };
+      }
+      setClauses.push("updated_at = datetime('now')");
+      if (updates.status === 'closed') {
+        setClauses.push("closed_at = datetime('now')");
+      }
+      params.push(id);
+      loggedPrepare(`UPDATE issues SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
+      const updated = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id);
+      log.info(`[IPC] issue:update - UPDATE issue in real database: id=${id}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('issue:update failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('issue:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM issues WHERE id = ?').run(id);
+      log.info(`[IPC] issue:delete - DELETE issue from real database: id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('issue:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('issue:claim', (_event, id: string, agentName: string) => {
+    try {
+      loggedPrepare(
+        `UPDATE issues SET status = 'in_progress', assigned_agent = ?, updated_at = datetime('now')
+        WHERE id = ? AND status = 'open'`,
+      ).run(agentName, id);
+      const issue = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id);
+      log.info(`[IPC] issue:claim - UPDATE issue in real database: id=${id}, agent=${agentName}`);
+      return { data: issue, error: null };
+    } catch (error) {
+      log.error('issue:claim failed:', error);
       return { data: null, error: String(error) };
     }
   });

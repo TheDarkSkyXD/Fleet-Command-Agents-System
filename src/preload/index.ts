@@ -24,9 +24,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Merge
   mergeQueue: () => ipcRenderer.invoke('merge:queue'),
+  mergeEnqueue: (entry: {
+    branch_name: string;
+    task_id?: string;
+    agent_name?: string;
+    files_modified?: string[];
+  }) => ipcRenderer.invoke('merge:enqueue', entry),
+  mergeNext: () => ipcRenderer.invoke('merge:next'),
   mergeExecute: (id: number) => ipcRenderer.invoke('merge:execute', id),
+  mergeComplete: (id: number, resolvedTier: string) =>
+    ipcRenderer.invoke('merge:complete', id, resolvedTier),
+  mergeFail: (id: number) => ipcRenderer.invoke('merge:fail', id),
+  mergeConflict: (id: number) => ipcRenderer.invoke('merge:conflict', id),
   mergePreview: (id: number) => ipcRenderer.invoke('merge:preview', id),
   mergeHistory: () => ipcRenderer.invoke('merge:history'),
+  mergeRemove: (id: number) => ipcRenderer.invoke('merge:remove', id),
+
+  // Issues
+  issueList: (filters?: { status?: string; priority?: string; type?: string }) =>
+    ipcRenderer.invoke('issue:list', filters),
+  issueCreate: (issue: { id: string; title: string; description?: string; type: string; priority: string }) =>
+    ipcRenderer.invoke('issue:create', issue),
+  issueGet: (id: string) => ipcRenderer.invoke('issue:get', id),
+  issueUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('issue:update', id, updates),
+  issueDelete: (id: string) => ipcRenderer.invoke('issue:delete', id),
+  issueClaim: (id: string, agentName: string) => ipcRenderer.invoke('issue:claim', id, agentName),
 
   // Settings
   settingsGet: (key: string) => ipcRenderer.invoke('settings:get', key),
