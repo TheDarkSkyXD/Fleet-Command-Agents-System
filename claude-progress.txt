@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Auto-Update & Silent Download)
+
+#### Feature #144: Auto-check for updates on startup - PASSING
+- Created src/main/services/updateService.ts wrapping electron-updater's autoUpdater
+- Checks GitHub Releases API on startup with 5-second delay (non-intrusive)
+- If update available, UpdateBanner appears at top of app with version info
+- If no update, nothing shown - completely silent
+- autoUpdater events: checking-for-update, update-available, update-not-available, download-progress, update-downloaded, error
+- Status pushed to renderer via IPC events (update:status, update:download-progress, update:downloaded, update:error)
+
+#### Feature #147: Silent download to app data directory - PASSING
+- electron-updater downloads to app userData cache directory, NOT Downloads folder
+- Download starts automatically when update detected (autoDownload=false, triggered manually after detection)
+- Progress tracked: percent, transferred bytes, total bytes, speed (bytes/sec)
+- UpdateBanner shows animated progress bar during download
+- autoInstallOnAppQuit=true for install on next restart
+- "Restart & Update" button for immediate install via quitAndInstall()
+
+#### Files Created/Modified
+- NEW: src/main/services/updateService.ts - Auto-updater service with electron-updater
+- NEW: src/renderer/components/UpdateBanner.tsx - Update notification banner with progress
+- MODIFIED: src/main/ipc/handlers.ts - Added update:check, update:status, update:download, update:install IPC handlers
+- MODIFIED: src/main/index.ts - Initialize auto-updater on startup, trigger check after 5s
+- MODIFIED: src/preload/index.ts - Added update IPC channels and event listeners
+- MODIFIED: src/shared/types/index.ts - Added UpdateStatus interface and ElectronAPI methods
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated UpdateBanner at top of layout
+
+#### Current Status
+- 43/366 features passing (added #144 and #147 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Stop Agent Confirmation Dialogs)
 
 #### Feature #39: Stop individual agent with confirmation - PASSING
