@@ -535,6 +535,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       loadRunningProcesses();
     }, 3000);
 
+    // Listen for agent state change events for immediate cascading updates
+    window.electronAPI.onAgentUpdate(() => {
+      loadSessions();
+      loadRunningProcesses();
+    });
+
     return () => clearInterval(interval);
   }, []);
 
@@ -1189,6 +1195,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="Search agents by name..."
+            data-testid="agent-global-filter"
             className="w-full rounded-lg border border-slate-600 bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           {globalFilter && (
@@ -1209,6 +1216,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           <select
             value={capabilityFilter}
             onChange={(e) => setCapabilityFilter(e.target.value)}
+            data-testid="agent-capability-filter"
             className="rounded-lg border border-slate-600 bg-slate-800 pl-9 pr-8 py-2 text-sm text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
           >
             <option value="all">All Capabilities</option>
@@ -1330,6 +1338,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
+                      data-testid={`agent-sort-${header.id}`}
                       className={`px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider ${
                         header.column.getCanSort()
                           ? 'cursor-pointer select-none hover:text-slate-200'
