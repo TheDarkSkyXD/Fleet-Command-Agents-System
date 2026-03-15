@@ -1,5 +1,42 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Agent Definitions & Import/Export)
+
+#### Feature #155: View all agent role definitions - PASSING
+- Created agent_definitions table in SQLite with role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope
+- Seeded 7 default roles on first run: scout (haiku), builder (sonnet), reviewer (sonnet), lead (opus), merger (sonnet), coordinator (opus), monitor (haiku)
+- Built AgentDefinitionsPage with split-view: left panel shows role cards, right panel shows full detail
+- Each role card displays icon, name, model badge, description, and capability tags
+- Detail view shows capabilities grid, tool allowlist, bash restrictions, file scope, timestamps
+- Color-coded per role type (cyan for scout, green for builder, etc.)
+- Added "Definitions" nav item to Sidebar with FiBookOpen icon
+- Integrated into AppLayout page routing
+
+#### Feature #160: Import and export agent definitions - PASSING
+- Export: generates JSON file with version, timestamp, and definitions array
+- Supports exporting all definitions or selected subset via checkboxes
+- Downloads as agent-definitions-YYYY-MM-DD.json via browser blob URL
+- Import: file picker for .json files, parses and validates required fields
+- Validates role, display_name, description, capabilities, default_model present
+- Uses INSERT OR REPLACE (upsert) so importing updates existing roles
+- Status messages shown for success/error with auto-dismiss
+- IPC handlers: agentDef:list, agentDef:get, agentDef:import, agentDef:export
+- All backed by real SQLite queries via loggedPrepare()
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/AgentDefinitionsPage.tsx - Full definitions page with import/export
+- MODIFIED: src/main/db/database.ts - Added agent_definitions table + seed data
+- MODIFIED: src/main/ipc/handlers.ts - Added agentDef IPC handlers
+- MODIFIED: src/shared/types/index.ts - Added AgentDefinition interface + ElectronAPI methods
+- MODIFIED: src/preload/index.ts - Added agentDef bridge methods
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Definitions nav item
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added definitions page routing
+
+#### Current Status
+- Features #155 and #160 passing
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Merge Queue & Clean Merge)
 
 #### Feature #80: FIFO merge queue SQLite-backed - PASSING

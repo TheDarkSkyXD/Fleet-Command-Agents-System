@@ -4,6 +4,7 @@ import log from 'electron-log';
 import windowStateKeeper from 'electron-window-state';
 import { closeDatabase, initDatabase } from './db/database';
 import { registerIpcHandlers } from './ipc/handlers';
+import { agentProcessManager } from './services/agentProcessManager';
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -180,8 +181,14 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   isQuitting = true;
+  // Stop all running agent processes before quitting
+  try {
+    await agentProcessManager.stopAll();
+  } catch (error) {
+    log.error('Failed to stop agent processes on quit:', error);
+  }
   // Close database gracefully to ensure WAL checkpoint
   closeDatabase();
 });
