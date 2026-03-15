@@ -4216,3 +4216,26 @@
 - 279/366 features passing (added #279 and #280 this session)
 - All code passes Biome lint (only pre-existing warnings) and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Task Group CRUD & Empty State Transitions)
+
+#### Feature #285: CRUD operations on task groups - PASSING
+- Verified all CRUD operations exist: Create (modal form), View (expand group details + progress bar),
+  Update/Rename (inline rename input with save/cancel), Close (manual close button), Reopen (reopen button),
+  Delete (delete button)
+- taskGroup:update IPC handler supports name and status updates
+- Preload bridge and ElectronAPI types include taskGroupUpdate method
+- All group actions have data-testid attributes
+
+#### Feature #286: Empty state transitions to populated state - PASSING
+- AgentsPage: agents-empty-state with CTA -> virtualized-agent-list (conditional on sessions.length)
+- TasksPage issues: issue-list-empty -> issue-list/kanban-board (conditional on issues.length)
+- TasksPage groups: groups-empty-state with CTA -> groups-list (conditional on groups.length)
+- Ready queue: ready-queue-empty -> ready-queue-list
+- Completed tab: completed-empty -> completed-issues-list
+- Added groups-empty-cta button for creating groups from empty state
+
+#### Current Status
+- 284/366 features passing (added #285 and #286 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
