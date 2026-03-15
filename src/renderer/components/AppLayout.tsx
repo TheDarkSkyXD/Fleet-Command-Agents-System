@@ -310,11 +310,16 @@ export function AppLayout() {
   // Welcome page shows full-screen without sidebar
   if (currentPage === 'welcome') {
     return (
-      <div className="flex h-screen w-screen min-w-[1024px] min-h-[680px] flex-col bg-slate-950 text-slate-50" data-testid="app-root" data-min-width="1024" data-min-height="680">
+      <div
+        className="flex h-screen w-screen min-w-[1024px] min-h-[680px] flex-col bg-slate-950 text-slate-50"
+        data-testid="app-root"
+        data-min-width="1024"
+        data-min-height="680"
+      >
         {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
         <OrphanedProcessDialog />
         <UpdateBanner />
-        <main className="flex-1 overflow-auto bg-slate-900">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-900">
           <ErrorBoundary sectionName="Welcome">
             <WelcomePage onProjectOpened={handleProjectOpened} />
           </ErrorBoundary>
@@ -324,7 +329,12 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen w-screen min-w-[1024px] min-h-[680px] flex-col bg-slate-950 text-slate-50" data-testid="app-root" data-min-width="1024" data-min-height="680">
+    <div
+      className="flex h-screen w-screen min-w-[1024px] min-h-[680px] flex-col bg-slate-950 text-slate-50"
+      data-testid="app-root"
+      data-min-width="1024"
+      data-min-height="680"
+    >
       {/* Setup Wizard - shown on first launch */}
       {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
       <OrphanedProcessDialog />
@@ -333,7 +343,7 @@ export function AppLayout() {
       <UpdateBanner />
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden" data-testid="app-main-area">
         {/* Sidebar */}
         <ErrorBoundary sectionName="Sidebar">
           <Sidebar
@@ -345,7 +355,11 @@ export function AppLayout() {
         </ErrorBoundary>
 
         {/* Content */}
-        <main className="flex-1 min-w-0 overflow-auto bg-slate-900 p-6">
+        <main
+          className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-slate-900 p-6"
+          data-testid="app-content-area"
+          data-no-horizontal-scroll="true"
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}

@@ -75,6 +75,8 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
 
   return (
     <aside
+      data-testid="app-sidebar"
+      data-collapsed={collapsed}
       className={`flex flex-col border-r border-slate-700 bg-slate-950 transition-all duration-200 ${
         collapsed ? 'w-16' : 'w-56'
       }`}
