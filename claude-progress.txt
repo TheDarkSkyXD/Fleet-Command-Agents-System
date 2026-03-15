@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Issue Filtering & Ready Queue)
+
+#### Feature #115: List issues with filtering - PASSING
+- Filtering by status, priority, and type was already implemented (backend SQL WHERE + frontend FilterSelect dropdowns)
+- Enhanced with explicit "Clear Filters" button that resets all filters at once
+- Added contextual empty state messaging ("No issues match filters" vs "No issues found")
+- Added data-testid attributes for filter controls and issue list
+
+#### Feature #116: Find available unblocked work - PASSING
+- Added issue:set-dependencies IPC handler to persist dependency arrays as JSON in SQLite
+- Added issue:ready-queue IPC handler that queries open/in_progress issues, filters out those with unresolved dependencies
+- Ready queue sorts by priority (critical > high > medium > low) then creation date
+- Added preload bridge methods (issueSetDependencies, issueReadyQueue) and ElectronAPI types
+- Added Ready Queue tab in TasksPage showing only unblocked issues
+- Added DependencyManager component in IssueDetailModal for adding/removing dependencies
+- Shows resolved/blocked status with color-coded indicators
+- Added 'dependencies' to issue:update allowed fields
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - issue:set-dependencies, issue:ready-queue handlers, dependencies in update
+- MODIFIED: src/preload/index.ts - issueSetDependencies, issueReadyQueue bridge methods
+- MODIFIED: src/shared/types/index.ts - New ElectronAPI type definitions
+- MODIFIED: src/renderer/pages/TasksPage.tsx - Ready Queue tab, DependencyManager, Clear Filters button
+
+#### Current Status
+- ~170/366 features passing (added #115 and #116 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Command Palette Live Updates & Issue Detail View)
 
 #### Feature #111: Command palette live-updating results - PASSING
