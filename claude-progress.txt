@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Mail Page - Send & Inbox)
+
+#### Feature #63: Send message between agents - PASSING
+- Created MailPage.tsx with full compose form (from_agent, to_agent, subject, body, type, priority)
+- Compose sends via mail:send IPC which INSERTs into real SQLite messages table
+- All message types and priorities supported via dropdowns
+- Message ID generated as msg-{timestamp}-{random} for uniqueness
+- Success/error status messages displayed with auto-dismiss
+
+#### Feature #70: Mail inbox view with unread indicators - PASSING
+- Message list sorted chronologically (newest first)
+- Unread messages show blue filled dot (FiCircle) and bold/semibold text
+- Read messages have no dot and lighter text styling
+- Inbox tab shows unread count badge (blue circle with number)
+- Header shows total unread count badge
+- Messages auto-marked as read when selected (mail:read IPC)
+- Inbox refreshes via 10s polling + mail:received event listener
+- Empty state shows inbox icon with helpful text
+- Message detail pane shows from/to, subject, body, type, priority, thread_id, payload
+- Tabs: Inbox, Sent, All
+- Purge all messages button with confirmation
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/MailPage.tsx - Full mail page with compose, inbox, detail view
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated MailPage replacing placeholder
+
+#### Current Status
+- 27/366 features passing (added #63 and #70 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Node-pty Agent Spawning & Scout Agent)
 
 #### Feature #28: Node-pty process spawning for agents - PASSING
