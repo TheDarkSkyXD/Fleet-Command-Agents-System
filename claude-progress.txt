@@ -1737,3 +1737,46 @@
 #### Current Status
 - 113/366 features passing (added #31 and #32 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
+
+### Session: 2026-03-14 (Setup Wizard & Auth Decision Tree)
+
+#### Feature #25: Setup wizard first-launch flow - PASSING
+- Created SetupWizard component with 5-step flow:
+  - Step 1: CLI binary detection (auto-runs PATH + fallback search via claudeDetect IPC)
+  - Step 2: Version verification display
+  - Step 3: Authentication status check
+  - Step 4: Project folder picker with name/path inputs and Browse button
+  - Step 5: Initial configuration generation (saves default settings)
+- Completion screen with Get Started button
+- Added setupCompleted to AppSettings interface and DEFAULT_SETTINGS (default: false)
+- AppLayout shows wizard overlay when setupCompleted=false, hides after completion
+- Wizard does not appear on subsequent launches (persisted to SQLite)
+- Added dialog:selectFolder IPC handler using Electron's showOpenDialog
+- Added dialogSelectFolder to preload bridge and ElectronAPI type
+
+#### Feature #26: Auth decision tree UI - PASSING
+- Created AuthDecisionTree component with 4-state decision tree visualization
+- States: not-installed → installed-broken → not-authenticated → ready
+- Visual tree with checkmark/X indicators showing progress through stages
+- Each failed state shows contextual action panel:
+  - Not installed: Setup Guide link (external) + npm install command
+  - Installed broken: Reinstall command
+  - Not authenticated: 'claude auth login' command
+- Refresh button to re-detect CLI status
+- Ready state shows CLI details (path, version, auth status)
+- Added CLI Status tab to Settings page as first tab
+
+#### Files Created/Modified
+- NEW: src/renderer/components/SetupWizard.tsx - 5-step setup wizard
+- NEW: src/renderer/components/AuthDecisionTree.tsx - Auth state decision tree
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated SetupWizard
+- MODIFIED: src/renderer/stores/settingsStore.ts - Added setupCompleted field
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Added CLI Status tab
+- MODIFIED: src/shared/types/index.ts - Added dialogSelectFolder to ElectronAPI
+- MODIFIED: src/preload/index.ts - Added dialogSelectFolder bridge method
+- MODIFIED: src/main/ipc/handlers.ts - Added dialog:selectFolder IPC handler
+
+#### Current Status
+- 115/366 features passing (added #25 and #26 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
