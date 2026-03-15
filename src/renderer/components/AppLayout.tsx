@@ -335,6 +335,15 @@ export function AppLayout() {
       data-min-width="1024"
       data-min-height="680"
     >
+      {/* Skip to content link for keyboard navigation */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:rounded focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:outline-none"
+        data-testid="skip-to-content"
+      >
+        Skip to content
+      </a>
+
       {/* Setup Wizard - shown on first launch */}
       {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
       <OrphanedProcessDialog />
@@ -356,6 +365,7 @@ export function AppLayout() {
 
         {/* Content */}
         <main
+          id="main-content"
           className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-slate-900 p-6"
           data-testid="app-content-area"
           data-no-horizontal-scroll="true"

@@ -89,7 +89,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+          className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
@@ -103,7 +103,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
       </div>
 
       {/* Navigation */}
-      <nav data-testid="sidebar-nav" className="flex-1 space-y-1 p-2">
+      <nav data-testid="sidebar-nav" aria-label="Main navigation" className="flex-1 space-y-1 p-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -113,12 +113,13 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
               key={item.id}
               data-testid={`nav-${item.id}`}
               onClick={() => onNavigate(item.id)}
-              className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 isActive
                   ? 'bg-blue-600/20 text-blue-400'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
               } ${collapsed ? 'justify-center' : ''}`}
               title={collapsed ? item.label : undefined}
+              aria-current={isActive ? 'page' : undefined}
             >
               <span className="relative">
                 <Icon size={18} />
