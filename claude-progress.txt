@@ -3811,3 +3811,39 @@
 - 253/366 features passing (added #248 and #250 this session)
 - All code passes Biome lint and Vite build
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Zod Spawn Validation & Operator Dispatch)
+
+#### Feature #252: Inline Zod validation on agent spawn form - PASSING
+- Added Zod schema (spawnFormSchema) validating name and taskId fields
+- Name: no whitespace-only, alphanumeric/hyphens/underscores only, max 64 chars
+- TaskId: no whitespace-only, alphanumeric/hyphens/underscores only
+- Inline error messages appear on blur, update on change after first touch
+- Red border highlighting on invalid fields (border-red-500)
+- Submit button disabled when validation errors present
+- Validation summary message shown when errors exist
+- data-testid attributes: spawn-name-error, spawn-task-id-error, spawn-validation-errors
+
+#### Feature #258: Operator dispatch message to coordinator - PASSING
+- Added operator:dispatch IPC handler that writes [OPERATOR MESSAGE] to coordinator's PTY
+- Finds active coordinator session, writes message to terminal via agentProcessManager.write
+- Stores message in messages table (from_agent='operator', type='dispatch')
+- Added operator:history IPC handler for retrieving past operator messages
+- Added preload bridge methods: operatorDispatch, operatorHistory
+- Added ElectronAPI types for both new methods
+- CoordinatorPanel: cyan-styled "Message" button in action row
+- Operator message form with textarea, send button, cancel button
+- Message history display with timestamps in collapsible section
+- data-testid attributes: operator-message-btn, operator-message-panel, operator-message-input, operator-message-send, operator-history
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Zod schema, inline validation, error display
+- MODIFIED: src/main/ipc/handlers.ts - operator:dispatch, operator:history IPC handlers
+- MODIFIED: src/preload/index.ts - operatorDispatch, operatorHistory bridges
+- MODIFIED: src/shared/types/index.ts - ElectronAPI operator types
+- MODIFIED: src/renderer/components/CoordinatorPanel.tsx - Operator message UI
+
+#### Current Status
+- 257/366 features passing (added #252 and #258 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
