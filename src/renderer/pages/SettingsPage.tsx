@@ -97,6 +97,7 @@ export function SettingsPage() {
     | 'profiles'
     | 'quality-gates'
     | 'project-config'
+    | 'notifications'
   >('agents');
 
   useEffect(() => {
@@ -122,6 +123,7 @@ export function SettingsPage() {
     { id: 'theme' as const, label: 'Theme' },
     { id: 'profiles' as const, label: 'Profiles' },
     { id: 'quality-gates' as const, label: 'Quality Gates' },
+    { id: 'notifications' as const, label: 'Notifications' },
     { id: 'project-config' as const, label: 'Project Config' },
   ];
 
@@ -171,6 +173,7 @@ export function SettingsPage() {
       {activeTab === 'theme' && <ThemeSettings />}
       {activeTab === 'profiles' && <ProfilesSettings />}
       {activeTab === 'quality-gates' && <QualityGatesSettings />}
+      {activeTab === 'notifications' && <NotificationPreferencesSettings />}
       {activeTab === 'project-config' && <ProjectConfigEditor />}
     </div>
   );

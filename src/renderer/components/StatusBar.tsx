@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiFolder, FiPlay, FiSquare } from 'react-icons/fi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FiCheck, FiChevronUp, FiFolder, FiPlay, FiSquare, FiStar } from 'react-icons/fi';
+import type { ConfigProfile } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
 import { useRunStore } from '../stores/runStore';
 
@@ -62,6 +63,10 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
+  const [activeProfile, setActiveProfile] = useState<ConfigProfile | null>(null);
+  const [allProfiles, setAllProfiles] = useState<ConfigProfile[]>([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const { activeRun, startRun, stopRun, fetchActiveRun } = useRunStore();
   const { activeProject, loadActiveProject } = useProjectStore();
@@ -103,6 +108,57 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
     const interval = setInterval(fetchActiveRun, 5000);
     return () => clearInterval(interval);
   }, [fetchActiveRun]);
+
+  // Fetch active profile on mount and poll every 10s
+  const loadProfiles = useCallback(async () => {
+    try {
+      const [activeResult, listResult] = await Promise.all([
+        window.electronAPI.profileGetActive(),
+        window.electronAPI.profileList(),
+      ]);
+      if (activeResult.data) {
+        setActiveProfile(activeResult.data);
+      } else {
+        setActiveProfile(null);
+      }
+      if (listResult.data) {
+        setAllProfiles(listResult.data);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProfiles();
+    const interval = setInterval(loadProfiles, 10000);
+    return () => clearInterval(interval);
+  }, [loadProfiles]);
+
+  // Close profile menu on click outside
+  useEffect(() => {
+    if (!showProfileMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileMenu]);
+
+  const handleQuickSwitch = useCallback(
+    async (profileId: string) => {
+      try {
+        await window.electronAPI.profileActivate(profileId);
+        setShowProfileMenu(false);
+        await loadProfiles();
+      } catch {
+        // ignore
+      }
+    },
+    [loadProfiles],
+  );
 
   // Tick timer every second when run is active
   useEffect(() => {
@@ -162,6 +218,59 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
         </span>
       </div>
       <div className="flex items-center gap-4">
+        {/* Active Profile Quick-Switch */}
+        {allProfiles.length > 0 && (
+          <div className="relative" ref={profileMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowProfileMenu((prev) => !prev)}
+              className="flex items-center gap-1 cursor-pointer rounded px-1.5 py-0.5 hover:bg-slate-800 transition-colors"
+              data-testid="status-bar-profile"
+              title={
+                activeProfile
+                  ? `Active Profile: ${activeProfile.name}\nClick to switch`
+                  : 'No active profile\nClick to select one'
+              }
+            >
+              <FiStar className={`h-3 w-3 ${activeProfile ? 'text-blue-400' : 'text-slate-500'}`} />
+              <span className={activeProfile ? 'text-blue-300' : 'text-slate-500'}>
+                {activeProfile ? activeProfile.name : 'No Profile'}
+              </span>
+              <FiChevronUp
+                className={`h-3 w-3 text-slate-500 transition-transform ${showProfileMenu ? '' : 'rotate-180'}`}
+              />
+            </button>
+
+            {/* Dropdown menu (opens upward from status bar) */}
+            {showProfileMenu && (
+              <div className="absolute bottom-full right-0 mb-1 w-56 rounded-lg border border-slate-700 bg-slate-800 shadow-xl z-50 py-1 max-h-64 overflow-y-auto">
+                <div className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Switch Profile
+                </div>
+                {allProfiles.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleQuickSwitch(p.id)}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-700 transition-colors ${
+                      p.is_active ? 'text-blue-300' : 'text-slate-300'
+                    }`}
+                    title={`${p.name}${p.description ? ` - ${p.description}` : ''}`}
+                  >
+                    {p.is_active ? (
+                      <FiCheck className="h-3 w-3 text-blue-400 shrink-0" />
+                    ) : (
+                      <span className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate">{p.name}</span>
+                    <span className="ml-auto text-slate-500 shrink-0">{p.default_model}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           type="button"
           className="flex items-center gap-1 cursor-pointer rounded px-1.5 py-0.5 hover:bg-slate-800 transition-colors"
