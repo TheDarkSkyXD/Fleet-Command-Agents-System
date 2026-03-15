@@ -323,9 +323,9 @@ export function ScopeTreeViewer({ maxHeight = '400px' }: ScopeTreeViewerProps) {
         className="rounded-lg border border-slate-600 bg-slate-800/50 p-4 text-center"
         data-testid="scope-tree-viewer"
       >
-        <FiMap className="h-6 w-6 text-slate-500 mx-auto mb-2" />
+        <FiMap className="h-6 w-6 text-slate-400 mx-auto mb-2" />
         <p className="text-sm text-slate-400">No active project</p>
-        <p className="text-xs text-slate-500 mt-1">Select a project to view scope assignments</p>
+        <p className="text-xs text-slate-400 mt-1">Select a project to view scope assignments</p>
       </div>
     );
   }
@@ -362,7 +362,7 @@ export function ScopeTreeViewer({ maxHeight = '400px' }: ScopeTreeViewerProps) {
       <div className="flex items-center gap-2 border-b border-slate-600 px-3 py-2">
         <FiMap className="h-4 w-4 text-blue-400 flex-shrink-0" />
         <span className="text-sm font-medium text-slate-200">Scope Map</span>
-        <span className="text-xs text-slate-500 ml-auto">
+        <span className="text-xs text-slate-400 ml-auto">
           {scopeStats.scoped} assigned / {scopeStats.total} files
         </span>
       </div>
@@ -401,7 +401,7 @@ export function ScopeTreeViewer({ maxHeight = '400px' }: ScopeTreeViewerProps) {
 
       {agentScopes.length === 0 && (
         <div className="px-3 py-2 border-b border-slate-600 bg-slate-900/30">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-400">
             No agents with file scopes assigned. Spawn builder agents with file scopes to see scope visualization.
           </p>
         </div>
@@ -427,7 +427,7 @@ export function ScopeTreeViewer({ maxHeight = '400px' }: ScopeTreeViewerProps) {
         data-testid="scope-tree-container"
       >
         {tree.length === 0 ? (
-          <p className="text-xs text-slate-500 text-center py-2">No files found</p>
+          <p className="text-xs text-slate-400 text-center py-2">No files found</p>
         ) : (
           tree.map((node) => (
             <ScopeTreeNode

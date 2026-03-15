@@ -29,6 +29,7 @@ import {
   FiZap,
 } from 'react-icons/fi';
 import type { AppLogEntry, Event, LogLevel, ToolStats } from '../../shared/types';
+import { formatTimeOnly, formatDateTime, formatAbsoluteDateTime } from '../lib/dateFormatting';
 
 type DebugTab = 'terminal' | 'events' | 'tool-stats' | 'logs' | 'timeline' | 'errors';
 
@@ -565,7 +566,7 @@ function AppLogPanel() {
       <div className="flex flex-wrap items-center gap-3">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
-          <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
@@ -578,7 +579,7 @@ function AppLogPanel() {
 
         {/* Level filter */}
         <div className="flex items-center gap-1.5">
-          <FiFilter className="h-3.5 w-3.5 text-slate-500" />
+          <FiFilter className="h-3.5 w-3.5 text-slate-400" />
           <select
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
@@ -608,7 +609,7 @@ function AppLogPanel() {
 
         {/* Time range */}
         <div className="flex items-center gap-1.5">
-          <FiCalendar className="h-3.5 w-3.5 text-slate-500" />
+          <FiCalendar className="h-3.5 w-3.5 text-slate-400" />
           <input
             type="datetime-local"
             value={startTime}
@@ -616,7 +617,7 @@ function AppLogPanel() {
             className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
             title="Start time"
           />
-          <span className="text-xs text-slate-500">to</span>
+          <span className="text-xs text-slate-400">to</span>
           <input
             type="datetime-local"
             value={endTime}
@@ -687,11 +688,11 @@ function AppLogPanel() {
         <LogSkeleton />
       ) : logs.length === 0 ? (
         <div
-          className="flex flex-col items-center justify-center py-16 text-slate-500"
+          className="flex flex-col items-center justify-center py-16 text-slate-400"
           data-testid="no-logs-empty-state"
         >
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 border border-slate-700">
-            <FiFileText className="h-7 w-7 text-slate-500" />
+            <FiFileText className="h-7 w-7 text-slate-400" />
           </div>
           <p className="text-lg font-medium text-slate-400">No log entries</p>
           {hasFilters ? (
@@ -700,10 +701,10 @@ function AppLogPanel() {
             </p>
           ) : (
             <div className="mt-3 text-center">
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="text-sm text-slate-400 mb-4">
                 Logs are generated as you use Fleet Command. Here are some ways to get started:
               </p>
-              <div className="flex flex-col gap-2 text-xs text-slate-500">
+              <div className="flex flex-col gap-2 text-xs text-slate-400">
                 <div className="flex items-center gap-2 justify-center">
                   <FiPlay className="h-3.5 w-3.5 text-emerald-500" />
                   <span>Spawn an agent to generate activity logs</span>
@@ -877,40 +878,40 @@ function LogEntryRow({
             {entry.source}
           </span>
         )}
-        <span className="text-xs text-slate-500 whitespace-nowrap">
-          {new Date(entry.created_at).toLocaleTimeString()}
+        <span className="text-xs text-slate-400 whitespace-nowrap">
+          {formatTimeOnly(entry.created_at)}
         </span>
       </button>
       {expanded && (
         <div className="border-t border-slate-700/50 bg-slate-900/50 px-4 py-3 text-xs space-y-2">
           <div className="grid grid-cols-2 gap-2 text-slate-400">
             <div>
-              <span className="text-slate-500">ID:</span> {entry.id}
+              <span className="text-slate-400">ID:</span> {entry.id}
             </div>
             <div>
-              <span className="text-slate-500">Timestamp:</span>{' '}
-              {new Date(entry.created_at).toLocaleString()}
+              <span className="text-slate-400">Timestamp:</span>{' '}
+              {formatDateTime(entry.created_at)}
             </div>
             <div>
-              <span className="text-slate-500">Level:</span>{' '}
+              <span className="text-slate-400">Level:</span>{' '}
               <span className={levelColors[entry.level]}>{entry.level}</span>
             </div>
             <div>
-              <span className="text-slate-500">Source:</span> {entry.source ?? '—'}
+              <span className="text-slate-400">Source:</span> {entry.source ?? '—'}
             </div>
             <div>
-              <span className="text-slate-500">Agent:</span> {entry.agent_name ?? '—'}
+              <span className="text-slate-400">Agent:</span> {entry.agent_name ?? '—'}
             </div>
           </div>
           <div>
-            <span className="text-slate-500">Message:</span>
+            <span className="text-slate-400">Message:</span>
             <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300 whitespace-pre-wrap">
               {entry.message}
             </pre>
           </div>
           {entry.data && (
             <div>
-              <span className="text-slate-500">Data (NDJSON):</span>
+              <span className="text-slate-400">Data (NDJSON):</span>
               <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300 whitespace-pre-wrap">
                 {tryFormatJson(entry.data)}
               </pre>
@@ -1013,7 +1014,7 @@ function ToolStatsPanel() {
       {isLoading ? (
         <ToolStatsSkeleton />
       ) : toolStats.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
           <FiBarChart2 className="mb-3 h-12 w-12" />
           <p className="text-lg font-medium">No tool usage data yet</p>
           <p className="mt-1 text-sm">Tool invocation stats will appear here as agents use tools</p>
@@ -1188,7 +1189,7 @@ function EventLogPanel() {
       {isLoading ? (
         <EventLogSkeleton />
       ) : events.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
           <FiActivity className="mb-3 h-12 w-12" />
           <p className="text-lg font-medium">No events recorded</p>
           <p className="mt-1 text-sm">
@@ -1227,32 +1228,32 @@ function EventRow({ event }: { event: Event }) {
           </span>
         )}
         {event.tool_duration_ms != null && (
-          <span className="text-xs text-slate-500">{formatDuration(event.tool_duration_ms)}</span>
+          <span className="text-xs text-slate-400">{formatDuration(event.tool_duration_ms)}</span>
         )}
-        <span className="ml-auto text-xs text-slate-500">
-          {new Date(event.created_at).toLocaleTimeString()}
+        <span className="ml-auto text-xs text-slate-400">
+          {formatTimeOnly(event.created_at)}
         </span>
       </button>
       {expanded && (
         <div className="border-t border-slate-700/50 bg-slate-850 px-4 py-3 text-xs">
           <div className="grid grid-cols-2 gap-2 text-slate-400">
             <div>
-              <span className="text-slate-500">ID:</span> {event.id}
+              <span className="text-slate-400">ID:</span> {event.id}
             </div>
             <div>
-              <span className="text-slate-500">Session:</span> {event.session_id ?? '—'}
+              <span className="text-slate-400">Session:</span> {event.session_id ?? '—'}
             </div>
             <div>
-              <span className="text-slate-500">Run:</span> {event.run_id ?? '—'}
+              <span className="text-slate-400">Run:</span> {event.run_id ?? '—'}
             </div>
             <div>
-              <span className="text-slate-500">Level:</span>{' '}
+              <span className="text-slate-400">Level:</span>{' '}
               <span className={event.level === 'error' ? 'text-red-400' : ''}>{event.level}</span>
             </div>
           </div>
           {event.tool_args && (
             <div className="mt-2">
-              <span className="text-slate-500">Tool Args:</span>
+              <span className="text-slate-400">Tool Args:</span>
               <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
                 {event.tool_args}
               </pre>
@@ -1260,7 +1261,7 @@ function EventRow({ event }: { event: Event }) {
           )}
           {event.data && (
             <div className="mt-2">
-              <span className="text-slate-500">Data:</span>
+              <span className="text-slate-400">Data:</span>
               <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
                 {tryFormatJson(event.data)}
               </pre>
@@ -1454,7 +1455,7 @@ function TimelinePanel() {
       {isLoading ? (
         <EventLogSkeleton />
       ) : events.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
           <FiClock className="mb-3 h-12 w-12" />
           <p className="text-lg font-medium">No timeline events</p>
           <p className="mt-1 text-sm">
@@ -1516,9 +1517,9 @@ function TimelinePanel() {
                           ⏱ {formatDuration(event.tool_duration_ms)}
                         </span>
                       )}
-                      <span className="ml-auto text-xs text-slate-500 flex items-center gap-1 flex-shrink-0">
+                      <span className="ml-auto text-xs text-slate-400 flex items-center gap-1 flex-shrink-0">
                         <FiClock className="h-3 w-3" />
-                        {new Date(event.created_at).toLocaleTimeString()}
+                        {formatTimeOnly(event.created_at)}
                       </span>
                     </div>
                   </button>
@@ -1528,27 +1529,27 @@ function TimelinePanel() {
                     <div className="mt-1 ml-6 rounded-md border border-slate-700/50 bg-slate-850 px-4 py-3 text-xs">
                       <div className="grid grid-cols-2 gap-2 text-slate-400">
                         <div>
-                          <span className="text-slate-500">ID:</span> {event.id}
+                          <span className="text-slate-400">ID:</span> {event.id}
                         </div>
                         <div>
-                          <span className="text-slate-500">Session:</span> {event.session_id ?? '—'}
+                          <span className="text-slate-400">Session:</span> {event.session_id ?? '—'}
                         </div>
                         <div>
-                          <span className="text-slate-500">Run:</span> {event.run_id ?? '—'}
+                          <span className="text-slate-400">Run:</span> {event.run_id ?? '—'}
                         </div>
                         <div>
-                          <span className="text-slate-500">Level:</span>{' '}
+                          <span className="text-slate-400">Level:</span>{' '}
                           <span className={event.level === 'error' ? 'text-red-400' : ''}>
                             {event.level}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-500">Timestamp:</span>{' '}
-                          {new Date(event.created_at).toISOString()}
+                          <span className="text-slate-400">Timestamp:</span>{' '}
+                          {formatAbsoluteDateTime(event.created_at)}
                         </div>
                         {event.tool_duration_ms != null && (
                           <div>
-                            <span className="text-slate-500">Duration:</span>{' '}
+                            <span className="text-slate-400">Duration:</span>{' '}
                             {formatDuration(event.tool_duration_ms)}
                           </div>
                         )}
@@ -1557,11 +1558,11 @@ function TimelinePanel() {
                         <div className="mt-2 rounded bg-green-900/20 border border-green-800/30 p-2">
                           <span className="text-green-400 font-medium">Correlated tool_end:</span>
                           <div className="mt-1 text-slate-400">
-                            <span className="text-slate-500">End time:</span>{' '}
-                            {new Date(paired.created_at).toLocaleTimeString()}
+                            <span className="text-slate-400">End time:</span>{' '}
+                            {formatTimeOnly(paired.created_at)}
                             {paired.tool_duration_ms != null && (
                               <span className="ml-3">
-                                <span className="text-slate-500">Duration:</span>{' '}
+                                <span className="text-slate-400">Duration:</span>{' '}
                                 {formatDuration(paired.tool_duration_ms)}
                               </span>
                             )}
@@ -1570,7 +1571,7 @@ function TimelinePanel() {
                       )}
                       {event.tool_args && (
                         <div className="mt-2">
-                          <span className="text-slate-500">Tool Args:</span>
+                          <span className="text-slate-400">Tool Args:</span>
                           <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
                             {tryFormatJson(event.tool_args)}
                           </pre>
@@ -1578,7 +1579,7 @@ function TimelinePanel() {
                       )}
                       {event.data && (
                         <div className="mt-2">
-                          <span className="text-slate-500">Data:</span>
+                          <span className="text-slate-400">Data:</span>
                           <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
                             {tryFormatJson(event.data)}
                           </pre>
@@ -1770,7 +1771,7 @@ function ErrorAggregationPanel() {
           ))}
           {unattributedErrors.length > 0 && (
             <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-              <div className="text-xs text-slate-500 italic">Unattributed</div>
+              <div className="text-xs text-slate-400 italic">Unattributed</div>
               <div className="mt-1 text-lg font-bold text-amber-400">
                 {unattributedErrors.length}
               </div>
@@ -1783,7 +1784,7 @@ function ErrorAggregationPanel() {
       {isLoading ? (
         <EventLogSkeleton />
       ) : filteredErrors.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
           <FiAlertTriangle className="mb-3 h-12 w-12" />
           <p className="text-lg font-medium">No errors found</p>
           <p className="mt-1 text-sm">
@@ -1825,9 +1826,9 @@ function ErrorAggregationPanel() {
                       {error.tool_name}
                     </span>
                   )}
-                  <span className="ml-auto text-xs text-slate-500 flex items-center gap-1 flex-shrink-0">
+                  <span className="ml-auto text-xs text-slate-400 flex items-center gap-1 flex-shrink-0">
                     <FiClock className="h-3 w-3" />
-                    {new Date(error.created_at).toLocaleTimeString()}
+                    {formatTimeOnly(error.created_at)}
                   </span>
                 </button>
 
@@ -1835,30 +1836,30 @@ function ErrorAggregationPanel() {
                   <div className="border-t border-slate-700/50 bg-slate-850 px-4 py-3 text-xs">
                     <div className="grid grid-cols-2 gap-2 text-slate-400">
                       <div>
-                        <span className="text-slate-500">ID:</span> {error.id}
+                        <span className="text-slate-400">ID:</span> {error.id}
                       </div>
                       <div>
-                        <span className="text-slate-500">Agent:</span> {error.agent_name ?? '—'}
+                        <span className="text-slate-400">Agent:</span> {error.agent_name ?? '—'}
                       </div>
                       <div>
-                        <span className="text-slate-500">Session:</span> {error.session_id ?? '—'}
+                        <span className="text-slate-400">Session:</span> {error.session_id ?? '—'}
                       </div>
                       <div>
-                        <span className="text-slate-500">Event Type:</span> {error.event_type}
+                        <span className="text-slate-400">Event Type:</span> {error.event_type}
                       </div>
                       <div>
-                        <span className="text-slate-500">Timestamp:</span>{' '}
-                        {new Date(error.created_at).toISOString()}
+                        <span className="text-slate-400">Timestamp:</span>{' '}
+                        {formatAbsoluteDateTime(error.created_at)}
                       </div>
                       {error.tool_name && (
                         <div>
-                          <span className="text-slate-500">Tool:</span> {error.tool_name}
+                          <span className="text-slate-400">Tool:</span> {error.tool_name}
                         </div>
                       )}
                     </div>
                     {error.tool_args && (
                       <div className="mt-2">
-                        <span className="text-slate-500">Tool Args:</span>
+                        <span className="text-slate-400">Tool Args:</span>
                         <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
                           {tryFormatJson(error.tool_args)}
                         </pre>
@@ -1866,7 +1867,7 @@ function ErrorAggregationPanel() {
                     )}
                     {error.data && (
                       <div className="mt-2">
-                        <span className="text-slate-500">Error Data:</span>
+                        <span className="text-slate-400">Error Data:</span>
                         <pre className="mt-1 overflow-x-auto rounded bg-red-950/50 border border-red-900/30 p-2 font-mono text-red-300">
                           {tryFormatJson(error.data)}
                         </pre>

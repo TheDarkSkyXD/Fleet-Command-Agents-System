@@ -392,6 +392,7 @@ export function WorktreesPage() {
               }}
               className="shrink-0 p-0.5 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
               title="Copy error message"
+              aria-label="Copy error message"
             >
               <FiCopy size={13} />
             </button>
@@ -420,6 +421,7 @@ export function WorktreesPage() {
               }}
               className="shrink-0 p-0.5 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
               title="Copy error message"
+              aria-label="Copy error message"
             >
               <FiCopy size={13} />
             </button>
@@ -429,9 +431,9 @@ export function WorktreesPage() {
 
       {!activeProject && (
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center">
-          <FiFolder size={32} className="mx-auto mb-3 text-slate-500" />
+          <FiFolder size={32} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 text-lg mb-1">No Project Selected</p>
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-400 text-sm">
             Select a project from the sidebar to view its worktrees.
           </p>
         </div>
@@ -453,6 +455,7 @@ export function WorktreesPage() {
               }}
               className="shrink-0 p-1 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
               title="Copy error message"
+              aria-label="Copy error message"
             >
               <FiCopy size={14} />
             </button>
@@ -462,9 +465,9 @@ export function WorktreesPage() {
 
       {activeProject && !error && worktrees.length === 0 && !loading && (
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center">
-          <FiGitBranch size={32} className="mx-auto mb-3 text-slate-500" />
+          <FiGitBranch size={32} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 text-lg mb-1">No Worktrees Found</p>
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-400 text-sm">
             This project has no git worktrees configured. The main working directory will appear
             when the repo is initialized.
           </p>
@@ -508,8 +511,9 @@ export function WorktreesPage() {
                           navigator.clipboard.writeText(wt.branch || '');
                           toast.success('Branch name copied to clipboard');
                         }}
-                        className="shrink-0 p-0.5 rounded text-slate-500 hover:text-blue-400 hover:bg-blue-500/20 transition-colors"
+                        className="shrink-0 p-0.5 rounded text-slate-400 hover:text-blue-400 hover:bg-blue-500/20 transition-colors"
                         title="Copy branch name"
+                        aria-label="Copy branch name"
                       >
                         <FiCopy size={13} />
                       </button>
@@ -523,12 +527,12 @@ export function WorktreesPage() {
 
                   {/* HEAD commit */}
                   <div className="flex items-center gap-2 mb-2">
-                    <FiGitCommit size={14} className="text-slate-500 shrink-0" />
+                    <FiGitCommit size={14} className="text-slate-400 shrink-0" />
                     <code className="text-xs text-slate-400 font-mono">
                       {wt.headCommitShort || 'unknown'}
                     </code>
                     {wt.headMessage && (
-                      <span className="text-xs text-slate-500 truncate" title={wt.headMessage}>
+                      <span className="text-xs text-slate-400 truncate" title={wt.headMessage}>
                         {wt.headMessage}
                       </span>
                     )}
@@ -536,8 +540,8 @@ export function WorktreesPage() {
 
                   {/* Path */}
                   <div className="flex items-center gap-2">
-                    <FiFolder size={13} className="text-slate-500 shrink-0" />
-                    <span className="text-xs text-slate-500 truncate font-mono" title={wt.path}>
+                    <FiFolder size={13} className="text-slate-400 shrink-0" />
+                    <span className="text-xs text-slate-400 truncate font-mono" title={wt.path}>
                       {wt.path}
                     </span>
                   </div>
@@ -575,7 +579,7 @@ export function WorktreesPage() {
                       <span>{wt.agentName}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
                       <FiUser size={12} />
                       <span>Unassigned</span>
                     </div>
@@ -645,7 +649,7 @@ export function WorktreesPage() {
 
       {/* Summary */}
       {!loading && worktrees.length > 0 && (
-        <div className="flex items-center gap-4 text-xs text-slate-500 pt-2">
+        <div className="flex items-center gap-4 text-xs text-slate-400 pt-2">
           <span>
             {worktrees.length} worktree{worktrees.length !== 1 ? 's' : ''}
           </span>
@@ -692,7 +696,7 @@ export function WorktreesPage() {
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <FiFolder size={14} className="text-slate-500" />
+                <FiFolder size={14} className="text-slate-400" />
                 <span
                   className="text-slate-400 font-mono text-xs truncate"
                   title={forceRemoveTarget.path}
@@ -702,9 +706,9 @@ export function WorktreesPage() {
               </div>
               {forceRemoveTarget.headMessage && (
                 <div className="flex items-center gap-2 text-sm">
-                  <FiGitCommit size={14} className="text-slate-500" />
+                  <FiGitCommit size={14} className="text-slate-400" />
                   <span
-                    className="text-slate-500 text-xs truncate"
+                    className="text-slate-400 text-xs truncate"
                     title={forceRemoveTarget.headMessage}
                   >
                     {forceRemoveTarget.headMessage}

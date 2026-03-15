@@ -516,7 +516,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       >
         <Command.Input
           placeholder="Type a command or search..."
-          className="w-full border-b border-slate-700 bg-transparent px-4 py-3 text-sm text-slate-50 outline-none placeholder:text-slate-500"
+          className="w-full border-b border-slate-700 bg-transparent px-4 py-3 text-sm text-slate-50 outline-none placeholder:text-slate-400"
           autoFocus
         />
 
@@ -534,7 +534,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
           </span>
           {activeProject && (
             <span
-              className="ml-auto text-[10px] text-slate-600 truncate max-w-[200px]"
+              className="ml-auto text-[10px] text-slate-500 truncate max-w-[200px]"
               title={activeProject.path}
             >
               {activeProject.path}
@@ -575,7 +575,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
           </div>
         ) : (
           <Command.List className="max-h-72 overflow-y-auto p-2">
-            <Command.Empty className="px-4 py-8 text-center text-sm text-slate-500">
+            <Command.Empty className="px-4 py-8 text-center text-sm text-slate-400">
               No results found.
             </Command.Empty>
 
@@ -583,7 +583,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
             {recentActions.length > 0 && (
               <Command.Group heading="Recent" className="mb-2">
                 <div className="flex items-center justify-between px-2 pb-1 pt-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Recent
                   </span>
                   <button
@@ -592,7 +592,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                       e.stopPropagation();
                       handleClearRecent();
                     }}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-700 hover:text-slate-300 transition-colors"
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-slate-700 hover:text-slate-300 transition-colors"
                   >
                     <FiTrash2 size={10} />
                     Clear
@@ -609,10 +609,10 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                       onSelect={() => handleSelect(matchedItem)}
                       className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 data-[selected=true]:bg-slate-700 data-[selected=true]:text-slate-50"
                     >
-                      <FiClock size={14} className="shrink-0 text-slate-500" />
+                      <FiClock size={14} className="shrink-0 text-slate-400" />
                       <Icon size={16} className="shrink-0 text-slate-400" />
                       <span>{matchedItem.label}</span>
-                      <span className="ml-auto text-[10px] text-slate-600">{recent.group}</span>
+                      <span className="ml-auto text-[10px] text-slate-500">{recent.group}</span>
                     </Command.Item>
                   );
                 })}
@@ -622,7 +622,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
             {/* Agent Actions - context-sensitive */}
             {contextualAgentActions.length > 0 && (
               <Command.Group heading="Agent Actions" className="mb-2">
-                <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Agent Actions
                   {commandContext.hasRunningAgents && (
                     <span className="ml-2 text-[10px] font-normal text-emerald-400">
@@ -653,7 +653,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
             {/* Running Agents (live-updating) */}
             {runningAgentItems.length > 0 && (
               <Command.Group heading="Running Agents" className="mb-2">
-                <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Running Agents
                   <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-normal text-emerald-400">
                     <FiRefreshCw
@@ -676,7 +676,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                       <FiCpu size={16} className="shrink-0 text-emerald-400" />
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="truncate">{agent?.agentName ?? 'Agent'}</span>
-                        <span className="text-[10px] text-slate-500">
+                        <span className="text-[10px] text-slate-400">
                           {agent?.capability} · {agent?.model}
                         </span>
                       </div>
@@ -692,7 +692,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 
             {/* System Status */}
             <Command.Group heading="System Status" className="mb-2">
-              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 System Status
               </div>
               <div className="px-3 py-1.5 flex items-center gap-4 text-[11px] text-slate-400">
@@ -700,7 +700,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                   <FiUsers
                     size={12}
                     className={
-                      commandContext.hasRunningAgents ? 'text-emerald-400' : 'text-slate-600'
+                      commandContext.hasRunningAgents ? 'text-emerald-400' : 'text-slate-500'
                     }
                   />
                   {commandContext.runningAgentCount} agent
@@ -709,7 +709,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                 <span className="inline-flex items-center gap-1.5">
                   <FiMail
                     size={12}
-                    className={unreadMailCount > 0 ? 'text-blue-400' : 'text-slate-600'}
+                    className={unreadMailCount > 0 ? 'text-blue-400' : 'text-slate-500'}
                   />
                   {unreadMailCount} unread
                 </span>
@@ -718,7 +718,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 
             {/* Navigation */}
             <Command.Group heading="Navigation" className="mb-2">
-              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Navigation
               </div>
               {navigationItems.map((item) => {
@@ -739,7 +739,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
           </Command.List>
         )}
 
-        <div className="flex items-center justify-between border-t border-slate-700 px-4 py-2 text-xs text-slate-500">
+        <div className="flex items-center justify-between border-t border-slate-700 px-4 py-2 text-xs text-slate-400">
           <span className="flex items-center gap-1.5">
             {pendingAction ? (
               <span className="text-red-400">Confirm destructive action</span>

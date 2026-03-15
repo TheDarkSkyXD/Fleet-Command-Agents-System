@@ -472,7 +472,7 @@ export function HealthStateMachine({ currentState }: HealthStateMachineProps) {
       </svg>
 
       {/* Legend */}
-      <div className="mt-2 flex items-center justify-center gap-4 text-xs text-slate-500">
+      <div className="mt-2 flex items-center justify-center gap-4 text-xs text-slate-400">
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-sky-500" />
           <span>Booting</span>

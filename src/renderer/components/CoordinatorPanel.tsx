@@ -360,7 +360,7 @@ export function CoordinatorPanel() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-100">Coordinator</h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               {isActive ? 'Fleet orchestrator active' : 'Fleet orchestrator idle'}
             </p>
           </div>
@@ -374,7 +374,7 @@ export function CoordinatorPanel() {
               isActive ? 'bg-green-400 animate-pulse' : 'bg-slate-600'
             }`}
           />
-          <span className={`text-xs font-medium ${isActive ? 'text-green-400' : 'text-slate-500'}`}>
+          <span className={`text-xs font-medium ${isActive ? 'text-green-400' : 'text-slate-400'}`}>
             {isActive ? (session?.state === 'booting' ? 'Booting' : 'Working') : 'Inactive'}
           </span>
         </div>
@@ -388,14 +388,14 @@ export function CoordinatorPanel() {
             {/* Stats row */}
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-700/50">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
                   <FiClock className="h-3 w-3" />
                   Uptime
                 </div>
                 <p className="text-sm font-medium text-slate-200">{uptimeStr}</p>
               </div>
               <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-700/50">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
                   <FiUsers className="h-3 w-3" />
                   Dispatched
                 </div>
@@ -404,7 +404,7 @@ export function CoordinatorPanel() {
                 </p>
               </div>
               <div className="rounded-lg bg-slate-900/60 p-3 border border-slate-700/50">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
                   <FiActivity className="h-3 w-3" />
                   PID
                 </div>
@@ -434,7 +434,7 @@ export function CoordinatorPanel() {
 
             {/* Mail polling status */}
             {pollCount > 0 && (
-              <div className="flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <FiMail className="h-3 w-3" />
                   Mail polls: {pollCount}
@@ -475,7 +475,7 @@ export function CoordinatorPanel() {
                       >
                         {msg.type}
                       </span>
-                      <span className="text-slate-500 text-[10px]">
+                      <span className="text-slate-400 text-[10px]">
                         {msg.action_taken.replace(/_/g, ' ')}
                       </span>
                     </div>
@@ -528,7 +528,7 @@ export function CoordinatorPanel() {
                           </span>
                         </div>
                         {lead.objective && (
-                          <p className="text-slate-500 truncate mt-0.5" title={lead.objective}>
+                          <p className="text-slate-400 truncate mt-0.5" title={lead.objective}>
                             {lead.objective}
                           </p>
                         )}
@@ -567,7 +567,7 @@ export function CoordinatorPanel() {
                           >
                             {streamLabel}
                           </span>
-                          <span className="text-slate-500 text-[10px]">
+                          <span className="text-slate-400 text-[10px]">
                             {stream.completed_tasks}/{stream.total_tasks} tasks
                           </span>
                         </div>
@@ -587,7 +587,7 @@ export function CoordinatorPanel() {
                     );
                   })}
                 </div>
-                <div className="mt-2 pt-1.5 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-500">
+                <div className="mt-2 pt-1.5 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400">
                   <span>Total: {workStreams.reduce((s, w) => s + w.total_tasks, 0)} tasks</span>
                   <span className="text-green-400">
                     {workStreams.reduce((s, w) => s + w.completed_tasks, 0)} completed
@@ -607,7 +607,7 @@ export function CoordinatorPanel() {
                   <FiFileText className="h-3 w-3" />
                   Activity Log ({activityLog.length} entries)
                 </span>
-                <span className="text-[10px] text-slate-500">
+                <span className="text-[10px] text-slate-400">
                   {showActivityLog ? 'Hide' : 'Show'}
                 </span>
               </button>
@@ -617,7 +617,7 @@ export function CoordinatorPanel() {
                   data-testid="coordinator-activity-log"
                 >
                   {activityLog.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-2">
+                    <p className="text-xs text-slate-400 text-center py-2">
                       No activity recorded yet
                     </p>
                   ) : (
@@ -678,7 +678,7 @@ export function CoordinatorPanel() {
                                   {entry.summary}
                                 </span>
                                 <span
-                                  className="text-[10px] text-slate-500 whitespace-nowrap shrink-0"
+                                  className="text-[10px] text-slate-400 whitespace-nowrap shrink-0"
                                   title={`${dateStr} ${timeStr}`}
                                 >
                                   {dateStr} {timeStr}
@@ -686,7 +686,7 @@ export function CoordinatorPanel() {
                               </div>
                               {entry.detail && (
                                 <p
-                                  className="text-[10px] text-slate-500 mt-0.5 truncate"
+                                  className="text-[10px] text-slate-400 mt-0.5 truncate"
                                   title={entry.detail}
                                 >
                                   {entry.detail}
@@ -704,11 +704,11 @@ export function CoordinatorPanel() {
 
             {/* Agent name & details */}
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">
+              <span className="text-slate-400">
                 Name: <span className="text-slate-300 font-mono">{session.agent_name}</span>
               </span>
               {session.worktree_path && (
-                <span className="text-slate-500 truncate ml-2" title={session.worktree_path}>
+                <span className="text-slate-400 truncate ml-2" title={session.worktree_path}>
                   {session.worktree_path}
                 </span>
               )}
@@ -889,12 +889,12 @@ export function CoordinatorPanel() {
                       >
                         {askResult.timed_out ? 'Timed Out (120s)' : 'Reply Received'}
                       </span>
-                      <span className="text-slate-500 text-[10px]">
+                      <span className="text-slate-400 text-[10px]">
                         {Math.round(askResult.elapsed_ms / 1000)}s elapsed
                       </span>
                     </div>
                     <div
-                      className="text-[10px] text-slate-500 mb-1"
+                      className="text-[10px] text-slate-400 mb-1"
                       data-testid="ask-correlation-id"
                     >
                       Correlation: {askResult.correlation_id}
@@ -998,7 +998,7 @@ export function CoordinatorPanel() {
                             <span className="text-slate-300 truncate" title={msg.body}>
                               {msg.body}
                             </span>
-                            <span className="text-slate-500 whitespace-nowrap shrink-0">
+                            <span className="text-slate-400 whitespace-nowrap shrink-0">
                               {timeStr}
                             </span>
                           </div>

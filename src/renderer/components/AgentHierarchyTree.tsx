@@ -35,7 +35,7 @@ const stateDotBg: Record<AgentState, string> = {
 const stateTextColor: Record<AgentState, string> = {
   booting: 'text-sky-400',
   working: 'text-emerald-400',
-  completed: 'text-slate-500',
+  completed: 'text-slate-400',
   stalled: 'text-amber-400',
   zombie: 'text-red-400',
 };
@@ -150,7 +150,7 @@ function TreeNodeComponent({
   const capColor =
     capabilityColors[session.capability] || 'bg-slate-600/20 text-slate-300 border-slate-600/40';
   const dotBg = stateDotBg[session.state] || 'bg-slate-400';
-  const textColor = stateTextColor[session.state] || 'text-slate-500';
+  const textColor = stateTextColor[session.state] || 'text-slate-400';
   const pulse = statePulse[session.state] || '';
   const icon = capabilityIcon[session.capability] || <FiCpu className="h-4 w-4" />;
 
@@ -236,7 +236,7 @@ function TreeNodeComponent({
 
           {/* Child count for leads/coordinators */}
           {hasChildren && (
-            <span className="text-xs text-slate-500 ml-auto flex-shrink-0">
+            <span className="text-xs text-slate-400 ml-auto flex-shrink-0">
               {node.children.length} child{node.children.length !== 1 ? 'ren' : ''}
             </span>
           )}
@@ -274,9 +274,9 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
   if (tree.length === 0) {
     return (
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
-        <FiUsers className="h-12 w-12 mx-auto mb-3 text-slate-600" />
+        <FiUsers className="h-12 w-12 mx-auto mb-3 text-slate-500" />
         <p className="text-lg mb-2">No agents to display</p>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-400">
           Spawn agents to see the hierarchy tree.
           <br />
           Coordinator → Leads → Workers
@@ -305,7 +305,7 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
           {legendItems.map((item) => (
             <div key={item.label} className="flex items-center gap-1">
               <span className={`${item.textColor}`}>{stateIcon[item.state]}</span>
-              <span className="text-xs text-slate-500">{item.label}</span>
+              <span className="text-xs text-slate-400">{item.label}</span>
             </div>
           ))}
         </div>
@@ -326,7 +326,7 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
       </div>
 
       {/* Footer stats */}
-      <div className="border-t border-slate-700 px-4 py-2 flex items-center gap-4 text-xs text-slate-500">
+      <div className="border-t border-slate-700 px-4 py-2 flex items-center gap-4 text-xs text-slate-400">
         <span>Total: {sessions.length} agents</span>
         <span>Roots: {tree.length}</span>
         <span>Max depth: {sessions.reduce((max, s) => Math.max(max, s.depth || 0), 0)}</span>

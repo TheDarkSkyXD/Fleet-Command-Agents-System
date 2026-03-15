@@ -488,7 +488,7 @@ export function ExpertisePage() {
       {/* Global search bar (shown on domain list view) */}
       {!selectedDomain && activeTab === 'domains' && (
         <div className="relative" data-testid="global-search-container">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
             value={globalSearchQuery}
@@ -506,7 +506,7 @@ export function ExpertisePage() {
                 setGlobalSearchResults([]);
                 setIsGlobalSearchActive(false);
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 hover:text-slate-300"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-300"
             >
               <FiX size={14} />
             </button>
@@ -557,7 +557,7 @@ export function ExpertisePage() {
                   >
                     <FiChevronRight
                       size={14}
-                      className={`flex-shrink-0 text-slate-500 transition-transform ${expandedRecordId === record.id ? 'rotate-90' : ''}`}
+                      className={`flex-shrink-0 text-slate-400 transition-transform ${expandedRecordId === record.id ? 'rotate-90' : ''}`}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -568,7 +568,7 @@ export function ExpertisePage() {
                         <TypeBadge type={record.type} />
                         <ClassificationBadge classification={record.classification} />
                       </div>
-                      <div className="mt-0.5 flex items-center gap-3 text-xs text-slate-500">
+                      <div className="mt-0.5 flex items-center gap-3 text-xs text-slate-400">
                         {record.agent_name && <span>by {record.agent_name}</span>}
                         <span>{new Date(record.created_at).toLocaleDateString()}</span>
                       </div>
@@ -579,7 +579,7 @@ export function ExpertisePage() {
                         e.stopPropagation();
                         handleDelete(record.id);
                       }}
-                      className="flex-shrink-0 rounded p-1.5 text-slate-500 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+                      className="flex-shrink-0 rounded p-1.5 text-slate-400 hover:bg-red-900/30 hover:text-red-400 transition-colors"
                       title="Delete record"
                     >
                       <FiTrash2 size={14} />
@@ -591,7 +591,7 @@ export function ExpertisePage() {
                       <p className="whitespace-pre-wrap text-sm text-slate-300">
                         <HighlightedText text={record.content} query={globalSearchQuery} />
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
                         {record.source_file && (
                           <span className="flex items-center gap-1">
                             <FiDatabase size={12} />
@@ -630,9 +630,9 @@ export function ExpertisePage() {
             </div>
           ) : timelineRecords.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-12 text-center">
-              <FiClock size={40} className="mx-auto mb-3 text-slate-500" />
+              <FiClock size={40} className="mx-auto mb-3 text-slate-400" />
               <p className="text-lg font-medium text-slate-300">No timeline entries yet</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-400">
                 Record your first expertise to see it in the timeline
               </p>
             </div>
@@ -696,14 +696,14 @@ export function ExpertisePage() {
                             <TypeBadge type={record.type} />
                             <ClassificationBadge classification={record.classification} />
                           </div>
-                          <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500">
+                          <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-400">
                             {record.agent_name ? (
                               <span className="flex items-center gap-1 text-slate-400">
                                 <FiUser size={11} />
                                 {record.agent_name}
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-slate-500">
+                              <span className="flex items-center gap-1 text-slate-400">
                                 <FiUser size={11} />
                                 Manual entry
                               </span>
@@ -727,7 +727,7 @@ export function ExpertisePage() {
                               <p className="whitespace-pre-wrap text-sm text-slate-300">
                                 {record.content}
                               </p>
-                              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
                                 {record.source_file && (
                                   <span className="flex items-center gap-1">
                                     <FiDatabase size={12} />
@@ -761,9 +761,9 @@ export function ExpertisePage() {
         <div>
           {domains.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-12 text-center">
-              <FiDatabase size={40} className="mx-auto mb-3 text-slate-500" />
+              <FiDatabase size={40} className="mx-auto mb-3 text-slate-400" />
               <p className="text-lg font-medium text-slate-300">No expertise domains yet</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-400">
                 Record your first expertise to create a domain
               </p>
             </div>
@@ -786,7 +786,7 @@ export function ExpertisePage() {
                     </h3>
                     <FiChevronRight
                       size={16}
-                      className="mt-0.5 text-slate-500 group-hover:text-blue-400"
+                      className="mt-0.5 text-slate-400 group-hover:text-blue-400"
                     />
                   </div>
                   <p className="mt-1 text-sm text-slate-400">
@@ -815,9 +815,9 @@ export function ExpertisePage() {
         <div data-testid="expertise-health-dashboard">
           {domains.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-12 text-center">
-              <FiActivity size={40} className="mx-auto mb-3 text-slate-500" />
+              <FiActivity size={40} className="mx-auto mb-3 text-slate-400" />
               <p className="text-lg font-medium text-slate-300">No domains to analyze</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-400">
                 Record expertise to see domain health metrics
               </p>
             </div>
@@ -826,17 +826,17 @@ export function ExpertisePage() {
               {/* Summary stats */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total Domains</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">Total Domains</p>
                   <p className="mt-1 text-2xl font-bold text-slate-100">{domains.length}</p>
                 </div>
                 <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total Entries</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">Total Entries</p>
                   <p className="mt-1 text-2xl font-bold text-slate-100">
                     {domains.reduce((sum, d) => sum + d.record_count, 0)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Healthy</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">Healthy</p>
                   <p className="mt-1 text-2xl font-bold text-emerald-400">
                     {
                       domains.filter((d) => {
@@ -849,7 +849,7 @@ export function ExpertisePage() {
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Stale</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">Stale</p>
                   <p className="mt-1 text-2xl font-bold text-amber-400">
                     {
                       domains.filter((d) => {
@@ -916,7 +916,7 @@ export function ExpertisePage() {
                         {/* Domain name */}
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-semibold text-slate-100">{domain.domain}</h3>
-                          <p className="text-xs text-slate-500 mt-0.5">
+                          <p className="text-xs text-slate-400 mt-0.5">
                             {domain.record_count} entr{domain.record_count === 1 ? 'y' : 'ies'}
                           </p>
                         </div>
@@ -966,7 +966,7 @@ export function ExpertisePage() {
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px]">
               <FiSearch
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 size={14}
               />
               <input
@@ -980,7 +980,7 @@ export function ExpertisePage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <FiFilter size={14} className="text-slate-500" />
+              <FiFilter size={14} className="text-slate-400" />
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
@@ -1028,7 +1028,7 @@ export function ExpertisePage() {
                   >
                     <FiChevronRight
                       size={14}
-                      className={`flex-shrink-0 text-slate-500 transition-transform ${expandedRecordId === record.id ? 'rotate-90' : ''}`}
+                      className={`flex-shrink-0 text-slate-400 transition-transform ${expandedRecordId === record.id ? 'rotate-90' : ''}`}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1038,7 +1038,7 @@ export function ExpertisePage() {
                         <TypeBadge type={record.type} />
                         <ClassificationBadge classification={record.classification} />
                       </div>
-                      <div className="mt-0.5 flex items-center gap-3 text-xs text-slate-500">
+                      <div className="mt-0.5 flex items-center gap-3 text-xs text-slate-400">
                         {record.agent_name && <span>by {record.agent_name}</span>}
                         <span>{new Date(record.created_at).toLocaleDateString()}</span>
                       </div>
@@ -1049,7 +1049,7 @@ export function ExpertisePage() {
                         e.stopPropagation();
                         handleDelete(record.id);
                       }}
-                      className="flex-shrink-0 rounded p-1.5 text-slate-500 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+                      className="flex-shrink-0 rounded p-1.5 text-slate-400 hover:bg-red-900/30 hover:text-red-400 transition-colors"
                       title="Delete record"
                     >
                       <FiTrash2 size={14} />
@@ -1062,7 +1062,7 @@ export function ExpertisePage() {
                       <p className="whitespace-pre-wrap text-sm text-slate-300">
                         <HighlightedText text={record.content} query={searchQuery} />
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
                         {record.source_file && (
                           <span className="flex items-center gap-1">
                             <FiDatabase size={12} />

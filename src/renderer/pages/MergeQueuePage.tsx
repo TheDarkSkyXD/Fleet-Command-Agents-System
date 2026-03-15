@@ -122,21 +122,21 @@ function HistoryEntryRow({
             <div className="mt-2 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
               {entry.agent_name && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-slate-500">Agent:</span> {entry.agent_name}
+                  <span className="text-slate-400">Agent:</span> {entry.agent_name}
                 </span>
               )}
               {entry.task_id && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-slate-500">Task:</span> {entry.task_id}
+                  <span className="text-slate-400">Task:</span> {entry.task_id}
                 </span>
               )}
               {filesModified.length > 0 && (
-                <span className="text-slate-500">
+                <span className="text-slate-400">
                   {filesModified.length} file{filesModified.length !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
-            <div className="mt-1.5 flex items-center gap-4 text-xs text-slate-500">
+            <div className="mt-1.5 flex items-center gap-4 text-xs text-slate-400">
               <span title={enqueuedDate.toLocaleString()}>
                 Enqueued: {enqueuedDate.toLocaleDateString()}{' '}
                 {enqueuedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -353,7 +353,7 @@ function EnqueueDialog({
               >
                 Depends On (optional)
               </label>
-              <p className="text-xs text-slate-500 mb-2">
+              <p className="text-xs text-slate-400 mb-2">
                 Select merges that must complete before this one can proceed.
               </p>
               <div
@@ -484,12 +484,12 @@ function QueueEntryRow({
               <span>Enqueued: {new Date(entry.enqueued_at).toLocaleString()}</span>
             </div>
             {filesModified.length > 0 && (
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 text-xs text-slate-400">
                 {filesModified.length} file{filesModified.length !== 1 ? 's' : ''} modified
               </div>
             )}
             {depEntries.length > 0 && (
-              <div className="mt-1.5 flex items-center gap-1 text-xs text-slate-500">
+              <div className="mt-1.5 flex items-center gap-1 text-xs text-slate-400">
                 <span className="text-slate-400">Depends on:</span>
                 {depEntries.map((dep) => (
                   <span
@@ -760,7 +760,7 @@ function TargetBranchSelector({
           title="Click to change merge target branch"
         >
           {targetBranch || '(current branch)'}
-          <span className="text-slate-500">&#9998;</span>
+          <span className="text-slate-400">&#9998;</span>
         </button>
       )}
     </div>

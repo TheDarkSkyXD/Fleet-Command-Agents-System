@@ -185,9 +185,9 @@ export function ProjectConfigEditor() {
   if (!activeProject) {
     return (
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center">
-        <FiFolder size={32} className="mx-auto mb-3 text-slate-500" />
+        <FiFolder size={32} className="mx-auto mb-3 text-slate-400" />
         <p className="text-slate-400 text-lg mb-1">No Project Selected</p>
-        <p className="text-slate-500 text-sm">Select a project to view its configuration.</p>
+        <p className="text-slate-400 text-sm">Select a project to view its configuration.</p>
       </div>
     );
   }
@@ -211,7 +211,7 @@ export function ProjectConfigEditor() {
             <p className="text-red-400/70">{error}</p>
           </div>
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-400">
           Make sure the .overstory directory has been initialized for this project. Go to the
           Worktrees page and click "Initialize .overstory".
         </p>
@@ -232,7 +232,7 @@ export function ProjectConfigEditor() {
             <FiFile size={18} className="text-blue-400" />
             Project Configuration
           </h3>
-          {configPath && <p className="text-xs text-slate-500 mt-1 font-mono">{configPath}</p>}
+          {configPath && <p className="text-xs text-slate-400 mt-1 font-mono">{configPath}</p>}
         </div>
         <div className="flex items-center gap-2">
           {/* Mode toggle */}
@@ -326,13 +326,13 @@ export function ProjectConfigEditor() {
                     style={{ paddingLeft: `${depth * 16}px` }}
                   >
                     {depth > 0 && (
-                      <span className="text-slate-600 mr-1">
+                      <span className="text-slate-500 mr-1">
                         {field.path.slice(0, -1).join('.')}.
                       </span>
                     )}
                     {field.key}
                   </span>
-                  <span className="text-[10px] text-slate-600 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
                     {field.type}
                   </span>
                 </div>
@@ -398,7 +398,7 @@ export function ProjectConfigEditor() {
             );
           })}
           {flatFields.length === 0 && (
-            <div className="p-6 text-center text-slate-500 text-sm">
+            <div className="p-6 text-center text-slate-400 text-sm">
               Configuration file is empty. Switch to JSON view to add fields.
             </div>
           )}

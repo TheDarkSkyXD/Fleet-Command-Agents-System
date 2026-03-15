@@ -558,13 +558,13 @@ function PageContent({
           data-testid="not-found-page"
         >
           <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-slate-800">
-            <span className="text-4xl font-bold text-slate-500">404</span>
+            <span className="text-4xl font-bold text-slate-400">404</span>
           </div>
           <h1 className="mb-2 text-2xl font-bold text-slate-200">Page Not Found</h1>
           <p className="mb-1 text-slate-400">
             The page <span className="font-mono text-slate-300">"{page}"</span> does not exist.
           </p>
-          <p className="mb-6 text-sm text-slate-500">
+          <p className="mb-6 text-sm text-slate-400">
             It may have been moved or the URL is incorrect.
           </p>
           <button

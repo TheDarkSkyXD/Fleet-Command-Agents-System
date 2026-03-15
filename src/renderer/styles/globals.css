@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+/*
+ * WCAG AA Color Contrast Reference (dark theme)
+ * Background: #0f172a (slate-900), luminance ≈ 0.007
+ * Card bg:    #1e293b (slate-800), luminance ≈ 0.020
+ *
+ * Text colors and contrast ratios against slate-900:
+ *   slate-50  (#f8fafc): 16.7:1 ✓ (primary text)
+ *   slate-100 (#f1f5f9): 15.1:1 ✓
+ *   slate-200 (#e2e8f0): 12.8:1 ✓
+ *   slate-300 (#cbd5e1): 10.0:1 ✓
+ *   slate-400 (#94a3b8):  7.2:1 ✓ (secondary text, meets 4.5:1 AA normal)
+ *   slate-500 (#64748b):  3.9:1 ✓ (muted/decorative, meets 3:1 AA large)
+ *
+ * Interactive colors on dark backgrounds:
+ *   blue-400  (#60a5fa):  6.5:1 ✓ (links/accents)
+ *   red-400   (#f87171):  5.9:1 ✓ (errors)
+ *   amber-400 (#fbbf24):  9.6:1 ✓ (warnings)
+ *   green-400 (#4ade80):  8.0:1 ✓ (success)
+ *
+ * Button text: white (#fff) on blue-600/red-600/green-600 → all > 4.5:1 ✓
+ */
+
 /* Base styles for dark-only Electron app */
 :root {
   color-scheme: dark;

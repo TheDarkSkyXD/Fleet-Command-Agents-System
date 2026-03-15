@@ -39,6 +39,7 @@ import type {
 } from '../../shared/types';
 import { AgentTerminal } from '../components/AgentTerminal';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { formatDateTime, formatTimeOnly, formatUptime as formatUptimeFn } from '../lib/dateFormatting';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 
 const CAPABILITY_COLORS: Record<string, string> = {
@@ -132,25 +133,6 @@ const TABS: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
   { id: 'gates', label: 'Gates', icon: <FiShield className="h-4 w-4" /> },
 ];
 
-function formatUptime(createdAt: string): string {
-  const uptime = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
-  const hours = Math.floor(uptime / 3600);
-  const minutes = Math.floor((uptime % 3600) / 60);
-  const seconds = uptime % 60;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 // ── Agent CV Profile Card ──────────────────────────────────────
 
@@ -239,9 +221,9 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
                   >
                     {capability.charAt(0).toUpperCase() + capability.slice(1)}
                   </span>
-                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
                     <FiCalendar className="h-3 w-3" />
-                    Since {formatDate(memberSince)}
+                    Since {formatDateTime(memberSince)}
                   </span>
                 </div>
               </div>
@@ -291,7 +273,7 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500 italic">
+            <p className="text-sm text-slate-400 italic">
               No expertise domains recorded yet. Domains are added as the agent works on tasks.
             </p>
           )}
@@ -310,13 +292,13 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
                   key={`${task}-${idx}`}
                   className="flex items-center gap-2 rounded-md bg-slate-700/40 px-3 py-2 text-sm text-slate-300 font-mono"
                 >
-                  <FiHash className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
+                  <FiHash className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
                   {task}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500 italic">
+            <p className="text-sm text-slate-400 italic">
               No tasks recorded yet. Tasks are tracked when sessions complete.
             </p>
           )}
@@ -348,20 +330,20 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
                       {s.state}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
                     {s.task_id && <span>Task: {s.task_id}</span>}
-                    <span>{formatDate(s.created_at)}</span>
+                    <span>{formatDateTime(s.created_at)}</span>
                   </div>
                 </div>
               ))}
               {sessionHistory.length > 10 && (
-                <p className="text-xs text-slate-500 text-center pt-1">
+                <p className="text-xs text-slate-400 text-center pt-1">
                   and {sessionHistory.length - 10} more sessions...
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-500 italic">
+            <p className="text-sm text-slate-400 italic">
               No previous sessions found for this agent.
             </p>
           )}
@@ -413,7 +395,7 @@ const EVENT_TYPE_STYLES: Record<string, { bg: string; icon: React.ReactNode }> =
 };
 
 const LOG_LEVEL_COLORS: Record<string, string> = {
-  debug: 'text-slate-500',
+  debug: 'text-slate-400',
   info: 'text-slate-300',
   warn: 'text-amber-400',
   error: 'text-red-400',
@@ -480,7 +462,7 @@ function AgentLogsTab({ agentName }: { agentName: string }) {
 
       {/* Events list */}
       {filteredEvents.length === 0 ? (
-        <div className="text-center py-8 text-slate-500">
+        <div className="text-center py-8 text-slate-400">
           <FiFile className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p>No log entries found for this agent</p>
         </div>
@@ -506,15 +488,15 @@ function AgentLogsTab({ agentName }: { agentName: string }) {
                       </span>
                     )}
                     {event.tool_duration_ms != null && (
-                      <span className="text-xs text-slate-500">{event.tool_duration_ms}ms</span>
+                      <span className="text-xs text-slate-400">{event.tool_duration_ms}ms</span>
                     )}
                   </div>
                   {event.data && (
-                    <p className="text-xs text-slate-500 mt-0.5 truncate max-w-lg">{event.data}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate max-w-lg">{event.data}</p>
                   )}
                 </div>
-                <span className="text-xs text-slate-600 whitespace-nowrap flex-shrink-0">
-                  {new Date(event.created_at).toLocaleTimeString()}
+                <span className="text-xs text-slate-500 whitespace-nowrap flex-shrink-0">
+                  {formatTimeOnly(event.created_at)}
                 </span>
               </div>
             );
@@ -552,13 +534,13 @@ function AgentFilesTab({ session }: { session: Session }) {
                   key={file}
                   className="flex items-center gap-2 rounded-md bg-slate-700/40 px-3 py-2 text-sm font-mono text-slate-300"
                 >
-                  <FiFile className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
+                  <FiFile className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
                   {file}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500 italic">
+            <p className="text-sm text-slate-400 italic">
               No file scope assigned. This agent can modify any files.
             </p>
           )}
@@ -573,12 +555,12 @@ function AgentFilesTab({ session }: { session: Session }) {
             </h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <span className="text-slate-500">Path:</span>
+                <span className="text-slate-400">Path:</span>
                 <span className="font-mono text-slate-300">{session.worktree_path}</span>
               </div>
               {session.branch_name && (
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-500">Branch:</span>
+                  <span className="text-slate-400">Branch:</span>
                   <span className="font-mono text-emerald-400">{session.branch_name}</span>
                 </div>
               )}
@@ -608,7 +590,7 @@ const MAIL_TYPE_COLORS: Record<string, string> = {
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  low: 'text-slate-500',
+  low: 'text-slate-400',
   normal: 'text-slate-400',
   high: 'text-amber-400',
   urgent: 'text-red-400 font-semibold',
@@ -646,7 +628,7 @@ function AgentMailTab({ agentName }: { agentName: string }) {
   return (
     <div className="p-4 h-full overflow-y-auto">
       {messages.length === 0 ? (
-        <div className="text-center py-8 text-slate-500">
+        <div className="text-center py-8 text-slate-400">
           <FiMail className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p>No mail messages for this agent</p>
         </div>
@@ -686,10 +668,10 @@ function AgentMailTab({ agentName }: { agentName: string }) {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
+                    <div className="text-xs text-slate-400 mt-0.5">
                       {isSender ? `To: ${msg.to_agent}` : `From: ${msg.from_agent}`}
                       {' · '}
-                      {new Date(msg.created_at).toLocaleString()}
+                      {formatDateTime(msg.created_at)}
                     </div>
                   </div>
                   {!msg.read && !isSender && (
@@ -874,6 +856,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             }}
             className="shrink-0 p-1 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
             title="Copy error message"
+            aria-label="Copy error message"
           >
             <FiCopy size={14} />
           </button>
@@ -899,7 +882,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
         </button>
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-800">
-            <span className="text-3xl font-bold text-slate-500">404</span>
+            <span className="text-3xl font-bold text-slate-400">404</span>
           </div>
           <h2 className="mb-2 text-xl font-semibold text-slate-200">Agent Not Found</h2>
           <p className="mb-1 text-slate-400">
@@ -908,7 +891,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
               "{agentId}"
             </span>
           </p>
-          <p className="mb-6 text-sm text-slate-500">
+          <p className="mb-6 text-sm text-slate-400">
             The agent may have been removed, or the URL contains an invalid ID.
           </p>
           <button
@@ -1073,7 +1056,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
         </div>
 
         {/* Info bar */}
-        <div className="flex items-center gap-4 text-xs text-slate-500">
+        <div className="flex items-center gap-4 text-xs text-slate-400">
           {(session.pid || processInfo?.pid) && (
             <span className="flex items-center gap-1 font-mono">
               <FiCpu className="h-3 w-3" />
@@ -1082,7 +1065,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
           )}
           <span className="flex items-center gap-1">
             <FiClock className="h-3 w-3" />
-            {formatUptime(session.created_at)}
+            {formatUptimeFn(session.created_at)}
           </span>
           {processInfo?.model && (
             <span className="flex items-center gap-1">
@@ -1251,6 +1234,7 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
           }}
           className="p-1 rounded text-red-400/50 hover:text-red-300 hover:bg-red-500/20 transition-colors"
           title="Copy error message"
+          aria-label="Copy error message"
         >
           <FiCopy size={14} />
         </button>
@@ -1260,7 +1244,7 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
 
   if (!perfData || perfData.totalSessions === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-500">
+      <div className="flex items-center justify-center h-full text-slate-400">
         No session history for this agent yet.
       </div>
     );
@@ -1277,11 +1261,11 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="performance-stats">
         <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Sessions</div>
+          <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Sessions</div>
           <div className="text-2xl font-bold text-slate-200 tabular-nums">{totalSessions}</div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Success Rate</div>
+          <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Success Rate</div>
           <div className="text-2xl font-bold tabular-nums" data-testid="success-rate">
             <span
               className={
@@ -1309,7 +1293,7 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
           </div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Avg Duration</div>
+          <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Avg Duration</div>
           <div
             className="text-2xl font-bold text-slate-200 tabular-nums"
             data-testid="avg-duration"
@@ -1318,7 +1302,7 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
           </div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Breakdown</div>
+          <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Breakdown</div>
           <div className="flex items-center gap-3 text-sm mt-1">
             <span className="flex items-center gap-1 text-emerald-400">
               <FiCheckCircle className="h-3.5 w-3.5" />
@@ -1390,8 +1374,8 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
                   <td className="px-4 py-2 text-slate-400 tabular-nums">
                     {formatSessionDuration(s.created_at, s.completed_at)}
                   </td>
-                  <td className="px-4 py-2 text-slate-500">
-                    {new Date(s.created_at).toLocaleString()}
+                  <td className="px-4 py-2 text-slate-400">
+                    {formatDateTime(s.created_at)}
                   </td>
                 </tr>
               ))}
@@ -1446,7 +1430,7 @@ function AgentGatesTab({
       case 'running':
         return <FiLoader className="h-5 w-5 text-blue-400 animate-spin" />;
       default:
-        return <FiClock className="h-5 w-5 text-slate-500" />;
+        return <FiClock className="h-5 w-5 text-slate-400" />;
     }
   };
 
@@ -1483,8 +1467,8 @@ function AgentGatesTab({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <FiLoader className="animate-spin text-slate-500 mr-2" size={20} />
-        <span className="text-slate-500">Loading gate results...</span>
+        <FiLoader className="animate-spin text-slate-400 mr-2" size={20} />
+        <span className="text-slate-400">Loading gate results...</span>
       </div>
     );
   }
@@ -1522,7 +1506,7 @@ function AgentGatesTab({
       </div>
 
       {results.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
           <FiShield size={40} className="mb-3 opacity-50" />
           <p className="text-lg font-medium">No gate results yet</p>
           <p className="text-sm mt-1">
@@ -1549,14 +1533,14 @@ function AgentGatesTab({
                       {gateStatusIcon(result.status)}
                       <div>
                         <span className="font-medium text-slate-50">{result.gate_name}</span>
-                        <span className="ml-2 text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded">
+                        <span className="ml-2 text-xs text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded">
                           {result.gate_type}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       {result.duration_ms != null && (
-                        <span className="text-xs text-slate-500 tabular-nums">
+                        <span className="text-xs text-slate-400 tabular-nums">
                           {result.duration_ms < 1000
                             ? `${result.duration_ms}ms`
                             : `${(result.duration_ms / 1000).toFixed(1)}s`}
@@ -1570,7 +1554,7 @@ function AgentGatesTab({
                       </span>
                     </div>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500 font-mono truncate">
+                  <div className="mt-1 text-xs text-slate-400 font-mono truncate">
                     {result.command}
                   </div>
                 </button>
@@ -1579,17 +1563,17 @@ function AgentGatesTab({
                 {isExpanded && (
                   <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-2">
                     <div className="text-xs text-slate-400">
-                      <span className="text-slate-500">Run at:</span>{' '}
-                      {new Date(result.created_at).toLocaleString()}
+                      <span className="text-slate-400">Run at:</span>{' '}
+                      {formatDateTime(result.created_at)}
                     </div>
                     {result.exit_code != null && (
                       <div className="text-xs text-slate-400">
-                        <span className="text-slate-500">Exit code:</span> {result.exit_code}
+                        <span className="text-slate-400">Exit code:</span> {result.exit_code}
                       </div>
                     )}
                     {result.stdout && (
                       <div>
-                        <div className="text-xs text-slate-500 mb-1">stdout:</div>
+                        <div className="text-xs text-slate-400 mb-1">stdout:</div>
                         <pre className="text-xs text-slate-300 bg-slate-900/50 rounded p-2 overflow-x-auto max-h-40 overflow-y-auto font-mono whitespace-pre-wrap">
                           {result.stdout}
                         </pre>
@@ -1597,7 +1581,7 @@ function AgentGatesTab({
                     )}
                     {result.stderr && (
                       <div>
-                        <div className="text-xs text-slate-500 mb-1">stderr:</div>
+                        <div className="text-xs text-slate-400 mb-1">stderr:</div>
                         <pre className="text-xs text-red-300/80 bg-slate-900/50 rounded p-2 overflow-x-auto max-h-40 overflow-y-auto font-mono whitespace-pre-wrap">
                           {result.stderr}
                         </pre>

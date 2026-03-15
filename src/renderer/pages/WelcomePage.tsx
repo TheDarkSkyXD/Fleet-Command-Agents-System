@@ -2,24 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Project } from '../../shared/types';
 import { formatAbsoluteTime } from '../components/RelativeTime';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
+import { formatRelativeTime } from '../lib/dateFormatting';
 import { useProjectStore } from '../stores/projectStore';
-
-function formatRelativeTime(dateStr: string | null): string {
-  if (!dateStr) return 'Never opened';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDays = Math.floor(diffHr / 24);
-
-  if (diffSec < 60) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
 
 function ProjectCard({
   project,
@@ -56,19 +40,19 @@ function ProjectCard({
             {project.path}
           </p>
           {project.description && (
-            <p className="mt-2 text-sm text-slate-500 line-clamp-2">{project.description}</p>
+            <p className="mt-2 text-sm text-slate-400 line-clamp-2">{project.description}</p>
           )}
         </div>
         <div className="shrink-0 text-right">
           <span
-            className="text-xs text-slate-500"
+            className="text-xs text-slate-400"
             title={project.last_opened_at ? formatAbsoluteTime(project.last_opened_at) : undefined}
           >
             {formatRelativeTime(project.last_opened_at)}
           </span>
         </div>
       </div>
-      <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+      <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
         <span
           className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${
             isActive
@@ -307,7 +291,7 @@ export function WelcomePage({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-200">Recent Projects</h2>
             {recentProjects.length > 0 && (
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-400">
                 {recentProjects.length} project
                 {recentProjects.length !== 1 ? 's' : ''}
               </span>
@@ -327,7 +311,7 @@ export function WelcomePage({
                 <span className="text-3xl">{'\u2693'}</span>
               </div>
               <p className="text-lg font-semibold text-slate-300 mb-2">No projects configured</p>
-              <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
+              <p className="text-sm text-slate-400 mb-6 max-w-sm mx-auto">
                 Get started by adding your first project. Point Fleet Command at a Git repository to
                 begin orchestrating AI coding agents.
               </p>

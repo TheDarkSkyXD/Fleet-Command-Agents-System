@@ -114,7 +114,7 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
               style={{ backgroundColor: '#141c2e' }}
             >
               <div className="px-3 py-2 border-b border-slate-700">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Switch Project
                 </span>
               </div>
@@ -131,8 +131,8 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
       <>
         <div className="max-h-56 overflow-y-auto scrollbar-thin">
           {projects.length === 0 && !showCreate && (
-            <div className="px-3 py-5 text-center text-xs text-slate-500">
-              <FiFolder size={20} className="mx-auto mb-2 text-slate-600" />
+            <div className="px-3 py-5 text-center text-xs text-slate-400">
+              <FiFolder size={20} className="mx-auto mb-2 text-slate-500" />
               No projects yet. Create one to get started.
             </div>
           )}
@@ -154,13 +154,13 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
               >
                 <FiFolder
                   size={14}
-                  className={`shrink-0 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}`}
+                  className={`shrink-0 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-400'}`}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="truncate font-medium text-[13px]" title={project.name}>
                     {project.name}
                   </div>
-                  <div className="truncate text-[11px] text-slate-500 mt-0.5" title={project.path}>
+                  <div className="truncate text-[11px] text-slate-400 mt-0.5" title={project.path}>
                     {project.path}
                   </div>
                 </div>
@@ -194,7 +194,7 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
-                className="p-0.5 rounded hover:bg-slate-700 text-slate-500 transition-colors"
+                className="p-0.5 rounded hover:bg-slate-700 text-slate-400 transition-colors"
               >
                 <FiX size={12} />
               </button>
@@ -269,12 +269,12 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
           ) : activeProject ? (
             activeProject.name
           ) : (
-            <span className="text-slate-500 italic">No project</span>
+            <span className="text-slate-400 italic">No project</span>
           )}
         </span>
         <FiChevronDown
           size={14}
-          className={`text-slate-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -298,10 +298,10 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
           >
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700/80">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Projects
               </span>
-              <span className="text-[10px] text-slate-600">
+              <span className="text-[10px] text-slate-500">
                 {projects.length} project{projects.length !== 1 ? 's' : ''}
               </span>
             </div>

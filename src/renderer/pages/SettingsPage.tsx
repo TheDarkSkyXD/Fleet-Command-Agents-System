@@ -350,11 +350,11 @@ function ProfilesSettings() {
       {/* Profile List */}
       {profiles.length === 0 ? (
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-12 text-center">
-          <div className="text-slate-500 text-4xl mb-3">
+          <div className="text-slate-400 text-4xl mb-3">
             <FiStar className="mx-auto" />
           </div>
           <p className="text-slate-400 text-sm">No configuration profiles yet.</p>
-          <p className="text-slate-500 text-xs mt-1">
+          <p className="text-slate-400 text-xs mt-1">
             Create a profile to quickly switch between different agent configurations.
           </p>
         </div>
@@ -469,13 +469,13 @@ function ProfileCard({
             <p className="text-sm text-slate-400 mt-1">{profile.description}</p>
           )}
           <div className="flex flex-wrap items-center gap-3 mt-3">
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-400">
               Depth: <span className="text-slate-300">{profile.max_hierarchy_depth}</span>
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-400">
               Max Agents: <span className="text-slate-300">{profile.max_concurrent_agents}</span>
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-400">
               Per Lead: <span className="text-slate-300">{profile.max_agents_per_lead}</span>
             </span>
             <span
@@ -1162,7 +1162,7 @@ function WatchdogSettings() {
                   <span className={`text-xs text-${step.color}-400 mt-1 font-medium`}>
                     {step.label}
                   </span>
-                  <span className="text-xs text-slate-500">{step.time}</span>
+                  <span className="text-xs text-slate-400">{step.time}</span>
                 </div>
               </div>
             ))}
@@ -2083,9 +2083,9 @@ function QualityGatesSettings() {
   if (!activeProject) {
     return (
       <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-8 text-center">
-        <FiShield className="mx-auto mb-3 text-slate-500" size={32} />
+        <FiShield className="mx-auto mb-3 text-slate-400" size={32} />
         <p className="text-slate-400 text-sm">Select a project to configure quality gates.</p>
-        <p className="text-slate-500 text-xs mt-1">Quality gates are stored per project.</p>
+        <p className="text-slate-400 text-xs mt-1">Quality gates are stored per project.</p>
       </div>
     );
   }
@@ -2188,7 +2188,7 @@ function QualityGatesSettings() {
                 placeholder={
                   GATE_TYPE_OPTIONS.find((o) => o.value === newGateType)?.label || 'Gate name'
                 }
-                className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 data-testid="gate-name-input"
               />
             </div>
@@ -2203,7 +2203,7 @@ function QualityGatesSettings() {
               value={newGateCommand}
               onChange={(e) => setNewGateCommand(e.target.value)}
               placeholder="e.g., npm test"
-              className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 font-mono placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 font-mono placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
               data-testid="gate-command-input"
             />
           </div>
@@ -2231,9 +2231,9 @@ function QualityGatesSettings() {
       {/* Gates list */}
       {gates.length === 0 && !showCreateForm ? (
         <div className="rounded-lg border border-dashed border-slate-700 bg-slate-800/30 p-8 text-center">
-          <FiShield className="mx-auto mb-3 text-slate-500" size={28} />
+          <FiShield className="mx-auto mb-3 text-slate-400" size={28} />
           <p className="text-slate-400 text-sm mb-1">No quality gates configured</p>
-          <p className="text-slate-500 text-xs">
+          <p className="text-slate-400 text-xs">
             Add test, lint, or typecheck commands to enforce code quality.
           </p>
         </div>
@@ -2321,7 +2321,7 @@ function QualityGatesSettings() {
                         type="button"
                         onClick={() => handleMoveUp(index)}
                         disabled={index === 0}
-                        className="text-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         title="Move up"
                       >
                         <FiChevronUp size={14} />
@@ -2330,7 +2330,7 @@ function QualityGatesSettings() {
                         type="button"
                         onClick={() => handleMoveDown(index)}
                         disabled={index >= gates.length - 1}
-                        className="text-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         title="Move down"
                       >
                         <FiChevronDown size={14} />
@@ -2415,7 +2415,7 @@ function QualityGatesSettings() {
             )}
             {runningGates ? 'Running Gates...' : 'Run All Gates'}
           </button>
-          <span className="text-xs text-slate-500">Test your quality gates manually</span>
+          <span className="text-xs text-slate-400">Test your quality gates manually</span>
         </div>
       )}
 
@@ -2447,7 +2447,7 @@ function QualityGatesSettings() {
                     {result.gate_type}
                   </span>
                   {result.agent_name && (
-                    <span className="text-xs text-slate-500">by {result.agent_name}</span>
+                    <span className="text-xs text-slate-400">by {result.agent_name}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
@@ -2463,13 +2463,13 @@ function QualityGatesSettings() {
                     {result.status}
                   </span>
                   {result.duration_ms != null && (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-400">
                       {result.duration_ms > 1000
                         ? `${(result.duration_ms / 1000).toFixed(1)}s`
                         : `${result.duration_ms}ms`}
                     </span>
                   )}
-                  <span className="text-xs text-slate-600">
+                  <span className="text-xs text-slate-500">
                     {new Date(result.created_at).toLocaleTimeString()}
                   </span>
                 </div>
@@ -2873,7 +2873,7 @@ function UpdateSettings() {
               v{status?.currentVersion ?? '...'}
             </p>
             {lastChecked && (
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 Last checked: {lastChecked.toLocaleTimeString()}
               </p>
             )}
@@ -3035,7 +3035,7 @@ function UpdateSettings() {
 
       {/* Auto-update info */}
       <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-400">
           Fleet Command automatically checks for updates on startup. Downloaded updates are
           installed when you quit the application.
         </p>
@@ -3169,7 +3169,7 @@ function CleanupSettings() {
                 >
                   {target.label}
                 </h3>
-                <p className="mt-1 text-xs text-slate-500">{target.description}</p>
+                <p className="mt-1 text-xs text-slate-400">{target.description}</p>
               </div>
               <button
                 type="button"

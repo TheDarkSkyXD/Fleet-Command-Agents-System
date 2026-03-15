@@ -283,9 +283,9 @@ export function NotificationsPage() {
           </div>
         ) : notifications.length === 0 ? (
           <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-8 text-center">
-            <FiBell className="mx-auto h-8 w-8 text-slate-500 mb-2" />
+            <FiBell className="mx-auto h-8 w-8 text-slate-400 mb-2" />
             <p className="text-slate-400">No notifications yet</p>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-400 mt-1">
               Notifications appear when agents encounter errors, complete tasks, or require
               attention.
             </p>
@@ -346,7 +346,7 @@ export function NotificationsPage() {
                       </button>
                     )}
                     <span
-                      className="whitespace-nowrap text-xs text-slate-500"
+                      className="whitespace-nowrap text-xs text-slate-400"
                       data-testid={`notification-time-${notification.id}`}
                       title={formatAbsoluteTime(notification.created_at)}
                     >

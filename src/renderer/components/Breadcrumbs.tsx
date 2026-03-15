@@ -24,6 +24,7 @@ export function Breadcrumbs({ items, onNavigate }: BreadcrumbsProps) {
         className="flex items-center gap-1 text-slate-400 hover:text-blue-400 transition-colors"
         data-testid="breadcrumb-home"
         title="Home"
+        aria-label="Home"
       >
         <FiHome size={14} />
       </button>
@@ -31,7 +32,7 @@ export function Breadcrumbs({ items, onNavigate }: BreadcrumbsProps) {
         const isLast = index === items.length - 1;
         return (
           <span key={item.label} className="flex items-center gap-1.5">
-            <FiChevronRight size={12} className="text-slate-600" />
+            <FiChevronRight size={12} className="text-slate-500" />
             {isLast ? (
               <span
                 className="text-slate-200 font-medium truncate max-w-[200px]"

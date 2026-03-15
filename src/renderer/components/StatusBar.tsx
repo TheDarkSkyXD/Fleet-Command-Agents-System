@@ -317,19 +317,19 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
                   : 'No active profile\nClick to select one'
               }
             >
-              <FiStar className={`h-3 w-3 ${activeProfile ? 'text-blue-400' : 'text-slate-500'}`} />
-              <span className={activeProfile ? 'text-blue-300' : 'text-slate-500'}>
+              <FiStar className={`h-3 w-3 ${activeProfile ? 'text-blue-400' : 'text-slate-400'}`} />
+              <span className={activeProfile ? 'text-blue-300' : 'text-slate-400'}>
                 {activeProfile ? activeProfile.name : 'No Profile'}
               </span>
               <FiChevronUp
-                className={`h-3 w-3 text-slate-500 transition-transform ${showProfileMenu ? '' : 'rotate-180'}`}
+                className={`h-3 w-3 text-slate-400 transition-transform ${showProfileMenu ? '' : 'rotate-180'}`}
               />
             </button>
 
             {/* Dropdown menu (opens upward from status bar) */}
             {showProfileMenu && (
               <div className="absolute bottom-full right-0 mb-1 w-56 rounded-lg border border-slate-700 bg-slate-800 shadow-xl z-50 py-1 max-h-64 overflow-y-auto">
-                <div className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <div className="px-3 py-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Switch Profile
                 </div>
                 {allProfiles.map((p) => (
@@ -350,7 +350,7 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
                     <span className="truncate" title={p.name}>
                       {p.name}
                     </span>
-                    <span className="ml-auto text-slate-500 shrink-0">{p.default_model}</span>
+                    <span className="ml-auto text-slate-400 shrink-0">{p.default_model}</span>
                   </button>
                 ))}
               </div>
@@ -372,7 +372,7 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
           <span className={`h-2 w-2 rounded-full ${indicator.color}`} />
           {indicator.label}
           {cliStatus?.version && cliState === 'ready' && (
-            <span className="text-slate-500 ml-1">v{cliStatus.version}</span>
+            <span className="text-slate-400 ml-1">v{cliStatus.version}</span>
           )}
         </button>
 
@@ -455,16 +455,16 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
               data-testid="run-history-dropdown"
             >
               <div className="flex items-center justify-between px-3 py-1.5">
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Run History
                 </span>
-                <span className="text-xs text-slate-600">
+                <span className="text-xs text-slate-500">
                   {runs.length} run{runs.length !== 1 ? 's' : ''}
                 </span>
               </div>
               {runs.length === 0 ? (
-                <div className="px-3 py-6 text-xs text-slate-500 text-center">
-                  <FiList className="h-5 w-5 mx-auto mb-2 text-slate-600" />
+                <div className="px-3 py-6 text-xs text-slate-400 text-center">
+                  <FiList className="h-5 w-5 mx-auto mb-2 text-slate-500" />
                   No runs yet. Start a run to see history.
                 </div>
               ) : (
@@ -510,7 +510,7 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
                         </span>
                       </div>
                       {/* Row 2: Start time, end time, duration, agent count */}
-                      <div className="flex items-center gap-3 text-[10px] text-slate-500 ml-5">
+                      <div className="flex items-center gap-3 text-[10px] text-slate-400 ml-5">
                         <span
                           className="flex items-center gap-0.5"
                           title={`Started: ${startDate.toLocaleString()}`}

@@ -178,7 +178,7 @@ function RoleCard({
               </span>
             ))}
             {capabilities.length > 4 && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-500">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400">
                 +{capabilities.length - 4} more
               </span>
             )}
@@ -199,11 +199,11 @@ function highlightMarkdown(text: string): React.ReactNode[] {
     else if (/^[-*]\s/.test(line)) className = 'text-amber-400';
     else if (/^\d+\.\s/.test(line)) className = 'text-amber-400';
     else if (/^```/.test(line)) className = 'text-purple-400';
-    else if (/^---/.test(line)) className = 'text-slate-500';
+    else if (/^---/.test(line)) className = 'text-slate-400';
 
     return (
       <div key={`line-${i}-${line.slice(0, 20)}`} className="flex">
-        <span className="w-10 text-right pr-3 text-slate-600 select-none text-xs leading-6">
+        <span className="w-10 text-right pr-3 text-slate-500 select-none text-xs leading-6">
           {i + 1}
         </span>
         <span className={className}>{line || '\u00A0'}</span>
@@ -322,7 +322,7 @@ function InstructionEditor({
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
               hasChanges
                 ? 'bg-blue-600 text-white hover:bg-blue-500'
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                : 'bg-slate-700 text-slate-400 cursor-not-allowed'
             }`}
             data-testid="save-instruction-btn"
           >
@@ -343,7 +343,7 @@ function InstructionEditor({
       {error && (
         <div className="rounded-md px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/30 flex items-center justify-between gap-2" data-testid="config-editor-error">
           <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-200 transition-colors shrink-0" title="Dismiss error">
+          <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-200 transition-colors shrink-0" title="Dismiss error" aria-label="Dismiss error">
             <FiX size={14} />
           </button>
         </div>
@@ -406,19 +406,19 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
           <span className="text-sm font-medium text-slate-200">
             Agent Manifest — {def.display_name}
           </span>
-          <span className="text-xs text-slate-500 ml-auto font-mono">{def.role}</span>
+          <span className="text-xs text-slate-400 ml-auto font-mono">{def.role}</span>
         </div>
 
         <div className="p-4 space-y-4 font-mono text-sm">
           {/* Identity Section */}
           <div>
-            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Identity</div>
+            <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Identity</div>
             <div className="grid grid-cols-[140px_1fr] gap-y-1.5">
-              <span className="text-slate-500">role:</span>
+              <span className="text-slate-400">role:</span>
               <span className={config.color}>{def.role}</span>
-              <span className="text-slate-500">display_name:</span>
+              <span className="text-slate-400">display_name:</span>
               <span className="text-slate-300">{def.display_name}</span>
-              <span className="text-slate-500">description:</span>
+              <span className="text-slate-400">description:</span>
               <span className="text-slate-400 text-xs leading-5">{def.description}</span>
             </div>
           </div>
@@ -427,9 +427,9 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
 
           {/* Model Section */}
           <div>
-            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Model</div>
+            <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Model</div>
             <div className="grid grid-cols-[140px_1fr] gap-y-1.5">
-              <span className="text-slate-500">default_model:</span>
+              <span className="text-slate-400">default_model:</span>
               <span>
                 <span className={`px-2 py-0.5 rounded-full border text-xs ${modelColors}`}>
                   {def.default_model}
@@ -442,13 +442,13 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
 
           {/* Capabilities Section */}
           <div>
-            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+            <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
               Capabilities ({capabilities.length})
             </div>
             <div className="space-y-1">
               {capabilities.map((cap, i) => (
                 <div key={cap} className="flex items-center gap-2">
-                  <span className="text-slate-600 w-5 text-right">{i}:</span>
+                  <span className="text-slate-500 w-5 text-right">{i}:</span>
                   <span className={`${config.color} flex items-center gap-1.5`}>
                     <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                     {cap}
@@ -462,7 +462,7 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
 
           {/* Tool Permissions Section */}
           <div>
-            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+            <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
               Tool Permissions ({tools.length})
             </div>
             {tools.length > 0 ? (
@@ -475,7 +475,7 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
                 ))}
               </div>
             ) : (
-              <span className="text-slate-600 italic">
+              <span className="text-slate-500 italic">
                 No tool restrictions (all tools allowed)
               </span>
             )}
@@ -485,13 +485,13 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
 
           {/* Constraints Section */}
           <div>
-            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+            <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
               Constraints & Restrictions
             </div>
 
             {/* Bash Restrictions */}
             <div className="mb-3">
-              <div className="text-xs text-slate-500 mb-1">bash_restrictions:</div>
+              <div className="text-xs text-slate-400 mb-1">bash_restrictions:</div>
               {restrictions.length > 0 ? (
                 <div className="space-y-1 ml-3">
                   {restrictions.map((r) => (
@@ -502,15 +502,15 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
                   ))}
                 </div>
               ) : (
-                <span className="text-slate-600 italic ml-3">none</span>
+                <span className="text-slate-500 italic ml-3">none</span>
               )}
             </div>
 
             {/* File Scope */}
             <div>
-              <div className="text-xs text-slate-500 mb-1">file_scope:</div>
+              <div className="text-xs text-slate-400 mb-1">file_scope:</div>
               <span
-                className={`ml-3 ${def.file_scope ? 'text-amber-400/80' : 'text-slate-600 italic'}`}
+                className={`ml-3 ${def.file_scope ? 'text-amber-400/80' : 'text-slate-500 italic'}`}
               >
                 {def.file_scope || 'unrestricted'}
               </span>
@@ -521,12 +521,12 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
 
           {/* Metadata */}
           <div>
-            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Metadata</div>
+            <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Metadata</div>
             <div className="grid grid-cols-[140px_1fr] gap-y-1.5 text-xs">
-              <span className="text-slate-500">created_at:</span>
-              <span className="text-slate-500">{def.created_at}</span>
-              <span className="text-slate-500">updated_at:</span>
-              <span className="text-slate-500">{def.updated_at}</span>
+              <span className="text-slate-400">created_at:</span>
+              <span className="text-slate-400">{def.created_at}</span>
+              <span className="text-slate-400">updated_at:</span>
+              <span className="text-slate-400">{def.updated_at}</span>
             </div>
           </div>
         </div>
@@ -574,7 +574,7 @@ function RoleDetail({
               </span>
             )}
           </div>
-          <span className="text-sm text-slate-500">Role: {def.role}</span>
+          <span className="text-sm text-slate-400">Role: {def.role}</span>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button
@@ -620,7 +620,7 @@ function RoleDetail({
           className={`px-3 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
             viewMode === 'details'
               ? 'text-slate-200 border-blue-500 bg-slate-800/50'
-              : 'text-slate-500 border-transparent hover:text-slate-300'
+              : 'text-slate-400 border-transparent hover:text-slate-300'
           }`}
           data-testid="view-details-tab"
         >
@@ -635,7 +635,7 @@ function RoleDetail({
           className={`px-3 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
             viewMode === 'manifest'
               ? 'text-slate-200 border-emerald-500 bg-slate-800/50'
-              : 'text-slate-500 border-transparent hover:text-slate-300'
+              : 'text-slate-400 border-transparent hover:text-slate-300'
           }`}
           data-testid="view-manifest-tab"
         >
@@ -725,7 +725,7 @@ function RoleDetail({
           )}
 
           {/* Timestamps */}
-          <div className="text-xs text-slate-600 flex gap-4">
+          <div className="text-xs text-slate-500 flex gap-4">
             <span>Created: {new Date(def.created_at).toLocaleString()}</span>
             <span>Updated: {new Date(def.updated_at).toLocaleString()}</span>
           </div>
@@ -841,6 +841,7 @@ function CreateRoleModal({
             onClick={onClose}
             className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
             title="Close"
+            aria-label="Close"
           >
             <FiX size={18} />
           </button>
@@ -851,7 +852,7 @@ function CreateRoleModal({
           {error && (
             <div className="rounded-md px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/30 flex items-center justify-between gap-2" data-testid="definition-editor-error">
               <span>{error}</span>
-              <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-200 transition-colors shrink-0" title="Dismiss error">
+              <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-200 transition-colors shrink-0" title="Dismiss error" aria-label="Dismiss error">
                 <FiX size={14} />
               </button>
             </div>
@@ -870,7 +871,7 @@ function CreateRoleModal({
               className="w-full px-3 py-2 rounded-md bg-slate-900 border border-slate-600 text-slate-200 text-sm focus:outline-none focus:border-blue-500 placeholder-slate-500"
               data-testid="create-role-name"
             />
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-slate-400 mt-1">
               Lowercase identifier (letters, numbers, underscores)
             </p>
           </div>
@@ -949,7 +950,7 @@ function CreateRoleModal({
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">
               Tool Allowlist{' '}
-              <span className="text-slate-500 font-normal">(optional, comma-separated)</span>
+              <span className="text-slate-400 font-normal">(optional, comma-separated)</span>
             </label>
             <input
               type="text"
@@ -964,7 +965,7 @@ function CreateRoleModal({
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">
               Bash Restrictions{' '}
-              <span className="text-slate-500 font-normal">(optional, comma-separated)</span>
+              <span className="text-slate-400 font-normal">(optional, comma-separated)</span>
             </label>
             <input
               type="text"
@@ -978,7 +979,7 @@ function CreateRoleModal({
           {/* File Scope */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">
-              File Scope <span className="text-slate-500 font-normal">(optional)</span>
+              File Scope <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <input
               type="text"
@@ -1125,6 +1126,7 @@ function OverlayPreviewModal({
             onClick={onClose}
             className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
             title="Close"
+            aria-label="Close"
           >
             <FiX size={18} />
           </button>
@@ -1147,7 +1149,7 @@ function OverlayPreviewModal({
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 activeLayer === tab.key
                   ? `${tab.color} bg-slate-700`
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
+                  : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/50'
               }`}
               data-testid={`overlay-tab-${tab.key}`}
             >
@@ -1164,7 +1166,7 @@ function OverlayPreviewModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3 border-t border-slate-700 text-xs text-slate-500">
+        <div className="flex items-center justify-between px-6 py-3 border-t border-slate-700 text-xs text-slate-400">
           <span>
             {activeLayer === 'all'
               ? 'Showing final rendered output (all 3 layers combined)'
@@ -1573,7 +1575,7 @@ export function AgentDefinitionsPage() {
               onDelete={(role) => handleDelete(role)}
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-slate-500">
+            <div className="flex items-center justify-center h-full text-slate-400">
               Select a role to view details
             </div>
           )}

@@ -125,7 +125,7 @@ function ErrorFallback({
         {/* Error name (brief, non-technical) */}
         {error && (
           <div className="mb-6 rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
               Error Details
             </p>
             <p className="text-sm text-slate-300 font-mono break-words">
@@ -159,7 +159,7 @@ function ErrorFallback({
           </button>
         </div>
 
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-4 text-xs text-slate-400">
           If this keeps happening, try restarting the application.
         </p>
       </div>

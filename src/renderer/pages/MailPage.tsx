@@ -25,6 +25,7 @@ import type { Message, MessagePriority, MessageType } from '../../shared/types';
 import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { formatAbsoluteTime } from '../components/RelativeTime';
+import { formatRelativeTime as formatRelTime } from '../lib/dateFormatting';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 
@@ -107,7 +108,7 @@ function priorityColor(priority: MessagePriority): string {
     case 'normal':
       return 'text-slate-400';
     case 'low':
-      return 'text-slate-500';
+      return 'text-slate-400';
   }
 }
 
@@ -135,20 +136,6 @@ function typeColor(type: MessageType): string {
   }
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
 
 export function MailPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -587,7 +574,7 @@ export function MailPage() {
 
                 {/* Purge by age */}
                 <div className="mb-3 space-y-1">
-                  <p className="text-xs text-slate-500">By age:</p>
+                  <p className="text-xs text-slate-400">By age:</p>
                   <div className="flex flex-wrap gap-1">
                     {[
                       { label: '1 hour', hours: 1 },
@@ -610,7 +597,7 @@ export function MailPage() {
 
                 {/* Purge by agent */}
                 <div className="mb-3">
-                  <p className="mb-1 text-xs text-slate-500">By agent:</p>
+                  <p className="mb-1 text-xs text-slate-400">By agent:</p>
                   <div className="flex gap-1">
                     <input
                       type="text"
@@ -668,22 +655,24 @@ export function MailPage() {
           <div className="relative flex-1">
             <FiSearch
               size={14}
-              className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-500"
+              className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-400"
             />
             <input
               type="text"
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search messages by subject, body, or agent..."
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pr-3 pl-9 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pr-3 pl-9 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
               data-testid="mail-search-input"
             />
             {searchInput && (
               <button
                 type="button"
                 onClick={() => handleSearchChange('')}
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400 hover:text-slate-300"
                 data-testid="mail-search-clear"
+                title="Clear search"
+                aria-label="Clear search"
               >
                 <FiX size={14} />
               </button>
@@ -897,10 +886,10 @@ export function MailPage() {
               ) : sortedMessages.length === 0 ? (
                 <div
                   data-testid="mail-empty-state"
-                  className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-500"
+                  className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-400"
                 >
                   <div className="mb-1 flex h-16 w-16 items-center justify-center rounded-full bg-slate-700/50">
-                    <FiInbox size={32} className="text-slate-500" />
+                    <FiInbox size={32} className="text-slate-400" />
                   </div>
                   <p
                     data-testid="mail-empty-title"
@@ -910,7 +899,7 @@ export function MailPage() {
                   </p>
                   <p
                     data-testid="mail-empty-message"
-                    className="text-sm text-slate-600 max-w-sm text-center"
+                    className="text-sm text-slate-500 max-w-sm text-center"
                   >
                     {hasAnyFilter
                       ? 'Try adjusting your search or filters.'
@@ -934,7 +923,7 @@ export function MailPage() {
                   activeTab={activeTab}
                   handleSelectMessage={handleSelectMessage}
                   handleMessageContextMenu={handleMessageContextMenu}
-                  formatDate={formatDate}
+                  formatDate={formatRelTime}
                   formatAbsoluteTime={formatAbsoluteTime}
                   typeColor={typeColor}
                   priorityColor={priorityColor}
@@ -1008,24 +997,24 @@ export function MailPage() {
 
                   <div className="mb-4 space-y-1 text-sm">
                     <div className="flex gap-2">
-                      <span className="w-16 text-slate-500">From:</span>
+                      <span className="w-16 text-slate-400">From:</span>
                       <span className="font-medium text-cyan-400">
                         {selectedMessage.from_agent}
                       </span>
                     </div>
                     <div className="flex gap-2">
-                      <span className="w-16 text-slate-500">To:</span>
+                      <span className="w-16 text-slate-400">To:</span>
                       <span className="font-medium text-green-400">{selectedMessage.to_agent}</span>
                     </div>
                     <div className="flex gap-2">
-                      <span className="w-16 text-slate-500">Time:</span>
+                      <span className="w-16 text-slate-400">Time:</span>
                       <span className="text-slate-300">
                         {new Date(selectedMessage.created_at).toLocaleString()}
                       </span>
                     </div>
                     {selectedMessage.thread_id && (
                       <div className="flex gap-2">
-                        <span className="w-16 text-slate-500">Thread:</span>
+                        <span className="w-16 text-slate-400">Thread:</span>
                         <span className="font-mono text-xs text-slate-400">
                           {selectedMessage.thread_id}
                         </span>
@@ -1071,7 +1060,7 @@ export function MailPage() {
                                 ))}
                               </div>
                               <details className="mt-3">
-                                <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-400">
+                                <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-400">
                                   Raw JSON
                                 </summary>
                                 <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-400">
@@ -1104,7 +1093,7 @@ export function MailPage() {
                         <button
                           type="button"
                           onClick={() => setShowThread(false)}
-                          className="text-xs text-slate-500 hover:text-slate-300"
+                          className="text-xs text-slate-400 hover:text-slate-300"
                         >
                           Hide thread
                         </button>
@@ -1124,7 +1113,7 @@ export function MailPage() {
                                 <span className="text-xs font-medium text-cyan-400">
                                   {tmsg.from_agent}
                                 </span>
-                                <span className="text-[10px] text-slate-600">{'\u2192'}</span>
+                                <span className="text-[10px] text-slate-500">{'\u2192'}</span>
                                 <span className="text-xs font-medium text-green-400">
                                   {tmsg.to_agent}
                                 </span>
@@ -1141,8 +1130,8 @@ export function MailPage() {
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-slate-500">
-                                {formatDate(tmsg.created_at)}
+                              <span className="text-[10px] text-slate-400">
+                                {formatRelTime(tmsg.created_at)}
                               </span>
                             </div>
                             {tmsg.subject && (
@@ -1208,7 +1197,7 @@ export function MailPage() {
                             setComposeForm((f) => ({ ...f, from_agent: e.target.value }))
                           }
                           placeholder="e.g. coordinator"
-                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
                           data-testid="compose-from-agent"
                         />
                         <datalist id="known-agents-from">
@@ -1233,7 +1222,7 @@ export function MailPage() {
                             setComposeForm((f) => ({ ...f, to_agent: e.target.value }))
                           }
                           placeholder="e.g. builder-1 or @all"
-                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
                         />
                         <datalist id="group-addresses">
                           {knownAgents.map((agent) => (
@@ -1267,7 +1256,7 @@ export function MailPage() {
                         value={composeForm.subject}
                         onChange={(e) => setComposeForm((f) => ({ ...f, subject: e.target.value }))}
                         placeholder="Message subject"
-                        className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
                       />
                     </div>
 
@@ -1337,7 +1326,7 @@ export function MailPage() {
                         onChange={(e) => setComposeForm((f) => ({ ...f, body: e.target.value }))}
                         placeholder="Message body..."
                         rows={isProtocolType(composeForm.type) ? 4 : 8}
-                        className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none resize-none"
+                        className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none resize-none"
                       />
                     </div>
 
@@ -1371,7 +1360,7 @@ export function MailPage() {
                           }
                           placeholder={PAYLOAD_TEMPLATES[composeForm.type] || '{"key": "value"}'}
                           rows={5}
-                          className="w-full rounded-md border border-slate-600 bg-slate-950 px-3 py-2 font-mono text-xs text-emerald-300 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none resize-none"
+                          className="w-full rounded-md border border-slate-600 bg-slate-950 px-3 py-2 font-mono text-xs text-emerald-300 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none resize-none"
                         />
                         {composeForm.payload.trim() &&
                           (() => {
@@ -1508,22 +1497,22 @@ function VirtualizedMailList({
                       <span
                         className={`truncate text-sm ${msg.read === 0 ? 'font-semibold text-slate-100' : 'text-slate-300'}`}
                       >
-                        <span className="text-slate-500">To:</span>{' '}
+                        <span className="text-slate-400">To:</span>{' '}
                         <span className="text-green-400">{msg.to_agent}</span>
-                        <span className="text-slate-600 ml-1.5 text-xs">from {msg.from_agent}</span>
+                        <span className="text-slate-500 ml-1.5 text-xs">from {msg.from_agent}</span>
                       </span>
                     ) : (
                       <span
                         className={`truncate text-sm ${msg.read === 0 ? 'font-semibold text-slate-100' : 'text-slate-300'}`}
                       >
                         {msg.from_agent}{' '}
-                        <span className="text-slate-500">
+                        <span className="text-slate-400">
                           {'\u2192'} {msg.to_agent}
                         </span>
                       </span>
                     )}
                     <span
-                      className="flex-shrink-0 text-xs text-slate-500"
+                      className="flex-shrink-0 text-xs text-slate-400"
                       title={formatAbsoluteTime(msg.created_at)}
                     >
                       {activeTab === 'outbox'

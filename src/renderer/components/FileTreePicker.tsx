@@ -272,8 +272,8 @@ export function FileTreePicker({
   if (!rootPath) {
     return (
       <div className="rounded-lg border border-slate-600 bg-slate-700/50 p-3 text-center">
-        <FiFolderPlus className="h-5 w-5 text-slate-500 mx-auto mb-1" />
-        <p className="text-xs text-slate-500">Select a project to browse files</p>
+        <FiFolderPlus className="h-5 w-5 text-slate-400 mx-auto mb-1" />
+        <p className="text-xs text-slate-400">Select a project to browse files</p>
       </div>
     );
   }
@@ -330,7 +330,7 @@ export function FileTreePicker({
       {/* Tree */}
       <div className="overflow-y-auto p-1" style={{ maxHeight }} data-testid="file-tree-container">
         {tree.length === 0 ? (
-          <p className="text-xs text-slate-500 text-center py-2">No files found</p>
+          <p className="text-xs text-slate-400 text-center py-2">No files found</p>
         ) : (
           tree.map((node) => (
             <TreeNode

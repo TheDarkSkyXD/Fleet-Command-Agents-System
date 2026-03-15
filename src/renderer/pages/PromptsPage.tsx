@@ -178,7 +178,7 @@ function PromptPreviewPanel({
       {/* Inheritance chain visualization */}
       {chain.length > 1 && (
         <div className="mb-4" data-testid="inheritance-chain">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Inheritance Chain ({chain.length} levels)
           </h4>
           <div className="flex items-center gap-1 flex-wrap">
@@ -194,7 +194,7 @@ function PromptPreviewPanel({
                   <TypeBadge type={link.type} />
                   {link.name}
                 </span>
-                {idx < chain.length - 1 && <span className="text-slate-500 mx-1">→</span>}
+                {idx < chain.length - 1 && <span className="text-slate-400 mx-1">→</span>}
               </div>
             ))}
           </div>
@@ -204,7 +204,7 @@ function PromptPreviewPanel({
       {/* Template variables summary */}
       {templateVars.length > 0 && (
         <div className="mb-4" data-testid="template-variables-summary">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Template Variables ({templateVars.length})
           </h4>
           <div className="flex flex-wrap gap-2">
@@ -222,7 +222,7 @@ function PromptPreviewPanel({
 
       {/* Rendered content */}
       <div className="flex-1 overflow-auto" data-testid="rendered-output">
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
           {chain.length > 1 ? 'Merged Output' : 'Rendered Output'}
         </h4>
         <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-4 font-mono text-sm text-slate-300 leading-relaxed">
@@ -233,7 +233,7 @@ function PromptPreviewPanel({
       {/* Per-level breakdown for multi-level chains */}
       {chain.length > 1 && (
         <div className="mt-4 border-t border-slate-700 pt-4">
-          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Per-Level Content
           </h4>
           <div className="space-y-3 max-h-48 overflow-auto">
@@ -298,6 +298,7 @@ function TreeNode({
               onToggle(node.id);
             }}
             className="flex-shrink-0 rounded p-0.5 hover:bg-slate-600"
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
           >
             {isExpanded ? <FiChevronDown size={14} /> : <FiChevronRight size={14} />}
           </button>
@@ -305,14 +306,14 @@ function TreeNode({
           <span className="w-5 flex-shrink-0" />
         )}
 
-        <FiFile size={14} className="flex-shrink-0 text-slate-500" />
+        <FiFile size={14} className="flex-shrink-0 text-slate-400" />
         <span className="truncate font-medium" title={node.name}>
           {node.name}
         </span>
         <TypeBadge type={node.type} />
-        {!node.is_active && <span className="text-xs text-slate-500 italic">inactive</span>}
+        {!node.is_active && <span className="text-xs text-slate-400 italic">inactive</span>}
         {hasChildren && (
-          <span className="ml-auto text-xs text-slate-500">{node.children.length}</span>
+          <span className="ml-auto text-xs text-slate-400">{node.children.length}</span>
         )}
       </button>
 
@@ -634,7 +635,7 @@ function VersionDiffViewer({
             ))}
           </select>
         </label>
-        <span className="text-slate-500">→</span>
+        <span className="text-slate-400">→</span>
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <span className="font-medium text-emerald-400">New:</span>
           <select
@@ -678,11 +679,11 @@ function VersionDiffViewer({
                   }
                 >
                   {/* Left line number */}
-                  <td className="w-12 select-none border-r border-slate-700/50 px-2 py-0.5 text-right text-xs text-slate-500 align-top">
+                  <td className="w-12 select-none border-r border-slate-700/50 px-2 py-0.5 text-right text-xs text-slate-400 align-top">
                     {line.leftNum ?? ''}
                   </td>
                   {/* Right line number */}
-                  <td className="w-12 select-none border-r border-slate-700/50 px-2 py-0.5 text-right text-xs text-slate-500 align-top">
+                  <td className="w-12 select-none border-r border-slate-700/50 px-2 py-0.5 text-right text-xs text-slate-400 align-top">
                     {line.rightNum ?? ''}
                   </td>
                   {/* Change indicator */}
@@ -692,7 +693,7 @@ function VersionDiffViewer({
                         ? 'text-emerald-400'
                         : line.type === 'removed'
                           ? 'text-red-400'
-                          : 'text-slate-600'
+                          : 'text-slate-500'
                     }`}
                   >
                     {line.type === 'added' ? '+' : line.type === 'removed' ? '−' : ' '}
@@ -783,11 +784,11 @@ function VersionHistoryPanel({
           onClick={() => onSelectVersion(v)}
           className="flex w-full items-center gap-3 rounded-md border border-slate-700 bg-slate-800/50 px-3 py-2 text-left text-sm transition-colors hover:border-slate-600 hover:bg-slate-800"
         >
-          <FiClock size={14} className="flex-shrink-0 text-slate-500" />
+          <FiClock size={14} className="flex-shrink-0 text-slate-400" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="font-medium text-slate-200">v{v.version}</span>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-400">
                 {new Date(v.created_at).toLocaleString()}
               </span>
             </div>
@@ -1141,7 +1142,7 @@ function PromptDetail({
             {/* Description */}
             {!editing && prompt.description && (
               <div className="mt-3 text-sm text-slate-400">
-                <span className="font-medium text-slate-500">Description:</span>{' '}
+                <span className="font-medium text-slate-400">Description:</span>{' '}
                 {prompt.description}
               </div>
             )}
@@ -1282,6 +1283,7 @@ export function PromptsPage() {
                 type="button"
                 onClick={handleExpandAll}
                 title="Expand all"
+                aria-label="Expand all"
                 className="rounded p-1 text-xs text-slate-400 hover:bg-slate-700 hover:text-slate-200"
               >
                 <FiChevronDown size={14} />
@@ -1290,6 +1292,7 @@ export function PromptsPage() {
                 type="button"
                 onClick={handleCollapseAll}
                 title="Collapse all"
+                aria-label="Collapse all"
                 className="rounded p-1 text-xs text-slate-400 hover:bg-slate-700 hover:text-slate-200"
               >
                 <FiChevronRight size={14} />
@@ -1301,7 +1304,7 @@ export function PromptsPage() {
           <div className="flex-1 overflow-auto p-2">
             {tree.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <FiFile size={32} className="mb-2 text-slate-600" />
+                <FiFile size={32} className="mb-2 text-slate-500" />
                 <p className="text-sm text-slate-400">No prompts yet</p>
                 <button
                   type="button"
@@ -1331,7 +1334,7 @@ export function PromptsPage() {
 
           {/* Stats */}
           {prompts.length > 0 && (
-            <div className="border-t border-slate-700 px-3 py-2 text-xs text-slate-500">
+            <div className="border-t border-slate-700 px-3 py-2 text-xs text-slate-400">
               {prompts.length} prompt{prompts.length !== 1 ? 's' : ''} &middot; {tree.length} root
               {tree.length !== 1 ? 's' : ''}
             </div>
@@ -1349,9 +1352,9 @@ export function PromptsPage() {
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <FiFile size={48} className="mb-3 text-slate-600" />
+              <FiFile size={48} className="mb-3 text-slate-500" />
               <h3 className="text-lg font-medium text-slate-400">Select a prompt</h3>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-400">
                 Choose a prompt from the tree to view or edit its content
               </p>
             </div>

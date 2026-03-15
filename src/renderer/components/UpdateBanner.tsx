@@ -111,6 +111,7 @@ function ChangelogModal({
             onClick={onClose}
             className="rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
             title="Close"
+            aria-label="Close"
           >
             <FiX className="h-5 w-5" />
           </button>
@@ -354,6 +355,7 @@ export function UpdateBanner() {
             onClick={handleDismiss}
             className="relative z-10 rounded p-1 hover:bg-white/20 transition-colors"
             title="Dismiss"
+            aria-label="Dismiss"
           >
             <FiX className="w-4 h-4" />
           </button>

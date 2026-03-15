@@ -284,8 +284,8 @@ export function MetricsPage() {
       {/* Tab Content */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <FiRefreshCw className="animate-spin text-slate-500 mr-2" size={20} />
-          <span className="text-slate-500">Loading metrics...</span>
+          <FiRefreshCw className="animate-spin text-slate-400 mr-2" size={20} />
+          <span className="text-slate-400">Loading metrics...</span>
         </div>
       ) : activeTab === 'sessions' ? (
         <SessionsTab
@@ -408,7 +408,7 @@ function SessionsTab({
 
   if (metrics.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
         <FiActivity size={40} className="mb-3 opacity-50" />
         <p className="text-lg font-medium">No session metrics yet</p>
         <p className="text-sm mt-1">Token usage will appear here after agent sessions complete</p>
@@ -451,12 +451,12 @@ function SessionsTab({
                     </span>
                   )}
                   {m.capability && (
-                    <span className="text-xs text-slate-500 bg-slate-700/50 px-2 py-0.5 rounded">
+                    <span className="text-xs text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded">
                       {m.capability}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-3 text-xs text-slate-400">
                   <span>{formatDuration(m.duration_ms)}</span>
                   <span>{formatCost(m.estimated_cost)}</span>
                   <button
@@ -465,7 +465,7 @@ function SessionsTab({
                       e.stopPropagation();
                       handleDelete(m.id);
                     }}
-                    className="text-slate-600 hover:text-red-400 transition-colors"
+                    className="text-slate-500 hover:text-red-400 transition-colors"
                     title="Delete metric"
                   >
                     <FiTrash2 size={14} />
@@ -494,7 +494,7 @@ function SessionsTab({
                   color="text-purple-400"
                 />
               </div>
-              <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
+              <div className="flex items-center justify-between mt-2 text-xs text-slate-400">
                 <span>Total: {formatTokenCount(totalTokens)} tokens</span>
                 <span>{m.completed_at || m.started_at || ''}</span>
               </div>
@@ -577,7 +577,7 @@ function ModelBreakdownTab({
 }) {
   if (breakdown.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
         <FiCpu size={40} className="mb-3 opacity-50" />
         <p className="text-lg font-medium">No model usage data yet</p>
         <p className="text-sm mt-1">
@@ -623,7 +623,7 @@ function ModelBreakdownTab({
                 <span className={`text-lg font-bold ${modelColor(b.model_used)}`}>
                   {b.model_used}
                 </span>
-                <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded">
+                <span className="text-xs text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded">
                   {b.session_count} session{b.session_count !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -666,25 +666,25 @@ function ModelBreakdownTab({
             {/* Token breakdown grid */}
             <div className="grid grid-cols-4 gap-3 text-sm">
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Input</div>
+                <div className="text-xs text-slate-400 mb-0.5">Input</div>
                 <div className="text-blue-400 font-medium">
                   {formatTokenCount(b.total_input_tokens)}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Output</div>
+                <div className="text-xs text-slate-400 mb-0.5">Output</div>
                 <div className="text-emerald-400 font-medium">
                   {formatTokenCount(b.total_output_tokens)}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Cache Read</div>
+                <div className="text-xs text-slate-400 mb-0.5">Cache Read</div>
                 <div className="text-amber-400 font-medium">
                   {formatTokenCount(b.total_cache_read_tokens)}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Cache Create</div>
+                <div className="text-xs text-slate-400 mb-0.5">Cache Create</div>
                 <div className="text-purple-400 font-medium">
                   {formatTokenCount(b.total_cache_creation_tokens)}
                 </div>
@@ -695,7 +695,7 @@ function ModelBreakdownTab({
       })}
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-slate-500 pt-2">
+      <div className="flex items-center gap-4 text-xs text-slate-400 pt-2">
         <span className="flex items-center gap-1">
           <span className="w-3 h-3 rounded bg-blue-500/70" /> Input
         </span>
@@ -770,7 +770,7 @@ function CapabilityBreakdownTab({
 }) {
   if (breakdown.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
         <FiUsers size={40} className="mb-3 opacity-50" />
         <p className="text-lg font-medium">No capability usage data yet</p>
         <p className="text-sm mt-1">
@@ -819,7 +819,7 @@ function CapabilityBreakdownTab({
                 <span className={`text-lg font-bold ${capabilityColor(b.capability)} capitalize`}>
                   {b.capability}
                 </span>
-                <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded">
+                <span className="text-xs text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded">
                   {b.session_count} session{b.session_count !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -862,25 +862,25 @@ function CapabilityBreakdownTab({
             {/* Token breakdown grid */}
             <div className="grid grid-cols-4 gap-3 text-sm">
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Input</div>
+                <div className="text-xs text-slate-400 mb-0.5">Input</div>
                 <div className="text-blue-400 font-medium">
                   {formatTokenCount(b.total_input_tokens)}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Output</div>
+                <div className="text-xs text-slate-400 mb-0.5">Output</div>
                 <div className="text-emerald-400 font-medium">
                   {formatTokenCount(b.total_output_tokens)}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Cache Read</div>
+                <div className="text-xs text-slate-400 mb-0.5">Cache Read</div>
                 <div className="text-amber-400 font-medium">
                   {formatTokenCount(b.total_cache_read_tokens)}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-500 mb-0.5">Cache Create</div>
+                <div className="text-xs text-slate-400 mb-0.5">Cache Create</div>
                 <div className="text-purple-400 font-medium">
                   {formatTokenCount(b.total_cache_creation_tokens)}
                 </div>
@@ -891,7 +891,7 @@ function CapabilityBreakdownTab({
       })}
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-slate-500 pt-2">
+      <div className="flex items-center gap-4 text-xs text-slate-400 pt-2">
         <span className="flex items-center gap-1">
           <span className="w-3 h-3 rounded bg-blue-500/70" /> Input
         </span>
@@ -920,7 +920,7 @@ function TokenBadge({
 }) {
   return (
     <div className="bg-slate-900/50 rounded px-2 py-1">
-      <div className="text-slate-500 text-[10px] uppercase">{label}</div>
+      <div className="text-slate-400 text-[10px] uppercase">{label}</div>
       <div className={`${color} font-medium`}>{value}</div>
     </div>
   );
@@ -946,7 +946,7 @@ function TokenRow({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-slate-500">{label}</span>
+      <span className="text-slate-400">{label}</span>
       <span className="text-slate-300 text-right max-w-[180px] truncate" title={value}>
         {value}
       </span>

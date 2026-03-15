@@ -183,13 +183,13 @@ export function AuthDecisionTree() {
                 >
                   {isPassed && <FiCheck className="h-3.5 w-3.5 text-emerald-400" />}
                   {isFailed && <FiX className="h-3.5 w-3.5 text-red-400" />}
-                  {isPending && <span className="text-xs text-slate-500">{i + 1}</span>}
+                  {isPending && <span className="text-xs text-slate-400">{i + 1}</span>}
                 </div>
 
                 {/* Step label */}
                 <span
                   className={`text-sm font-medium ${
-                    isPassed ? 'text-emerald-400' : isFailed ? 'text-red-400' : 'text-slate-500'
+                    isPassed ? 'text-emerald-400' : isFailed ? 'text-red-400' : 'text-slate-400'
                   }`}
                 >
                   {step.label}
@@ -216,19 +216,19 @@ export function AuthDecisionTree() {
           <h4 className="mb-2 text-sm font-medium text-slate-300">CLI Details</h4>
           <div className="space-y-1 text-xs text-slate-400">
             <div className="flex gap-2">
-              <FiCpu className="mt-0.5 h-3 w-3 text-slate-500" />
+              <FiCpu className="mt-0.5 h-3 w-3 text-slate-400" />
               <span>
                 Path: <span className="font-mono text-slate-300">{cliData.path}</span>
               </span>
             </div>
             <div className="flex gap-2">
-              <FiCheck className="mt-0.5 h-3 w-3 text-slate-500" />
+              <FiCheck className="mt-0.5 h-3 w-3 text-slate-400" />
               <span>
                 Version: <span className="font-mono text-emerald-400">{cliData.version}</span>
               </span>
             </div>
             <div className="flex gap-2">
-              <FiKey className="mt-0.5 h-3 w-3 text-slate-500" />
+              <FiKey className="mt-0.5 h-3 w-3 text-slate-400" />
               <span>
                 Auth: <span className="text-emerald-400">Authenticated</span>
               </span>
@@ -265,7 +265,7 @@ function ActionPanel({
             <FiExternalLink className="h-3 w-3" />
             Setup Guide
           </a>
-          <span className="text-xs text-slate-500">or run:</span>
+          <span className="text-xs text-slate-400">or run:</span>
           <code className="rounded bg-slate-900 px-2 py-1 font-mono text-xs text-slate-300">
             npm install -g @anthropic-ai/claude-code
           </code>
@@ -282,7 +282,7 @@ function ActionPanel({
           installation may be corrupt.
         </p>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Try reinstalling:</span>
+          <span className="text-xs text-slate-400">Try reinstalling:</span>
           <code className="rounded bg-slate-900 px-2 py-1 font-mono text-xs text-slate-300">
             npm install -g @anthropic-ai/claude-code
           </code>
@@ -299,7 +299,7 @@ function ActionPanel({
           account.
         </p>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Run in terminal:</span>
+          <span className="text-xs text-slate-400">Run in terminal:</span>
           <code className="rounded bg-slate-900 px-2 py-1 font-mono text-xs text-amber-300">
             claude auth login
           </code>

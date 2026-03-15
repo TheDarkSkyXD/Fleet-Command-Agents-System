@@ -735,7 +735,7 @@ export function GuardRulesPage() {
         <div className="flex gap-6">
           {/* Left: Capability list */}
           <div className="w-64 flex-shrink-0 space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
               Agent Capabilities
             </h2>
             {definitions.map((def) => {
@@ -758,10 +758,10 @@ export function GuardRulesPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium capitalize">{def.display_name}</span>
-                    <span className="text-xs text-slate-500">{allowlist.length} tools</span>
+                    <span className="text-xs text-slate-400">{allowlist.length} tools</span>
                   </div>
                   <p
-                    className="text-xs text-slate-500 mt-0.5 truncate"
+                    className="text-xs text-slate-400 mt-0.5 truncate"
                     title={def.file_scope || 'No scope set'}
                   >
                     {def.file_scope || 'No scope set'}
@@ -843,7 +843,7 @@ export function GuardRulesPage() {
                     <FiShield size={14} className="text-blue-400" />
                     Tool Allowlist
                   </h3>
-                  <p className="text-xs text-slate-500 mb-3">
+                  <p className="text-xs text-slate-400 mb-3">
                     Tools this capability is allowed to use. Any tool not in this list will be
                     blocked.
                   </p>
@@ -873,7 +873,7 @@ export function GuardRulesPage() {
                     )}
                     {(isEditing ? editingAllowlist || [] : getCurrentAllowlist(selectedDef))
                       .length === 0 && (
-                      <span className="text-sm text-slate-500 italic">No tools allowed</span>
+                      <span className="text-sm text-slate-400 italic">No tools allowed</span>
                     )}
                   </div>
 
@@ -919,7 +919,7 @@ export function GuardRulesPage() {
                     <FiXCircle size={14} className="text-red-400" />
                     Bash Restrictions
                   </h3>
-                  <p className="text-xs text-slate-500 mb-3">
+                  <p className="text-xs text-slate-400 mb-3">
                     Bash commands or patterns that are blocked for this capability.
                   </p>
 
@@ -949,7 +949,7 @@ export function GuardRulesPage() {
                       ? editingBashRestrictions || []
                       : getCurrentBashRestrictions(selectedDef)
                     ).length === 0 && (
-                      <span className="text-sm text-slate-500 italic">No restrictions</span>
+                      <span className="text-sm text-slate-400 italic">No restrictions</span>
                     )}
                   </div>
 
@@ -989,7 +989,7 @@ export function GuardRulesPage() {
                     <FiEye size={14} className="text-emerald-400" />
                     File Scope
                   </h3>
-                  <p className="text-xs text-slate-500 mb-3">
+                  <p className="text-xs text-slate-400 mb-3">
                     Defines which files this capability can access or modify.
                   </p>
 
@@ -1009,7 +1009,7 @@ export function GuardRulesPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-64 text-slate-500">
+              <div className="flex items-center justify-center h-64 text-slate-400">
                 <p>Select a capability to view its guard rules</p>
               </div>
             )}
@@ -1021,7 +1021,7 @@ export function GuardRulesPage() {
         <div className="flex gap-6">
           {/* Left: Capability list */}
           <div className="w-64 flex-shrink-0 space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
               Agent Capabilities
             </h2>
             {definitions.map((def) => {
@@ -1045,12 +1045,12 @@ export function GuardRulesPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium capitalize">{def.display_name}</span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-400">
                       {boundaries.length} {boundaries.length === 1 ? 'rule' : 'rules'}
                     </span>
                   </div>
                   <p
-                    className="text-xs text-slate-500 mt-0.5 truncate"
+                    className="text-xs text-slate-400 mt-0.5 truncate"
                     title={
                       boundaries.length > 0
                         ? boundaries.map((b) => boundaryTypeLabels[b.type] || b.type).join(', ')
@@ -1134,7 +1134,7 @@ export function GuardRulesPage() {
                     <FiFolder size={14} className="text-amber-400" />
                     Configured Boundaries
                   </h3>
-                  <p className="text-xs text-slate-500 mb-3">
+                  <p className="text-xs text-slate-400 mb-3">
                     Path boundaries restrict where agents can access files. Worktree boundaries
                     auto-enforce the worktree root.
                   </p>
@@ -1193,7 +1193,7 @@ export function GuardRulesPage() {
                       ? editingBoundaries || []
                       : getCurrentBoundaries(boundarySelectedDef)
                     ).length === 0 && (
-                      <span className="text-sm text-slate-500 italic">
+                      <span className="text-sm text-slate-400 italic">
                         No boundaries configured - agent has unrestricted path access
                       </span>
                     )}
@@ -1264,7 +1264,7 @@ export function GuardRulesPage() {
                     <FiCheckCircle size={14} className="text-blue-400" />
                     Test Path Access
                   </h3>
-                  <p className="text-xs text-slate-500 mb-3">
+                  <p className="text-xs text-slate-400 mb-3">
                     Verify if a file path would be allowed or blocked by the current boundary rules.
                   </p>
                   <div className="space-y-2">
@@ -1331,7 +1331,7 @@ export function GuardRulesPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-64 text-slate-500">
+              <div className="flex items-center justify-center h-64 text-slate-400">
                 <p>Select a capability to view its path boundaries</p>
               </div>
             )}
@@ -1435,7 +1435,7 @@ export function GuardRulesPage() {
 
           {/* Violations list */}
           {violations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <FiCheckCircle size={48} className="mb-4 text-emerald-500/40" />
               <p className="text-lg font-medium text-slate-400">No violations recorded</p>
               <p className="text-sm mt-1">
@@ -1459,9 +1459,9 @@ export function GuardRulesPage() {
                     className="w-full text-left px-4 py-3 flex items-center gap-3"
                   >
                     {expandedViolation === v.id ? (
-                      <FiChevronDown size={14} className="text-slate-500 flex-shrink-0" />
+                      <FiChevronDown size={14} className="text-slate-400 flex-shrink-0" />
                     ) : (
-                      <FiChevronRight size={14} className="text-slate-500 flex-shrink-0" />
+                      <FiChevronRight size={14} className="text-slate-400 flex-shrink-0" />
                     )}
 
                     {/* Severity badge */}
@@ -1479,20 +1479,20 @@ export function GuardRulesPage() {
                     </span>
 
                     {/* Rule type */}
-                    <span className="text-xs text-slate-500 flex-shrink-0">
+                    <span className="text-xs text-slate-400 flex-shrink-0">
                       {ruleTypeLabels[v.rule_type] || v.rule_type}
                     </span>
 
                     {/* Violation text */}
                     <span
-                      className={`text-sm truncate ${v.acknowledged ? 'text-slate-500' : 'text-slate-200'}`}
+                      className={`text-sm truncate ${v.acknowledged ? 'text-slate-400' : 'text-slate-200'}`}
                     >
                       {v.violation}
                     </span>
 
                     {/* Timestamp and acknowledged */}
                     <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <span className="text-xs text-slate-400 flex items-center gap-1">
                         <FiClock size={10} />
                         {new Date(v.created_at).toLocaleString()}
                       </span>
@@ -1524,33 +1524,33 @@ export function GuardRulesPage() {
                     <div className="px-4 pb-3 pt-1 border-t border-slate-700/50 ml-7">
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <span className="text-slate-500">Agent:</span>{' '}
+                          <span className="text-slate-400">Agent:</span>{' '}
                           <span className="text-slate-200">{v.agent_name}</span>
                         </div>
                         <div>
-                          <span className="text-slate-500">Capability:</span>{' '}
+                          <span className="text-slate-400">Capability:</span>{' '}
                           <span className="text-slate-200 capitalize">{v.capability}</span>
                         </div>
                         {v.tool_attempted && (
                           <div>
-                            <span className="text-slate-500">Tool Attempted:</span>{' '}
+                            <span className="text-slate-400">Tool Attempted:</span>{' '}
                             <span className="text-red-300 font-mono">{v.tool_attempted}</span>
                           </div>
                         )}
                         {v.command_attempted && (
                           <div>
-                            <span className="text-slate-500">Command:</span>{' '}
+                            <span className="text-slate-400">Command:</span>{' '}
                             <span className="text-red-300 font-mono">{v.command_attempted}</span>
                           </div>
                         )}
                         {v.file_attempted && (
                           <div className="col-span-2">
-                            <span className="text-slate-500">File:</span>{' '}
+                            <span className="text-slate-400">File:</span>{' '}
                             <span className="text-red-300 font-mono">{v.file_attempted}</span>
                           </div>
                         )}
                         <div className="col-span-2">
-                          <span className="text-slate-500">Violation:</span>{' '}
+                          <span className="text-slate-400">Violation:</span>{' '}
                           <span className="text-slate-200">{v.violation}</span>
                         </div>
                       </div>
@@ -1583,6 +1583,7 @@ export function GuardRulesPage() {
                 onClick={closeAddRuleModal}
                 className="text-slate-400 hover:text-slate-200 transition-colors"
                 title="Close"
+                aria-label="Close"
               >
                 <FiX size={18} />
               </button>

@@ -266,7 +266,7 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
             className={`rounded p-1 text-xs transition-colors ${
               autoScroll
                 ? 'text-blue-400 bg-blue-500/10 hover:bg-blue-500/20'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
             }`}
             title={
               autoScroll ? 'Auto-scroll ON (click to disable)' : 'Auto-scroll OFF (click to enable)'

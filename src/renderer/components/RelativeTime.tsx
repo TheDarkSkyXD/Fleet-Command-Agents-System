@@ -1,27 +1,11 @@
+import { formatAbsoluteDateTime } from '../lib/dateFormatting';
 import { Tooltip } from './Tooltip';
 
 /**
  * Format an absolute date/time string with date, time, and timezone.
- * Example: "Mar 15, 2026, 2:30:45 PM EST"
+ * Re-exported for backward compatibility.
  */
-export function formatAbsoluteTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  try {
-    const date = new Date(dateStr.endsWith?.('Z') ? dateStr : dateStr);
-    if (Number.isNaN(date.getTime())) return dateStr;
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZoneName: 'short',
-    });
-  } catch {
-    return dateStr ?? '';
-  }
-}
+export const formatAbsoluteTime = formatAbsoluteDateTime;
 
 interface RelativeTimeProps {
   /** The ISO date string or date-parseable string */
@@ -45,7 +29,7 @@ export function RelativeTime({
   className = '',
   'data-testid': testId,
 }: RelativeTimeProps) {
-  const absoluteTime = dateStr ? formatAbsoluteTime(dateStr) : '';
+  const absoluteTime = dateStr ? formatAbsoluteDateTime(dateStr) : '';
 
   return (
     <Tooltip content={absoluteTime} position="top" delay={200} disabled={!absoluteTime}>

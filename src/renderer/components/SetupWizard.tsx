@@ -339,7 +339,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             const Icon = step.icon;
             return (
               <div key={step.key} className="flex items-center gap-2">
-                {i > 0 && <FiChevronRight className="h-3 w-3 text-slate-600" />}
+                {i > 0 && <FiChevronRight className="h-3 w-3 text-slate-500" />}
                 <div
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                     isActive
@@ -348,7 +348,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                         ? 'bg-emerald-600/20 text-emerald-400'
                         : isPast && status.status === 'error'
                           ? 'bg-amber-600/20 text-amber-400'
-                          : 'bg-slate-800 text-slate-500'
+                          : 'bg-slate-800 text-slate-400'
                   }`}
                   data-testid={`setup-step-${step.key}`}
                 >
@@ -385,7 +385,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-slate-700 px-6 py-4">
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-slate-400">
             Step {currentStepIndex + 1} of {STEPS.length}
           </span>
           <button
@@ -462,7 +462,7 @@ function StepVersion({
       <StatusDisplay status={status} />
       {cliResult?.version && (
         <div className="mt-3 rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300">
-          <span className="text-slate-500">Installed version: </span>
+          <span className="text-slate-400">Installed version: </span>
           <span className="font-mono text-emerald-400">{cliResult.version}</span>
         </div>
       )}

@@ -239,7 +239,7 @@ export function EventFeedPage() {
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 p-3">
           {/* Event type filter */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Type:</span>
+            <span className="text-xs text-slate-400">Type:</span>
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
@@ -257,7 +257,7 @@ export function EventFeedPage() {
 
           {/* Agent filter */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Agent:</span>
+            <span className="text-xs text-slate-400">Agent:</span>
             <select
               value={filterAgent}
               onChange={(e) => setFilterAgent(e.target.value)}
@@ -275,7 +275,7 @@ export function EventFeedPage() {
 
           {/* Limit */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Show:</span>
+            <span className="text-xs text-slate-400">Show:</span>
             <select
               value={eventLimit}
               onChange={(e) => setEventLimit(Number(e.target.value))}
@@ -310,13 +310,13 @@ export function EventFeedPage() {
       <div ref={feedRef} className="flex-1 space-y-1 overflow-y-auto pr-1">
         {loading && events.length === 0 ? (
           <div className="flex items-center justify-center py-20">
-            <FiRefreshCw size={24} className="animate-spin text-slate-500" />
+            <FiRefreshCw size={24} className="animate-spin text-slate-400" />
           </div>
         ) : events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <FiActivity size={40} className="mb-3 opacity-30" />
             <p className="text-sm">No events recorded yet</p>
-            <p className="mt-1 text-xs text-slate-600">
+            <p className="mt-1 text-xs text-slate-500">
               Events will appear here as agents perform actions
             </p>
           </div>
@@ -366,7 +366,7 @@ export function EventFeedPage() {
 
                     {/* Duration */}
                     {event.tool_duration_ms != null && event.tool_duration_ms > 0 && (
-                      <span className="text-[10px] text-slate-500">{event.tool_duration_ms}ms</span>
+                      <span className="text-[10px] text-slate-400">{event.tool_duration_ms}ms</span>
                     )}
 
                     {/* Spacer */}
@@ -374,7 +374,7 @@ export function EventFeedPage() {
 
                     {/* Timestamp */}
                     <span
-                      className="flex-shrink-0 text-[10px] text-slate-500"
+                      className="flex-shrink-0 text-[10px] text-slate-400"
                       title={formatFullTime(event.created_at)}
                     >
                       {formatEventTime(event.created_at)}
@@ -398,7 +398,7 @@ export function EventFeedPage() {
           <button
             type="button"
             onClick={() => setEventLimit((v) => v + 100)}
-            className="flex w-full items-center justify-center gap-1 rounded-lg border border-slate-800 py-2 text-xs text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
+            className="flex w-full items-center justify-center gap-1 rounded-lg border border-slate-800 py-2 text-xs text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-300"
           >
             <FiChevronDown size={14} />
             Load more events

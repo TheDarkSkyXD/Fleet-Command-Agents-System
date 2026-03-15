@@ -270,7 +270,7 @@ export function OnboardingTour() {
 
         {/* Tooltip footer */}
         <div className="flex items-center justify-between border-t border-slate-700 px-4 py-3">
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-slate-400">
             {currentStep + 1} of {TOUR_STEPS.length}
           </span>
           <button

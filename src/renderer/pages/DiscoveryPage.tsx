@@ -453,7 +453,7 @@ function DiscoverySetupView({
                       <span className="text-sm text-slate-200">
                         {categories.length} categories scanned
                       </span>
-                      <span className="ml-2 text-xs text-slate-500">
+                      <span className="ml-2 text-xs text-slate-400">
                         {new Date(scan.created_at).toLocaleString()}
                       </span>
                     </div>
@@ -472,7 +472,7 @@ function DiscoverySetupView({
                     <button
                       type="button"
                       onClick={() => onDeleteScan(scan.id)}
-                      className="rounded p-1 text-slate-500 hover:bg-slate-700 hover:text-red-400 transition-colors"
+                      className="rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
                     >
                       <FiTrash2 size={14} />
                     </button>
@@ -533,7 +533,7 @@ function DiscoveryProgressView({ scan }: { scan: DiscoveryScan }) {
           style={{ width: `${progressPercent}%` }}
         />
       </div>
-      <div className="mb-6 flex items-center justify-between text-xs text-slate-500">
+      <div className="mb-6 flex items-center justify-between text-xs text-slate-400">
         <span>
           {completedCount} complete{runningCount > 0 ? `, ${runningCount} scanning` : ''},{' '}
           {totalCount - completedCount - runningCount} pending
@@ -593,7 +593,7 @@ function DiscoveryProgressView({ scan }: { scan: DiscoveryScan }) {
                         ? 'text-green-400'
                         : status === 'running'
                           ? 'text-blue-400'
-                          : 'text-slate-500'
+                          : 'text-slate-400'
                     }`}
                     data-testid={`category-percent-${catId}`}
                   >
@@ -613,7 +613,7 @@ function DiscoveryProgressView({ scan }: { scan: DiscoveryScan }) {
                       </div>
                     )}
                     {status === 'pending' && (
-                      <span className="text-xs text-slate-500">Pending</span>
+                      <span className="text-xs text-slate-400">Pending</span>
                     )}
                   </div>
                 </div>
@@ -718,7 +718,7 @@ function DiscoveryResultsView({
       <div className="grid grid-cols-12 gap-4">
         {/* Category sidebar */}
         <div className="col-span-3 space-y-1">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Categories
           </h3>
           {categories.map((catId) => {
@@ -761,7 +761,7 @@ function DiscoveryResultsView({
               </div>
 
               {findings.length === 0 ? (
-                <div className="py-8 text-center text-slate-500">
+                <div className="py-8 text-center text-slate-400">
                   <FiSearch className="mx-auto mb-2" size={24} />
                   <p className="text-sm">No findings in this category</p>
                 </div>
@@ -778,7 +778,7 @@ function DiscoveryResultsView({
                           <h4 className="text-sm font-medium text-slate-200">{finding.title}</h4>
                           <p className="mt-1 text-xs text-slate-400">{finding.description}</p>
                           {finding.file_path && (
-                            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                            <div className="mt-2 flex items-center gap-1 text-xs text-slate-400">
                               <FiFile size={10} />
                               <span className="font-mono">
                                 {finding.file_path}
@@ -806,7 +806,7 @@ function DiscoveryResultsView({
             </div>
           ) : (
             <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-600 py-16">
-              <p className="text-sm text-slate-500">Select a category to view findings</p>
+              <p className="text-sm text-slate-400">Select a category to view findings</p>
             </div>
           )}
         </div>

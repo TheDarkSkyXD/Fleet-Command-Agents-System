@@ -9,6 +9,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
+import { formatDateTime } from '../lib/dateFormatting';
 import { motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -262,7 +263,7 @@ function AgentProgressBar({
         >
           <div className="h-full w-1/3 rounded-full bg-blue-500/60 animate-pulse" />
         </div>
-        <span className={`${compact ? 'text-[10px]' : 'text-xs'} text-slate-500 whitespace-nowrap`}>
+        <span className={`${compact ? 'text-[10px]' : 'text-xs'} text-slate-400 whitespace-nowrap`}>
           {label}
         </span>
       </div>
@@ -292,7 +293,7 @@ function AgentProgressBar({
         />
       </div>
       <span
-        className={`${compact ? 'text-[10px]' : 'text-xs'} text-slate-500 whitespace-nowrap`}
+        className={`${compact ? 'text-[10px]' : 'text-xs'} text-slate-400 whitespace-nowrap`}
         data-testid="agent-progress-label"
       >
         {compact ? label : `${phase} · ${label}`}
@@ -353,7 +354,7 @@ function StopConfirmDialog({
               </p>
             </div>
           )}
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-slate-400">
             The agent process will be killed via tree-kill. This action cannot be undone.
           </p>
         </div>
@@ -922,7 +923,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           const shortId = agentId.length > 8 ? `${agentId.slice(0, 8)}…` : agentId;
           return (
             <div className="flex items-center gap-1 group/id">
-              <span className="text-xs text-slate-500 font-mono" title={agentId}>
+              <span className="text-xs text-slate-400 font-mono" title={agentId}>
                 {shortId}
               </span>
               <button
@@ -932,7 +933,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                   navigator.clipboard.writeText(agentId);
                   toast.success('Agent ID copied to clipboard');
                 }}
-                className="opacity-0 group-hover/id:opacity-100 rounded p-0.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all"
+                className="opacity-0 group-hover/id:opacity-100 rounded p-0.5 text-slate-400 hover:text-slate-300 hover:bg-slate-700 transition-all"
                 title="Copy agent ID"
                 data-testid={`copy-agent-id-${agentId}`}
               >
@@ -1026,9 +1027,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         cell: ({ getValue }) => {
           const pid = getValue<number | null>();
           return pid ? (
-            <span className="text-xs text-slate-500 font-mono">{pid}</span>
+            <span className="text-xs text-slate-400 font-mono">{pid}</span>
           ) : (
-            <span className="text-xs text-slate-600">-</span>
+            <span className="text-xs text-slate-500">-</span>
           );
         },
       },
@@ -1038,7 +1039,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         enableSorting: true,
         accessorFn: (row) => new Date(row.created_at).getTime(),
         cell: ({ row }) => (
-          <span className="text-xs text-slate-500">{formatUptime(row.original.created_at)}</span>
+          <span className="text-xs text-slate-400">{formatUptime(row.original.created_at)}</span>
         ),
       },
       {
@@ -1053,7 +1054,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
               {taskId}
             </span>
           ) : (
-            <span className="text-xs text-slate-600">-</span>
+            <span className="text-xs text-slate-500">-</span>
           );
         },
       },
@@ -1093,6 +1094,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                   }}
                   className="rounded-md bg-amber-600/20 p-1.5 text-amber-400 hover:bg-amber-600/30 transition-colors"
                   title="Nudge stalled agent"
+                  aria-label="Nudge stalled agent"
                 >
                   <FiZap className="h-3.5 w-3.5" />
                 </button>
@@ -1105,6 +1107,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                 }}
                 className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
                 title="Stop agent"
+                aria-label="Stop agent"
               >
                 <FiSquare className="h-3.5 w-3.5" />
               </button>
@@ -1249,6 +1252,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
               onClick={() => setGlobalFilter('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
               title="Clear search"
+              aria-label="Clear search"
               data-testid="agent-search-clear"
             >
               <FiX className="h-3.5 w-3.5" />
@@ -1286,6 +1290,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
             title="Table view"
+            aria-label="Table view"
           >
             <FiList className="h-4 w-4" />
           </button>
@@ -1298,6 +1303,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
             title="Card view"
+            aria-label="Card view"
           >
             <FiGrid className="h-4 w-4" />
           </button>
@@ -1310,6 +1316,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
             title="Hierarchy tree view"
+            aria-label="Hierarchy tree view"
           >
             <FiGitBranch className="h-4 w-4" />
           </button>
@@ -1322,6 +1329,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
             title="Scope map - file tree color-coded by agent"
+            aria-label="Scope map - file tree color-coded by agent"
             data-testid="view-mode-scope"
           >
             <FiMap className="h-4 w-4" />
@@ -1346,14 +1354,14 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           className="rounded-lg border border-slate-700 bg-slate-800 p-12 text-center text-slate-400"
         >
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-700/50">
-            <FiCpu className="h-10 w-10 text-slate-500" />
+            <FiCpu className="h-10 w-10 text-slate-400" />
           </div>
           <p data-testid="agents-empty-title" className="text-xl font-semibold text-slate-300 mb-2">
             No agents running
           </p>
           <p
             data-testid="agents-empty-message"
-            className="text-sm text-slate-500 mb-6 max-w-md mx-auto"
+            className="text-sm text-slate-400 mb-6 max-w-md mx-auto"
           >
             Spawn an agent to start coding with AI. Agents can scout, build, review, and orchestrate
             your codebase autonomously.
@@ -1428,7 +1436,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           </table>
           {/* Table footer with count */}
           <div
-            className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500"
+            className="border-t border-slate-700 px-4 py-2 text-xs text-slate-400"
             data-testid="agent-filter-count"
             data-filtered-count={filteredRows.length}
             data-total-count={sessions.length}
@@ -1499,7 +1507,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                             {session.agent_name}
                           </span>
                         </div>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-slate-400">
                           {session.completed_at
                             ? new Date(session.completed_at).toLocaleString()
                             : ''}
@@ -1512,7 +1520,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           )}
 
           {filteredRows.length === 0 && (
-            <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-sm text-slate-500">
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-sm text-slate-400">
               No agents match your filters
             </div>
           )}
@@ -1753,13 +1761,13 @@ function AgentCard({
         <div className="flex items-center gap-3">
           {/* PID */}
           {(session.pid || processInfo?.pid) && (
-            <span className="text-xs text-slate-500 font-mono" data-testid="agent-card-pid">
+            <span className="text-xs text-slate-400 font-mono" data-testid="agent-card-pid">
               PID: {session.pid || processInfo?.pid}
             </span>
           )}
 
           {/* Uptime */}
-          <span className="text-xs text-slate-500" data-testid="agent-card-uptime">
+          <span className="text-xs text-slate-400" data-testid="agent-card-uptime">
             {formatUptime(session.created_at)}
           </span>
 
@@ -1794,7 +1802,7 @@ function AgentCard({
       </div>
 
       {/* Details row */}
-      <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
+      <div className="mt-2 flex items-center gap-4 text-xs text-slate-400">
         {/* Agent ID with copy button */}
         <span className="inline-flex items-center gap-1 group/card-id" data-testid="agent-card-id">
           <span className="font-mono" title={session.id}>
@@ -1807,7 +1815,7 @@ function AgentCard({
               navigator.clipboard.writeText(session.id);
               toast.success('Agent ID copied to clipboard');
             }}
-            className="opacity-0 group-hover/card-id:opacity-100 rounded p-0.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all"
+            className="opacity-0 group-hover/card-id:opacity-100 rounded p-0.5 text-slate-400 hover:text-slate-300 hover:bg-slate-700 transition-all"
             title="Copy agent ID"
             data-testid={`copy-agent-card-id-${session.id}`}
           >
@@ -2037,6 +2045,7 @@ function SpawnDialog({
             onClick={onClose}
             className="rounded-md p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
             title="Close"
+            aria-label="Close"
           >
             <FiX className="h-5 w-5" />
           </button>
@@ -2065,7 +2074,7 @@ function SpawnDialog({
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">{capabilityInfo.description}</p>
+            <p className="mt-1.5 text-xs text-slate-400">{capabilityInfo.description}</p>
           </div>
 
           {/* Runtime selector */}
@@ -2134,7 +2143,7 @@ function SpawnDialog({
           <div>
             <label htmlFor="spawn-name" className="block text-sm font-medium text-slate-300 mb-1">
               Name{' '}
-              <span className="text-slate-500 font-normal" data-testid="spawn-name-hint">
+              <span className="text-slate-400 font-normal" data-testid="spawn-name-hint">
                 (optional, auto-generated if empty)
               </span>
             </label>
@@ -2167,7 +2176,7 @@ function SpawnDialog({
               htmlFor="spawn-task-id"
               className="block text-sm font-medium text-slate-300 mb-1"
             >
-              Task ID <span className="text-slate-500 font-normal">(optional)</span>
+              Task ID <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <input
               id="spawn-task-id"
@@ -2199,7 +2208,7 @@ function SpawnDialog({
                 htmlFor="spawn-parent-agent"
                 className="block text-sm font-medium text-slate-300 mb-1"
               >
-                Parent Agent <span className="text-slate-500 font-normal">(optional)</span>
+                Parent Agent <span className="text-slate-400 font-normal">(optional)</span>
               </label>
               <div className="relative">
                 <select
@@ -2218,7 +2227,7 @@ function SpawnDialog({
                 </select>
                 <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               </div>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-400">
                 Assign this agent under a lead or coordinator in the hierarchy
               </p>
             </div>
@@ -2231,7 +2240,7 @@ function SpawnDialog({
                 htmlFor="spawn-file-scope"
                 className="block text-sm font-medium text-slate-300"
               >
-                File Scope <span className="text-slate-500 font-normal">(optional)</span>
+                File Scope <span className="text-slate-400 font-normal">(optional)</span>
               </label>
               {projectPath && (
                 <button
@@ -2263,7 +2272,7 @@ function SpawnDialog({
                   data-testid="spawn-file-scope"
                   className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-400">
                   Glob patterns restricting which files this agent can modify
                 </p>
               </>
@@ -2279,7 +2288,7 @@ function SpawnDialog({
 
             {/* Scope overlap warning */}
             {checkingOverlaps && (
-              <p className="mt-1 text-xs text-slate-500 animate-pulse">
+              <p className="mt-1 text-xs text-slate-400 animate-pulse">
                 Checking for scope conflicts...
               </p>
             )}
@@ -2316,7 +2325,7 @@ function SpawnDialog({
           {/* Initial prompt */}
           <div>
             <label htmlFor="spawn-prompt" className="block text-sm font-medium text-slate-300 mb-1">
-              Initial Prompt <span className="text-slate-500 font-normal">(optional)</span>
+              Initial Prompt <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <textarea
               id="spawn-prompt"
@@ -2405,7 +2414,7 @@ function VirtualizedTableBody({
     return (
       <tbody>
         <tr>
-          <td colSpan={colCount} className="px-4 py-8 text-center text-sm text-slate-500">
+          <td colSpan={colCount} className="px-4 py-8 text-center text-sm text-slate-400">
             No agents match your filters
           </td>
         </tr>

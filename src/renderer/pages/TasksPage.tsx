@@ -1160,7 +1160,7 @@ export function TasksPage() {
 
                               {progress && progress.total > 0 && (
                                 <>
-                                  <span className="text-xs text-slate-500">|</span>
+                                  <span className="text-xs text-slate-400">|</span>
                                   <span
                                     className="text-xs text-green-400"
                                     data-testid={`group-progress-completed-${group.id}`}
@@ -1280,7 +1280,7 @@ export function TasksPage() {
                               ))}
                             </select>
                             <FiChevronDown
-                              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+                              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
                               size={12}
                             />
                           </div>
@@ -1314,7 +1314,7 @@ export function TasksPage() {
                     {isExpanded && (
                       <div className="border-t border-slate-700/50 p-3 pl-12 space-y-1.5">
                         {memberIssues.length === 0 ? (
-                          <p className="text-xs text-slate-500 py-2">
+                          <p className="text-xs text-slate-400 py-2">
                             No issues in this group yet. Click the link icon to add issues.
                           </p>
                         ) : (
@@ -1343,7 +1343,7 @@ export function TasksPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveIssueFromGroup(group.id, issue.id)}
-                                  className="rounded p-1 text-slate-500 hover:text-red-400 transition-colors"
+                                  className="rounded p-1 text-slate-400 hover:text-red-400 transition-colors"
                                   title="Remove from group"
                                 >
                                   <FiMinus size={12} />
@@ -1466,7 +1466,7 @@ export function TasksPage() {
                             </p>
                           </div>
                         )}
-                        <div className="flex items-center gap-3 mt-2 ml-6 text-xs text-slate-500">
+                        <div className="flex items-center gap-3 mt-2 ml-6 text-xs text-slate-400">
                           <span className={typeInfo.color}>{typeInfo.label}</span>
                           <span className={`inline-flex items-center gap-1 ${priorityInfo.color}`}>
                             <PriorityIcon size={11} />
@@ -1527,13 +1527,13 @@ export function TasksPage() {
               <div>
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: textarea follows */}
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Summary / Reason <span className="text-slate-500">(optional)</span>
+                  Summary / Reason <span className="text-slate-400">(optional)</span>
                 </label>
                 <textarea
                   value={closeSummary}
                   onChange={(e) => setCloseSummary(e.target.value)}
                   placeholder="Describe what was done or why this issue is being closed..."
-                  className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none resize-y"
+                  className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none resize-y"
                   rows={4}
                   data-testid="close-summary-input"
                 />
@@ -1688,7 +1688,7 @@ function KanbanBoard({
             {/* Column Body */}
             <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-280px)]">
               {columnIssues.length === 0 ? (
-                <div className="flex items-center justify-center h-20 text-xs text-slate-500 italic">
+                <div className="flex items-center justify-center h-20 text-xs text-slate-400 italic">
                   No issues
                 </div>
               ) : (
@@ -1787,7 +1787,7 @@ function KanbanCard({
       </div>
 
       {/* Bottom row: agent + date */}
-      <div className="flex items-center justify-between mt-2 text-[10px] text-slate-500">
+      <div className="flex items-center justify-between mt-2 text-[10px] text-slate-400">
         {issue.assigned_agent ? (
           <span
             className="inline-flex items-center gap-1 text-amber-400 truncate max-w-[60%]"
@@ -1914,7 +1914,7 @@ function IssueCard({
             <p className="text-xs text-slate-400 mt-1 line-clamp-2">{issue.description}</p>
           )}
 
-          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+          <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
             {issue.assigned_agent && (
               <span className="inline-flex items-center gap-1 text-amber-400">
                 <FiUser size={11} />
@@ -2023,7 +2023,7 @@ function FilterSelect({
         ))}
       </select>
       <FiChevronDown
-        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
+        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
         size={12}
       />
     </div>
@@ -2081,7 +2081,7 @@ function DependencyManager({
       {/* Blocked By (dependencies) */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
             <FiLink className="inline mr-1 -mt-0.5" size={11} />
             Blocked By ({deps.length})
           </span>
@@ -2120,7 +2120,7 @@ function DependencyManager({
         )}
 
         {depIssues.length === 0 ? (
-          <p className="text-sm text-slate-500 italic">No dependencies</p>
+          <p className="text-sm text-slate-400 italic">No dependencies</p>
         ) : (
           <div className="space-y-1">
             {depIssues.map((dep) => {
@@ -2147,7 +2147,7 @@ function DependencyManager({
                         deps.filter((d) => d !== dep.id),
                       )
                     }
-                    className="rounded p-0.5 text-slate-500 hover:text-red-400 transition-colors"
+                    className="rounded p-0.5 text-slate-400 hover:text-red-400 transition-colors"
                     title="Remove dependency"
                   >
                     <FiX size={12} />
@@ -2257,6 +2257,7 @@ function IssueDetailModal({
               onClick={onClose}
               className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
               title="Back to list"
+              aria-label="Back to list"
             >
               <FiArrowLeft size={18} />
             </button>
@@ -2267,6 +2268,7 @@ function IssueDetailModal({
             onClick={onClose}
             className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
             title="Close"
+            aria-label="Close"
           >
             <FiX size={18} />
           </button>
@@ -2279,7 +2281,7 @@ function IssueDetailModal({
             <h3 className="text-xl font-semibold text-slate-50" data-testid="issue-detail-title">
               {issue.title}
             </h3>
-            <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
+            <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
               <FiHash size={11} />
               <span className="font-mono">{issue.id}</span>
             </div>
@@ -2289,7 +2291,7 @@ function IssueDetailModal({
           <div className="grid grid-cols-2 gap-4">
             {/* Status */}
             <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
-              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
                 Status
               </span>
               <div className="flex items-center gap-2" data-testid="issue-detail-status">
@@ -2323,7 +2325,7 @@ function IssueDetailModal({
 
             {/* Type */}
             <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
-              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
                 Type
               </span>
               <span
@@ -2336,7 +2338,7 @@ function IssueDetailModal({
 
             {/* Priority */}
             <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
-              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
                 Priority
               </span>
               <div className="flex items-center gap-2" data-testid="issue-detail-priority">
@@ -2349,7 +2351,7 @@ function IssueDetailModal({
 
             {/* Assigned Agent */}
             <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
-              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
                 Assigned Agent
               </span>
               <div data-testid="issue-detail-assigned-agent">
@@ -2359,7 +2361,7 @@ function IssueDetailModal({
                     {issue.assigned_agent}
                   </span>
                 ) : (
-                  <span className="text-sm text-slate-500 italic">Unassigned</span>
+                  <span className="text-sm text-slate-400 italic">Unassigned</span>
                 )}
               </div>
             </div>
@@ -2367,7 +2369,7 @@ function IssueDetailModal({
 
           {/* Description */}
           <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
-            <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+            <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
               Description
             </span>
             <div data-testid="issue-detail-description">
@@ -2376,7 +2378,7 @@ function IssueDetailModal({
                   {issue.description}
                 </p>
               ) : (
-                <p className="text-sm text-slate-500 italic">No description provided</p>
+                <p className="text-sm text-slate-400 italic">No description provided</p>
               )}
             </div>
           </div>
@@ -2405,7 +2407,7 @@ function IssueDetailModal({
           />
 
           {/* Timestamps & metadata footer */}
-          <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-700/50 pt-4">
+          <div className="flex items-center justify-between text-xs text-slate-400 border-t border-slate-700/50 pt-4">
             <div className="flex items-center gap-4">
               <span className="inline-flex items-center gap-1">
                 <FiClock size={11} />

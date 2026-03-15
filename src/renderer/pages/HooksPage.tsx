@@ -194,7 +194,7 @@ function HookEventLog() {
           </div>
         </label>
 
-        <span className="text-sm text-slate-500">
+        <span className="text-sm text-slate-400">
           {events.length} event{events.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -206,9 +206,9 @@ function HookEventLog() {
         </div>
       ) : events.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 py-16">
-          <FiList size={40} className="mb-4 text-slate-600" />
+          <FiList size={40} className="mb-4 text-slate-500" />
           <p className="text-lg font-medium text-slate-400">No hook events recorded</p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-400">
             Events will appear here when hooks are deployed or executed
           </p>
         </div>
@@ -242,7 +242,7 @@ function HookEventLog() {
                       {triggerLabel(event.trigger)}
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
+                  <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
                     <span title={formatAbsoluteTime(event.created_at)}>
                       {formatTime(event.created_at)}
                     </span>
@@ -259,7 +259,7 @@ function HookEventLog() {
                 {/* Expand indicator */}
                 <FiChevronDown
                   size={14}
-                  className={`text-slate-500 transition-transform ${expandedId === event.id ? 'rotate-180' : ''}`}
+                  className={`text-slate-400 transition-transform ${expandedId === event.id ? 'rotate-180' : ''}`}
                 />
               </button>
 
@@ -271,45 +271,45 @@ function HookEventLog() {
                 >
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-slate-500">Event ID:</span>{' '}
+                      <span className="text-slate-400">Event ID:</span>{' '}
                       <span className="text-slate-300 font-mono">{event.id}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Hook ID:</span>{' '}
+                      <span className="text-slate-400">Hook ID:</span>{' '}
                       <span className="text-slate-300 font-mono">{event.hook_id}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Timestamp:</span>{' '}
+                      <span className="text-slate-400">Timestamp:</span>{' '}
                       <span className="text-slate-300">
                         {new Date(event.created_at).toLocaleString()}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Trigger:</span>{' '}
+                      <span className="text-slate-400">Trigger:</span>{' '}
                       <span className="text-slate-300">{triggerLabel(event.trigger)}</span>
                     </div>
                     {event.agent_name && (
                       <div>
-                        <span className="text-slate-500">Agent:</span>{' '}
+                        <span className="text-slate-400">Agent:</span>{' '}
                         <span className="text-slate-300">{event.agent_name}</span>
                       </div>
                     )}
                     {event.duration_ms != null && (
                       <div>
-                        <span className="text-slate-500">Duration:</span>{' '}
+                        <span className="text-slate-400">Duration:</span>{' '}
                         <span className="text-slate-300">{event.duration_ms}ms</span>
                       </div>
                     )}
                   </div>
                   {event.worktree && (
                     <div className="text-xs">
-                      <span className="text-slate-500">Worktree:</span>{' '}
+                      <span className="text-slate-400">Worktree:</span>{' '}
                       <span className="text-slate-300 font-mono break-all">{event.worktree}</span>
                     </div>
                   )}
                   {event.details && (
                     <div className="text-xs">
-                      <span className="text-slate-500">Details:</span>{' '}
+                      <span className="text-slate-400">Details:</span>{' '}
                       <span className="text-slate-300">{event.details}</span>
                     </div>
                   )}
@@ -594,7 +594,7 @@ export function HooksPage() {
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="e.g., inject-context"
-                className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
               />
             </label>
             <label className="block">
@@ -637,7 +637,7 @@ export function HooksPage() {
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
               placeholder="Brief description of what this hook does"
-              className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
             />
           </label>
 
@@ -647,7 +647,7 @@ export function HooksPage() {
               value={formScript}
               onChange={(e) => setFormScript(e.target.value)}
               rows={12}
-              className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-50 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-50 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
               spellCheck={false}
             />
           </label>
@@ -689,7 +689,7 @@ export function HooksPage() {
             1. Select Hooks to Deploy
           </h2>
           {hooks.length === 0 ? (
-            <p className="text-sm text-slate-500">No hooks available. Create hooks first.</p>
+            <p className="text-sm text-slate-400">No hooks available. Create hooks first.</p>
           ) : (
             <div className="space-y-2">
               {hooks.map((hook) => (
@@ -717,7 +717,7 @@ export function HooksPage() {
                       {hook.hook_type}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-500">{projectName(hook.project_id)}</span>
+                  <span className="text-xs text-slate-400">{projectName(hook.project_id)}</span>
                 </label>
               ))}
             </div>
@@ -730,7 +730,7 @@ export function HooksPage() {
             2. Select Target Worktrees
           </h2>
           {deployWorktrees.length === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-400">
               No worktrees found. Ensure a project is active with git worktrees.
             </p>
           ) : (
@@ -758,7 +758,7 @@ export function HooksPage() {
                     <span className="text-sm font-medium text-slate-200">
                       {wt.branch || 'detached'}
                     </span>
-                    <p className="truncate text-xs text-slate-500" title={wt.path}>
+                    <p className="truncate text-xs text-slate-400" title={wt.path}>
                       {wt.path}
                     </p>
                   </div>
@@ -904,7 +904,7 @@ export function HooksPage() {
           </div>
         </label>
 
-        <span className="text-sm text-slate-500">
+        <span className="text-sm text-slate-400">
           {hooks.length} hook{hooks.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -916,9 +916,9 @@ export function HooksPage() {
         </div>
       ) : hooks.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 py-16">
-          <FiPlay size={40} className="mb-4 text-slate-600" />
+          <FiPlay size={40} className="mb-4 text-slate-500" />
           <p className="text-lg font-medium text-slate-400">No hooks configured</p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-400">
             Create hooks to automate agent lifecycle events
           </p>
           <button
@@ -948,10 +948,10 @@ export function HooksPage() {
                     {group.hooks.length}
                   </span>
                 </div>
-                <p className="mb-3 text-xs text-slate-500">{group.description}</p>
+                <p className="mb-3 text-xs text-slate-400">{group.description}</p>
 
                 {group.hooks.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-slate-700 p-4 text-center text-sm text-slate-500">
+                  <div className="rounded-md border border-dashed border-slate-700 p-4 text-center text-sm text-slate-400">
                     No {group.label} hooks configured
                   </div>
                 ) : (
@@ -989,13 +989,13 @@ export function HooksPage() {
                           </div>
                           {hook.description && (
                             <p
-                              className="mt-0.5 text-xs text-slate-500 truncate"
+                              className="mt-0.5 text-xs text-slate-400 truncate"
                               title={hook.description}
                             >
                               {hook.description}
                             </p>
                           )}
-                          <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
+                          <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
                             <span>Project: {projectName(hook.project_id)}</span>
                             {hook.installed_at && (
                               <span>
