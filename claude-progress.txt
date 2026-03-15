@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Agent Status Cards & Color Coding)
+
+#### Feature #42: Agent status cards display - PASSING
+- Added `model` column to sessions SQLite table with ALTER TABLE migration for existing DBs
+- Model stored on agent spawn in sessions DB record (previously only in process manager)
+- Enhanced AgentCard with model badge (FiCpu icon, color-coded: haiku=slate, sonnet=indigo, opus=violet)
+- Added capability-specific left border accent colors (scout=purple, builder=blue, etc.)
+- Added data-testid attributes on all card elements (name, capability, state, model, uptime, task, pid)
+- Updated Session TypeScript interface with model field
+- Cards now display: state (dot + badge), capability (badge), model (badge), task, uptime, PID
+
+#### Feature #54: Agent color coding by capability type - PASSING
+- Verified color coding applied consistently across entire application
+- scout=purple, builder=blue, reviewer=cyan, lead=amber, merger=emerald, coordinator=rose, monitor=teal
+- Used in: AgentsPage (table, cards, spawn dialog), AgentDetailPage, AgentHierarchyTree, GuardRulesPage, SettingsPage
+- All views use matching color palettes (bg-{color}-500/20 text-{color}-400 border-{color}-500/30)
+- Card view also has left border accent per capability type
+
+#### Files Created/Modified
+- MODIFIED: src/main/db/database.ts - Added model column to sessions table + ALTER TABLE migration
+- MODIFIED: src/main/ipc/handlers.ts - Store model in INSERT INTO sessions on agent:spawn and coordinator:start
+- MODIFIED: src/shared/types/index.ts - Added model field to Session interface
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Enhanced AgentCard with model badge, border accents, data-testid
+
+#### Current Status
+- 79/366 features passing (added #42 and #54 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Builder Spawn & File Tree Picker)
 
 #### Feature #34: Spawn builder agent - PASSING
