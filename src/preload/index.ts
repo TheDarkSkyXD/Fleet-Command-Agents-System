@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agentStop: (name: string) => ipcRenderer.invoke('agent:stop', name),
   agentStopAll: () => ipcRenderer.invoke('agent:stop-all'),
   agentNudge: (name: string) => ipcRenderer.invoke('agent:nudge', name),
+  agentResume: (options: Record<string, unknown>) =>
+    ipcRenderer.invoke('agent:resume', options),
 
   // Scope overlap detection
   scopeCheckOverlap: (filePaths: string[], excludeSessionId?: string) =>
@@ -220,6 +222,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('agent:update', (_event, data) => callback(data)),
   onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) =>
     ipcRenderer.on('agent:output', (_event, data) => callback(data)),
+  onAgentParsedEvent: (
+    callback: (data: { agentId: string; event: Record<string, unknown> }) => void,
+  ) => ipcRenderer.on('agent:parsed-event', (_event, data) => callback(data)),
   onMailReceived: (callback: (data: unknown) => void) =>
     ipcRenderer.on('mail:received', (_event, data) => callback(data)),
   onMergeUpdate: (callback: (data: unknown) => void) =>
@@ -450,6 +455,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hookDelete: (id: string) => ipcRenderer.invoke('hook:delete', id),
   hookDeploy: (hookIds: string[], worktreePaths: string[]) =>
     ipcRenderer.invoke('hook:deploy', hookIds, worktreePaths),
+
+  // Dialog
+  dialogSelectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 
   // Window management
   windowSetTitle: (title: string) => ipcRenderer.invoke('window:setTitle', title),

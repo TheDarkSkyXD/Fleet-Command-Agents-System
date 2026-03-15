@@ -4,6 +4,7 @@ import * as nodePty from 'node-pty';
 import { getDatabase } from '../db/database';
 import { detectClaudeCli } from './claudeCliService';
 import { notificationService } from './notificationService';
+import { type StreamJsonEvent, StreamJsonParser } from './streamJsonParser';
 
 /**
  * Agent capability type determines model defaults and guard rules.
@@ -65,6 +66,8 @@ export interface AgentSpawnOptions {
   prompt?: string;
   /** File scope restrictions */
   fileScope?: string[];
+  /** Session ID to resume (uses --resume flag instead of new session) */
+  resumeSessionId?: string;
 }
 
 export interface AgentTokenUsage {
@@ -86,6 +89,8 @@ export interface AgentProcess {
   isRunning: boolean;
   tokenUsage: AgentTokenUsage;
   jsonLineBuffer: string;
+  /** Dedicated stream-json parser instance for structured event handling */
+  streamParser: StreamJsonParser;
   /** Original spawn options preserved for checkpoint saving */
   spawnOptions: AgentSpawnOptions;
 }
@@ -123,8 +128,16 @@ class AgentProcessManager {
     // Add model flag
     args.push('--model', model);
 
-    // Add initial prompt if provided
-    if (options.prompt) {
+    // Add resume flag if resuming a previous session
+    if (options.resumeSessionId) {
+      args.push('--resume', options.resumeSessionId);
+      log.info(
+        `[AgentProcessManager] Resuming session: ${options.resumeSessionId} for agent ${options.agentName}`,
+      );
+    }
+
+    // Add initial prompt if provided (only when not resuming)
+    if (options.prompt && !options.resumeSessionId) {
       args.push('-p', options.prompt);
     }
 
@@ -163,6 +176,9 @@ class AgentProcessManager {
     const pid = ptyProcess.pid;
     log.info(`[AgentProcessManager] Agent spawned: ${options.agentName}, PID=${pid}`);
 
+    // Create a dedicated stream-json parser for this agent
+    const streamParser = new StreamJsonParser();
+
     const agentProcess: AgentProcess = {
       id: options.id,
       agentName: options.agentName,
@@ -180,8 +196,14 @@ class AgentProcessManager {
         cacheCreationTokens: 0,
       },
       jsonLineBuffer: '',
+      streamParser,
       spawnOptions: options,
     };
+
+    // Register the stream-json event handler to process structured events
+    streamParser.onEvent((event: StreamJsonEvent) => {
+      this.handleParsedEvent(agentProcess, event);
+    });
 
     // Store the process
     this.processes.set(options.id, agentProcess);
@@ -194,8 +216,11 @@ class AgentProcessManager {
         agentProcess.outputBuffer.shift();
       }
 
-      // Parse stream-json output for token usage tracking
+      // Parse stream-json output via dedicated parser (token tracking + event handling)
       this.parseStreamJsonForTokens(agentProcess, data);
+
+      // Feed data through the structured StreamJsonParser for typed event broadcasting
+      agentProcess.streamParser.feed(data);
 
       // Forward output to renderer via IPC
       this.broadcastOutput(options.id, data);
@@ -231,6 +256,19 @@ class AgentProcessManager {
     });
 
     return agentProcess;
+  }
+
+  /**
+   * Resume a previous Claude Code CLI agent session via node-pty.
+   * This spawns a new process with the --resume flag pointing to the previous session ID.
+   */
+  resume(
+    options: Omit<AgentSpawnOptions, 'resumeSessionId'> & { resumeSessionId: string },
+  ): AgentProcess {
+    log.info(
+      `[AgentProcessManager] Resuming agent: ${options.agentName}, previous session: ${options.resumeSessionId}`,
+    );
+    return this.spawn(options);
   }
 
   /**
@@ -594,6 +632,45 @@ class AgentProcessManager {
       );
     } catch (error) {
       log.error(`[AgentProcessManager] Failed to save metrics for ${agent.agentName}:`, error);
+    }
+  }
+
+  /**
+   * Handle a parsed stream-json event from the StreamJsonParser.
+   * Updates token usage, records events to database, and broadcasts to renderer.
+   */
+  private handleParsedEvent(agent: AgentProcess, event: StreamJsonEvent): void {
+    // Extract and accumulate token usage from any event that carries it
+    const usage = StreamJsonParser.extractUsage(event);
+    if (usage) {
+      if (typeof usage.input_tokens === 'number') {
+        agent.tokenUsage.inputTokens += usage.input_tokens;
+      }
+      if (typeof usage.output_tokens === 'number') {
+        agent.tokenUsage.outputTokens += usage.output_tokens;
+      }
+      if (typeof usage.cache_read_input_tokens === 'number') {
+        agent.tokenUsage.cacheReadTokens += usage.cache_read_input_tokens;
+      }
+      if (typeof usage.cache_creation_input_tokens === 'number') {
+        agent.tokenUsage.cacheCreationTokens += usage.cache_creation_input_tokens;
+      }
+    }
+
+    // Broadcast the structured parsed event to the renderer
+    this.broadcastParsedEvent(agent.id, event);
+  }
+
+  /**
+   * Broadcast a parsed stream-json event to all renderer windows.
+   * The renderer can listen on 'agent:parsed-event' for structured events.
+   */
+  private broadcastParsedEvent(agentId: string, event: StreamJsonEvent): void {
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('agent:parsed-event', { agentId, event });
+      }
     }
   }
 

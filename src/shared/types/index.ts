@@ -866,6 +866,7 @@ export interface ElectronAPI {
 
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
+  dialogSelectFolder: () => Promise<{ data: string | null; error: string | null }>;
   claudeStatus: () => Promise<{
     data: {
       installed: boolean;
@@ -1124,6 +1125,9 @@ export interface ElectronAPI {
 
   onAgentUpdate: (callback: (data: unknown) => void) => void;
   onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => void;
+  onAgentParsedEvent: (
+    callback: (data: { agentId: string; event: Record<string, unknown> }) => void,
+  ) => void;
   onMailReceived: (callback: (data: unknown) => void) => void;
   onMergeUpdate: (callback: (data: unknown) => void) => void;
   onUpdateStatus: (callback: (data: UpdateStatus) => void) => void;
