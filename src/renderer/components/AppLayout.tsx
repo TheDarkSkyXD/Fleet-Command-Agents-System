@@ -15,6 +15,7 @@ import { MetricsPage } from '../pages/MetricsPage';
 import { PromptsPage } from '../pages/PromptsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
+import { WelcomePage } from '../pages/WelcomePage';
 import { WorktreesPage } from '../pages/WorktreesPage';
 import { useProjectStore } from '../stores/projectStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -27,7 +28,7 @@ import { StatusBar } from './StatusBar';
 import { UpdateBanner } from './UpdateBanner';
 
 export function AppLayout() {
-  const [currentPage, setCurrentPage] = useState('agents');
+  const [currentPage, setCurrentPage] = useState('welcome');
   const { settings, loaded, updateSetting } = useSettingsStore();
   const sidebarCollapsed = settings.sidebarCollapsed;
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -96,12 +97,32 @@ export function AppLayout() {
     setCurrentPage('agents');
   }, []);
 
+  const handleProjectOpened = useCallback(() => {
+    setCurrentPage('agents');
+    loadActiveProject();
+  }, [loadActiveProject]);
+
   // Setup wizard: show on first launch when setupCompleted is false
   const showSetupWizard = loaded && !settings.setupCompleted;
 
   const handleSetupComplete = useCallback(() => {
     updateSetting('setupCompleted', true);
   }, [updateSetting]);
+
+  // Welcome page shows full-screen without sidebar
+  if (currentPage === 'welcome') {
+    return (
+      <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
+        {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
+        <UpdateBanner />
+        <main className="flex-1 overflow-auto bg-slate-900">
+          <ErrorBoundary sectionName="Welcome">
+            <WelcomePage onProjectOpened={handleProjectOpened} />
+          </ErrorBoundary>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
