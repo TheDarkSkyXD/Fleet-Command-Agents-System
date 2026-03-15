@@ -1,5 +1,33 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Merge Completion & Default Model)
+
+#### Feature #311: Merge completion updates queue and history - PASSING
+- merge:queue IPC already filtered to pending/merging entries (verified active-only queue)
+- merge:complete handler already updates associated agent session to 'completed' state
+- Added toast notifications (sonner) for all merge actions: complete, fail, execute, auto-resolve, AI-resolve, reimagine, rollback, remove
+- Added data-testid attributes: merge-stats, merge-stat-{status}, merge-tabs, merge-tab-queue, merge-tab-history, merge-queue-list, merge-history-list, queue-entry-{id}, history-entry-{id}
+- Fixed merge store type signatures to accept optional repoPath/targetBranch parameters
+- execute action now also refreshes history after execution (was missing)
+
+#### Feature #312: Default model selection per capability - PASSING
+- Verified existing implementation: CAPABILITY_DEFAULTS maps scout→haiku, builder→sonnet, lead→opus
+- DEFAULT_MODEL_DEFAULTS in settingsStore mirrors these defaults with settings override support
+- useEffect automatically updates model when capability changes
+- Warning text shown when selected model differs from configured default
+- Added data-testid attributes: spawn-capability-{cap}, spawn-model-{m}, spawn-model-default-hint
+- Added aria-selected attributes to capability and model buttons
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Toast notifications, data-testid attributes
+- MODIFIED: src/renderer/stores/mergeStore.ts - Type signatures for repoPath/targetBranch, execute refreshes history
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - data-testid and aria-selected on spawn buttons
+
+#### Current Status
+- 309/366 features passing (added #311 and #312 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Active Count Fix & Mail Purge Events)
 
 #### Feature #309: Stopped agent removed from active lists - PASSING
