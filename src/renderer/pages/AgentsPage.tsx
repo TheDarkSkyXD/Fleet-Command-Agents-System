@@ -1037,9 +1037,18 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         id: 'uptime',
         header: 'Uptime',
         enableSorting: true,
+        // Uses numeric milliseconds for correct sorting across midnight/day boundaries
         accessorFn: (row) => new Date(row.created_at).getTime(),
+        sortingFn: 'basic',
+        sortDescFirst: true,
         cell: ({ row }) => (
-          <span className="text-xs text-slate-400">{formatUptime(row.original.created_at)}</span>
+          <span
+            className="text-xs text-slate-400"
+            data-testid="agent-uptime-cell"
+            data-created-at={row.original.created_at}
+          >
+            {formatUptime(row.original.created_at)}
+          </span>
         ),
       },
       {
