@@ -239,12 +239,12 @@ export function MergeQueuePage() {
     fetchHistory();
   }, [fetchQueue, fetchHistory]);
 
-  const pendingCount = queue.filter((e) => e.status === 'pending').length;
-  const mergingCount = queue.filter((e) => e.status === 'merging').length;
-  const mergedCount = history.filter((e) => e.status === 'merged').length;
-  const failedCount = history.filter(
-    (e) => e.status === 'failed' || e.status === 'conflict',
-  ).length;
+  const allEntries = [...queue, ...history];
+  const pendingCount = allEntries.filter((e) => e.status === 'pending').length;
+  const mergingCount = allEntries.filter((e) => e.status === 'merging').length;
+  const mergedCount = allEntries.filter((e) => e.status === 'merged').length;
+  const conflictCount = allEntries.filter((e) => e.status === 'conflict').length;
+  const failedCount = allEntries.filter((e) => e.status === 'failed').length;
 
   const handleEnqueue = async (entry: {
     branch_name: string;
@@ -286,18 +286,22 @@ export function MergeQueuePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
-          <div className="text-2xl font-bold text-sky-400">{pendingCount}</div>
+          <div className="text-2xl font-bold text-slate-300">{pendingCount}</div>
           <div className="text-xs text-slate-400 mt-1">Pending</div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
-          <div className="text-2xl font-bold text-amber-400">{mergingCount}</div>
+          <div className="text-2xl font-bold text-blue-400">{mergingCount}</div>
           <div className="text-xs text-slate-400 mt-1">Merging</div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
           <div className="text-2xl font-bold text-emerald-400">{mergedCount}</div>
           <div className="text-xs text-slate-400 mt-1">Merged</div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+          <div className="text-2xl font-bold text-amber-400">{conflictCount}</div>
+          <div className="text-xs text-slate-400 mt-1">Conflict</div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
           <div className="text-2xl font-bold text-red-400">{failedCount}</div>
