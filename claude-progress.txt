@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Issue-Agent Mapping & Debug Terminal)
+
+#### Feature #120: Issue-to-agent mapping - PASSING
+- Added issue:by-agent IPC handler querying issues by assigned_agent from SQLite
+- Added issueByAgent preload bridge and ElectronAPI type
+- AgentDetailPage fetches and displays associated issues with color-coded status badges
+- Issues show title, status (in_progress=blue, closed=green, blocked=red), and count
+- IssueDetailModal already shows assigned agent - bidirectional mapping verified
+
+#### Feature #124: Built-in debug terminal - PASSING
+- Added debug:shell-spawn/write/resize/output/kill IPC handlers managing node-pty shell process
+- PowerShell on Windows, $SHELL on Unix - spawned with project cwd
+- Created DebugTerminalPanel with full xterm.js terminal (same theme as AgentTerminal)
+- Auto-fit to container via ResizeObserver + FitAddon
+- Live output streaming via IPC events (debug:shell-output)
+- Toolbar shows PID, running status, restart and kill buttons
+- Terminal tab is now the default active tab in Debug view
+- Output buffer persists across tab switches (up to 5000 entries)
+
+#### Files Created/Modified
+- MODIFIED: src/main/ipc/handlers.ts - issue:by-agent handler, debug shell handlers, node-pty import
+- MODIFIED: src/preload/index.ts - issueByAgent, debugShell* bridges, onDebugShellOutput listener
+- MODIFIED: src/shared/types/index.ts - issueByAgent, debugShell* ElectronAPI types
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Associated issues display with badges
+- MODIFIED: src/renderer/pages/DebugPage.tsx - DebugTerminalPanel with xterm.js
+
+#### Current Status
+- 174/366 features passing (added #120 and #124 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Issue Filtering & Ready Queue)
 
 #### Feature #115: List issues with filtering - PASSING
