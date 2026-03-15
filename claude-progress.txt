@@ -4639,3 +4639,29 @@
 - 312/366 features passing (added #313 and #314 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Search Empty Query & Special Characters)
+
+#### Feature #315: Search with empty query shows all results - PASSING
+- Mail: empty search string is falsy, so no search filter sent to backend -> all messages returned
+- Agents: TanStack Table globalFilter='' with includesString matches everything
+- Logs: filter='all' shows all events (type-based filter, not text search)
+- Clearing search restores all results in both mail and agents
+- Added data-testid: mail-search-clear, agent-search-clear, agent-filter-count, log-filter-*
+- Added data-message-count to virtualized-mail-list
+
+#### Feature #316: Search with special characters doesn't crash - PASSING
+- Mail: parameterized SQL LIKE queries with ? placeholders handle all special chars safely
+- Agents: String.includes() (not regex) handles quotes, brackets, asterisks safely
+- Logs: predefined event type buttons, no user text input to worry about
+- No regex used anywhere in search paths
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MailPage.tsx - mail-search-clear testid, data-message-count
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - agent-search-clear testid, agent-filter-count
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - log-filter-* testids
+
+#### Current Status
+- 316/366 features passing (added #315 and #316 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
