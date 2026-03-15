@@ -153,6 +153,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     file_scope?: string;
   }) => ipcRenderer.invoke('agentDef:create', definition),
   agentDefDelete: (role: string) => ipcRenderer.invoke('agentDef:delete', role),
+  agentDefResetDefaults: () => ipcRenderer.invoke('agentDef:reset-defaults'),
   agentDefUpdate: (
     role: string,
     updates: {

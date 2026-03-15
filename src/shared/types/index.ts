@@ -1014,6 +1014,7 @@ export interface ElectronAPI {
     file_scope?: string;
   }) => Promise<{ data: AgentDefinition | null; error: string | null }>;
   agentDefDelete: (role: string) => Promise<{ data: boolean; error: string | null }>;
+  agentDefResetDefaults: () => Promise<{ data: AgentDefinition[] | null; error: string | null }>;
   agentDefUpdate: (
     role: string,
     updates: {
