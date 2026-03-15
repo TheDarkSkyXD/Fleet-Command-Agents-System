@@ -141,3 +141,24 @@
 - Note: tsc command is blocked by sandbox restrictions - use biome for linting
 - Note: Biome v1.9.4 installed, config must use 1.9.4 schema (not 2.0.0)
 - Note: react-remove-scroll-bar@2.3.8 has a bug - es2015/component.js is missing from dist, manually created
+
+### Session: 2026-03-14 (Claude CLI Detection & Auth)
+
+#### Feature #22: Claude CLI binary detection via PATH - PASSING
+- Created src/main/services/claudeCliService.ts with full CLI detection
+- PATH lookup via which/where command, platform-specific fallback paths (Win/Mac/Linux)
+- Version parsing via `claude --version`
+- Detection results cached for session with forceRefresh option
+- Updated IPC handlers from stubs to real detection service
+- Updated preload and shared types with proper typing
+
+#### Feature #24: Claude CLI auth status check - PASSING
+- Enhanced checkAuthentication() to try JSON parsing first (`claude auth status --output-format json`)
+- Falls back to text-based parsing for CLI versions without JSON output
+- StatusBar component calls claudeStatus on mount, shows real-time auth state
+- Four UI states: Ready (green), Not Authenticated (amber), Not Installed (red), Checking (gray pulse)
+- Version displayed when CLI is ready, tooltip shows path/version/auth details
+
+#### Current Status
+- 15/366 features passing (added #22 and #24 this session)
+- Claude CLI integration service established at src/main/services/claudeCliService.ts
