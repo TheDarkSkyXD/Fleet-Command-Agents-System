@@ -17,6 +17,7 @@ import {
   FiLoader,
   FiMail,
   FiSend,
+  FiShield,
   FiSquare,
   FiTerminal,
   FiTool,
@@ -30,6 +31,7 @@ import type {
   Event,
   Issue,
   Message,
+  QualityGateResult,
   Session,
 } from '../../shared/types';
 import { AgentTerminal } from '../components/AgentTerminal';
@@ -92,7 +94,7 @@ const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> 
   zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
-type DetailTab = 'terminal' | 'logs' | 'identity' | 'files' | 'mail' | 'performance';
+type DetailTab = 'terminal' | 'logs' | 'identity' | 'files' | 'mail' | 'performance' | 'gates';
 
 const TABS: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
   { id: 'terminal', label: 'Terminal', icon: <FiTerminal className="h-4 w-4" /> },
@@ -101,6 +103,7 @@ const TABS: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
   { id: 'files', label: 'Files Changed', icon: <FiHash className="h-4 w-4" /> },
   { id: 'mail', label: 'Mail', icon: <FiMail className="h-4 w-4" /> },
   { id: 'performance', label: 'Performance', icon: <FiActivity className="h-4 w-4" /> },
+  { id: 'gates', label: 'Gates', icon: <FiShield className="h-4 w-4" /> },
 ];
 
 function formatUptime(createdAt: string): string {
@@ -1005,6 +1008,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
         {activeTab === 'files' && <AgentFilesTab session={session} />}
         {activeTab === 'mail' && <AgentMailTab agentName={session.agent_name} />}
         {activeTab === 'performance' && <AgentPerformanceTab agentName={session.agent_name} />}
+        {activeTab === 'gates' && <AgentGatesTab agentName={session.agent_name} />}
       </div>
     </div>
   );
@@ -1215,6 +1219,217 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Agent Gates Tab ──────────────────────────────────────────────────
+
+function AgentGatesTab({
+  agentName,
+}: {
+  agentName: string;
+}) {
+  const [results, setResults] = useState<QualityGateResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const loadGateResults = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await window.electronAPI.qualityGateResults({
+        agent_name: agentName,
+        limit: 100,
+      });
+      if (res.data) {
+        setResults(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load gate results:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [agentName]);
+
+  useEffect(() => {
+    loadGateResults();
+  }, [loadGateResults]);
+
+  const gateStatusIcon = (status: string) => {
+    switch (status) {
+      case 'passed':
+        return <FiCheckCircle className="h-5 w-5 text-emerald-400" />;
+      case 'failed':
+        return <FiAlertTriangle className="h-5 w-5 text-red-400" />;
+      case 'error':
+        return <FiAlertTriangle className="h-5 w-5 text-amber-400" />;
+      case 'running':
+        return <FiLoader className="h-5 w-5 text-blue-400 animate-spin" />;
+      default:
+        return <FiClock className="h-5 w-5 text-slate-500" />;
+    }
+  };
+
+  const gateStatusColor = (status: string) => {
+    switch (status) {
+      case 'passed':
+        return 'border-emerald-700/50 bg-emerald-900/20';
+      case 'failed':
+        return 'border-red-700/50 bg-red-900/20';
+      case 'error':
+        return 'border-amber-700/50 bg-amber-900/20';
+      case 'running':
+        return 'border-blue-700/50 bg-blue-900/20';
+      default:
+        return 'border-slate-700 bg-slate-800';
+    }
+  };
+
+  const gateStatusBadge = (status: string) => {
+    switch (status) {
+      case 'passed':
+        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      case 'failed':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'error':
+        return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'running':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      default:
+        return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <FiLoader className="animate-spin text-slate-500 mr-2" size={20} />
+        <span className="text-slate-500">Loading gate results...</span>
+      </div>
+    );
+  }
+
+  const passedCount = results.filter((r) => r.status === 'passed').length;
+  const failedCount = results.filter((r) => r.status === 'failed' || r.status === 'error').length;
+
+  return (
+    <div className="p-6 overflow-y-auto h-full" data-testid="gate-status-section">
+      {/* Header summary */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-50 flex items-center gap-2">
+            <FiShield className="text-blue-400" />
+            Quality Gates
+          </h3>
+          <p className="text-sm text-slate-400 mt-1">
+            Gate results for agent <span className="text-slate-300 font-medium">{agentName}</span>
+          </p>
+        </div>
+        {results.length > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-sm">
+              <FiCheckCircle className="text-emerald-400" size={14} />
+              <span className="text-emerald-400 font-medium">{passedCount} passed</span>
+            </span>
+            {failedCount > 0 && (
+              <span className="flex items-center gap-1.5 text-sm">
+                <FiAlertTriangle className="text-red-400" size={14} />
+                <span className="text-red-400 font-medium">{failedCount} failed</span>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {results.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+          <FiShield size={40} className="mb-3 opacity-50" />
+          <p className="text-lg font-medium">No gate results yet</p>
+          <p className="text-sm mt-1">
+            Quality gate results will appear here after gates run for this agent
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {results.map((result) => {
+            const isExpanded = expandedId === result.id;
+            return (
+              <div
+                key={result.id}
+                className={`rounded-lg border p-4 transition-colors ${gateStatusColor(result.status)}`}
+                data-testid={`gate-result-${result.id}`}
+              >
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  onClick={() => setExpandedId(isExpanded ? null : result.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {gateStatusIcon(result.status)}
+                      <div>
+                        <span className="font-medium text-slate-50">{result.gate_name}</span>
+                        <span className="ml-2 text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded">
+                          {result.gate_type}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {result.duration_ms != null && (
+                        <span className="text-xs text-slate-500 tabular-nums">
+                          {result.duration_ms < 1000
+                            ? `${result.duration_ms}ms`
+                            : `${(result.duration_ms / 1000).toFixed(1)}s`}
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${gateStatusBadge(result.status)}`}
+                        data-testid={`gate-status-${result.status}`}
+                      >
+                        {result.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500 font-mono truncate">
+                    {result.command}
+                  </div>
+                </button>
+
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-2">
+                    <div className="text-xs text-slate-400">
+                      <span className="text-slate-500">Run at:</span>{' '}
+                      {new Date(result.created_at).toLocaleString()}
+                    </div>
+                    {result.exit_code != null && (
+                      <div className="text-xs text-slate-400">
+                        <span className="text-slate-500">Exit code:</span> {result.exit_code}
+                      </div>
+                    )}
+                    {result.stdout && (
+                      <div>
+                        <div className="text-xs text-slate-500 mb-1">stdout:</div>
+                        <pre className="text-xs text-slate-300 bg-slate-900/50 rounded p-2 overflow-x-auto max-h-40 overflow-y-auto font-mono whitespace-pre-wrap">
+                          {result.stdout}
+                        </pre>
+                      </div>
+                    )}
+                    {result.stderr && (
+                      <div>
+                        <div className="text-xs text-slate-500 mb-1">stderr:</div>
+                        <pre className="text-xs text-red-300/80 bg-slate-900/50 rounded p-2 overflow-x-auto max-h-40 overflow-y-auto font-mono whitespace-pre-wrap">
+                          {result.stderr}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

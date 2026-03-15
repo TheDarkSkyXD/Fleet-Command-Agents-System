@@ -121,7 +121,7 @@ export function MetricsPage() {
     : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="metrics-dashboard">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -178,28 +178,79 @@ export function MetricsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="metrics-summary">
         <SummaryCard
           icon={<FiDatabase className="text-blue-400" />}
           label="Total Sessions"
           value={String(summary?.total_sessions ?? 0)}
+          testId="summary-total-sessions"
         />
         <SummaryCard
           icon={<FiZap className="text-amber-400" />}
           label="Total Tokens"
           value={formatTokenCount(totalTokens)}
+          testId="summary-total-tokens"
         />
         <SummaryCard
           icon={<FiActivity className="text-emerald-400" />}
           label="Total Duration"
           value={formatDuration(summary?.total_duration_ms)}
+          testId="summary-total-duration"
         />
         <SummaryCard
           icon={<FiBarChart2 className="text-purple-400" />}
           label="Estimated Cost"
           value={formatCost(summary?.total_cost)}
+          testId="summary-estimated-cost"
         />
       </div>
+
+      {/* Token Usage Chart */}
+      {summary && totalTokens > 0 && (
+        <div
+          className="rounded-lg border border-slate-700 bg-slate-800 p-5"
+          data-testid="metrics-chart"
+        >
+          <h3 className="text-sm font-semibold text-slate-50 mb-4 flex items-center gap-2">
+            <FiBarChart2 className="text-blue-400" />
+            Token Usage Breakdown
+          </h3>
+          <div className="space-y-3">
+            <TokenBar
+              label="Input Tokens"
+              value={summary.total_input_tokens || 0}
+              max={totalTokens}
+              color="bg-blue-500"
+              textColor="text-blue-400"
+              formatTokenCount={formatTokenCount}
+            />
+            <TokenBar
+              label="Output Tokens"
+              value={summary.total_output_tokens || 0}
+              max={totalTokens}
+              color="bg-emerald-500"
+              textColor="text-emerald-400"
+              formatTokenCount={formatTokenCount}
+            />
+            <TokenBar
+              label="Cache Read Tokens"
+              value={summary.total_cache_read_tokens || 0}
+              max={totalTokens}
+              color="bg-amber-500"
+              textColor="text-amber-400"
+              formatTokenCount={formatTokenCount}
+            />
+            <TokenBar
+              label="Cache Creation Tokens"
+              value={summary.total_cache_creation_tokens || 0}
+              max={totalTokens}
+              color="bg-purple-500"
+              textColor="text-purple-400"
+              formatTokenCount={formatTokenCount}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-slate-700 pb-0">
@@ -266,18 +317,54 @@ function SummaryCard({
   icon,
   label,
   value,
+  testId,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  testId?: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <div className="rounded-lg border border-slate-700 bg-slate-800 p-4" data-testid={testId}>
       <div className="flex items-center gap-2 text-sm text-slate-400 mb-1">
         {icon}
         {label}
       </div>
       <div className="text-2xl font-bold text-slate-50">{value}</div>
+    </div>
+  );
+}
+
+function TokenBar({
+  label,
+  value,
+  max,
+  color,
+  textColor,
+  formatTokenCount,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+  textColor: string;
+  formatTokenCount: (n: number) => string;
+}) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm mb-1">
+        <span className="text-slate-400">{label}</span>
+        <span className={`${textColor} font-mono font-medium`}>
+          {formatTokenCount(value)} ({pct.toFixed(1)}%)
+        </span>
+      </div>
+      <div className="h-3 bg-slate-900/50 rounded-full overflow-hidden">
+        <div
+          className={`${color} h-full rounded-full transition-all duration-500`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }
