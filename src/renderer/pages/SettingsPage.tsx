@@ -13,7 +13,12 @@ import {
 } from 'react-icons/fi';
 import { z } from 'zod';
 import type { ConfigProfile } from '../../shared/types';
-import { DEFAULT_SETTINGS, useSettingsStore } from '../stores/settingsStore';
+import {
+  ACCENT_COLORS,
+  type AccentColorKey,
+  DEFAULT_SETTINGS,
+  useSettingsStore,
+} from '../stores/settingsStore';
 
 // ── Zod schema for profile creation/editing ──────────────────────────
 
@@ -73,9 +78,9 @@ const DEFAULT_PROFILE_FORM: ProfileFormData = {
 
 export function SettingsPage() {
   const { loaded, saving, loadSettings } = useSettingsStore();
-  const [activeTab, setActiveTab] = useState<'agents' | 'watchdog' | 'terminal' | 'profiles'>(
-    'agents',
-  );
+  const [activeTab, setActiveTab] = useState<
+    'agents' | 'watchdog' | 'terminal' | 'theme' | 'profiles'
+  >('agents');
 
   useEffect(() => {
     if (!loaded) {
@@ -96,6 +101,7 @@ export function SettingsPage() {
     { id: 'agents' as const, label: 'Agents' },
     { id: 'watchdog' as const, label: 'Watchdog' },
     { id: 'terminal' as const, label: 'Terminal' },
+    { id: 'theme' as const, label: 'Theme' },
     { id: 'profiles' as const, label: 'Profiles' },
   ];
 
@@ -120,9 +126,17 @@ export function SettingsPage() {
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id
-                ? 'border-blue-500 text-blue-400'
+                ? 'border-transparent'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
+            style={
+              activeTab === tab.id
+                ? {
+                    borderBottomColor: 'var(--accent-primary)',
+                    color: 'var(--accent-text)',
+                  }
+                : undefined
+            }
           >
             {tab.label}
           </button>
@@ -133,6 +147,7 @@ export function SettingsPage() {
       {activeTab === 'agents' && <AgentSettings />}
       {activeTab === 'watchdog' && <WatchdogSettings />}
       {activeTab === 'terminal' && <TerminalSettings />}
+      {activeTab === 'theme' && <ThemeSettings />}
       {activeTab === 'profiles' && <ProfilesSettings />}
     </div>
   );
@@ -1027,8 +1042,53 @@ function WatchdogSettings() {
 
 // ── Agent Settings Tab ───────────────────────────────────────────────
 
+// ── Zod schemas for settings validation ──────────────────────────────
+
+const agentSettingsSchema = z.object({
+  maxHierarchyDepth: z
+    .number()
+    .int('Must be a whole number')
+    .min(1, 'Minimum depth is 1')
+    .max(10, 'Maximum depth is 10'),
+  maxConcurrentAgents: z
+    .number()
+    .int('Must be a whole number')
+    .min(1, 'Minimum is 1 agent')
+    .max(50, 'Maximum is 50 agents'),
+  maxAgentsPerLead: z
+    .number()
+    .int('Must be a whole number')
+    .min(1, 'Minimum is 1 agent per lead')
+    .max(20, 'Maximum is 20 agents per lead'),
+});
+
+/** Validate a single field against its schema and return error message or null */
+function validateSettingField<T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>,
+  field: string,
+  value: unknown,
+): string | null {
+  const fieldSchema = schema.shape[field];
+  if (!fieldSchema) return null;
+  const result = fieldSchema.safeParse(value);
+  if (result.success) return null;
+  return result.error.errors[0]?.message || 'Invalid value';
+}
+
 function AgentSettings() {
   const { settings, updateSetting } = useSettingsStore();
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+  const handleChange = (
+    key: 'maxHierarchyDepth' | 'maxConcurrentAgents' | 'maxAgentsPerLead',
+    value: number,
+  ) => {
+    const error = validateSettingField(agentSettingsSchema, key, value);
+    setErrors((prev) => ({ ...prev, [key]: error }));
+    if (!error) {
+      updateSetting(key, value);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1039,12 +1099,14 @@ function AgentSettings() {
         <SettingRow
           label="Max Hierarchy Depth"
           description="Maximum depth of the agent hierarchy tree (coordinator → leads → workers). Default is 2."
+          error={errors.maxHierarchyDepth}
         >
-          <NumberInput
+          <ValidatedNumberInput
             value={settings.maxHierarchyDepth}
             min={1}
             max={10}
-            onChange={(v) => updateSetting('maxHierarchyDepth', v)}
+            onChange={(v) => handleChange('maxHierarchyDepth', v)}
+            hasError={!!errors.maxHierarchyDepth}
           />
         </SettingRow>
 
@@ -1052,12 +1114,14 @@ function AgentSettings() {
         <SettingRow
           label="Max Concurrent Agents"
           description="Maximum number of agents that can run simultaneously."
+          error={errors.maxConcurrentAgents}
         >
-          <NumberInput
+          <ValidatedNumberInput
             value={settings.maxConcurrentAgents}
             min={1}
             max={50}
-            onChange={(v) => updateSetting('maxConcurrentAgents', v)}
+            onChange={(v) => handleChange('maxConcurrentAgents', v)}
+            hasError={!!errors.maxConcurrentAgents}
           />
         </SettingRow>
 
@@ -1065,12 +1129,14 @@ function AgentSettings() {
         <SettingRow
           label="Max Agents Per Lead"
           description="Maximum number of worker agents a single lead can manage."
+          error={errors.maxAgentsPerLead}
         >
-          <NumberInput
+          <ValidatedNumberInput
             value={settings.maxAgentsPerLead}
             min={1}
             max={20}
-            onChange={(v) => updateSetting('maxAgentsPerLead', v)}
+            onChange={(v) => handleChange('maxAgentsPerLead', v)}
+            hasError={!!errors.maxAgentsPerLead}
           />
         </SettingRow>
       </div>
@@ -1080,6 +1146,7 @@ function AgentSettings() {
         <button
           type="button"
           onClick={() => {
+            setErrors({});
             updateSetting('maxHierarchyDepth', DEFAULT_SETTINGS.maxHierarchyDepth);
             updateSetting('maxConcurrentAgents', DEFAULT_SETTINGS.maxConcurrentAgents);
             updateSetting('maxAgentsPerLead', DEFAULT_SETTINGS.maxAgentsPerLead);
@@ -1087,6 +1154,120 @@ function AgentSettings() {
           className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
         >
           Reset Agent Settings to Defaults
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Theme Settings Tab ───────────────────────────────────────────────
+
+function ThemeSettings() {
+  const { settings, updateSetting } = useSettingsStore();
+  const currentAccent = (settings.accentColor || 'blue') as AccentColorKey;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+        <h2 className="text-lg font-semibold text-slate-100 mb-2">Accent Color</h2>
+        <p className="text-sm text-slate-400 mb-6">
+          Customize the accent color used throughout the interface. The dark theme is always active.
+        </p>
+
+        {/* Color palette grid */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {(
+            Object.entries(ACCENT_COLORS) as [
+              AccentColorKey,
+              (typeof ACCENT_COLORS)[AccentColorKey],
+            ][]
+          ).map(([key, color]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => updateSetting('accentColor', key)}
+              className={`relative flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all ${
+                currentAccent === key
+                  ? 'border-white bg-slate-700/50 shadow-lg'
+                  : 'border-slate-600 bg-slate-800 hover:border-slate-500 hover:bg-slate-700/30'
+              }`}
+              data-testid={`accent-color-${key}`}
+            >
+              {/* Color swatch */}
+              <div
+                className="w-10 h-10 rounded-full shadow-inner"
+                style={{ backgroundColor: color.primary }}
+              />
+              {/* Label */}
+              <span className="text-xs font-medium text-slate-300">{color.label}</span>
+              {/* Selected indicator */}
+              {currentAccent === key && (
+                <div className="absolute top-2 right-2">
+                  <FiCheck size={14} className="text-white" />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Preview */}
+        <div className="border-t border-slate-700 pt-4">
+          <p className="text-sm text-slate-400 mb-3">Preview</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
+              style={{ backgroundColor: ACCENT_COLORS[currentAccent].primary }}
+              onMouseEnter={(e) => {
+                (e.target as HTMLElement).style.backgroundColor =
+                  ACCENT_COLORS[currentAccent].hover;
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLElement).style.backgroundColor =
+                  ACCENT_COLORS[currentAccent].primary;
+              }}
+            >
+              Primary Button
+            </button>
+            <span
+              className="text-sm font-medium"
+              style={{ color: ACCENT_COLORS[currentAccent].text }}
+            >
+              Accent Link
+            </span>
+            <span
+              className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium"
+              style={{
+                borderColor: ACCENT_COLORS[currentAccent].border,
+                color: ACCENT_COLORS[currentAccent].text,
+                backgroundColor: ACCENT_COLORS[currentAccent].bgSubtle,
+              }}
+            >
+              Badge
+            </span>
+            <div
+              className="h-8 w-8 rounded-md border-2"
+              style={{ borderColor: ACCENT_COLORS[currentAccent].primary }}
+            />
+            <input
+              type="text"
+              readOnly
+              value="Input focus"
+              className="rounded-md border bg-slate-700 px-3 py-1.5 text-sm text-slate-100 focus:outline-none"
+              style={{ borderColor: ACCENT_COLORS[currentAccent].primary }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Reset Button */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => updateSetting('accentColor', DEFAULT_SETTINGS.accentColor)}
+          className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+        >
+          Reset to Default (Blue)
         </button>
       </div>
     </div>
@@ -1183,17 +1364,28 @@ function TerminalSettings() {
 function SettingRow({
   label,
   description,
+  error,
   children,
 }: {
   label: string;
   description: string;
+  error?: string | null;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex items-start justify-between py-4 border-b border-slate-700 last:border-0">
-      <div className="pr-8">
+      <div className="pr-8 flex-1">
         <p className="text-sm font-medium text-slate-200">{label}</p>
         <p className="text-xs text-slate-400 mt-1">{description}</p>
+        {error && (
+          <p
+            className="text-xs text-red-400 mt-1.5 flex items-center gap-1"
+            data-testid="validation-error"
+          >
+            <FiAlertTriangle size={12} />
+            {error}
+          </p>
+        )}
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>
@@ -1237,6 +1429,78 @@ function NumberInput({
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+/** Number input that allows typing raw values (including invalid ones) with visual error feedback */
+function ValidatedNumberInput({
+  value,
+  min,
+  max,
+  onChange,
+  hasError,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  hasError?: boolean;
+}) {
+  const [rawValue, setRawValue] = useState(String(value));
+
+  // Sync rawValue when value prop changes (e.g., from reset)
+  useEffect(() => {
+    setRawValue(String(value));
+  }, [value]);
+
+  const handleRawChange = (text: string) => {
+    setRawValue(text);
+    const parsed = Number.parseInt(text, 10);
+    if (!Number.isNaN(parsed)) {
+      onChange(parsed); // Let Zod validate - don't clamp
+    }
+  };
+
+  const borderClass = hasError
+    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+    : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500';
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          const next = Math.max(min, value - 1);
+          setRawValue(String(next));
+          onChange(next);
+        }}
+        disabled={value <= min}
+        className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        -
+      </button>
+      <input
+        type="number"
+        value={rawValue}
+        min={min}
+        max={max}
+        onChange={(e) => handleRawChange(e.target.value)}
+        className={`w-16 rounded-md border bg-slate-700 px-2 py-1 text-center text-sm text-slate-100 focus:outline-none focus:ring-1 ${borderClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+        data-testid="validated-number-input"
+      />
+      <button
+        type="button"
+        onClick={() => {
+          const next = Math.min(max, value + 1);
+          setRawValue(String(next));
+          onChange(next);
+        }}
         disabled={value >= max}
         className="rounded-md border border-slate-600 bg-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
