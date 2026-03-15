@@ -268,6 +268,8 @@ export interface MergeQueueEntry {
   resolved_tier: MergeResolutionTier | null;
   enqueued_at: string;
   completed_at: string | null;
+  depends_on: string | null; // JSON array of merge queue IDs this entry depends on
+  blocked?: boolean; // computed field - true if any dependency has failed status
 }
 
 export interface TaskGroup {
@@ -908,6 +910,8 @@ export interface ElectronAPI {
     error: string | null;
     reimagineBranch?: string;
   }>;
+  mergeGetTargetBranch: () => Promise<{ data: string | null; error: string | null }>;
+  mergeSetTargetBranch: (branch: string) => Promise<{ data: boolean; error: string | null }>;
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) => Promise<{
     data: Issue[] | null;

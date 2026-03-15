@@ -1,7 +1,168 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { MergeQueueEntry, MergeStatus } from '../../shared/types';
+import type { MergeQueueEntry, MergeResolutionTier, MergeStatus } from '../../shared/types';
 import { DiffViewer } from '../components/DiffViewer';
 import { useMergeStore } from '../stores/mergeStore';
+
+const TIER_COLORS: Record<MergeResolutionTier, string> = {
+  'clean-merge': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  'auto-resolve': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  'ai-resolve': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  reimagine: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+};
+
+const TIER_LABELS: Record<MergeResolutionTier, string> = {
+  'clean-merge': 'Tier 1: Clean Merge',
+  'auto-resolve': 'Tier 2: Auto-Resolve',
+  'ai-resolve': 'Tier 3: AI-Resolve',
+  reimagine: 'Tier 4: Reimagine',
+};
+
+const TIER_ICONS: Record<MergeResolutionTier, string> = {
+  'clean-merge': '\u2714',
+  'auto-resolve': '\u2699',
+  'ai-resolve': '\u2728',
+  reimagine: '\u267B',
+};
+
+function TierBadge({ tier }: { tier: MergeResolutionTier }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${TIER_COLORS[tier]}`}
+    >
+      <span>{TIER_ICONS[tier]}</span>
+      {TIER_LABELS[tier]}
+    </span>
+  );
+}
+
+function OutcomeBadge({ status }: { status: MergeStatus }) {
+  if (status === 'merged') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
+        <span>\u2714</span> Success
+      </span>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-400">
+        <span>\u2718</span> Failed
+      </span>
+    );
+  }
+  if (status === 'conflict') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-400">
+        <span>\u26A0</span> Conflict
+      </span>
+    );
+  }
+  return <StatusBadge status={status} />;
+}
+
+function HistoryEntryRow({
+  entry,
+  onViewDiff,
+}: {
+  entry: MergeQueueEntry;
+  onViewDiff: (id: number) => void;
+}) {
+  const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
+  const completedDate = entry.completed_at ? new Date(entry.completed_at) : null;
+  const enqueuedDate = new Date(entry.enqueued_at);
+
+  return (
+    <div
+      className={`rounded-lg border bg-slate-800/50 hover:bg-slate-800 transition-colors ${
+        entry.status === 'merged'
+          ? 'border-emerald-700/40'
+          : entry.status === 'failed'
+            ? 'border-red-700/40'
+            : 'border-amber-700/40'
+      }`}
+    >
+      <div className="flex items-start justify-between p-4">
+        <div className="flex items-start gap-4 min-w-0 flex-1">
+          {/* Outcome icon */}
+          <div
+            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg ${
+              entry.status === 'merged'
+                ? 'bg-emerald-500/20 text-emerald-400'
+                : entry.status === 'failed'
+                  ? 'bg-red-500/20 text-red-400'
+                  : 'bg-amber-500/20 text-amber-400'
+            }`}
+          >
+            {entry.status === 'merged' ? '\u2714' : entry.status === 'failed' ? '\u2718' : '\u26A0'}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            {/* Branch name + outcome */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-sm text-slate-50 truncate">{entry.branch_name}</span>
+              <OutcomeBadge status={entry.status} />
+            </div>
+
+            {/* Tier badge (prominent) */}
+            <div className="mt-2">
+              {entry.resolved_tier ? (
+                <TierBadge tier={entry.resolved_tier} />
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-600 bg-slate-700/50 px-3 py-1 text-xs text-slate-400">
+                  No resolution tier
+                </span>
+              )}
+            </div>
+
+            {/* Metadata row */}
+            <div className="mt-2 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
+              {entry.agent_name && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-slate-500">Agent:</span> {entry.agent_name}
+                </span>
+              )}
+              {entry.task_id && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-slate-500">Task:</span> {entry.task_id}
+                </span>
+              )}
+              {filesModified.length > 0 && (
+                <span className="text-slate-500">
+                  {filesModified.length} file{filesModified.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            {/* Timestamps */}
+            <div className="mt-1.5 flex items-center gap-4 text-xs text-slate-500">
+              <span title={enqueuedDate.toLocaleString()}>
+                Enqueued: {enqueuedDate.toLocaleDateString()}{' '}
+                {enqueuedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              {completedDate && (
+                <span title={completedDate.toLocaleString()}>
+                  Completed: {completedDate.toLocaleDateString()}{' '}
+                  {completedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="shrink-0 ml-4">
+          <button
+            type="button"
+            onClick={() => onViewDiff(entry.id)}
+            className="rounded-md border border-cyan-600/50 bg-cyan-600/10 px-3 py-1.5 text-xs font-medium text-cyan-400 hover:bg-cyan-600/20 transition-colors"
+          >
+            View Diff
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const STATUS_COLORS: Record<MergeStatus, string> = {
   pending: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
@@ -560,18 +721,41 @@ export function MergeQueuePage() {
           <p className="text-sm">Completed and failed merges will appear here</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {history.map((entry, index) => (
-            <QueueEntryRow
-              key={entry.id}
-              entry={entry}
-              position={index + 1}
-              onExecute={handleExecute}
-              onComplete={handleComplete}
-              onFail={handleFail}
-              onRemove={handleRemove}
-              onViewDiff={handleViewDiff}
-            />
+        <div className="space-y-3">
+          {/* History tier summary */}
+          <div className="flex items-center gap-4 text-xs text-slate-400 pb-2 border-b border-slate-700/50">
+            <span className="font-medium text-slate-300">
+              {history.length} merge{history.length !== 1 ? 's' : ''} total
+            </span>
+            <span className="text-emerald-400">
+              {history.filter((e) => e.status === 'merged').length} succeeded
+            </span>
+            <span className="text-red-400">
+              {history.filter((e) => e.status === 'failed').length} failed
+            </span>
+            {history.filter((e) => e.resolved_tier === 'clean-merge').length > 0 && (
+              <span className="text-emerald-400/70">
+                {history.filter((e) => e.resolved_tier === 'clean-merge').length} clean
+              </span>
+            )}
+            {history.filter((e) => e.resolved_tier === 'auto-resolve').length > 0 && (
+              <span className="text-amber-400/70">
+                {history.filter((e) => e.resolved_tier === 'auto-resolve').length} auto-resolved
+              </span>
+            )}
+            {history.filter((e) => e.resolved_tier === 'ai-resolve').length > 0 && (
+              <span className="text-violet-400/70">
+                {history.filter((e) => e.resolved_tier === 'ai-resolve').length} AI-resolved
+              </span>
+            )}
+            {history.filter((e) => e.resolved_tier === 'reimagine').length > 0 && (
+              <span className="text-rose-400/70">
+                {history.filter((e) => e.resolved_tier === 'reimagine').length} reimagined
+              </span>
+            )}
+          </div>
+          {history.map((entry) => (
+            <HistoryEntryRow key={entry.id} entry={entry} onViewDiff={handleViewDiff} />
           ))}
         </div>
       )}

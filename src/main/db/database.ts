@@ -115,7 +115,8 @@ export async function initDatabase(): Promise<void> {
       files_modified TEXT,
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'merging', 'merged', 'conflict', 'failed')),
       resolved_tier TEXT CHECK(resolved_tier IN ('clean-merge', 'auto-resolve', 'ai-resolve', 'reimagine')),
-      enqueued_at TEXT NOT NULL DEFAULT (datetime('now'))
+      enqueued_at TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS task_groups (
@@ -403,6 +404,20 @@ export async function initDatabase(): Promise<void> {
     db.prepare('SELECT file_scope FROM sessions LIMIT 1').get();
   } catch {
     db.exec('ALTER TABLE sessions ADD COLUMN file_scope TEXT');
+  }
+
+  // Migration: add completed_at column to merge_queue if not present
+  try {
+    db.prepare('SELECT completed_at FROM merge_queue LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE merge_queue ADD COLUMN completed_at TEXT');
+  }
+
+  // Migration: add depends_on column to merge_queue for dependency tracking
+  try {
+    db.prepare('SELECT depends_on FROM merge_queue LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE merge_queue ADD COLUMN depends_on TEXT');
   }
 
   // Seed default agent definitions if table is empty

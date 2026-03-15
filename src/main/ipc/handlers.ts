@@ -2085,7 +2085,36 @@ export function registerIpcHandlers(): void {
   // List all merge queue entries ordered by enqueue time (FIFO)
   ipcMain.handle('merge:queue', () => {
     try {
-      const queue = loggedPrepare('SELECT * FROM merge_queue ORDER BY enqueued_at ASC').all();
+      const queue = loggedPrepare('SELECT * FROM merge_queue ORDER BY enqueued_at ASC').all() as Array<Record<string, unknown>>;
+      // Compute blocked status: an entry is blocked if any of its dependencies have 'failed' status
+      const statusMap = new Map<number, string>();
+      for (const entry of queue) {
+        statusMap.set(entry.id as number, entry.status as string);
+      }
+      // Also check history for failed dependencies
+      const historyEntries = loggedPrepare(
+        "SELECT id, status FROM merge_queue WHERE status IN ('merged', 'failed', 'conflict')",
+      ).all() as Array<{ id: number; status: string }>;
+      for (const h of historyEntries) {
+        statusMap.set(h.id, h.status);
+      }
+      for (const entry of queue) {
+        const dependsOnJson = entry.depends_on as string | null;
+        if (dependsOnJson) {
+          try {
+            const depIds = JSON.parse(dependsOnJson) as number[];
+            const isBlocked = depIds.some((depId) => {
+              const depStatus = statusMap.get(depId);
+              return depStatus === 'failed';
+            });
+            (entry as Record<string, unknown>).blocked = isBlocked;
+          } catch {
+            (entry as Record<string, unknown>).blocked = false;
+          }
+        } else {
+          (entry as Record<string, unknown>).blocked = false;
+        }
+      }
       log.info(`[IPC] merge:queue - SELECT returned ${queue.length} entries from real database`);
       return { data: queue, error: null };
     } catch (error) {
@@ -2104,14 +2133,16 @@ export function registerIpcHandlers(): void {
         task_id?: string;
         agent_name?: string;
         files_modified?: string[];
+        depends_on?: number[];
       },
     ) => {
       try {
         const filesJson = entry.files_modified ? JSON.stringify(entry.files_modified) : null;
+        const dependsOnJson = entry.depends_on && entry.depends_on.length > 0 ? JSON.stringify(entry.depends_on) : null;
         const result = loggedPrepare(
-          `INSERT INTO merge_queue (branch_name, task_id, agent_name, files_modified, status, enqueued_at)
-          VALUES (?, ?, ?, ?, 'pending', datetime('now'))`,
-        ).run(entry.branch_name, entry.task_id ?? null, entry.agent_name ?? null, filesJson);
+          `INSERT INTO merge_queue (branch_name, task_id, agent_name, files_modified, depends_on, status, enqueued_at)
+          VALUES (?, ?, ?, ?, ?, 'pending', datetime('now'))`,
+        ).run(entry.branch_name, entry.task_id ?? null, entry.agent_name ?? null, filesJson, dependsOnJson);
         const inserted = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(
           result.lastInsertRowid,
         );
@@ -2155,9 +2186,29 @@ export function registerIpcHandlers(): void {
           id: number;
           branch_name: string;
           status: string;
+          depends_on: string | null;
         } | null;
         if (!entry) {
           return { data: null, error: `Merge queue entry ${id} not found` };
+        }
+
+        // Check if blocked by failed dependencies
+        if (entry.depends_on) {
+          try {
+            const depIds = JSON.parse(entry.depends_on) as number[];
+            if (depIds.length > 0) {
+              const placeholders = depIds.map(() => '?').join(',');
+              const failedDeps = loggedPrepare(
+                `SELECT id, branch_name FROM merge_queue WHERE id IN (${placeholders}) AND status = 'failed'`,
+              ).all(...depIds) as Array<{ id: number; branch_name: string }>;
+              if (failedDeps.length > 0) {
+                const failedNames = failedDeps.map((d) => `#${d.id} (${d.branch_name})`).join(', ');
+                return { data: null, error: `Blocked by failed dependencies: ${failedNames}` };
+              }
+            }
+          } catch {
+            // ignore parse errors
+          }
         }
 
         // Mark as merging
@@ -2307,7 +2358,7 @@ export function registerIpcHandlers(): void {
       } catch (error) {
         log.error('merge:ai-resolve failed:', error);
         try {
-          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+          loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         } catch {
           /* ignore */
         }
@@ -2344,7 +2395,7 @@ export function registerIpcHandlers(): void {
 
         if (result.success) {
           loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'reimagine' WHERE id = ?",
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'reimagine', completed_at = datetime('now') WHERE id = ?",
           ).run(id);
           const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
           log.info(
@@ -2353,14 +2404,14 @@ export function registerIpcHandlers(): void {
           return { data: updated, error: null, reimagineBranch: result.reimagineBranch };
         }
 
-        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
         log.error(`[IPC] merge:reimagine - failed for id=${id}: ${result.error}`);
         return { data: updated, error: result.error };
       } catch (error) {
         log.error('merge:reimagine failed:', error);
         try {
-          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+          loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         } catch {
           /* ignore */
         }
@@ -2372,7 +2423,7 @@ export function registerIpcHandlers(): void {
   // Complete a merge with a resolution tier
   ipcMain.handle('merge:complete', (_event, id: number, resolvedTier: string) => {
     try {
-      loggedPrepare("UPDATE merge_queue SET status = 'merged', resolved_tier = ? WHERE id = ?").run(
+      loggedPrepare("UPDATE merge_queue SET status = 'merged', resolved_tier = ?, completed_at = datetime('now') WHERE id = ?").run(
         resolvedTier,
         id,
       );
@@ -2390,7 +2441,7 @@ export function registerIpcHandlers(): void {
   // Mark a merge as failed
   ipcMain.handle('merge:fail', (_event, id: number) => {
     try {
-      loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+      loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
       const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
       log.info(`[IPC] merge:fail - UPDATE merge in real database: id=${id}`);
       return { data: entry, error: null };
@@ -2442,7 +2493,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('merge:history', () => {
     try {
       const history = loggedPrepare(
-        "SELECT * FROM merge_queue WHERE status IN ('merged', 'failed', 'conflict') ORDER BY enqueued_at DESC",
+        "SELECT * FROM merge_queue WHERE status IN ('merged', 'failed', 'conflict') ORDER BY completed_at DESC, enqueued_at DESC",
       ).all();
       log.info(
         `[IPC] merge:history - SELECT returned ${history.length} entries from real database`,
@@ -2499,6 +2550,34 @@ export function registerIpcHandlers(): void {
       return { data: true, error: null };
     } catch (error) {
       log.error('merge:remove failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  // Get merge target branch setting
+  ipcMain.handle('merge:get-target-branch', () => {
+    try {
+      const row = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get('mergeTargetBranch') as { value: string } | undefined;
+      const branch = row ? JSON.parse(row.value) : null;
+      log.info(`[IPC] merge:get-target-branch - current target: ${branch || 'default (current branch)'}`);
+      return { data: branch, error: null };
+    } catch (error) {
+      log.error('merge:get-target-branch failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Set merge target branch setting
+  ipcMain.handle('merge:set-target-branch', (_event, branch: string) => {
+    try {
+      loggedPrepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(
+        'mergeTargetBranch',
+        JSON.stringify(branch),
+      );
+      log.info(`[IPC] merge:set-target-branch - set to: ${branch || 'default (current branch)'}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('merge:set-target-branch failed:', error);
       return { data: false, error: String(error) };
     }
   });
