@@ -270,6 +270,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   runStop: (id: string) => ipcRenderer.invoke('run:stop', id),
   runGet: (id: string) => ipcRenderer.invoke('run:get', id),
 
+  // Agent Performance
+  agentPerformanceHistory: (agentName: string) =>
+    ipcRenderer.invoke('agent:performance-history', agentName),
+
   // System - Auto Update
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateStatus: () => ipcRenderer.invoke('update:status'),
@@ -389,7 +393,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   guardRuleGet: (role: string) => ipcRenderer.invoke('guardRule:get', role),
   guardRuleUpdate: (
     role: string,
-    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string; path_boundaries?: string },
+    updates: {
+      tool_allowlist?: string;
+      bash_restrictions?: string;
+      file_scope?: string;
+      path_boundaries?: string;
+    },
   ) => ipcRenderer.invoke('guardRule:update', role, updates),
   guardPathBoundaryValidate: (role: string, filePath: string, worktreePath?: string) =>
     ipcRenderer.invoke('guardRule:path-boundary-validate', role, filePath, worktreePath),

@@ -475,7 +475,9 @@ export async function initDatabase(): Promise<void> {
         tool_allowlist: JSON.stringify(['Read', 'Grep', 'Glob', 'Bash (read-only)', 'WebSearch']),
         bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'no git reset']),
         file_scope: 'read-only (entire project)',
-        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
+        path_boundaries: JSON.stringify([
+          { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
+        ]),
       },
       {
         role: 'builder',
@@ -498,7 +500,9 @@ export async function initDatabase(): Promise<void> {
           'confined to worktree',
         ]),
         file_scope: 'assigned files only',
-        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
+        path_boundaries: JSON.stringify([
+          { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
+        ]),
       },
       {
         role: 'reviewer',
@@ -523,7 +527,9 @@ export async function initDatabase(): Promise<void> {
         ]),
         bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'test execution only']),
         file_scope: 'read-only (entire project)',
-        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
+        path_boundaries: JSON.stringify([
+          { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
+        ]),
       },
       {
         role: 'lead',
@@ -551,7 +557,9 @@ export async function initDatabase(): Promise<void> {
         ]),
         bash_restrictions: JSON.stringify(['no git push to main', 'no git reset --hard']),
         file_scope: 'full project access',
-        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
+        path_boundaries: JSON.stringify([
+          { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
+        ]),
       },
       {
         role: 'merger',
@@ -569,7 +577,9 @@ export async function initDatabase(): Promise<void> {
         tool_allowlist: JSON.stringify(['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash', 'Git']),
         bash_restrictions: JSON.stringify(['no git push --force', 'merge operations only']),
         file_scope: 'merge-scoped files',
-        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
+        path_boundaries: JSON.stringify([
+          { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
+        ]),
       },
       {
         role: 'coordinator',
@@ -596,7 +606,9 @@ export async function initDatabase(): Promise<void> {
         ]),
         bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'read-only + spawn']),
         file_scope: 'read-only (entire project)',
-        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
+        path_boundaries: JSON.stringify([
+          { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
+        ]),
       },
       {
         role: 'monitor',
@@ -618,7 +630,9 @@ export async function initDatabase(): Promise<void> {
           'monitoring only',
         ]),
         file_scope: 'read-only (logs and status)',
-        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
+        path_boundaries: JSON.stringify([
+          { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
+        ]),
       },
     ];
 

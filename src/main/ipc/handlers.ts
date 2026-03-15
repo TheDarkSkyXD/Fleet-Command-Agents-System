@@ -5454,6 +5454,65 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // ── Agent Performance History ────────────────────────────────────────
+
+  ipcMain.handle('agent:performance-history', (_event, agentName: string) => {
+    try {
+      const sessions = loggedPrepare(
+        `SELECT id, capability, model, state, task_id, created_at, completed_at
+         FROM sessions
+         WHERE agent_name = ?
+         ORDER BY created_at DESC`,
+      ).all(agentName) as Array<{
+        id: string;
+        capability: string;
+        model: string | null;
+        state: string;
+        task_id: string | null;
+        created_at: string;
+        completed_at: string | null;
+      }>;
+
+      const totalSessions = sessions.length;
+      const completedSessions = sessions.filter((s) => s.state === 'completed');
+      const failedSessions = sessions.filter((s) => s.state === 'zombie' || s.state === 'stalled');
+      const successRate =
+        totalSessions > 0 ? Math.round((completedSessions.length / totalSessions) * 100) : 0;
+
+      // Calculate average duration for completed sessions
+      let avgDurationMs = 0;
+      const durations: number[] = [];
+      for (const s of completedSessions) {
+        if (s.created_at && s.completed_at) {
+          const dur = new Date(s.completed_at).getTime() - new Date(s.created_at).getTime();
+          if (dur > 0) durations.push(dur);
+        }
+      }
+      if (durations.length > 0) {
+        avgDurationMs = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
+      }
+
+      log.info(
+        `[IPC] agent:performance-history - ${totalSessions} sessions for agent ${agentName}`,
+      );
+      return {
+        data: {
+          agentName,
+          totalSessions,
+          completedCount: completedSessions.length,
+          failedCount: failedSessions.length,
+          successRate,
+          avgDurationMs,
+          sessions,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('agent:performance-history failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // ── Watchdog ──────────────────────────────────────────────────────────
 
   ipcMain.handle('watchdog:start', () => {

@@ -189,6 +189,26 @@ export interface Run {
   completed_at: string | null;
 }
 
+export interface AgentPerformanceSession {
+  id: string;
+  capability: string;
+  model: string | null;
+  state: string;
+  task_id: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface AgentPerformanceHistory {
+  agentName: string;
+  totalSessions: number;
+  completedCount: number;
+  failedCount: number;
+  successRate: number;
+  avgDurationMs: number;
+  sessions: AgentPerformanceSession[];
+}
+
 export interface Message {
   id: string;
   thread_id: string | null;
@@ -238,6 +258,18 @@ export interface Metric {
 // Model breakdown aggregation
 export interface ModelBreakdown {
   model_used: string;
+  session_count: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cache_read_tokens: number;
+  total_cache_creation_tokens: number;
+  total_cost: number;
+  total_duration_ms: number;
+}
+
+// Capability breakdown aggregation
+export interface CapabilityBreakdown {
+  capability: string;
   session_count: number;
   total_input_tokens: number;
   total_output_tokens: number;
@@ -1182,6 +1214,12 @@ export interface ElectronAPI {
   runStop: (id: string) => Promise<{ data: Run | null; error: string | null }>;
   runGet: (id: string) => Promise<{ data: Run | null; error: string | null }>;
 
+  // Agent Performance
+  agentPerformanceHistory: (agentName: string) => Promise<{
+    data: AgentPerformanceHistory | null;
+    error: string | null;
+  }>;
+
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
   dialogSelectFolder: () => Promise<{ data: string | null; error: string | null }>;
@@ -1316,17 +1354,28 @@ export interface ElectronAPI {
   }>;
   guardRuleUpdate: (
     role: string,
-    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string; path_boundaries?: string },
+    updates: {
+      tool_allowlist?: string;
+      bash_restrictions?: string;
+      file_scope?: string;
+      path_boundaries?: string;
+    },
   ) => Promise<{ data: AgentDefinition | null; error: string | null }>;
   guardPathBoundaryValidate: (
     role: string,
     filePath: string,
     worktreePath?: string,
-  ) => Promise<{ data: { allowed: boolean; reason: string; boundary?: string } | null; error: string | null }>;
+  ) => Promise<{
+    data: { allowed: boolean; reason: string; boundary?: string } | null;
+    error: string | null;
+  }>;
   guardCheckBash: (
     role: string,
     command: string,
-  ) => Promise<{ data: { blocked: boolean; reason: string; matched_pattern?: string } | null; error: string | null }>;
+  ) => Promise<{
+    data: { blocked: boolean; reason: string; matched_pattern?: string } | null;
+    error: string | null;
+  }>;
   guardViolationList: (filters?: {
     capability?: string;
     rule_type?: string;

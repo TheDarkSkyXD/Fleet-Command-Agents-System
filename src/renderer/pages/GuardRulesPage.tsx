@@ -9,6 +9,7 @@ import {
   FiEdit3,
   FiEye,
   FiFolder,
+  FiLock,
   FiPlus,
   FiShield,
   FiTrash2,
@@ -928,6 +929,321 @@ export function GuardRulesPage() {
         </div>
       )}
 
+      {activeTab === 'boundaries' && (
+        <div className="flex gap-6">
+          {/* Left: Capability list */}
+          <div className="w-64 flex-shrink-0 space-y-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+              Agent Capabilities
+            </h2>
+            {definitions.map((def) => {
+              const colorClass =
+                capabilityColors[def.role] || 'text-slate-400 bg-slate-500/10 border-slate-500/30';
+              const boundaries = getCurrentBoundaries(def);
+              return (
+                <button
+                  type="button"
+                  key={def.role}
+                  onClick={() => {
+                    setBoundarySelectedRole(def.role);
+                    cancelBoundaryEditing();
+                    setTestResult(null);
+                  }}
+                  className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                    boundarySelectedRole === def.role
+                      ? colorClass
+                      : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium capitalize">{def.display_name}</span>
+                    <span className="text-xs text-slate-500">
+                      {boundaries.length} {boundaries.length === 1 ? 'rule' : 'rules'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    {boundaries.length > 0
+                      ? boundaries.map((b) => boundaryTypeLabels[b.type] || b.type).join(', ')
+                      : 'No boundaries set'}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right: Path boundary detail */}
+          <div className="flex-1 min-w-0">
+            {boundarySelectedDef ? (
+              <div className="space-y-6">
+                {/* Role header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-50 capitalize">
+                      {boundarySelectedDef.display_name} Path Boundaries
+                    </h2>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Configure path boundaries to confine this agent to its worktree
+                    </p>
+                  </div>
+                  {!isBoundaryEditing ? (
+                    <button
+                      type="button"
+                      onClick={startBoundaryEditing}
+                      className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 transition-colors"
+                    >
+                      <FiEdit3 size={14} />
+                      Edit Boundaries
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={cancelBoundaryEditing}
+                        className="flex items-center gap-2 rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+                      >
+                        <FiX size={14} />
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveBoundaryChanges}
+                        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
+                      >
+                        <FiCheck size={14} />
+                        Save
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Worktree enforcement info */}
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <FiLock className="text-amber-400 mt-0.5 flex-shrink-0" size={16} />
+                    <div>
+                      <h3 className="text-sm font-semibold text-amber-300">
+                        Worktree Root Enforcement
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        When a worktree boundary is active, agents are confined to their assigned
+                        worktree directory. Any file access outside the worktree root will be
+                        blocked and logged as a violation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Current boundaries */}
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                    <FiFolder size={14} className="text-amber-400" />
+                    Configured Boundaries
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Path boundaries restrict where agents can access files. Worktree boundaries
+                    auto-enforce the worktree root.
+                  </p>
+
+                  <div className="space-y-2 mb-3">
+                    {(isBoundaryEditing
+                      ? editingBoundaries || []
+                      : getCurrentBoundaries(boundarySelectedDef)
+                    ).map((boundary, index) => (
+                      <div
+                        key={`${boundary.type}-${boundary.pattern}-${index}`}
+                        className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${
+                          boundaryTypeColors[boundary.type] || 'border-slate-600 bg-slate-700/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {boundary.type === 'worktree' ? (
+                            <FiLock size={14} />
+                          ) : boundary.type === 'directory' ? (
+                            <FiFolder size={14} />
+                          ) : (
+                            <FiEye size={14} />
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-700/50">
+                                {boundaryTypeLabels[boundary.type] || boundary.type}
+                              </span>
+                              {boundary.type !== 'worktree' && (
+                                <span className="text-sm font-mono">{boundary.pattern}</span>
+                              )}
+                              {boundary.type === 'worktree' && (
+                                <span className="text-sm">Agent&apos;s assigned worktree root</span>
+                              )}
+                            </div>
+                            {boundary.description && (
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                {boundary.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {isBoundaryEditing && (
+                          <button
+                            type="button"
+                            onClick={() => removeBoundaryRule(index)}
+                            className="text-slate-400 hover:text-red-400 transition-colors"
+                            data-testid={`remove-boundary-${index}`}
+                          >
+                            <FiX size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {(isBoundaryEditing
+                      ? editingBoundaries || []
+                      : getCurrentBoundaries(boundarySelectedDef)
+                    ).length === 0 && (
+                      <span className="text-sm text-slate-500 italic">
+                        No boundaries configured - agent has unrestricted path access
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Add boundary */}
+                  {isBoundaryEditing && (
+                    <div className="mt-4 rounded-lg border border-slate-600 bg-slate-700/30 p-3 space-y-3">
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Add Boundary Rule
+                      </h4>
+                      <div className="flex gap-2">
+                        <select
+                          value={newBoundary.type}
+                          onChange={(e) =>
+                            setNewBoundary((b) => ({
+                              ...b,
+                              type: e.target.value as PathBoundaryRule['type'],
+                            }))
+                          }
+                          className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200"
+                        >
+                          <option value="worktree">Worktree Root (auto-enforced)</option>
+                          <option value="directory">Specific Directory</option>
+                          <option value="glob">Glob Pattern</option>
+                        </select>
+                      </div>
+                      {newBoundary.type !== 'worktree' && (
+                        <input
+                          type="text"
+                          value={newBoundary.pattern}
+                          onChange={(e) =>
+                            setNewBoundary((b) => ({ ...b, pattern: e.target.value }))
+                          }
+                          placeholder={
+                            newBoundary.type === 'directory'
+                              ? 'e.g. /home/user/project/src'
+                              : 'e.g. !node_modules'
+                          }
+                          className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
+                        />
+                      )}
+                      <input
+                        type="text"
+                        value={newBoundary.description || ''}
+                        onChange={(e) =>
+                          setNewBoundary((b) => ({ ...b, description: e.target.value }))
+                        }
+                        placeholder="Description (optional)"
+                        className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={addBoundaryRule}
+                        disabled={newBoundary.type !== 'worktree' && !newBoundary.pattern.trim()}
+                        className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <FiPlus size={14} />
+                        Add Boundary
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Path Validation Test */}
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                    <FiCheckCircle size={14} className="text-blue-400" />
+                    Test Path Access
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Verify if a file path would be allowed or blocked by the current boundary rules.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={testWorktree}
+                      onChange={(e) => {
+                        setTestWorktree(e.target.value);
+                        setTestResult(null);
+                      }}
+                      placeholder="Worktree path, e.g. /home/user/project/worktrees/feature-1"
+                      className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={testPath}
+                        onChange={(e) => {
+                          setTestPath(e.target.value);
+                          setTestResult(null);
+                        }}
+                        placeholder="File path to test, e.g. /home/user/other-project/secret.txt"
+                        className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') validateTestPath();
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={validateTestPath}
+                        disabled={!testPath.trim()}
+                        className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Test
+                      </button>
+                    </div>
+                    {testResult && (
+                      <div
+                        className={`mt-2 rounded-lg border px-3 py-2 text-sm ${
+                          testResult.allowed
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                            : 'border-red-500/30 bg-red-500/10 text-red-400'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {testResult.allowed ? (
+                            <FiCheckCircle size={14} />
+                          ) : (
+                            <FiXCircle size={14} />
+                          )}
+                          <span className="font-medium">
+                            {testResult.allowed ? 'ALLOWED' : 'BLOCKED'}
+                          </span>
+                        </div>
+                        <p className="text-xs mt-1 opacity-80">{testResult.reason}</p>
+                        {testResult.boundary && (
+                          <p className="text-xs mt-0.5 opacity-60">
+                            Boundary: {testResult.boundary}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-slate-500">
+                <p>Select a capability to view its path boundaries</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'violations' && (
         <div className="space-y-4">
           {/* Violation stats cards */}
@@ -992,6 +1308,7 @@ export function GuardRulesPage() {
                 <option value="tool_allowlist">Tool Allowlist</option>
                 <option value="bash_restriction">Bash Restriction</option>
                 <option value="file_scope">File Scope</option>
+                <option value="path_boundary">Path Boundary</option>
               </select>
               <select
                 value={violationFilter.severity || ''}
