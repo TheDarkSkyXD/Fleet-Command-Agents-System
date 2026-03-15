@@ -4,7 +4,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiArrowDown, FiLock, FiUnlock } from 'react-icons/fi';
+import { FiArrowDown, FiCopy, FiLock, FiTrash2, FiUnlock } from 'react-icons/fi';
+import { ContextMenu, type ContextMenuItem, useContextMenu } from './ContextMenu';
 
 interface AgentTerminalProps {
   agentId: string;
@@ -190,6 +191,57 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
     }
   }, [autoScroll]);
 
+  // Right-click context menu
+  const { menu: contextMenu, show: showContextMenu, hide: hideContextMenu } = useContextMenu();
+
+  const handleTerminalContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const term = xtermRef.current;
+      const hasSelection = term ? term.hasSelection() : false;
+
+      const items: ContextMenuItem[] = [
+        {
+          id: 'copy-selection',
+          label: 'Copy Selection',
+          icon: <FiCopy size={14} />,
+          disabled: !hasSelection,
+          onClick: () => {
+            if (term?.hasSelection()) {
+              navigator.clipboard.writeText(term.getSelection());
+            }
+          },
+        },
+        {
+          id: 'separator-1',
+          label: '',
+          separator: true,
+          onClick: () => {},
+        },
+        {
+          id: 'clear',
+          label: 'Clear',
+          icon: <FiTrash2 size={14} />,
+          onClick: () => {
+            if (term) {
+              term.clear();
+            }
+          },
+        },
+        {
+          id: 'scroll-to-bottom',
+          label: 'Scroll to Bottom',
+          icon: <FiArrowDown size={14} />,
+          onClick: () => {
+            scrollToBottom();
+          },
+        },
+      ];
+
+      showContextMenu(e, items);
+    },
+    [showContextMenu, scrollToBottom],
+  );
+
   return (
     <div className="flex flex-col h-full">
       {/* Terminal toolbar */}
@@ -232,7 +284,7 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
       </div>
 
       {/* Terminal container with floating scroll-to-bottom button */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="flex-1 min-h-0 relative" onContextMenu={handleTerminalContextMenu}>
         <div
           ref={terminalRef}
           className="h-full w-full"
@@ -254,6 +306,9 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
           </button>
         )}
       </div>
+
+      {/* Right-click context menu */}
+      <ContextMenu menu={contextMenu} onClose={hideContextMenu} />
     </div>
   );
 }

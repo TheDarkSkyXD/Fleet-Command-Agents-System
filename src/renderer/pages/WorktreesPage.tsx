@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import {
   FiAlertTriangle,
   FiCheck,
@@ -15,7 +14,9 @@ import {
   FiUser,
   FiX,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type { Worktree } from '../../shared/types';
+import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { useProjectStore } from '../stores/projectStore';
 
 export function WorktreesPage() {
@@ -118,7 +119,7 @@ export function WorktreesPage() {
         const result = await window.electronAPI.worktreeRemove(activeProject.path, worktreePath);
         if (result.error) {
           setCleanResult({ type: 'error', message: `Failed to remove: ${result.error}` });
-          toast.error(`Failed to remove worktree`);
+          toast.error('Failed to remove worktree');
         } else {
           setCleanResult({ type: 'success', message: `Removed worktree: ${worktreePath}` });
           toast.success('Worktree removed');
@@ -236,6 +237,62 @@ export function WorktreesPage() {
       setCleanResult({ type: 'error', message: `Failed to open explorer: ${String(err)}` });
     }
   }, []);
+
+  // Context menu for right-click on worktree cards
+  const { menu: contextMenu, show: showContextMenu, hide: hideContextMenu } = useContextMenu();
+
+  const handleWorktreeContextMenu = useCallback(
+    (e: React.MouseEvent, wt: Worktree) => {
+      const items: ContextMenuItem[] = [
+        {
+          id: 'open-vscode',
+          label: 'Open in VS Code',
+          icon: <FiCode size={14} />,
+          onClick: () => handleOpenVSCode(wt.path),
+        },
+        {
+          id: 'open-explorer',
+          label: 'Open in Explorer',
+          icon: <FiExternalLink size={14} />,
+          onClick: () => handleOpenExplorer(wt.path),
+        },
+      ];
+
+      // Add cleanup option for non-main, unassigned worktrees
+      if (!wt.isMain && !wt.agentName) {
+        items.push({
+          id: 'separator-cleanup',
+          label: '',
+          separator: true,
+          onClick: () => {},
+        });
+        items.push({
+          id: 'clean-up',
+          label: wt.isMerged ? 'Clean Up' : 'Force Remove',
+          icon: <FiTrash2 size={14} />,
+          danger: true,
+          disabled: removingPaths.has(wt.path),
+          onClick: () => {
+            if (wt.isMerged) {
+              handleRemoveWorktree(wt.path);
+            } else {
+              handleForceRemoveWorktree(wt);
+            }
+          },
+        });
+      }
+
+      showContextMenu(e, items);
+    },
+    [
+      handleOpenVSCode,
+      handleOpenExplorer,
+      handleRemoveWorktree,
+      handleForceRemoveWorktree,
+      removingPaths,
+      showContextMenu,
+    ],
+  );
 
   const statusColor = (status: Worktree['status']) => {
     switch (status) {
@@ -380,7 +437,9 @@ export function WorktreesPage() {
           {worktrees.map((wt) => (
             <div
               key={wt.path}
-              className="rounded-lg border border-slate-700 bg-slate-800 p-4 hover:border-slate-600 transition-colors"
+              onContextMenu={(e) => handleWorktreeContextMenu(e, wt)}
+              className="rounded-lg border border-slate-700 bg-slate-800 p-4 hover:border-slate-600 transition-colors cursor-context-menu"
+              data-testid={`worktree-card-${wt.branch || 'detached'}`}
             >
               <div className="flex items-start justify-between gap-4">
                 {/* Left side: branch + path */}
@@ -538,6 +597,9 @@ export function WorktreesPage() {
           )}
         </div>
       )}
+
+      {/* Right-click context menu */}
+      <ContextMenu menu={contextMenu} onClose={hideContextMenu} />
 
       {/* Force Remove Confirmation Dialog */}
       {forceRemoveTarget && (
