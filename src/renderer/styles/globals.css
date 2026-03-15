@@ -52,10 +52,23 @@ body {
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
 }
 
-/* Focus ring styles for accessibility */
+/* Focus ring styles for accessibility - ensure visible on dark backgrounds */
 :focus-visible {
-  outline: 2px solid var(--accent-ring, #3b82f6);
+  outline: 2px solid var(--accent-ring, #3b82f6) !important;
   outline-offset: 2px;
+}
+
+/* Ensure buttons, links, and inputs show focus rings on keyboard navigation */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-ring, #3b82f6) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Accent color utility classes */
@@ -145,4 +158,5 @@ body {
 /* Prevent flex children from overflowing their containers */
 main {
   min-width: 0;
+  overflow-x: hidden;
 }
