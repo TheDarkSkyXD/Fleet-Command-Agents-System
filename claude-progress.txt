@@ -1,5 +1,40 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Configuration Profiles & Zod Validation)
+
+#### Feature #141: Named configuration profiles - PASSING
+- Created `config_profiles` SQLite table with id, name, description, max_hierarchy_depth, max_concurrent_agents, max_agents_per_lead, default_capability, default_model, is_active, timestamps
+- Added indexes on name and is_active columns
+- Created 7 IPC handlers: profile:list, profile:create, profile:get, profile:update, profile:delete, profile:activate, profile:get-active
+- profile:activate atomically deactivates all profiles then activates selected one (transaction)
+- profile:create checks name uniqueness before insert
+- Built Profiles tab in Settings page with full CRUD UI
+- Profile cards show: name, description, config values, capability badge, model badge, active status
+- Activate (star icon), edit (pencil), delete (trash) actions per profile
+- Create dialog with full form fields
+- Inline edit mode for existing profiles
+- Empty state with helpful text when no profiles exist
+- Status messages with auto-dismiss for success/error feedback
+
+#### Feature #254: Inline Zod validation on profile creation - PASSING
+- Zod schema validates: name (required, 1-50 chars, alphanumeric+spaces+hyphens+underscores regex), description (max 200 chars), max_hierarchy_depth (1-10), max_concurrent_agents (1-50), max_agents_per_lead (1-20), default_capability (7 agent types enum), default_model (haiku/sonnet/opus enum)
+- Dynamic uniqueness refinement checks existing profile names client-side
+- Server-side uniqueness check in profile:create and profile:update IPC handlers
+- Validation errors shown inline per field with red border + error message
+- Both create dialog and edit form use same Zod validation
+
+#### Files Created/Modified
+- MODIFIED: src/main/db/database.ts - Added config_profiles table with indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added 7 profile IPC handlers
+- MODIFIED: src/preload/index.ts - Added profile bridge methods
+- MODIFIED: src/shared/types/index.ts - Added ConfigProfile interface + ElectronAPI methods
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Added Profiles tab with full CRUD + Zod validation
+
+#### Current Status
+- 41/366 features passing (added #141 and #254 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Auto-Update & Silent Download)
 
 #### Feature #144: Auto-check for updates on startup - PASSING
