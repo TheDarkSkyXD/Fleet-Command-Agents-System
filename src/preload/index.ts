@@ -571,7 +571,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     type?: string;
     classification?: string;
     search?: string;
+    source_file?: string;
   }) => ipcRenderer.invoke('expertise:list', filters),
+  expertiseByFile: (filePath: string) => ipcRenderer.invoke('expertise:by-file', filePath),
   expertiseDomains: () => ipcRenderer.invoke('expertise:domains'),
   expertiseCreate: (record: {
     id: string;

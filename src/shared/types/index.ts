@@ -1406,7 +1406,9 @@ export interface ElectronAPI {
     type?: string;
     classification?: string;
     search?: string;
+    source_file?: string;
   }) => Promise<{ data: ExpertiseRecord[] | null; error: string | null }>;
+  expertiseByFile: (filePath: string) => Promise<{ data: ExpertiseRecord[] | null; error: string | null }>;
   expertiseDomains: () => Promise<{ data: ExpertiseDomainSummary[] | null; error: string | null }>;
   expertiseCreate: (record: {
     id: string;

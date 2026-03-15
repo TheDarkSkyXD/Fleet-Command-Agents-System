@@ -522,6 +522,7 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_expertise_type ON expertise_records(type);
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);
     CREATE INDEX IF NOT EXISTS idx_expertise_agent ON expertise_records(agent_name);
+    CREATE INDEX IF NOT EXISTS idx_expertise_source_file ON expertise_records(source_file);
     CREATE INDEX IF NOT EXISTS idx_notification_history_type ON notification_history(event_type);
     CREATE INDEX IF NOT EXISTS idx_notification_history_created ON notification_history(created_at);
     CREATE INDEX IF NOT EXISTS idx_notification_history_agent ON notification_history(agent_name);

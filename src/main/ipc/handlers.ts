@@ -7824,7 +7824,13 @@ export function registerIpcHandlers(): void {
     'expertise:list',
     (
       _event,
-      filters?: { domain?: string; type?: string; classification?: string; search?: string },
+      filters?: {
+        domain?: string;
+        type?: string;
+        classification?: string;
+        search?: string;
+        source_file?: string;
+      },
     ) => {
       try {
         let sql = 'SELECT * FROM expertise_records WHERE 1=1';
@@ -7841,6 +7847,10 @@ export function registerIpcHandlers(): void {
         if (filters?.classification) {
           sql += ' AND classification = ?';
           params.push(filters.classification);
+        }
+        if (filters?.source_file?.trim()) {
+          sql += ' AND source_file = ?';
+          params.push(filters.source_file.trim());
         }
         if (filters?.search?.trim()) {
           sql += ' AND (title LIKE ? OR content LIKE ? OR domain LIKE ?)';
@@ -7859,6 +7869,29 @@ export function registerIpcHandlers(): void {
       }
     },
   );
+
+  // File-scoped expertise query - returns records associated with a specific file
+  ipcMain.handle('expertise:by-file', (_event, filePath: string) => {
+    try {
+      if (!filePath || typeof filePath !== 'string' || !filePath.trim()) {
+        return { data: null, error: 'File path is required' };
+      }
+
+      const sanitizedPath = filePath.trim().slice(0, 500);
+      const records = loggedPrepare(
+        `SELECT * FROM expertise_records WHERE source_file = ?
+         ORDER BY CASE classification WHEN 'foundational' THEN 1 WHEN 'tactical' THEN 2 WHEN 'observational' THEN 3 ELSE 4 END, updated_at DESC`,
+      ).all(sanitizedPath);
+
+      log.info(
+        `[IPC] expertise:by-file - found ${(records as unknown[]).length} records for file: ${sanitizedPath}`,
+      );
+      return { data: records, error: null };
+    } catch (error) {
+      log.error('expertise:by-file failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
 
   ipcMain.handle('expertise:domains', () => {
     try {

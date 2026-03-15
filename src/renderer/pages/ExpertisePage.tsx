@@ -133,6 +133,7 @@ export function ExpertisePage() {
   const [isGlobalSearching, setIsGlobalSearching] = useState(false);
   const [isGlobalSearchActive, setIsGlobalSearchActive] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('');
+  const [fileFilter, setFileFilter] = useState<string>('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
@@ -192,9 +193,15 @@ export function ExpertisePage() {
     async (domain: string) => {
       setIsLoadingRecords(true);
       try {
-        const filters: { domain?: string; type?: string; search?: string } = { domain };
+        const filters: {
+          domain?: string;
+          type?: string;
+          search?: string;
+          source_file?: string;
+        } = { domain };
         if (typeFilter) filters.type = typeFilter;
         if (searchQuery.trim()) filters.search = searchQuery.trim();
+        if (fileFilter.trim()) filters.source_file = fileFilter.trim();
 
         const result = await window.electronAPI.expertiseList(filters);
         if (result.data) {
@@ -206,7 +213,7 @@ export function ExpertisePage() {
         setIsLoadingRecords(false);
       }
     },
-    [typeFilter, searchQuery],
+    [typeFilter, searchQuery, fileFilter],
   );
 
   const performGlobalSearch = useCallback(async (query: string) => {
@@ -1112,6 +1119,18 @@ export function ExpertisePage() {
                 ))}
               </select>
             </div>
+            <div className="relative min-w-[180px]">
+              <input
+                type="text"
+                value={fileFilter}
+                onChange={(e) => setFileFilter(e.target.value)}
+                maxLength={500}
+                placeholder="Filter by file..."
+                aria-label="Filter expertise records by source file"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-mono text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                data-testid="expertise-file-filter"
+              />
+            </div>
           </div>
 
           {/* Records list */}
@@ -1124,7 +1143,7 @@ export function ExpertisePage() {
           ) : records.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-8 text-center">
               <p className="text-slate-400">
-                No records found{typeFilter || searchQuery.trim() ? ' matching your filters' : ''}
+                No records found{typeFilter || searchQuery.trim() || fileFilter.trim() ? ' matching your filters' : ''}
               </p>
             </div>
           ) : (
