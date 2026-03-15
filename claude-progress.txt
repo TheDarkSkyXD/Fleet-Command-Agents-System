@@ -1,5 +1,45 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Token Usage Metrics)
+
+#### Feature #183: Token usage tracking per agent session - PASSING
+- Created MetricsPage (src/renderer/pages/MetricsPage.tsx) with Per Session tab
+- Per-session view shows input, output, cache read, cache creation tokens per metric record
+- Selectable detail panel with full session metadata (agent, model, capability, task, run, parent)
+- Delete individual metric records
+- Summary cards: total sessions, total tokens, total duration, estimated cost
+- Added metrics IPC handlers: metrics:list, metrics:create, metrics:get, metrics:by-session, metrics:by-model, metrics:summary, metrics:update, metrics:delete
+- All handlers use real SQLite queries via loggedPrepare()
+- Added automatic token tracking in agentProcessManager:
+  - Parses Claude CLI stream-json output for usage data (input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens)
+  - Accumulates tokens across multiple API calls within a session
+  - Saves metric record to DB on agent exit with duration calculation
+- Updated preload bridge with 8 new metrics IPC channels
+- Added ModelBreakdown and MetricsSummary TypeScript interfaces
+
+#### Feature #184: Token usage per model breakdown - PASSING
+- Model Breakdown tab in MetricsPage shows per-model aggregated token usage
+- metrics:by-model IPC handler uses GROUP BY model_used with SUM aggregations
+- Color-coded model cards: emerald (haiku), blue (sonnet), purple (opus)
+- Stacked bar visualization showing token type distribution per model
+- Shows session count, total duration, estimated cost per model
+- Legend for token type colors (input, output, cache read, cache create)
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/MetricsPage.tsx - Full metrics page with session and model tabs
+- MODIFIED: src/main/ipc/handlers.ts - Added 8 metrics IPC handlers
+- MODIFIED: src/main/services/agentProcessManager.ts - Token tracking + auto-save metrics on exit
+- MODIFIED: src/preload/index.ts - Added metrics bridge methods
+- MODIFIED: src/shared/types/index.ts - Added ModelBreakdown, MetricsSummary interfaces + ElectronAPI methods
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Metrics nav item with FiBarChart2 icon
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added MetricsPage routing
+- MODIFIED: src/renderer/components/CommandPalette.tsx - Added Metrics to command palette
+
+#### Current Status
+- 31/366 features passing (added #183 and #184 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (System Tray & Close Dialog)
 
 #### Feature #13: System tray icon appears - PASSING
