@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Coordinator Dispatch & Mail Polling)
+
+#### Feature #59: Lead agent dispatching with objectives - PASSING
+- Added coordinator:dispatch IPC handler that spawns lead agents via node-pty
+- Objective embedded in prompt, stored as dispatch mail message (type='dispatch', priority='high')
+- Session record created with parent_agent pointing to coordinator
+- Agent identity upserted for lead agent
+- Dispatch event recorded in event log with action='dispatch_lead'
+- Added coordinator:dispatched-leads handler to list leads with objectives via SQL JOIN
+- CoordinatorPanel UI: Dispatch Lead button, objective textarea form, dispatched leads list
+
+#### Feature #60: Fleet monitoring via mail polling - PASSING
+- Added coordinator:poll-mail IPC handler that fetches unread mail for coordinator
+- Processes messages by type with appropriate reactions:
+  - status → logged, worker_done → noted, error → escalation incremented
+  - escalation → marks stalled if level >= 2, merge_ready → queued, health_check → confirmed
+- Messages marked as read, mail_received events recorded
+- Returns fleet summary (active/stalled/completed agent counts)
+- CoordinatorPanel auto-polls every 5 seconds when coordinator active
+- UI shows fleet status grid, poll count, recent mail activity log
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added coordinator:dispatch, coordinator:dispatched-leads, coordinator:poll-mail handlers
+- MODIFIED: src/preload/index.ts - Added coordinatorDispatch, coordinatorDispatchedLeads, coordinatorPollMail bridge methods
+- MODIFIED: src/shared/types/index.ts - Added coordinator dispatch/poll types to ElectronAPI
+- MODIFIED: src/renderer/components/CoordinatorPanel.tsx - Full rewrite with dispatch UI, fleet summary, mail activity
+
+#### Current Status
+- 127/366 features passing (added #59 and #60 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Agent State Icons & Coordinator Display)
 
 #### Feature #43: Agent state visualization - PASSING
