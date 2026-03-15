@@ -2436,3 +2436,34 @@
 - 163/366 features passing (added #107 and #108 this session)
 - All code passes Biome lint and TypeScript check (no new errors)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Open Explorer and Config Editor)
+
+#### Feature #102: Open worktree in file explorer - PASSING
+- Added worktree:open-explorer IPC handler using Electron shell.openPath API
+- Verifies directory exists before attempting to open
+- Added worktreeOpenExplorer preload bridge method and ElectronAPI type
+- Added purple-themed Explorer button with FiExternalLink icon to worktree card actions
+- Button positioned alongside existing VS Code button in action row
+
+#### Feature #103: Project-level configuration editor - PASSING
+- Added project:config-read and project:config-write IPC handlers for .overstory/config.json
+- Created ProjectConfigEditor component with dual-mode editing:
+  - Form view: Flattens nested JSON into editable fields with type indicators
+  - JSON view: Raw JSON textarea editor with syntax validation on save
+- Boolean fields use toggle switches, string/number use inline click-to-edit
+- Unsaved changes warning, success/error notifications, reload from disk
+- Added Project Config tab to SettingsPage
+
+#### Files Created/Modified
+- NEW: src/renderer/components/ProjectConfigEditor.tsx
+- MODIFIED: src/main/ipc/handlers.ts - shell import, open-explorer and config handlers
+- MODIFIED: src/preload/index.ts - worktreeOpenExplorer, projectConfigRead/Write bridges
+- MODIFIED: src/shared/types/index.ts - New ElectronAPI type definitions
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Explorer button
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Project Config tab
+
+#### Current Status
+- 161/366 features passing (added #102 and #103 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
