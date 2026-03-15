@@ -1,5 +1,41 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Event Store Tracking & Tool Stats)
+
+#### Feature #129: Event store tracking - PASSING
+- Added recordEvent() helper function in handlers.ts for inserting events into SQLite events table
+- Integrated event recording into agent:spawn (session_start), agent:stop (session_end), mail:send (mail_sent)
+- Enhanced agentProcessManager.parseStreamJsonForTokens() to detect Claude CLI stream-json tool events:
+  - tool_use messages → tool_start events (with tool_name, tool_args)
+  - tool_result messages → tool_end events (with tool_name, tool_duration_ms)
+  - content_block_start/stop for tool_use type also tracked
+- Added session_end event recording on agent process exit (onExit handler)
+- Created IPC handlers: event:list (with eventType/agentName/limit filters), event:create, event:tool-stats (aggregation), event:by-session, event:purge
+- Updated preload bridge with 5 new event IPC channels
+- Added ToolStats interface to shared types
+
+#### Feature #130: Tool invocation statistics - PASSING
+- Created DebugPage (src/renderer/pages/DebugPage.tsx) with two tabs: Tool Stats and Event Log
+- Tool Stats tab: summary cards (total tools, total invocations, total duration), table with tool name, usage count, avg/min/max/total duration, visual usage bar
+- Tools sorted by usage count descending via SQL GROUP BY query on events table
+- Event Log tab: chronological event list with type filter dropdown, expandable detail rows showing ID, session, run, level, tool args, data
+- Purge all events button with confirmation dialog
+- Skeleton loading states for both tabs
+- Replaced debug placeholder in AppLayout with full DebugPage component
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/DebugPage.tsx - Full debug page with tool stats and event log
+- MODIFIED: src/main/ipc/handlers.ts - Added recordEvent() helper + event IPC handlers + event recording in spawn/stop/mail
+- MODIFIED: src/main/services/agentProcessManager.ts - Tool event tracking in stream-json parser + session_end on exit
+- MODIFIED: src/preload/index.ts - Added event bridge methods
+- MODIFIED: src/shared/types/index.ts - Added ToolStats interface + event methods to ElectronAPI
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated DebugPage
+
+#### Current Status
+- 39/366 features passing (added #129 and #130 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Live Terminal & Scroll-to-Bottom)
 
 #### Feature #44: Live terminal view per agent via xterm.js - PASSING
