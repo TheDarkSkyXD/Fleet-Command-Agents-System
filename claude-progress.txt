@@ -2886,3 +2886,56 @@
 - 191/366 features passing (added #150 and #153 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Agent Manifest Viewer & Reset to Defaults)
+
+#### Feature #159: Agent manifest viewer - PASSING
+- Added ManifestViewer component with structured manifest view
+- Shows identity (role, display_name, description), model badge, capabilities (indexed), tool permissions (checkmarks), constraints (bash restrictions, file scope), metadata
+- Details/Manifest tab toggle in RoleDetail view
+- Monospace font styling for structured data display
+
+#### Feature #161: Reset agent definitions to defaults - PASSING
+- Added agentDef:reset-defaults IPC handler that deletes all definitions and re-inserts 7 factory defaults
+- Added agentDefResetDefaults preload bridge method and ElectronAPI type
+- Amber-styled Reset to Defaults button in page header
+- Confirmation modal with warnings about custom role removal and data loss
+- Spinning icon animation during reset, success notification after completion
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentDefinitionsPage.tsx - ManifestViewer component, tab toggle, reset button, confirmation modal
+- MODIFIED: src/main/ipc/handlers.ts - agentDef:reset-defaults IPC handler
+- MODIFIED: src/preload/index.ts - agentDefResetDefaults bridge method
+- MODIFIED: src/shared/types/index.ts - agentDefResetDefaults ElectronAPI type
+
+#### Current Status
+- 197/366 features passing (added #159 and #161 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
+### Session: 2026-03-15 (Discovery Progress & Guard Rule Editor)
+
+#### Feature #168: Discovery progress tracking - PASSING
+- Enhanced DiscoveryProgressView with per-category progress bars
+- Added percentage completion per category (0%/50%/100% for pending/scanning/complete)
+- Overall percentage indicator with bold monospaced font
+- Status summary showing complete/scanning/pending counts
+- Color-coded progress bars (green=complete, blue+pulse=scanning, grey=pending)
+- data-testid attributes for all progress elements
+
+#### Feature #175: Guard rule editor UI - PASSING
+- Added 'Add Rule' button available in both view and edit modes
+- Add Rule modal with rule type selector (Tool Allowlist, Bash Restriction, File Scope)
+- Appropriate input per type: dropdown for tools, text input for patterns
+- Delete confirmation dialog before removing any rule
+- Confirmation shows rule type label and value with Cancel/Delete buttons
+- Modals close on Escape and backdrop click
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/DiscoveryPage.tsx - Enhanced progress view
+- MODIFIED: src/renderer/pages/GuardRulesPage.tsx - Add rule modal, delete confirmation
+
+#### Current Status
+- 199/366 features passing (added #168 and #175 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
