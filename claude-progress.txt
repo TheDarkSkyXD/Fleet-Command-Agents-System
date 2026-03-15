@@ -1,5 +1,30 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Concurrency Locks & Cascading Deletion)
+
+#### Feature #307: Concurrent agent operations don't conflict - PASSING
+- Added AgentOperationLock mutex class to serialize spawn/stop/stop-all IPC handlers
+- Lock uses async queue - operations wait their turn, preventing race conditions during async gaps (e.g., tree-kill)
+- Spawn handler's multi-statement DB operations wrapped in SQLite transaction (INSERT session + UPDATE to working + UPSERT identity)
+- Stop handler's identity update wrapped in transaction (increment sessions_completed + append recent_tasks)
+- All three agent operation handlers acquire lock before proceeding, release in finally blocks
+- Combined with existing: Node.js single-threaded event loop, SQLite WAL + busy_timeout, unique ID check, UI isSpawning guard
+
+#### Feature #308: Parent deletion cascades to child records - PASSING
+- project:delete now cascades atomically to: quality_gate_results, quality_gates, discovery_findings, discovery_scans, hook_events, hooks; nullifies sessions.project_id
+- issue:delete now also cleans up dependency references from other issues that depend on the deleted issue
+- taskGroup:delete wrapped in transaction for atomic group deletion + member issue unlinking
+- prompt:delete wrapped in transaction for atomic deletion of versions + child unlinking + prompt
+- All cascade operations use db.transaction() to prevent orphaned records on partial failures
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - AgentOperationLock class, transaction wrapping for spawn/stop/stop-all/project:delete/issue:delete/taskGroup:delete/prompt:delete
+
+#### Current Status
+- 306/366 features passing (added #307 and #308 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Rapid Click Guards & Resubmit Prevention)
 
 #### Feature #304: Rapid delete clicks handled safely - PASSING
