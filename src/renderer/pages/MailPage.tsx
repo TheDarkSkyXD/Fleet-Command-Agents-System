@@ -496,7 +496,7 @@ export function MailPage() {
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 rounded-lg border border-slate-700 bg-slate-800/50 p-1">
-        {(['inbox', 'sent', 'all'] as MailTab[]).map((tab) => (
+        {(['inbox', 'outbox', 'all'] as MailTab[]).map((tab) => (
           <button
             type="button"
             key={tab}
@@ -511,9 +511,9 @@ export function MailPage() {
             }`}
           >
             {tab === 'inbox' && <FiInbox size={14} />}
-            {tab === 'sent' && <FiSend size={14} />}
+            {tab === 'outbox' && <FiSend size={14} />}
             {tab === 'all' && <FiMail size={14} />}
-            {tab}
+            {tab === 'outbox' ? 'Outbox' : tab}
             {tab === 'inbox' && unreadCount > 0 && (
               <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
                 {unreadCount}
@@ -593,18 +593,42 @@ export function MailPage() {
                       <div className="min-w-0 flex-1">
                         {/* From/To + time */}
                         <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`truncate text-sm ${
-                              msg.read === 0 ? 'font-semibold text-slate-100' : 'text-slate-300'
-                            }`}
-                          >
-                            {msg.from_agent}{' '}
-                            <span className="text-slate-500">
-                              {'\u2192'} {msg.to_agent}
+                          {activeTab === 'outbox' ? (
+                            <span
+                              className={`truncate text-sm ${
+                                msg.read === 0 ? 'font-semibold text-slate-100' : 'text-slate-300'
+                              }`}
+                            >
+                              <span className="text-slate-500">To:</span>{' '}
+                              <span className="text-green-400">{msg.to_agent}</span>
+                              <span className="text-slate-600 ml-1.5 text-xs">
+                                from {msg.from_agent}
+                              </span>
                             </span>
-                          </span>
-                          <span className="flex-shrink-0 text-xs text-slate-500">
-                            {formatDate(msg.created_at)}
+                          ) : (
+                            <span
+                              className={`truncate text-sm ${
+                                msg.read === 0 ? 'font-semibold text-slate-100' : 'text-slate-300'
+                              }`}
+                            >
+                              {msg.from_agent}{' '}
+                              <span className="text-slate-500">
+                                {'\u2192'} {msg.to_agent}
+                              </span>
+                            </span>
+                          )}
+                          <span
+                            className="flex-shrink-0 text-xs text-slate-500"
+                            title={new Date(msg.created_at).toLocaleString()}
+                          >
+                            {activeTab === 'outbox'
+                              ? new Date(msg.created_at).toLocaleString([], {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : formatDate(msg.created_at)}
                           </span>
                         </div>
 
