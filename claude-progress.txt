@@ -5091,3 +5091,29 @@
 - 344/366 features passing (added #344 and #345 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Memory Stability & Virtualized Agent List)
+
+#### Feature #349: Memory stable during extended use - PASSING
+- Audited all setInterval calls across renderer - all have clearInterval in useEffect cleanup
+- Audited all IPC subscriptions (onAgentUpdate, onAgentOutput, onNotificationEvent, onNotificationNavigateToAgent) - all unsubscribed in cleanup
+- Audited all addEventListener calls - all have removeEventListener in cleanup
+- xterm.js Terminal properly dispose()d with ResizeObserver.disconnect()
+- Terminal scrollback capped at 5000 lines (prevents unbounded buffer growth)
+- Zustand stores use flat replacement state (no unbounded array growth)
+- API fetches replace state rather than appending
+- mounted flags used for async operations to prevent stale state updates
+- No memory leak patterns found
+
+#### Feature #350: Virtualized agent list for large fleets - PASSING
+- Table view: VirtualizedTableBody uses @tanstack/react-virtual useVirtualizer (estimateSize: 48px, overscan: 10)
+- Card view: VirtualizedCardList uses useVirtualizer (estimateSize: 120px, overscan: 5)
+- Both render only visible rows via absolute positioning with translateY
+- data-testid attributes: virtualized-agent-list, virtualized-card-list
+- Completed agents in card view bounded with .slice(0, 10)
+- No code changes needed - infrastructure was already solid
+
+#### Current Status
+- 347/366 features passing (added #349 and #350 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
