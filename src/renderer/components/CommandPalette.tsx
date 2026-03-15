@@ -4,6 +4,7 @@ import {
   FiBarChart2,
   FiBook,
   FiCheckSquare,
+  FiFolder,
   FiGitMerge,
   FiMail,
   FiSettings,
@@ -11,6 +12,7 @@ import {
   FiTerminal,
   FiUsers,
 } from 'react-icons/fi';
+import { useProjectStore } from '../stores/projectStore';
 
 interface CommandPaletteProps {
   onNavigate: (page: string) => void;
@@ -30,6 +32,7 @@ const navigationItems = [
 
 export function CommandPalette({ onNavigate }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
+  const { activeProject } = useProjectStore();
 
   // Toggle the command palette with Ctrl+K / Cmd+K
   useEffect(() => {
@@ -79,6 +82,28 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
           autoFocus
         />
 
+        {/* Project context indicator */}
+        <div
+          className="flex items-center gap-2 border-b border-slate-700/60 bg-slate-800/40 px-4 py-1.5"
+          data-testid="command-palette-project-context"
+        >
+          <FiFolder size={12} className="text-blue-400 shrink-0" />
+          <span className="text-[11px] text-slate-400">
+            Project:{' '}
+            <span className="font-medium text-slate-300">
+              {activeProject ? activeProject.name : 'None selected'}
+            </span>
+          </span>
+          {activeProject && (
+            <span
+              className="ml-auto text-[10px] text-slate-600 truncate max-w-[200px]"
+              title={activeProject.path}
+            >
+              {activeProject.path}
+            </span>
+          )}
+        </div>
+
         <Command.List className="max-h-72 overflow-y-auto p-2">
           <Command.Empty className="px-4 py-8 text-center text-sm text-slate-500">
             No results found.
@@ -106,7 +131,12 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
         </Command.List>
 
         <div className="flex items-center justify-between border-t border-slate-700 px-4 py-2 text-xs text-slate-500">
-          <span>Navigate with arrow keys</span>
+          <span className="flex items-center gap-1.5">
+            Commands apply to{' '}
+            <span className="font-medium text-slate-400">
+              {activeProject ? activeProject.name : 'no project'}
+            </span>
+          </span>
           <div className="flex items-center gap-2">
             <kbd className="rounded border border-slate-600 bg-slate-700 px-1.5 py-0.5 text-xs text-slate-400">
               Enter
