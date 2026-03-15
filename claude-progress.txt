@@ -1,5 +1,47 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Merge Conflict Resolution Tiers 2 & 3)
+
+#### Feature #85: Tier 2 auto-resolve conflicts - PASSING
+- Added autoResolveConflicts() to mergeService.ts
+- Parses git conflict markers (standard and diff3 formats) via parseConflictMarkers()
+- Resolves simple conflicts automatically:
+  - Identical changes on both sides → keep either
+  - One side empty (deletion vs modification) → keep the modification
+  - Whitespace-only differences → keep ours
+  - One side unchanged from base (diff3) → take the changed side
+  - Additive-only (one side superset of other) → keep the superset
+- resolveFileConflicts() processes each file, returns resolved content + allResolved flag
+- On success: commits merge with resolved_tier='auto-resolve'
+- On failure: aborts merge and reports unresolvable files
+- Added merge:auto-resolve IPC handler, preload bridge, types, store action
+- Amber-themed Auto-Resolve button on conflict entries in MergeQueuePage UI
+
+#### Feature #86: Tier 3 AI-resolve conflicts - PASSING
+- Added aiResolveConflicts() to mergeService.ts
+- Detects Claude CLI via detectClaudeCli() service
+- Starts merge to produce conflict markers, reads each conflicted file
+- Sends file content to Claude CLI via `claude -p` with targeted prompt for resolution
+- invokeClaudeForResolution() helper: execFile with 2-min timeout, 10MB buffer, strips markdown fences
+- Writes Claude's resolved content back, stages files
+- On success: commits merge with resolved_tier='ai-resolve'
+- On failure: aborts merge and reports failed files
+- Added merge:ai-resolve IPC handler, preload bridge, types, store action
+- Violet-themed AI-Resolve button on conflict entries in MergeQueuePage UI
+
+#### Files Created/Modified
+- MODIFIED: src/main/services/mergeService.ts - Added autoResolveConflicts(), aiResolveConflicts(), parseConflictMarkers(), invokeClaudeForResolution()
+- MODIFIED: src/main/ipc/handlers.ts - Added merge:auto-resolve and merge:ai-resolve IPC handlers, imported merge functions
+- MODIFIED: src/preload/index.ts - Added mergeAutoResolve, mergeAiResolve bridge methods
+- MODIFIED: src/shared/types/index.ts - Added mergeAutoResolve, mergeAiResolve to ElectronAPI
+- MODIFIED: src/renderer/stores/mergeStore.ts - Added autoResolve, aiResolve store actions
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Added Auto-Resolve and AI-Resolve buttons, handlers
+
+#### Current Status
+- 91/366 features passing (added #85 and #86 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Scope Overlap Detection)
 
 #### Feature #255: Visual file tree with scope assignment - PASSING
