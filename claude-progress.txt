@@ -1,5 +1,39 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Unsaved Changes Guard & Single Instance Lock)
+
+#### Feature #298: Form state preserved on accidental navigation - PASSING
+- Created useUnsavedChanges.ts hook with global dirty form registry
+- registerDirtyForm/unregisterDirtyForm for components to track dirty state
+- useFormDirtyTracking hook for auto-registration based on isDirty flag
+- useNavigationGuard hook for AppLayout to intercept navigation
+- Created UnsavedChangesDialog component with Stay/Leave buttons (amber-themed)
+- Integrated guard into AppLayout handleNavigate and handleSelectAgent
+- Added beforeunload handler for window close protection
+- Agent spawn form tracks dirty state (name, taskId, fileScope, prompt, parentAgent, treePaths)
+- data-testid attributes: unsaved-changes-dialog, unsaved-changes-stay, unsaved-changes-leave
+
+#### Feature #299: Multi-tab behavior doesn't corrupt state - PASSING
+- Added app.requestSingleInstanceLock() to prevent multiple app instances
+- Second instance launch focuses existing window instead of creating new one
+- Added busy_timeout pragma (5000ms) for database concurrency safety
+- App already had WAL mode, single window architecture, and broadcast sync
+
+#### Files Created
+- NEW: src/renderer/hooks/useUnsavedChanges.ts
+- NEW: src/renderer/components/UnsavedChangesDialog.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/components/AppLayout.tsx - Navigation guard integration, unsaved changes dialog
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Spawn form dirty tracking
+- MODIFIED: src/main/index.ts - Single instance lock, second-instance handler
+- MODIFIED: src/main/db/database.ts - busy_timeout pragma
+
+#### Current Status
+- 297/366 features passing (added #298 and #299 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Cascading Updates & IPC Error Messages)
 
 #### Feature #296: Cascading updates when parent data changes - PASSING
