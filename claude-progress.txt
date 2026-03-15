@@ -1836,3 +1836,24 @@
 - 121/366 features passing (added #48 and #50 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Nudge Button & Agent Detail Tabs)
+
+#### Feature #41: Nudge stalled agent - PASSING
+- Updated IPC handler to send nudge prompt to agent terminal via agentProcessManager.write()
+- Resets session state from stalled to working, clears escalation_level
+- Added Nudge button (amber, FiZap icon) to AgentDetailPage actions
+- Added Nudge button to AgentsPage card view and table view
+- Button only visible when agent state is stalled
+
+#### Feature #46: Agent detail page with tabbed views - PASSING
+- All 5 tabs implemented: Terminal (default), Logs, Identity/CV, Files Changed, Mail
+- Logs tab: fetches real event data from DB with event type filter buttons
+- Files Changed tab: shows assigned file scope and worktree/branch info
+- Mail tab: shows sent/received messages with expandable body, type badges, priority
+- Terminal and Identity/CV tabs were already functional
+
+#### Current Status
+- 121/366 features passing (added #41 and #46 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
