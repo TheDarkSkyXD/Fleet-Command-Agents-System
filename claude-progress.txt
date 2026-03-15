@@ -1,5 +1,44 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Multi-Project & Worktree Manager)
+
+#### Feature #94: Multi-project support - PASSING
+- Created `projects` table in SQLite with id, name, path, description, is_active, last_opened_at, timestamps
+- Added indexes on is_active and path columns
+- Created full CRUD IPC handlers: project:list, project:create, project:get, project:update, project:delete
+- project:switch atomically deactivates all projects then activates selected one
+- project:get-active returns the currently active project
+- Created Zustand projectStore (src/renderer/stores/projectStore.ts) with full state management
+- Built ProjectSwitcher component in sidebar with dropdown, create form, switch, and delete
+- Updated preload bridge and ElectronAPI TypeScript types
+
+#### Feature #98: Visual worktree manager - PASSING
+- Created WorktreesPage (src/renderer/pages/WorktreesPage.tsx) showing all git worktrees
+- worktree:list IPC handler uses simple-git `git worktree list --porcelain` for real git data
+- Each worktree card shows: branch name, HEAD commit hash (short), commit message, file path
+- Status indicators: Clean (green), Modified (amber), Unknown (gray) with colored badges
+- Agent assignment detection via branch name pattern matching (agent role prefix) and sessions DB lookup
+- Summary bar shows total count, clean/modified/assigned counts
+- Requires active project to be selected (shows prompt if none)
+- Added "Worktrees" nav item in sidebar with FiGitBranch icon
+- Integrated into AppLayout routing
+
+#### Files Created/Modified
+- NEW: src/renderer/stores/projectStore.ts - Zustand store for multi-project management
+- NEW: src/renderer/components/ProjectSwitcher.tsx - Project switcher dropdown in sidebar
+- NEW: src/renderer/pages/WorktreesPage.tsx - Visual worktree manager page
+- MODIFIED: src/main/db/database.ts - Added projects table with indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added project CRUD + worktree:list IPC handlers
+- MODIFIED: src/preload/index.ts - Exposed project and worktree IPC channels
+- MODIFIED: src/shared/types/index.ts - Added Project, Worktree interfaces and ElectronAPI methods
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added ProjectSwitcher and Worktrees nav item
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added WorktreesPage routing
+
+#### Current Status
+- Features #94 and #98 marked as passing
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Agent Definitions & Import/Export)
 
 #### Feature #155: View all agent role definitions - PASSING
