@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import {
   FiActivity,
   FiBarChart2,
@@ -178,32 +179,32 @@ export function MetricsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="metrics-summary">
-        <SummaryCard
+      <AnimatedCardContainer className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="metrics-summary">
+        <AnimatedCard><SummaryCard
           icon={<FiDatabase className="text-blue-400" />}
           label="Total Sessions"
           value={String(summary?.total_sessions ?? 0)}
           testId="summary-total-sessions"
-        />
-        <SummaryCard
+        /></AnimatedCard>
+        <AnimatedCard><SummaryCard
           icon={<FiZap className="text-amber-400" />}
           label="Total Tokens"
           value={formatTokenCount(totalTokens)}
           testId="summary-total-tokens"
-        />
-        <SummaryCard
+        /></AnimatedCard>
+        <AnimatedCard><SummaryCard
           icon={<FiActivity className="text-emerald-400" />}
           label="Total Duration"
           value={formatDuration(summary?.total_duration_ms)}
           testId="summary-total-duration"
-        />
-        <SummaryCard
+        /></AnimatedCard>
+        <AnimatedCard><SummaryCard
           icon={<FiBarChart2 className="text-purple-400" />}
           label="Estimated Cost"
           value={formatCost(summary?.total_cost)}
           testId="summary-estimated-cost"
-        />
-      </div>
+        /></AnimatedCard>
+      </AnimatedCardContainer>
 
       {/* Token Usage Chart */}
       {summary && totalTokens > 0 && (

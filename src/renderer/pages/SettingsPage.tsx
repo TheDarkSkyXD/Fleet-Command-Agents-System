@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import {
   FiAlertTriangle,
   FiBell,
@@ -358,26 +359,27 @@ function ProfilesSettings() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <AnimatedCardContainer className="grid gap-4">
           {profiles.map((profile) => (
-            <ProfileCard
-              key={profile.id}
-              profile={profile}
-              isEditing={editingId === profile.id}
-              onEdit={() => setEditingId(profile.id)}
-              onCancelEdit={() => setEditingId(null)}
-              onSaveEdit={() => {
-                setEditingId(null);
-                loadProfiles();
-              }}
-              onDelete={() => handleDelete(profile.id, profile.name)}
-              onActivate={() => handleActivate(profile.id, profile.name)}
-              onDuplicate={() => handleDuplicate(profile)}
-              existingNames={profiles.filter((p) => p.id !== profile.id).map((p) => p.name)}
-              setStatusMessage={setStatusMessage}
-            />
+            <AnimatedCard key={profile.id}>
+              <ProfileCard
+                profile={profile}
+                isEditing={editingId === profile.id}
+                onEdit={() => setEditingId(profile.id)}
+                onCancelEdit={() => setEditingId(null)}
+                onSaveEdit={() => {
+                  setEditingId(null);
+                  loadProfiles();
+                }}
+                onDelete={() => handleDelete(profile.id, profile.name)}
+                onActivate={() => handleActivate(profile.id, profile.name)}
+                onDuplicate={() => handleDuplicate(profile)}
+                existingNames={profiles.filter((p) => p.id !== profile.id).map((p) => p.name)}
+                setStatusMessage={setStatusMessage}
+              />
+            </AnimatedCard>
           ))}
-        </div>
+        </AnimatedCardContainer>
       )}
 
       {/* Create Dialog */}

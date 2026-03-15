@@ -1988,3 +1988,86 @@ function SpawnDialog({
     </motion.div>
   );
 }
+
+/** Virtualized table body for agent list - only renders visible rows */
+function VirtualizedTableBody({
+  filteredRows,
+  colCount,
+  onSelectAgent,
+  handleAgentContextMenu,
+}: {
+  filteredRows: Row<Session>[];
+  colCount: number;
+  onSelectAgent?: (id: string) => void;
+  handleAgentContextMenu: (e: React.MouseEvent, session: Session) => void;
+}) {
+  const tbodyRef = useRef<HTMLTableSectionElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: filteredRows.length,
+    getScrollElement: () => tbodyRef.current,
+    estimateSize: () => 48,
+    overscan: 10,
+  });
+
+  if (filteredRows.length === 0) {
+    return (
+      <tbody>
+        <tr>
+          <td colSpan={colCount} className="px-4 py-8 text-center text-sm text-slate-500">
+            No agents match your filters
+          </td>
+        </tr>
+      </tbody>
+    );
+  }
+
+  return (
+    <tbody
+      ref={tbodyRef}
+      style={{ display: 'block', maxHeight: '600px', overflowY: 'auto' }}
+      data-testid="virtualized-agent-list"
+    >
+      <tr
+        style={{
+          display: 'block',
+          height: `${virtualizer.getTotalSize()}px`,
+          position: 'relative',
+        }}
+      >
+        <td style={{ display: 'block', padding: 0 }}>
+          {virtualizer.getVirtualItems().map((virtualItem) => {
+            const row = filteredRows[virtualItem.index];
+            return (
+              <div
+                key={row.id}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+                className="flex border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                onClick={() => onSelectAgent?.(row.original.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onSelectAgent?.(row.original.id);
+                }}
+                onContextMenu={(e) => handleAgentContextMenu(e, row.original)}
+                tabIndex={0}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <div key={cell.id} className="px-4 py-3 flex-1">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </td>
+      </tr>
+    </tbody>
+  );
+}

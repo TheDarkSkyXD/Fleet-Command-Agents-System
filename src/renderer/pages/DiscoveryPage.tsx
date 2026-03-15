@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import {
   FiActivity,
   FiAlertCircle,
@@ -371,14 +372,14 @@ function DiscoverySetupView({
           to analyze specific aspects.
         </p>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <AnimatedCardContainer className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {DISCOVERY_CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const isSelected = selectedCategories.has(cat.id);
             return (
+              <AnimatedCard key={cat.id}>
               <button
                 type="button"
-                key={cat.id}
                 onClick={() => onToggleCategory(cat.id)}
                 className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
                   isSelected
@@ -403,9 +404,10 @@ function DiscoverySetupView({
                   <p className="mt-1 text-xs text-slate-400 line-clamp-2">{cat.description}</p>
                 </div>
               </button>
+              </AnimatedCard>
             );
           })}
-        </div>
+        </AnimatedCardContainer>
 
         <div className="mt-5 flex items-center justify-between">
           <span className="text-sm text-slate-400">

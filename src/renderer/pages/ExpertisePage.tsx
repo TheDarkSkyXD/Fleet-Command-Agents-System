@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import {
   FiActivity,
   FiBook,
@@ -763,14 +764,14 @@ export function ExpertisePage() {
               </p>
             </div>
           ) : (
-            <div
+            <AnimatedCardContainer
               className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
               data-testid="domain-list"
             >
               {domains.map((domain) => (
+                <AnimatedCard key={domain.domain}>
                 <button
                   type="button"
-                  key={domain.domain}
                   onClick={() => handleSelectDomain(domain.domain)}
                   className="group rounded-lg border border-slate-700 bg-slate-800/50 p-4 text-left transition-all hover:border-blue-500/50 hover:bg-slate-800"
                   data-testid={`domain-card-${domain.domain}`}
@@ -798,8 +799,9 @@ export function ExpertisePage() {
                     ))}
                   </div>
                 </button>
+                </AnimatedCard>
               ))}
-            </div>
+            </AnimatedCardContainer>
           )}
         </div>
       )}
