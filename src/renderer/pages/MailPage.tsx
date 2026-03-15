@@ -173,6 +173,9 @@ export function MailPage() {
   const [showFilters, setShowFilters] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Database-driven agent names derived from messages
+  const [knownAgents, setKnownAgents] = useState<string[]>([]);
+
   const activeFilterCount = [filters.type, filters.priority, filters.agent].filter(Boolean).length;
   const hasAnyFilter = filters.search !== '' || activeFilterCount > 0;
 
@@ -192,6 +195,13 @@ export function MailPage() {
         );
         if (result.data) {
           setMessages(result.data);
+          // Extract unique agent names from messages for database-driven dropdowns
+          const agentSet = new Set<string>();
+          for (const m of result.data) {
+            if (m.from_agent) agentSet.add(m.from_agent);
+            if (m.to_agent && !m.to_agent.startsWith('@')) agentSet.add(m.to_agent);
+          }
+          setKnownAgents([...agentSet].sort());
         }
         const countResult = await window.electronAPI.mailUnreadCount();
         if (countResult.data !== undefined && countResult.data !== null) {
@@ -733,15 +743,20 @@ export function MailPage() {
               <label htmlFor="filter-agent" className="text-xs font-medium text-slate-400">
                 Agent:
               </label>
-              <input
+              <select
                 id="filter-agent"
-                type="text"
                 value={filters.agent}
                 onChange={(e) => handleFilterChange('agent', e.target.value)}
-                placeholder="Filter by agent name..."
-                className="w-40 rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                className="w-40 rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-blue-500 focus:outline-none"
                 data-testid="mail-filter-agent"
-              />
+              >
+                <option value="">All agents</option>
+                {knownAgents.map((agent) => (
+                  <option key={agent} value={agent}>
+                    {agent}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         )}
@@ -1160,13 +1175,20 @@ export function MailPage() {
                         <input
                           id="compose-from"
                           type="text"
+                          list="known-agents-from"
                           value={composeForm.from_agent}
                           onChange={(e) =>
                             setComposeForm((f) => ({ ...f, from_agent: e.target.value }))
                           }
                           placeholder="e.g. coordinator"
                           className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                          data-testid="compose-from-agent"
                         />
+                        <datalist id="known-agents-from">
+                          {knownAgents.map((agent) => (
+                            <option key={agent} value={agent} />
+                          ))}
+                        </datalist>
                       </div>
                       <div className="flex-1">
                         <label
@@ -1187,6 +1209,9 @@ export function MailPage() {
                           className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
                         />
                         <datalist id="group-addresses">
+                          {knownAgents.map((agent) => (
+                            <option key={agent} value={agent} />
+                          ))}
                           {GROUP_BROADCAST_ADDRESSES.map((addr) => (
                             <option key={addr} value={addr} />
                           ))}

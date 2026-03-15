@@ -439,6 +439,7 @@ function CreatePromptDialog({
                 value={selectedParent}
                 onChange={(e) => setSelectedParent(e.target.value)}
                 className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+                data-testid="prompt-parent-select"
               >
                 <option value="">None (root level)</option>
                 {prompts.map((p) => (

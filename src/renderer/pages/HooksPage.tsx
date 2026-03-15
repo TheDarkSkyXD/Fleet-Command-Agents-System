@@ -619,6 +619,7 @@ export function HooksPage() {
               value={formProjectId}
               onChange={(e) => setFormProjectId(e.target.value)}
               className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 focus:border-blue-500 focus:outline-none"
+              data-testid="hook-project-select"
             >
               <option value="">Global (all projects)</option>
               {projects.map((p) => (
@@ -865,6 +866,7 @@ export function HooksPage() {
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               className="appearance-none rounded-md border border-slate-600 bg-slate-800 pl-3 pr-8 py-1.5 text-sm text-slate-200 focus:border-blue-500 focus:outline-none"
+              data-testid="hook-project-filter"
             >
               <option value="all">All Projects</option>
               {projects.map((p) => (
