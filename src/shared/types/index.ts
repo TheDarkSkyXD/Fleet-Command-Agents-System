@@ -612,6 +612,12 @@ export interface ElectronAPI {
     error: string | null;
   }>;
 
+  // Checkpoints
+  checkpointList: () => Promise<{ data: Checkpoint[] | null; error: string | null }>;
+  checkpointGet: (agentName: string) => Promise<{ data: Checkpoint | null; error: string | null }>;
+  checkpointSaveNow: () => Promise<{ data: { saved: number } | null; error: string | null }>;
+  checkpointDelete: (agentName: string) => Promise<{ data: boolean; error: string | null }>;
+
   // Notifications
   notificationSend: (options: {
     title: string;

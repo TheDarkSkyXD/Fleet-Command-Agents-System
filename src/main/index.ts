@@ -128,6 +128,13 @@ function createWindow() {
           } else if (response === 1) {
             // Stop all agents and close
             log.info('Stopping all agents and closing app...');
+            // Save checkpoints before stopping agents
+            try {
+              agentProcessManager.saveCheckpoints();
+              log.info('Agent checkpoints saved before close');
+            } catch (error) {
+              log.error('Error saving checkpoints on close:', error);
+            }
             try {
               await agentProcessManager.stopAll();
               log.info('All agents stopped');
@@ -307,6 +314,13 @@ app.on('before-quit', async () => {
   isQuitting = true;
   // Stop watchdog daemon
   watchdogService.stop();
+  // Save checkpoints for all agents before stopping them
+  try {
+    agentProcessManager.saveCheckpoints();
+    log.info('Agent checkpoints saved on app close');
+  } catch (error) {
+    log.error('Failed to save agent checkpoints on quit:', error);
+  }
   // Stop all running agent processes before quitting
   try {
     await agentProcessManager.stopAll();

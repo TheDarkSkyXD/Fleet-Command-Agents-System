@@ -2340,6 +2340,57 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Checkpoint channels - save/load agent state checkpoints
+  ipcMain.handle('checkpoint:list', () => {
+    try {
+      const checkpoints = loggedPrepare('SELECT * FROM checkpoints ORDER BY timestamp DESC').all();
+      log.info(
+        `[IPC] checkpoint:list - SELECT returned ${checkpoints.length} checkpoints from real database`,
+      );
+      return { data: checkpoints, error: null };
+    } catch (error) {
+      log.error('checkpoint:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('checkpoint:get', (_event, agentName: string) => {
+    try {
+      const checkpoint = loggedPrepare('SELECT * FROM checkpoints WHERE agent_name = ?').get(
+        agentName,
+      );
+      log.info(`[IPC] checkpoint:get - SELECT checkpoint from real database: agent=${agentName}`);
+      return { data: checkpoint || null, error: null };
+    } catch (error) {
+      log.error('checkpoint:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('checkpoint:save-now', () => {
+    try {
+      const saved = agentProcessManager.saveCheckpoints();
+      log.info(`[IPC] checkpoint:save-now - saved ${saved} checkpoints`);
+      return { data: { saved }, error: null };
+    } catch (error) {
+      log.error('checkpoint:save-now failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('checkpoint:delete', (_event, agentName: string) => {
+    try {
+      loggedPrepare('DELETE FROM checkpoints WHERE agent_name = ?').run(agentName);
+      log.info(
+        `[IPC] checkpoint:delete - DELETE checkpoint from real database: agent=${agentName}`,
+      );
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('checkpoint:delete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   log.info(
     'IPC handlers registered - all database handlers use real SQLite queries via loggedPrepare()',
   );

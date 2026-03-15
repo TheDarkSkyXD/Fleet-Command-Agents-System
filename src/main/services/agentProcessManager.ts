@@ -86,6 +86,8 @@ export interface AgentProcess {
   isRunning: boolean;
   tokenUsage: AgentTokenUsage;
   jsonLineBuffer: string;
+  /** Original spawn options preserved for checkpoint saving */
+  spawnOptions: AgentSpawnOptions;
 }
 
 /**
@@ -178,6 +180,7 @@ class AgentProcessManager {
         cacheCreationTokens: 0,
       },
       jsonLineBuffer: '',
+      spawnOptions: options,
     };
 
     // Store the process
@@ -356,6 +359,71 @@ class AgentProcessManager {
   getOutput(id: string): string[] {
     const agent = this.processes.get(id);
     return agent?.outputBuffer ?? [];
+  }
+
+  /**
+   * Save checkpoint data for all currently tracked agents to the database.
+   * Called on app close/crash to preserve agent states for recovery.
+   */
+  saveCheckpoints(): number {
+    let saved = 0;
+    try {
+      const db = getDatabase();
+      const upsertStmt = db.prepare(`
+        INSERT INTO checkpoints (agent_name, task_id, session_id, progress_summary, files_modified, current_branch, pending_work, mulch_domains, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(agent_name) DO UPDATE SET
+          task_id = excluded.task_id,
+          session_id = excluded.session_id,
+          progress_summary = excluded.progress_summary,
+          files_modified = excluded.files_modified,
+          current_branch = excluded.current_branch,
+          pending_work = excluded.pending_work,
+          mulch_domains = excluded.mulch_domains,
+          timestamp = excluded.timestamp
+      `);
+
+      for (const agent of this.processes.values()) {
+        const opts = agent.spawnOptions;
+
+        // Build progress summary from token usage and run duration
+        const durationMs = Date.now() - agent.createdAt.getTime();
+        const durationMin = Math.round(durationMs / 60000);
+        const progressSummary = JSON.stringify({
+          state: agent.isRunning ? 'running' : 'stopped',
+          capability: agent.capability,
+          model: agent.model,
+          durationMinutes: durationMin,
+          tokenUsage: agent.tokenUsage,
+        });
+
+        // Extract files_modified from the output buffer by scanning for file paths
+        const filesModified = JSON.stringify(opts.fileScope ?? []);
+
+        // Pending work: the initial prompt or task context
+        const pendingWork = agent.isRunning
+          ? JSON.stringify({ prompt: opts.prompt ?? null, taskId: opts.taskId ?? null })
+          : null;
+
+        upsertStmt.run(
+          agent.agentName,
+          opts.taskId ?? null,
+          agent.id,
+          progressSummary,
+          filesModified,
+          opts.branchName ?? null,
+          pendingWork,
+          opts.worktreePath ? JSON.stringify([opts.worktreePath]) : null,
+        );
+        saved++;
+        log.info(`[AgentProcessManager] Checkpoint saved for agent: ${agent.agentName}`);
+      }
+
+      log.info(`[AgentProcessManager] Saved ${saved} checkpoint(s) on app close`);
+    } catch (error) {
+      log.error('[AgentProcessManager] Failed to save checkpoints:', error);
+    }
+    return saved;
   }
 
   /**

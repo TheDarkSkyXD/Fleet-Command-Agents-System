@@ -256,6 +256,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   appLogImportNdjson: (ndjsonContent: string) =>
     ipcRenderer.invoke('appLog:import-ndjson', ndjsonContent),
 
+  // Checkpoints
+  checkpointList: () => ipcRenderer.invoke('checkpoint:list'),
+  checkpointGet: (agentName: string) => ipcRenderer.invoke('checkpoint:get', agentName),
+  checkpointSaveNow: () => ipcRenderer.invoke('checkpoint:save-now'),
+  checkpointDelete: (agentName: string) => ipcRenderer.invoke('checkpoint:delete', agentName),
+
   // Notifications
   notificationSend: (options: {
     title: string;
