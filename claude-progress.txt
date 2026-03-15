@@ -1,5 +1,32 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Navigation State & Data Persistence)
+
+#### Feature #281: Navigation with agents running maintains state - PASSING
+- Verified architecture: agent processes run in main Electron process (agentProcessManager singleton)
+- Navigation only affects renderer components; main process is completely isolated
+- Terminal output buffered in main process (outputBuffer array, up to 1000 lines)
+- On re-navigation, AgentTerminal replays buffered output via agentOutput() IPC call
+- Live output subscription re-established via onAgentOutput() on component mount
+- AgentsPage re-fetches sessions and running processes on mount + polls every 3s
+- AppLayout maintains activeAgentCount across all pages with its own polling
+- No code changes needed - architecture already correct
+
+#### Feature #282: Create data verify display and persist - PASSING
+- Verified full data persistence pipeline uses real SQLite (better-sqlite3 with WAL mode)
+- Database stored at {userData}/fleet-command.db
+- agent:spawn handler inserts sessions via INSERT INTO sessions SQL
+- agent:list handler reads via SELECT * FROM sessions SQL
+- AgentsPage loads sessions on mount and polls every 3 seconds
+- Data persists across page refresh (F5) since SQLite is on-disk
+- All session fields properly stored and retrieved
+- No mock data patterns found in codebase
+
+#### Current Status
+- 281/366 features passing (added #281 and #282 this session)
+- Vite build passes for all three targets (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Back Navigation & 404 Page)
 
 #### Feature #277: Back button behavior after navigation - PASSING
