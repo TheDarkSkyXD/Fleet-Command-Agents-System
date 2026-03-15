@@ -317,6 +317,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => void,
   ) => ipcRenderer.on('watchdog:update', (_event, data) => callback(data)),
 
+  // Notification navigation events (main -> renderer)
+  onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) =>
+    ipcRenderer.on('notification:navigate-to-agent', (_event, data) => callback(data)),
+
   // App Logs
   appLogList: (filters?: {
     level?: string;

@@ -102,6 +102,26 @@ export function AppLayout() {
     loadActiveProject();
   }, [loadActiveProject]);
 
+  // Listen for notification click -> navigate to agent detail
+  useEffect(() => {
+    window.electronAPI.onNotificationNavigateToAgent(async (data: { agentName: string }) => {
+      try {
+        const result = await window.electronAPI.agentList();
+        if (result.data) {
+          const agent = result.data.find(
+            (a: { agent_name: string }) => a.agent_name === data.agentName,
+          );
+          if (agent) {
+            setSelectedAgentId(agent.id);
+            setCurrentPage('agent-detail');
+          }
+        }
+      } catch {
+        // Silently ignore - best effort navigation
+      }
+    });
+  }, []);
+
   // Setup wizard: show on first launch when setupCompleted is false
   const showSetupWizard = loaded && !settings.setupCompleted;
 

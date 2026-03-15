@@ -65,9 +65,13 @@ class NotificationService {
       });
 
       // Clicking the notification brings the app window to the foreground
+      // and navigates to the agent if applicable
       notification.on('click', () => {
         log.debug('[NotificationService] Notification clicked, focusing app window');
         this.focusMainWindow();
+        if (options.agentName) {
+          this.navigateToAgent(options.agentName);
+        }
       });
 
       notification.show();
@@ -158,6 +162,19 @@ class NotificationService {
       body: message,
       eventType: 'health_alert',
     });
+  }
+
+  /**
+   * Send a navigation request to the renderer to navigate to a specific agent.
+   */
+  private navigateToAgent(agentName: string): void {
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('notification:navigate-to-agent', { agentName });
+        break;
+      }
+    }
   }
 
   /**

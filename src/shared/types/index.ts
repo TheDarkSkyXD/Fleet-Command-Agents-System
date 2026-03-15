@@ -1438,6 +1438,8 @@ export interface ElectronAPI {
       results: WatchdogCheckResult[];
     }) => void,
   ) => void;
+  // Notification navigation events (main -> renderer)
+  onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => void;
   // Window management
   windowSetTitle: (title: string) => Promise<{ data: boolean; error: string | null }>;
 

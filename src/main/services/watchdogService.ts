@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
 import { type AgentProcess, agentProcessManager } from './agentProcessManager';
+import { notificationService } from './notificationService';
 
 /**
  * Escalation level for progressive nudging.
@@ -292,6 +293,12 @@ class WatchdogService {
       this.updateSessionState(agent.id, 'zombie', 4);
       this.escalationStates.delete(agent.id);
 
+      // Send desktop notification for dead agent process
+      notificationService.notifyAgentError(
+        agent.agentName,
+        `Process died unexpectedly (PID=${agent.pid}, pidAlive=${pidAlive}, ptyRunning=${ptyRunning})`,
+      );
+
       this.recordWatchdogEvent(agent, 'process_dead', 4, {
         pidAlive,
         ptyRunning,
@@ -450,6 +457,9 @@ class WatchdogService {
 
     this.updateSessionState(agent.id, 'stalled', 1);
 
+    // Send desktop notification for stalled agent
+    notificationService.notifyAgentStalled(agent.agentName, agent.capability);
+
     this.recordWatchdogEvent(agent, 'watchdog_warn', 1, {
       stalledDurationMs: stalledMs,
       message: `Agent appears stalled for ${stalledSec}s`,
@@ -515,6 +525,9 @@ class WatchdogService {
     );
 
     this.updateSessionState(agent.id, 'zombie', 4);
+
+    // Send desktop notification for zombie agent
+    notificationService.notifyAgentZombie(agent.agentName, agent.capability);
 
     this.recordWatchdogEvent(agent, 'watchdog_terminate', 4, {
       stalledDurationMs: stalledMs,
