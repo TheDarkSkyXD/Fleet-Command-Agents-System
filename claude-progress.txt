@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Active Count Fix & Mail Purge Events)
+
+#### Feature #309: Stopped agent removed from active lists - PASSING
+- Fixed run:get-active to count only non-completed sessions (state != 'completed') for agent_count
+- Previously counted ALL sessions including completed ones, so count never decremented
+- Added onAgentUpdate listener to StatusBar for immediate refresh when agents stop/spawn
+- AgentsPage already correctly separated active vs completed agent lists
+
+#### Feature #310: Mail purge updates all referencing views - PASSING
+- Added mail:purged broadcast event from main process after all purge operations
+- Added onMailPurged preload bridge and ElectronAPI type
+- Sidebar badge now refreshes immediately via onMailPurged + onMailReceived listeners
+- MailPage listens for mail:purged for cross-view consistency (inbox, outbox, search, badge)
+- handlePurgeAll directly clears state; handlePurgeByAge/handlePurgeByAgent call loadMessages()
+- loadMessages() refreshes messages, unread count, and search results with current filters
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - run:get-active active-only count, mail:purged broadcast
+- MODIFIED: src/preload/index.ts - onMailPurged bridge
+- MODIFIED: src/shared/types/index.ts - ElectronAPI onMailPurged type
+- MODIFIED: src/renderer/components/StatusBar.tsx - onAgentUpdate listener for immediate refresh
+- MODIFIED: src/renderer/components/Sidebar.tsx - onMailPurged + onMailReceived listeners
+- MODIFIED: src/renderer/pages/MailPage.tsx - onMailPurged listener with cleanup
+
+#### Current Status
+- 307/366 features passing (added #309 and #310 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Concurrency Locks & Cascading Deletion)
 
 #### Feature #307: Concurrent agent operations don't conflict - PASSING
