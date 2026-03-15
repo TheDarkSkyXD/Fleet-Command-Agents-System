@@ -166,6 +166,7 @@ export interface Session {
   escalation_level: number;
   stalled_at: string | null;
   file_scope: string | null;
+  project_id: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -1476,6 +1477,21 @@ export interface ElectronAPI {
     data: { blocked: boolean; reason: string; matched_pattern?: string } | null;
     error: string | null;
   }>;
+  guardCheckTool: (
+    role: string,
+    toolName: string,
+  ) => Promise<{
+    data: { allowed: boolean; reason: string } | null;
+    error: string | null;
+  }>;
+  guardCheckFileScope: (
+    filePath: string,
+    fileScope: string[],
+    worktreePath?: string,
+  ) => Promise<{
+    data: { allowed: boolean; reason: string } | null;
+    error: string | null;
+  }>;
   guardViolationList: (filters?: {
     capability?: string;
     rule_type?: string;
@@ -1674,6 +1690,8 @@ export interface ElectronAPI {
       timestamp: string;
     }) => void,
   ) => void;
+  // Project switch event for data isolation
+  onProjectSwitched: (callback: (data: { projectId: string; project: unknown }) => void) => void;
   // Notification history
   notificationHistory: (filters?: {
     event_type?: string;

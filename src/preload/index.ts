@@ -390,6 +390,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => void,
   ) => ipcRenderer.on('notification:event', (_event, data) => callback(data)),
 
+  // Project switch event for data isolation
+  onProjectSwitched: (callback: (data: { projectId: string; project: unknown }) => void) =>
+    ipcRenderer.on('project:switched', (_event, data) => callback(data)),
+
   // Notification history
   notificationHistory: (filters?: {
     event_type?: string;
@@ -454,6 +458,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('guardRule:path-boundary-validate', role, filePath, worktreePath),
   guardCheckBash: (role: string, command: string) =>
     ipcRenderer.invoke('guardRule:check-bash', role, command),
+  guardCheckTool: (role: string, toolName: string) =>
+    ipcRenderer.invoke('guardRule:check-tool', role, toolName),
+  guardCheckFileScope: (filePath: string, fileScope: string[], worktreePath?: string) =>
+    ipcRenderer.invoke('guardRule:check-file-scope', filePath, fileScope, worktreePath),
   guardViolationList: (filters?: {
     capability?: string;
     rule_type?: string;

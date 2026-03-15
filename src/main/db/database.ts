@@ -428,6 +428,7 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_notification_history_type ON notification_history(event_type);
     CREATE INDEX IF NOT EXISTS idx_notification_history_created ON notification_history(created_at);
     CREATE INDEX IF NOT EXISTS idx_notification_history_agent ON notification_history(agent_name);
+    CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id);
   `);
 
   // Migrations: add model column to sessions if not present
@@ -442,6 +443,13 @@ export async function initDatabase(): Promise<void> {
     db.prepare('SELECT file_scope FROM sessions LIMIT 1').get();
   } catch {
     db.exec('ALTER TABLE sessions ADD COLUMN file_scope TEXT');
+  }
+
+  // Migration: add project_id column to sessions for data isolation between projects
+  try {
+    db.prepare('SELECT project_id FROM sessions LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE sessions ADD COLUMN project_id TEXT');
   }
 
   // Migration: add completed_at column to merge_queue if not present

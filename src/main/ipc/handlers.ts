@@ -667,6 +667,27 @@ export function registerIpcHandlers(): void {
     ]);
     if (!validation.valid) return { data: null, error: validation.error };
     try {
+      // Check if agent session is already stopped/completed - reject nudge
+      const sessionCheck = loggedPrepare('SELECT state FROM sessions WHERE id = ?').get(agentId) as
+        | { state: string }
+        | undefined;
+      if (sessionCheck?.state === 'completed') {
+        log.warn(`[IPC] agent:nudge - rejected: agent ${agentId} is already stopped/completed`);
+        return {
+          data: null,
+          error: 'Cannot nudge a stopped agent. Session has already completed.',
+        };
+      }
+
+      // Check if process is still running in the process manager
+      if (!agentProcessManager.isRunning(agentId)) {
+        log.warn(`[IPC] agent:nudge - rejected: agent ${agentId} has no running process`);
+        return {
+          data: null,
+          error: 'Cannot nudge agent: process is no longer running.',
+        };
+      }
+
       // Send nudge prompt to the agent's terminal
       const nudgePrompt =
         'You appear to be stalled. Please continue with your current task or report your status.\n';
@@ -724,10 +745,15 @@ export function registerIpcHandlers(): void {
           resumeSessionId: options.resume_session_id,
         });
 
+        // Get active project ID for data isolation
+        const resumeActiveProject = loggedPrepare(
+          'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { id: string } | undefined;
+
         // Insert new session record (resumed sessions get a new session ID)
         loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?)`,
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, project_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?, ?)`,
         ).run(
           options.id,
           options.agent_name,
@@ -741,6 +767,7 @@ export function registerIpcHandlers(): void {
           options.depth ?? 0,
           agentProcess.pid,
           options.file_scope ?? null,
+          resumeActiveProject?.id ?? null,
         );
 
         // Transition to 'working' state
@@ -902,11 +929,23 @@ export function registerIpcHandlers(): void {
         depth: 0,
       });
 
+      // Get active project ID for data isolation
+      const coordActiveProject = loggedPrepare(
+        'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
+      ).get() as { id: string } | undefined;
+
       // Insert session record
       loggedPrepare(
-        `INSERT INTO sessions (id, agent_name, capability, model, run_id, worktree_path, depth, state, pid, created_at, updated_at)
-        VALUES (?, ?, 'coordinator', 'opus', ?, ?, 0, 'booting', ?, datetime('now'), datetime('now'))`,
-      ).run(id, agentName, options?.run_id ?? null, worktreePath, agentProcess.pid);
+        `INSERT INTO sessions (id, agent_name, capability, model, run_id, worktree_path, depth, state, pid, project_id, created_at, updated_at)
+        VALUES (?, ?, 'coordinator', 'opus', ?, ?, 0, 'booting', ?, ?, datetime('now'), datetime('now'))`,
+      ).run(
+        id,
+        agentName,
+        options?.run_id ?? null,
+        worktreePath,
+        agentProcess.pid,
+        coordActiveProject?.id ?? null,
+      );
 
       // Update state to working after brief boot and auto-decompose tasks
       setTimeout(() => {
@@ -1180,9 +1219,14 @@ export function registerIpcHandlers(): void {
           prompt,
         });
 
+        // Get active project ID for data isolation
+        const leadActiveProject = loggedPrepare(
+          'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { id: string } | undefined;
+
         loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, created_at, updated_at)
-          VALUES (?, ?, 'lead', ?, ?, ?, ?, ?, ?, 1, 'booting', ?, ?, datetime('now'), datetime('now'))`,
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, project_id, created_at, updated_at)
+          VALUES (?, ?, 'lead', ?, ?, ?, ?, ?, ?, 1, 'booting', ?, ?, ?, datetime('now'), datetime('now'))`,
         ).run(
           leadId,
           leadName,
@@ -1194,6 +1238,7 @@ export function registerIpcHandlers(): void {
           options.branch_name ?? null,
           agentProcess.pid,
           options.file_scope ?? null,
+          leadActiveProject?.id ?? null,
         );
 
         loggedPrepare(
@@ -4346,6 +4391,14 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('agent:write', (_event, agentId: string, data: string) => {
     try {
+      // Reject terminal input for stopped/completed agents
+      if (!agentProcessManager.isRunning(agentId)) {
+        log.warn(`[IPC] agent:write - rejected: agent ${agentId} is not running`);
+        return {
+          data: false,
+          error: 'Cannot send input to a stopped agent. Session has already completed.',
+        };
+      }
       const success = agentProcessManager.write(agentId, data);
       return { data: success, error: null };
     } catch (error) {
@@ -5005,6 +5058,15 @@ export function registerIpcHandlers(): void {
       ).run(id);
       const project = loggedPrepare('SELECT * FROM projects WHERE id = ?').get(id);
       log.info(`[IPC] project:switch - switched active project in real database: id=${id}`);
+
+      // Broadcast project switch event so renderer can refresh project-scoped data
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('project:switched', { projectId: id, project });
+        }
+      }
+
       return { data: project, error: null };
     } catch (error) {
       log.error('project:switch failed:', error);
@@ -7019,6 +7081,84 @@ export function registerIpcHandlers(): void {
       return { data: null, error: String(error) };
     }
   });
+
+  // Tool allowlist check - validates if a tool is allowed for a given role
+  ipcMain.handle('guardRule:check-tool', (_event, role: string, toolName: string) => {
+    try {
+      const row = loggedPrepare('SELECT tool_allowlist FROM agent_definitions WHERE role = ?').get(
+        role,
+      ) as { tool_allowlist: string | null } | undefined;
+
+      if (!row) {
+        return { data: { allowed: true, reason: `Role '${role}' not found` }, error: null };
+      }
+
+      if (!row.tool_allowlist) {
+        return {
+          data: { allowed: true, reason: 'No tool allowlist configured (all tools permitted)' },
+          error: null,
+        };
+      }
+
+      let allowlist: string[];
+      try {
+        allowlist = JSON.parse(row.tool_allowlist);
+      } catch {
+        return {
+          data: { allowed: true, reason: 'Invalid tool allowlist format' },
+          error: null,
+        };
+      }
+
+      // Check if the tool is in the allowlist (same logic as guardEnforcementService)
+      for (const allowed of allowlist) {
+        if (allowed === toolName) {
+          return {
+            data: { allowed: true, reason: `Tool '${toolName}' is in ${role}'s allowlist` },
+            error: null,
+          };
+        }
+        const baseTool = allowed.split(' ')[0];
+        if (baseTool === toolName) {
+          return {
+            data: {
+              allowed: true,
+              reason: `Tool '${toolName}' matches allowlist entry '${allowed}'`,
+            },
+            error: null,
+          };
+        }
+      }
+
+      log.warn(
+        `[GUARD] Tool blocked for role=${role}: "${toolName}" not in allowlist [${allowlist.join(', ')}]`,
+      );
+      return {
+        data: {
+          allowed: false,
+          reason: `Tool '${toolName}' is not in ${role}'s allowlist. Permitted: [${allowlist.join(', ')}]`,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('guardRule:check-tool failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // File scope check - validates if a file is within an agent's assigned scope
+  ipcMain.handle(
+    'guardRule:check-file-scope',
+    (_event, filePath: string, fileScope: string[], worktreePath?: string) => {
+      try {
+        const result = guardEnforcementService.validateFileScope(filePath, fileScope, worktreePath);
+        return { data: result, error: null };
+      } catch (error) {
+        log.error('guardRule:check-file-scope failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   ipcMain.handle(
     'guardViolation:list',
