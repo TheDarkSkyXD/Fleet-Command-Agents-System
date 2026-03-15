@@ -3966,3 +3966,31 @@
 - 257/366 features passing (added #252 and #258 this session)
 - All code passes Biome lint (only pre-existing warnings) and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Data Isolation & Session Stop Cleanup)
+
+#### Feature #269: Data isolation between projects - PASSING
+- Added project_id column to sessions table (migration + index)
+- agent:list now filters sessions by active project ID for data isolation
+- All session INSERT statements updated to record active project_id (agent:spawn, agent:resume, coordinator:start, lead:dispatch)
+- project:switch broadcasts project:switched event to renderer
+- Added onProjectSwitched preload bridge and ElectronAPI type
+- Legacy sessions without project_id still visible (backward compatibility)
+
+#### Feature #270: Session state not accessible after agent stop - PASSING
+- agent:nudge now checks session state and rejects nudging completed agents with clear error message
+- agent:nudge also checks agentProcessManager.isRunning() before attempting to write
+- agent:write now explicitly validates process is running, returns error for stopped agents
+- agent:stop already properly cleans up: updates state to 'completed', removes from process map
+- Renderer already separates active vs completed agents in UI
+
+#### Files Modified
+- MODIFIED: src/main/db/database.ts - project_id migration and index
+- MODIFIED: src/main/ipc/handlers.ts - agent:list filtering, spawn project_id, nudge/write guards
+- MODIFIED: src/preload/index.ts - onProjectSwitched bridge
+- MODIFIED: src/shared/types/index.ts - Session.project_id, onProjectSwitched type
+
+#### Current Status
+- 267/366 features passing (added #269 and #270 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
