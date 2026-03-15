@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Hook Event Log and Cleanup Mail Wipe)
+
+#### Feature #201: Hook event log viewer - PASSING
+- Created hook_events database table with id, hook_id, hook_name, hook_type, trigger, status, worktree, agent_name, details, error_message, duration_ms, created_at
+- Added hookEvent:list and hookEvent:create IPC handlers
+- Hook deploys automatically log success/failure events to hook_events table
+- Added Event Log tab to HooksPage with chronological event list
+- Filters by hook type and status, expandable details per event
+- Color-coded status icons and badges (success/failure/error)
+- Added HookEvent interface and ElectronAPI types, preload bridges
+
+#### Feature #202: Cleanup wipe mail database - PASSING
+- Added Cleanup tab to SettingsPage with amber warning banner
+- Granular controls: wipe mail, sessions, metrics, events, issues, or all
+- Confirmation dialog with red alert icon and Cancel/Confirm buttons
+- Success/failure notification after wipe, spinning indicator during operation
+- Added cleanupExecute preload bridge to existing cleanup:execute IPC handler
+
+#### Files Modified
+- src/main/db/database.ts - Added hook_events table
+- src/main/ipc/handlers.ts - Hook event IPC handlers, deploy event logging
+- src/preload/index.ts - hookEventList, hookEventCreate, cleanupExecute bridges
+- src/shared/types/index.ts - HookEvent interface, ElectronAPI types
+- src/renderer/pages/HooksPage.tsx - Event Log tab with HookEventLog component
+- src/renderer/pages/SettingsPage.tsx - Cleanup tab with CleanupSettings component
+
+#### Current Status
+- 214/366 features passing (added #201 and #202 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Doctor Config Validation & DB Integrity)
 
 #### Feature #206: Doctor config validation - PASSING
