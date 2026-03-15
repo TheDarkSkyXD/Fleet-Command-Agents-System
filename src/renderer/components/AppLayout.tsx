@@ -22,6 +22,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { CommandPalette } from './CommandPalette';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingTour } from './OnboardingTour';
+import { OrphanedProcessDialog } from './OrphanedProcessDialog';
 import { SetupWizard } from './SetupWizard';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
@@ -134,6 +135,7 @@ export function AppLayout() {
     return (
       <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
         {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
+        <OrphanedProcessDialog />
         <UpdateBanner />
         <main className="flex-1 overflow-auto bg-slate-900">
           <ErrorBoundary sectionName="Welcome">
@@ -148,6 +150,7 @@ export function AppLayout() {
     <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
       {/* Setup Wizard - shown on first launch */}
       {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
+      <OrphanedProcessDialog />
 
       {/* Update banner - appears at top when update available */}
       <UpdateBanner />
