@@ -1,5 +1,33 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Sortable Agent Table & Skeleton Loading)
+
+#### Feature #45: Agent list sortable filterable table - PASSING
+- Replaced card-only agent list with @tanstack/react-table powered sortable/filterable table
+- Columns: state indicator, name, capability, status, PID, uptime, task, actions (stop button)
+- Click column headers to sort ascending/descending with visual sort indicators (chevron icons)
+- Global text search input to filter agents by name
+- Capability dropdown filter to filter by agent type (scout, builder, reviewer, etc.)
+- Table/card view toggle - both views respect active filters and sorting
+- Card view preserved with same layout as before for users who prefer it
+- Keyboard accessible: Enter/Space on column headers triggers sort
+- Footer shows "Showing X of Y agents" count
+
+#### Feature #224: Skeleton screens for agent list loading - PASSING
+- AgentTableSkeleton: 4 placeholder rows with animate-pulse shimmer
+- AgentCardSkeleton: 3 placeholder cards with animate-pulse shimmer
+- Both skeletons match the exact layout of real data (state dot, name, badges, PID, uptime)
+- Shown while isLoading=true, replaced with real data on load
+- data-testid attributes for testability
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Complete rewrite with react-table, filters, skeletons
+
+#### Current Status
+- 27/366 features passing (added #45 and #224)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Coordinator Start & Stop)
 
 #### Feature #55: Start coordinator agent at project root - PASSING
