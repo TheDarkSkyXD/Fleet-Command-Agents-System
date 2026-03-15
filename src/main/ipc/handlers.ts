@@ -1,4 +1,7 @@
 import { exec, execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
@@ -236,10 +239,23 @@ export function registerIpcHandlers(): void {
           prompt: options.prompt,
         });
 
-        // Insert session record into database with PID, model, and file_scope
+        // Compute transcript path for this agent session
+        // Claude CLI stores transcripts at ~/.claude/projects/<dir-hash>/sessions/<session-id>/
+        const agentCwd = options.worktree_path || process.cwd();
+        const projectDirHash = createHash('sha256').update(agentCwd).digest('hex').substring(0, 16);
+        const claudeHome = path.join(os.homedir(), '.claude');
+        const transcriptPath = path.join(
+          claudeHome,
+          'projects',
+          projectDirHash,
+          'sessions',
+          options.id,
+        );
+
+        // Insert session record into database with PID, model, file_scope, and transcript_path
         loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?)`,
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope, transcript_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?, ?)`,
         ).run(
           options.id,
           options.agent_name,
@@ -253,6 +269,7 @@ export function registerIpcHandlers(): void {
           options.depth ?? 0,
           agentProcess.pid,
           options.file_scope ?? null,
+          transcriptPath,
         );
 
         // Transition to 'working' state after successful spawn
@@ -2503,7 +2520,6 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('project:file-tree', async (_event, rootPath: string, maxDepth = 4) => {
     try {
       const fs = await import('node:fs/promises');
-      const path = await import('node:path');
 
       interface FileTreeNode {
         name: string;
@@ -4891,7 +4907,6 @@ export function registerIpcHandlers(): void {
           try {
             // Write the hook script to the worktree's .claude/hooks directory
             const fs = require('node:fs');
-            const path = require('node:path');
             const hooksDir = path.join(wt, '.claude', 'hooks');
             fs.mkdirSync(hooksDir, { recursive: true });
             const hookFileName = `${hook.hook_type}_${hook.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.sh`;
