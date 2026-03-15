@@ -1177,3 +1177,35 @@
 - 76/366 features passing (added #9 and #27 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Hooks Management)
+
+#### Feature #199: View deployed hooks - PASSING
+- Created HooksPage with hooks grouped by type (SessionStart, UserPromptSubmit, PreToolUse)
+- Each hook shows installed/not-installed status badge, project association, deploy date
+- Project selector dropdown for multi-project filtering
+- Hook type filter (All/SessionStart/UserPromptSubmit/PreToolUse)
+- Create/edit form with name, type, project, description, and script content fields
+- Copy script and delete actions per hook
+
+#### Feature #200: Deploy hooks to worktrees - PASSING
+- Deploy view with checkbox selection of hooks and target worktrees
+- Worktrees loaded from active project via worktreeList IPC
+- hook:deploy IPC handler writes scripts to .claude/hooks/ in each worktree
+- Files created with executable permissions (0o755)
+- Deploy results displayed with success/failure per hook-worktree pair
+- Hook records updated with is_installed, target_worktrees, installed_at
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/HooksPage.tsx - Full hooks management UI
+- MODIFIED: src/main/db/database.ts - Added hooks table with indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added hook CRUD + deploy IPC handlers
+- MODIFIED: src/shared/types/index.ts - Added Hook, HookType, HookDeployResult types
+- MODIFIED: src/preload/index.ts - Added hook bridge methods
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Hooks nav item with FiAnchor icon
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated HooksPage
+
+#### Current Status
+- 69/366 features passing (added #199 and #200)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
