@@ -678,14 +678,39 @@ function AppLogPanel() {
       {isLoading ? (
         <LogSkeleton />
       ) : logs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-          <FiFileText className="mb-3 h-12 w-12" />
-          <p className="text-lg font-medium">No log entries</p>
-          <p className="mt-1 text-sm">
-            {hasFilters
-              ? 'No logs match the current filters. Try adjusting or clearing filters.'
-              : 'Application logs will appear here. Click "Add Test Logs" to create sample entries, or "Import NDJSON" to load log files.'}
-          </p>
+        <div
+          className="flex flex-col items-center justify-center py-16 text-slate-500"
+          data-testid="no-logs-empty-state"
+        >
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 border border-slate-700">
+            <FiFileText className="h-7 w-7 text-slate-500" />
+          </div>
+          <p className="text-lg font-medium text-slate-400">No log entries</p>
+          {hasFilters ? (
+            <p className="mt-1 text-sm">
+              No logs match the current filters. Try adjusting or clearing filters.
+            </p>
+          ) : (
+            <div className="mt-3 text-center">
+              <p className="text-sm text-slate-500 mb-4">
+                Logs are generated as you use Fleet Command. Here are some ways to get started:
+              </p>
+              <div className="flex flex-col gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 justify-center">
+                  <FiPlay className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Spawn an agent to generate activity logs</span>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <FiUpload className="h-3.5 w-3.5 text-blue-400" />
+                  <span>Import existing logs via &quot;Import NDJSON&quot; above</span>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <FiZap className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Click &quot;Add Test Logs&quot; to create sample entries</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-1 max-h-[600px] overflow-y-auto">

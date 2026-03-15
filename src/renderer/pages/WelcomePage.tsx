@@ -122,6 +122,7 @@ function AddProjectForm({
       <button
         type="button"
         onClick={() => setShowForm(true)}
+        data-testid="add-project-button"
         className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-700 p-6 text-sm text-slate-400 transition-colors hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5"
       >
         <span className="text-xl">+</span>
@@ -242,11 +243,30 @@ export function WelcomePage({
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
             </div>
           ) : recentProjects.length === 0 ? (
-            <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-8 text-center">
-              <p className="text-slate-400 mb-2">No projects yet</p>
-              <p className="text-sm text-slate-500">
-                Add a project to get started with Fleet Command
+            <div
+              className="rounded-lg border border-slate-700 bg-slate-800/30 p-10 text-center"
+              data-testid="no-projects-empty-state"
+            >
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10 border border-blue-500/20">
+                <span className="text-3xl">{'\u2693'}</span>
+              </div>
+              <p className="text-lg font-semibold text-slate-300 mb-2">No projects configured</p>
+              <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
+                Get started by adding your first project. Point Fleet Command at a Git repository to
+                begin orchestrating AI coding agents.
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const addBtn = document.querySelector('[data-testid="add-project-button"]');
+                  if (addBtn instanceof HTMLElement) addBtn.click();
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-colors"
+                data-testid="open-project-button"
+              >
+                <span className="text-lg">+</span>
+                Open Project
+              </button>
             </div>
           ) : (
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
