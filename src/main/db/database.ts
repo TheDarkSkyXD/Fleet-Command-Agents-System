@@ -358,6 +358,15 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS notification_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      agent_name TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Create indexes for common queries
@@ -416,6 +425,9 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_expertise_type ON expertise_records(type);
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);
     CREATE INDEX IF NOT EXISTS idx_expertise_agent ON expertise_records(agent_name);
+    CREATE INDEX IF NOT EXISTS idx_notification_history_type ON notification_history(event_type);
+    CREATE INDEX IF NOT EXISTS idx_notification_history_created ON notification_history(created_at);
+    CREATE INDEX IF NOT EXISTS idx_notification_history_agent ON notification_history(agent_name);
   `);
 
   // Migrations: add model column to sessions if not present

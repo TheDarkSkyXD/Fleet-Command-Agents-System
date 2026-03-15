@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
@@ -12,6 +13,7 @@ import { HooksPage } from '../pages/HooksPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { MetricsPage } from '../pages/MetricsPage';
+import { NotificationsPage } from '../pages/NotificationsPage';
 import { NuclearCleanupPage } from '../pages/NuclearCleanupPage';
 import { PromptsPage } from '../pages/PromptsPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -103,6 +105,44 @@ export function AppLayout() {
     setCurrentPage('agents');
     loadActiveProject();
   }, [loadActiveProject]);
+
+  // Listen for notification events from main process -> show in-app toasts
+  useEffect(() => {
+    window.electronAPI.onNotificationEvent((data) => {
+      const isError =
+        data.eventType === 'agent_error' ||
+        data.eventType === 'merge_failed' ||
+        data.eventType === 'health_alert';
+      const isWarning = data.eventType === 'agent_stalled' || data.eventType === 'agent_zombie';
+
+      if (isError) {
+        toast.error(data.title, {
+          description: data.body,
+          duration: 8000,
+          style: {
+            background: '#7f1d1d',
+            border: '1px solid #dc2626',
+            color: '#fecaca',
+          },
+        });
+      } else if (isWarning) {
+        toast.warning(data.title, {
+          description: data.body,
+          duration: 6000,
+          style: {
+            background: '#78350f',
+            border: '1px solid #d97706',
+            color: '#fde68a',
+          },
+        });
+      } else {
+        toast.success(data.title, {
+          description: data.body,
+          duration: 5000,
+        });
+      }
+    });
+  }, []);
 
   // Listen for notification click -> navigate to agent detail
   useEffect(() => {
@@ -284,6 +324,12 @@ function PageContent({
       return (
         <ErrorBoundary sectionName="Expertise">
           <ExpertisePage />
+        </ErrorBoundary>
+      );
+    case 'notifications':
+      return (
+        <ErrorBoundary sectionName="Notifications">
+          <NotificationsPage />
         </ErrorBoundary>
       );
     case 'events':

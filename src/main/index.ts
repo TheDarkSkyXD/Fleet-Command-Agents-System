@@ -6,6 +6,8 @@ import { closeDatabase, initDatabase } from './db/database';
 import { registerIpcHandlers } from './ipc/handlers';
 import { agentProcessManager } from './services/agentProcessManager';
 import { checkpointService } from './services/checkpointService';
+import { createClaudeCodeAdapter } from './services/claudeCodeAdapter';
+import { runtimeRegistry } from './services/runtimeRegistry';
 import { type TrayIconStatus, generateTrayIcon } from './services/trayIconGenerator';
 import { checkForUpdates, initAutoUpdater } from './services/updateService';
 import { watchdogService } from './services/watchdogService';
@@ -286,6 +288,11 @@ app.whenReady().then(async () => {
 
   // Register IPC handlers
   registerIpcHandlers();
+
+  // Initialize runtime registry with Claude Code adapter
+  const claudeCodeAdapter = createClaudeCodeAdapter();
+  runtimeRegistry.register(claudeCodeAdapter);
+  log.info('Runtime registry initialized with Claude Code adapter');
 
   // Restore checkpoints from previous session
   try {

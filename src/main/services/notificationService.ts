@@ -1,5 +1,6 @@
 import { BrowserWindow, Notification } from 'electron';
 import log from 'electron-log';
+import { getDatabase } from '../db/database';
 
 /**
  * Notification event types that trigger desktop notifications.
@@ -21,9 +22,22 @@ interface NotificationOptions {
 }
 
 /**
+ * Stored notification history record from the database.
+ */
+export interface NotificationHistoryRecord {
+  id: number;
+  title: string;
+  body: string;
+  event_type: string;
+  agent_name: string | null;
+  created_at: string;
+}
+
+/**
  * NotificationService handles desktop notifications using Electron's Notification API.
  * Notifications are shown when agent events occur (completion, stalls, errors, merges).
  * Clicking a notification brings the app window to the foreground.
+ * All notifications are stored in the database for history viewing.
  */
 /**
  * Per-event-type notification preferences.
@@ -81,11 +95,49 @@ class NotificationService {
   }
 
   /**
+   * Store a notification in the database for history tracking.
+   */
+  private storeNotification(options: NotificationOptions): void {
+    try {
+      const db = getDatabase();
+      db.prepare(
+        'INSERT INTO notification_history (title, body, event_type, agent_name) VALUES (?, ?, ?, ?)',
+      ).run(options.title, options.body, options.eventType, options.agentName || null);
+      log.debug(`[NotificationService] Stored notification in history: ${options.eventType}`);
+    } catch (error) {
+      log.warn('[NotificationService] Failed to store notification in history:', error);
+    }
+  }
+
+  /**
+   * Broadcast a notification event to the renderer process for in-app display.
+   */
+  private broadcastToRenderer(options: NotificationOptions): void {
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('notification:event', {
+          title: options.title,
+          body: options.body,
+          eventType: options.eventType,
+          agentName: options.agentName || null,
+          timestamp: new Date().toISOString(),
+        });
+        break;
+      }
+    }
+  }
+
+  /**
    * Show a desktop notification for an agent event.
    */
   notify(options: NotificationOptions): void {
+    // Always store in history and broadcast to renderer, regardless of desktop notification preferences
+    this.storeNotification(options);
+    this.broadcastToRenderer(options);
+
     if (!this.enabled) {
-      log.debug('[NotificationService] Notifications disabled, skipping');
+      log.debug('[NotificationService] Notifications disabled, skipping desktop notification');
       return;
     }
 
@@ -93,7 +145,7 @@ class NotificationService {
     const eventType = options.eventType as keyof NotificationPreferencesMap;
     if (eventType in this.preferences && !this.preferences[eventType]) {
       log.debug(
-        `[NotificationService] Notification for ${eventType} disabled by preferences, skipping`,
+        `[NotificationService] Notification for ${eventType} disabled by preferences, skipping desktop notification`,
       );
       return;
     }
@@ -208,6 +260,64 @@ class NotificationService {
       body: message,
       eventType: 'health_alert',
     });
+  }
+
+  /**
+   * Get notification history from the database.
+   */
+  getHistory(filters?: {
+    event_type?: string;
+    agent_name?: string;
+    limit?: number;
+    offset?: number;
+  }): NotificationHistoryRecord[] {
+    try {
+      const db = getDatabase();
+      let sql = 'SELECT * FROM notification_history WHERE 1=1';
+      const params: (string | number)[] = [];
+
+      if (filters?.event_type) {
+        sql += ' AND event_type = ?';
+        params.push(filters.event_type);
+      }
+      if (filters?.agent_name) {
+        sql += ' AND agent_name = ?';
+        params.push(filters.agent_name);
+      }
+
+      sql += ' ORDER BY created_at DESC';
+
+      if (filters?.limit) {
+        sql += ' LIMIT ?';
+        params.push(filters.limit);
+      } else {
+        sql += ' LIMIT 200';
+      }
+      if (filters?.offset) {
+        sql += ' OFFSET ?';
+        params.push(filters.offset);
+      }
+
+      return db.prepare(sql).all(...params) as NotificationHistoryRecord[];
+    } catch (error) {
+      log.error('[NotificationService] Failed to get notification history:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Clear all notification history.
+   */
+  clearHistory(): number {
+    try {
+      const db = getDatabase();
+      const result = db.prepare('DELETE FROM notification_history').run();
+      log.info(`[NotificationService] Cleared ${result.changes} notification history entries`);
+      return result.changes;
+    } catch (error) {
+      log.error('[NotificationService] Failed to clear notification history:', error);
+      return 0;
+    }
   }
 
   /**

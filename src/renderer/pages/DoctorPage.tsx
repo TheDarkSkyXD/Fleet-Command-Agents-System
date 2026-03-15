@@ -4,7 +4,9 @@ import {
   FiCheckCircle,
   FiCpu,
   FiDatabase,
+  FiFileText,
   FiGitBranch,
+  FiHardDrive,
   FiRefreshCw,
   FiTerminal,
   FiTool,
@@ -17,6 +19,8 @@ const checkIcons: Record<string, React.ReactNode> = {
   'Node.js': <FiCpu className="h-5 w-5" />,
   'Claude CLI': <FiTerminal className="h-5 w-5" />,
   Git: <FiGitBranch className="h-5 w-5" />,
+  Config: <FiFileText className="h-5 w-5" />,
+  'DB Integrity': <FiHardDrive className="h-5 w-5" />,
 };
 
 export function DoctorPage() {

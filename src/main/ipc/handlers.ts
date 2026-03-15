@@ -26,6 +26,7 @@ import {
   rollbackMerge,
 } from '../services/mergeService';
 import { type NotificationEventType, notificationService } from '../services/notificationService';
+import { runtimeRegistry } from '../services/runtimeRegistry';
 import {
   checkForUpdates,
   downloadUpdate,
@@ -6164,6 +6165,39 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // ── Notification History ───────────────────────────────────────────────
+
+  ipcMain.handle(
+    'notification:history',
+    (
+      _event,
+      filters?: {
+        event_type?: string;
+        agent_name?: string;
+        limit?: number;
+        offset?: number;
+      },
+    ) => {
+      try {
+        const history = notificationService.getHistory(filters);
+        return { data: history, error: null };
+      } catch (error) {
+        log.error('notification:history failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('notification:clear-history', () => {
+    try {
+      const deleted = notificationService.clearHistory();
+      return { data: { deleted }, error: null };
+    } catch (error) {
+      log.error('notification:clear-history failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // ── App Logs ──────────────────────────────────────────────────────────
 
   ipcMain.handle(
@@ -8397,6 +8431,69 @@ export function registerIpcHandlers(): void {
       return { data: null, error: String(error) };
     }
   });
+
+  // ── Runtime Registry Handlers ──────────────────────────────────────
+  ipcMain.handle('runtime:list', () => {
+    try {
+      const runtimes = runtimeRegistry.listRuntimeInfo();
+      log.info(`[IPC] runtime:list - returning ${runtimes.length} registered runtimes`);
+      return { data: runtimes, error: null };
+    } catch (error) {
+      log.error('runtime:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('runtime:get-default', () => {
+    try {
+      const defaultId = runtimeRegistry.getDefaultRuntimeId();
+      log.info(`[IPC] runtime:get-default - current default: ${defaultId}`);
+      return { data: { defaultRuntimeId: defaultId }, error: null };
+    } catch (error) {
+      log.error('runtime:get-default failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('runtime:set-default', (_event, runtimeId: string) => {
+    try {
+      runtimeRegistry.setDefaultRuntime(runtimeId);
+      log.info(`[IPC] runtime:set-default - set to: ${runtimeId}`);
+      return { data: { defaultRuntimeId: runtimeId }, error: null };
+    } catch (error) {
+      log.error('runtime:set-default failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'runtime:resolve-model',
+    (
+      _event,
+      params: {
+        runtimeId: string;
+        capability: string;
+        explicitModel?: string;
+        capabilityConfigModel?: string;
+      },
+    ) => {
+      try {
+        const resolved = runtimeRegistry.resolveModel(
+          params.runtimeId,
+          params.capability as AgentCapability,
+          params.explicitModel,
+          params.capabilityConfigModel,
+        );
+        log.info(
+          `[IPC] runtime:resolve-model - resolved: ${resolved} (runtime=${params.runtimeId}, cap=${params.capability}, explicit=${params.explicitModel || 'none'}, config=${params.capabilityConfigModel || 'none'})`,
+        );
+        return { data: { model: resolved }, error: null };
+      } catch (error) {
+        log.error('runtime:resolve-model failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   log.info(
     'IPC handlers registered - all database handlers use real SQLite queries via loggedPrepare()',

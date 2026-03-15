@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import {
   FiAlertTriangle,
   FiCheck,
@@ -58,14 +59,17 @@ export function NuclearCleanupPage() {
           const result = await window.electronAPI.cleanupExecute({ target: 'sessions' });
           if (result.error) {
             setSessionResult({ type: 'error', message: result.error });
+            toast.error('Failed to wipe sessions');
           } else {
             setSessionResult({
               type: 'success',
               message: 'All session records have been wiped from the database.',
             });
+            toast.success('All session records wiped');
           }
         } catch (err) {
           setSessionResult({ type: 'error', message: String(err) });
+          toast.error('Failed to wipe sessions');
         } finally {
           setWipingSessions(false);
         }

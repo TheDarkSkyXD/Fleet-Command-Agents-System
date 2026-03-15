@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
   FiAlertTriangle,
   FiCheck,
@@ -405,9 +406,11 @@ export function HooksPage() {
       });
       resetForm();
       setViewMode('list');
+      toast.success(`Hook "${formName.trim()}" created`);
       loadHooks();
     } catch (err) {
       console.error('Failed to create hook:', err);
+      toast.error('Failed to create hook');
     }
   };
 
@@ -424,18 +427,22 @@ export function HooksPage() {
       resetForm();
       setEditingHook(null);
       setViewMode('list');
+      toast.success('Hook updated');
       loadHooks();
     } catch (err) {
       console.error('Failed to update hook:', err);
+      toast.error('Failed to update hook');
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
       await window.electronAPI.hookDelete(id);
+      toast.success('Hook deleted');
       loadHooks();
     } catch (err) {
       console.error('Failed to delete hook:', err);
+      toast.error('Failed to delete hook');
     }
   };
 
@@ -478,10 +485,12 @@ export function HooksPage() {
       );
       if (result.data) {
         setDeployResults(result.data);
+        toast.success('Hooks deployed successfully');
       }
       loadHooks();
     } catch (err) {
       console.error('Failed to deploy hooks:', err);
+      toast.error('Failed to deploy hooks');
     } finally {
       setDeploying(false);
     }

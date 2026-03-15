@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { create } from 'zustand';
 import type { Project } from '../../shared/types';
 
@@ -57,13 +58,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const result = await window.electronAPI.projectCreate({ id, name, path, description });
       if (result.error) {
         set({ error: result.error });
+        toast.error(result.error);
         return null;
       }
+      toast.success(`Project "${name}" created`);
       // Reload projects list
       await get().loadProjects();
       return result.data;
     } catch (err) {
       set({ error: String(err) });
+      toast.error('Failed to create project');
       return null;
     }
   },
@@ -73,13 +77,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const result = await window.electronAPI.projectSwitch(id);
       if (result.error) {
         set({ error: result.error });
+        toast.error(result.error);
         return;
       }
       set({ activeProject: result.data });
+      toast.success(`Switched to project "${result.data?.name || id}"`);
       // Reload projects to update order
       await get().loadProjects();
     } catch (err) {
       set({ error: String(err) });
+      toast.error('Failed to switch project');
     }
   },
 
@@ -88,15 +95,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const result = await window.electronAPI.projectDelete(id);
       if (!result.data) {
         set({ error: 'Failed to delete project' });
+        toast.error('Failed to delete project');
         return;
       }
       const { activeProject } = get();
       if (activeProject?.id === id) {
         set({ activeProject: null });
       }
+      toast.success('Project deleted');
       await get().loadProjects();
     } catch (err) {
       set({ error: String(err) });
+      toast.error('Failed to delete project');
     }
   },
 

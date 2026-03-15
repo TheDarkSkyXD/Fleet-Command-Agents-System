@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
   FiAlertTriangle,
   FiBell,
@@ -237,12 +238,15 @@ function ProfilesSettings() {
       const result = await window.electronAPI.profileDelete(id);
       if (result.data) {
         setStatusMessage({ type: 'success', text: `Deleted profile "${name}"` });
+        toast.success(`Deleted profile "${name}"`);
         loadProfiles();
       } else {
         setStatusMessage({ type: 'error', text: result.error || 'Failed to delete' });
+        toast.error(result.error || 'Failed to delete profile');
       }
     } catch {
       setStatusMessage({ type: 'error', text: 'Failed to delete profile' });
+      toast.error('Failed to delete profile');
     }
   };
 
@@ -270,12 +274,15 @@ function ProfilesSettings() {
       });
       if (result.data) {
         setStatusMessage({ type: 'success', text: `Duplicated profile as "${copyName}"` });
+        toast.success(`Duplicated profile as "${copyName}"`);
         loadProfiles();
       } else {
         setStatusMessage({ type: 'error', text: result.error || 'Failed to duplicate profile' });
+        toast.error(result.error || 'Failed to duplicate profile');
       }
     } catch {
       setStatusMessage({ type: 'error', text: 'Failed to duplicate profile' });
+      toast.error('Failed to duplicate profile');
     }
   };
 
@@ -284,12 +291,15 @@ function ProfilesSettings() {
       const result = await window.electronAPI.profileActivate(id);
       if (result.data) {
         setStatusMessage({ type: 'success', text: `Activated profile "${name}"` });
+        toast.success(`Activated profile "${name}"`);
         loadProfiles();
       } else {
         setStatusMessage({ type: 'error', text: result.error || 'Failed to activate' });
+        toast.error(result.error || 'Failed to activate profile');
       }
     } catch {
       setStatusMessage({ type: 'error', text: 'Failed to activate profile' });
+      toast.error('Failed to activate profile');
     }
   };
 
@@ -1760,6 +1770,8 @@ function QualityGatesSettings() {
   const showStatus = (type: 'success' | 'error', text: string) => {
     setStatusMessage({ type, text });
     setTimeout(() => setStatusMessage(null), 3000);
+    if (type === 'success') toast.success(text);
+    else toast.error(text);
   };
 
   const handleCreate = async () => {

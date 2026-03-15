@@ -368,6 +368,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) =>
     ipcRenderer.on('notification:navigate-to-agent', (_event, data) => callback(data)),
 
+  // Notification event broadcast (main -> renderer, for in-app toasts)
+  onNotificationEvent: (
+    callback: (data: {
+      title: string;
+      body: string;
+      eventType: string;
+      agentName: string | null;
+      timestamp: string;
+    }) => void,
+  ) => ipcRenderer.on('notification:event', (_event, data) => callback(data)),
+
+  // Notification history
+  notificationHistory: (filters?: {
+    event_type?: string;
+    agent_name?: string;
+    limit?: number;
+    offset?: number;
+  }) => ipcRenderer.invoke('notification:history', filters),
+  notificationClearHistory: () => ipcRenderer.invoke('notification:clear-history'),
+
   // App Logs
   appLogList: (filters?: {
     level?: string;
@@ -631,6 +651,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   orphanKill: (sessionId: string, pid: number) => ipcRenderer.invoke('orphan:kill', sessionId, pid),
   orphanReconnect: (sessionId: string) => ipcRenderer.invoke('orphan:reconnect', sessionId),
   orphanDismiss: (sessionId: string) => ipcRenderer.invoke('orphan:dismiss', sessionId),
+
+  // Runtime registry
+  runtimeList: () => ipcRenderer.invoke('runtime:list'),
+  runtimeGetDefault: () => ipcRenderer.invoke('runtime:get-default'),
+  runtimeSetDefault: (runtimeId: string) => ipcRenderer.invoke('runtime:set-default', runtimeId),
+  runtimeResolveModel: (params: {
+    runtimeId: string;
+    capability: string;
+    explicitModel?: string;
+    capabilityConfigModel?: string;
+  }) => ipcRenderer.invoke('runtime:resolve-model', params),
 
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),

@@ -4,6 +4,7 @@ import * as nodePty from 'node-pty';
 import { getDatabase } from '../db/database';
 import { detectClaudeCli } from './claudeCliService';
 import { notificationService } from './notificationService';
+import { runtimeRegistry } from './runtimeRegistry';
 import { type StreamJsonEvent, StreamJsonParser } from './streamJsonParser';
 
 /**
@@ -48,8 +49,12 @@ export interface AgentSpawnOptions {
   agentName: string;
   /** Agent capability/role */
   capability: AgentCapability;
-  /** Claude model override (uses capability default if not specified) */
+  /** Claude model override (uses capability default if not specified) - explicit flag, highest priority */
   model?: string;
+  /** Model from capability config/settings - medium priority in resolution chain */
+  capabilityConfigModel?: string;
+  /** Runtime adapter ID (uses default runtime if not specified) */
+  runtime?: string;
   /** Working directory / worktree path */
   worktreePath?: string;
   /** Git branch name */
@@ -107,11 +112,29 @@ class AgentProcessManager {
    * Spawn a new Claude Code CLI agent via node-pty.
    */
   spawn(options: AgentSpawnOptions): AgentProcess {
-    const cliResult = detectClaudeCli(false);
-    if (!cliResult.found || !cliResult.path) {
-      throw new Error(
-        'Claude CLI not found. Please install Claude Code CLI and ensure it is in your PATH.',
-      );
+    // Resolve runtime adapter (use specified runtime or default)
+    const runtimeId = options.runtime || runtimeRegistry.getDefaultRuntimeId();
+    const adapter = runtimeRegistry.getAdapter(runtimeId);
+
+    // Detect CLI via adapter or fallback
+    let cliPath: string;
+    if (adapter) {
+      const detection = adapter.detect(false);
+      if (!detection.found || !detection.path) {
+        throw new Error(
+          `Runtime '${adapter.displayName}' not found. Please install it and ensure it is in your PATH.`,
+        );
+      }
+      cliPath = detection.path;
+    } else {
+      // Fallback to direct Claude CLI detection if no adapter
+      const cliResult = detectClaudeCli(false);
+      if (!cliResult.found || !cliResult.path) {
+        throw new Error(
+          'Claude CLI not found. Please install Claude Code CLI and ensure it is in your PATH.',
+        );
+      }
+      cliPath = cliResult.path;
     }
 
     // Check if an agent with this ID already exists
@@ -119,26 +142,41 @@ class AgentProcessManager {
       throw new Error(`Agent with ID ${options.id} is already running.`);
     }
 
-    const model = options.model || getDefaultModel(options.capability);
-    const claudePath = cliResult.path;
+    // Model resolution chain: explicit flag > capability config > runtime default
+    const model = runtimeRegistry.resolveModel(
+      runtimeId,
+      options.capability,
+      options.model,
+      options.capabilityConfigModel,
+    );
 
-    // Build command arguments
-    const args: string[] = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
-
-    // Add model flag
-    args.push('--model', model);
-
-    // Add resume flag if resuming a previous session
-    if (options.resumeSessionId) {
-      args.push('--resume', options.resumeSessionId);
-      log.info(
-        `[AgentProcessManager] Resuming session: ${options.resumeSessionId} for agent ${options.agentName}`,
-      );
-    }
-
-    // Add initial prompt if provided (only when not resuming)
-    if (options.prompt && !options.resumeSessionId) {
-      args.push('-p', options.prompt);
+    // Build command arguments via adapter or fallback
+    let args: string[];
+    if (adapter) {
+      args = adapter.buildSpawnArgs({
+        model,
+        prompt: options.prompt,
+        resumeSessionId: options.resumeSessionId,
+        outputFormat: 'stream-json',
+      });
+      if (options.resumeSessionId) {
+        log.info(
+          `[AgentProcessManager] Resuming session: ${options.resumeSessionId} for agent ${options.agentName}`,
+        );
+      }
+    } else {
+      // Fallback arg building (legacy path)
+      args = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
+      args.push('--model', model);
+      if (options.resumeSessionId) {
+        args.push('--resume', options.resumeSessionId);
+        log.info(
+          `[AgentProcessManager] Resuming session: ${options.resumeSessionId} for agent ${options.agentName}`,
+        );
+      }
+      if (options.prompt && !options.resumeSessionId) {
+        args.push('-p', options.prompt);
+      }
     }
 
     // Determine working directory
@@ -156,13 +194,13 @@ class AgentProcessManager {
       }
     }
 
-    // Determine shell/command based on platform
-    const shell = process.platform === 'win32' ? claudePath : claudePath;
+    // Use CLI path from adapter detection
+    const shell = cliPath;
 
     log.info(
-      `[AgentProcessManager] Spawning agent: ${options.agentName} (${options.capability}), model=${model}, cwd=${cwd}`,
+      `[AgentProcessManager] Spawning agent: ${options.agentName} (${options.capability}), runtime=${runtimeId}, model=${model}, cwd=${cwd}`,
     );
-    log.info(`[AgentProcessManager] Command: ${claudePath} ${args.join(' ')}`);
+    log.info(`[AgentProcessManager] Command: ${cliPath} ${args.join(' ')}`);
 
     // Spawn the pty process
     const ptyProcess = nodePty.spawn(shell, args, {

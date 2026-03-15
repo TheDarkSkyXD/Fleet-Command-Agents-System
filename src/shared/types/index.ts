@@ -1622,6 +1622,37 @@ export interface ElectronAPI {
   onWatchdogPatrolResult: (callback: (data: PatrolResult) => void) => void;
   // Notification navigation events (main -> renderer)
   onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => void;
+  // Notification event broadcast (main -> renderer, for in-app toasts)
+  onNotificationEvent: (
+    callback: (data: {
+      title: string;
+      body: string;
+      eventType: string;
+      agentName: string | null;
+      timestamp: string;
+    }) => void,
+  ) => void;
+  // Notification history
+  notificationHistory: (filters?: {
+    event_type?: string;
+    agent_name?: string;
+    limit?: number;
+    offset?: number;
+  }) => Promise<{
+    data: Array<{
+      id: number;
+      title: string;
+      body: string;
+      event_type: string;
+      agent_name: string | null;
+      created_at: string;
+    }> | null;
+    error: string | null;
+  }>;
+  notificationClearHistory: () => Promise<{
+    data: { deleted: number } | null;
+    error: string | null;
+  }>;
   // Agent Instruction Files
   agentDefInstructionRead: (role: string) => Promise<{
     data: { role: string; content: string; filePath: string; isDefault?: boolean } | null;
@@ -1684,6 +1715,23 @@ export interface ElectronAPI {
     data: { dismissed: boolean; sessionId: string } | null;
     error: string | null;
   }>;
+
+  // Runtime registry
+  runtimeList: () => Promise<{ data: RuntimeInfo[] | null; error: string | null }>;
+  runtimeGetDefault: () => Promise<{
+    data: { defaultRuntimeId: string } | null;
+    error: string | null;
+  }>;
+  runtimeSetDefault: (runtimeId: string) => Promise<{
+    data: { defaultRuntimeId: string } | null;
+    error: string | null;
+  }>;
+  runtimeResolveModel: (params: {
+    runtimeId: string;
+    capability: string;
+    explicitModel?: string;
+    capabilityConfigModel?: string;
+  }) => Promise<{ data: { model: string } | null; error: string | null }>;
 
   removeAllListeners: (channel: string) => void;
 }
@@ -1781,6 +1829,18 @@ export interface PatrolStatus {
   patrolCount: number;
   lastPatrolAt: string | null;
   historySize: number;
+}
+
+// Runtime registry types
+export interface RuntimeInfo {
+  id: string;
+  displayName: string;
+  description: string;
+  defaultModel: string;
+  supportedModels: string[];
+  detected: boolean;
+  version: string | null;
+  authenticated: boolean;
 }
 
 export interface SessionHandoff {

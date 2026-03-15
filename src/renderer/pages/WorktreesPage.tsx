@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
   FiAlertTriangle,
   FiCheck,
@@ -86,19 +87,23 @@ export function WorktreesPage() {
       const result = await window.electronAPI.projectInitOverstory(activeProject.path);
       if (result.error) {
         setOverstoryStatus({ type: 'error', message: result.error });
+        toast.error(result.error);
       } else if (result.data?.alreadyExisted) {
         setOverstoryStatus({
           type: 'info',
           message: '.overstory/ directory already exists for this project.',
         });
+        toast.info('.overstory/ directory already exists');
       } else {
         setOverstoryStatus({
           type: 'success',
           message: '.overstory/ directory initialized successfully!',
         });
+        toast.success('.overstory/ initialized successfully');
       }
     } catch (err) {
       setOverstoryStatus({ type: 'error', message: String(err) });
+      toast.error('Failed to initialize .overstory/');
     } finally {
       setInitializingOverstory(false);
     }
@@ -113,12 +118,15 @@ export function WorktreesPage() {
         const result = await window.electronAPI.worktreeRemove(activeProject.path, worktreePath);
         if (result.error) {
           setCleanResult({ type: 'error', message: `Failed to remove: ${result.error}` });
+          toast.error(`Failed to remove worktree`);
         } else {
           setCleanResult({ type: 'success', message: `Removed worktree: ${worktreePath}` });
+          toast.success('Worktree removed');
           await loadWorktrees();
         }
       } catch (err) {
         setCleanResult({ type: 'error', message: String(err) });
+        toast.error('Failed to remove worktree');
       } finally {
         setRemovingPaths((prev) => {
           const next = new Set(prev);

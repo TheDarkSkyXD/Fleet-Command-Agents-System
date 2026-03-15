@@ -9,6 +9,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   FiActivity,
   FiAlertTriangle,
@@ -28,7 +29,7 @@ import {
   FiX,
   FiZap,
 } from 'react-icons/fi';
-import type { AgentCapability, AgentProcessInfo, ScopeOverlap, Session } from '../../shared/types';
+import type { AgentCapability, AgentProcessInfo, RuntimeInfo, ScopeOverlap, Session } from '../../shared/types';
 import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
@@ -303,6 +304,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [spawnPrompt, setSpawnPrompt] = useState('');
   const [spawnParentAgent, setSpawnParentAgent] = useState('');
   const [spawnTreePaths, setSpawnTreePaths] = useState<string[]>([]);
+  const [spawnRuntime, setSpawnRuntime] = useState('claude-code');
+  const [availableRuntimes, setAvailableRuntimes] = useState<RuntimeInfo[]>([]);
   const [isSpawning, setIsSpawning] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
@@ -390,7 +393,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     }
   }, [capabilityFilter]);
 
-  const openSpawnDialog = () => {
+  const openSpawnDialog = async () => {
     setSpawnCapability('scout');
     const modelDefaults = appSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS;
     setSpawnModel(modelDefaults.scout || 'haiku');
@@ -401,6 +404,23 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     setSpawnParentAgent('');
     setSpawnTreePaths([]);
     setSpawnError(null);
+
+    // Load available runtimes
+    try {
+      const runtimeResult = await window.electronAPI.runtimeList();
+      if (runtimeResult.data) {
+        setAvailableRuntimes(runtimeResult.data);
+      }
+      const defaultResult = await window.electronAPI.runtimeGetDefault();
+      if (defaultResult.data) {
+        setSpawnRuntime(defaultResult.data.defaultRuntimeId);
+      }
+    } catch {
+      // Fallback - claude-code only
+      setAvailableRuntimes([]);
+      setSpawnRuntime('claude-code');
+    }
+
     setShowSpawnDialog(true);
   };
 
@@ -423,6 +443,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         agent_name: agentName,
         capability: spawnCapability,
         model: spawnModel,
+        runtime: spawnRuntime,
         task_id: spawnTaskId.trim() || undefined,
         file_scope:
           spawnTreePaths.length > 0
@@ -435,16 +456,19 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
 
       if (result.error) {
         setSpawnError(result.error);
+        toast.error(`Failed to spawn agent: ${result.error}`);
         setIsSpawning(false);
         return;
       }
 
       // Success - close dialog and refresh
       setShowSpawnDialog(false);
+      toast.success(`Agent "${agentName}" spawned successfully`);
       await loadSessions();
       await loadRunningProcesses();
     } catch (err) {
       setSpawnError(String(err));
+      toast.error('Failed to spawn agent');
     } finally {
       setIsSpawning(false);
     }
@@ -467,6 +491,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     try {
       if (stopConfirm.type === 'single' && stopConfirm.sessionId) {
         await window.electronAPI.agentStop(stopConfirm.sessionId);
+        toast.success(`Agent "${stopConfirm.agentName || 'unknown'}" stopped`);
       } else if (stopConfirm.type === 'bulk') {
         // Stop selected agents one by one
         const promises = Array.from(selectedAgents).map((id) =>
@@ -475,14 +500,17 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           }),
         );
         await Promise.all(promises);
+        toast.success(`Stopped ${selectedAgents.size} agent(s)`);
         setSelectedAgents(new Set());
       } else {
         await window.electronAPI.agentStopAll();
+        toast.success('All agents stopped');
       }
       await loadSessions();
       await loadRunningProcesses();
     } catch (err) {
       setError(String(err));
+      toast.error('Failed to stop agent(s)');
     } finally {
       setIsStopping(false);
       setStopConfirm(null);
@@ -539,9 +567,11 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     async (sessionId: string) => {
       try {
         await window.electronAPI.agentNudge(sessionId);
+        toast.success('Agent nudged');
         await loadSessions();
       } catch (err) {
         setError(String(err));
+        toast.error('Failed to nudge agent');
       }
     },
     [loadSessions],
@@ -1105,6 +1135,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         <SpawnDialog
           capability={spawnCapability}
           model={spawnModel}
+          runtime={spawnRuntime}
+          availableRuntimes={availableRuntimes}
           name={spawnName}
           taskId={spawnTaskId}
           fileScope={spawnFileScope}
@@ -1123,6 +1155,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             setSpawnModel(modelDefaults[cap as keyof typeof modelDefaults] || CAPABILITY_DEFAULTS[cap].model);
           }}
           onModelChange={setSpawnModel}
+          onRuntimeChange={setSpawnRuntime}
           onNameChange={setSpawnName}
           onTaskIdChange={setSpawnTaskId}
           onFileScopeChange={setSpawnFileScope}
