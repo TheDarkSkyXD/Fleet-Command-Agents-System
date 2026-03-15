@@ -1,5 +1,35 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Lead Agent Spawning & Hierarchy Tree)
+
+#### Feature #36: Spawn lead agent - PASSING
+- Fixed model auto-update: selecting lead capability now automatically sets opus model
+- Added child agent count display for lead/coordinator agents in card view
+- Parent agent relationship shown in agent detail rows
+- Lead agents show as available parents in spawn dialog for child agents
+- FiUsers icon imported for child count indicator
+
+#### Feature #47: Agent hierarchy tree visualization - PASSING
+- Complete rewrite of AgentHierarchyTree component with visual connection lines
+- CSS border-based tree connectors (vertical lines + horizontal branches)
+- Status colors matching spec: green=working, sky=booting, amber=stalled, red=zombie, slate=completed
+- Pulse animations on active states (booting, working, stalled)
+- Capability-sorted tree: coordinator first, then leads, then workers
+- Status color legend in header
+- Footer stats showing total agents, root count, max depth
+- Expand/collapse per node with chevron indicators
+- Click node to navigate to agent detail view
+- Capability-specific icons (FiUsers for coordinator, FiUser for lead, FiCpu for workers)
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Auto-model-update on capability change, child count in cards
+- REWRITTEN: src/renderer/components/AgentHierarchyTree.tsx - Full visual tree with connection lines
+
+#### Current Status
+- 51/366 features passing (added #36, #47)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Desktop Notifications & Merge Ready Notification)
 
 #### Feature #211: Desktop notifications via Electron Notification API - PASSING
