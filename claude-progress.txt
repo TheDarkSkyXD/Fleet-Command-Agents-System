@@ -1,5 +1,44 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (date-fns Timestamps & Accurate created_at)
+
+#### Feature #336: Timestamps display with date-fns formatting - PASSING
+- Created centralized date formatting utility: src/renderer/lib/dateFormatting.ts
+- Functions: formatAbsoluteDateTime, formatDateTime, formatDateOnly, formatTimeOnly, formatRelativeTime, formatUptime, formatCompactDateTime
+- Updated 12 files to use date-fns: AgentDetailPage, MailPage, WelcomePage, DebugPage, AgentsPage, TasksPage, AgentDefinitionsPage, CoordinatorPanel, StatusBar, UpdateBanner, OrphanedProcessDialog, RelativeTime
+- Removed all duplicated local formatDate/formatRelativeTime functions
+- All timestamps now use date-fns format() and formatDistanceToNow() consistently
+
+#### Feature #337: Accurate created_at timestamps on records - PASSING
+- Verified all database tables use DEFAULT (datetime('now')) for created_at - SQLite sets at INSERT time
+- Explicit inserts use datetime('now') or new Date().toISOString() - both accurate
+- No hardcoded timestamps found anywhere in codebase
+- Timezone consistently UTC in database
+- Added data-testid='agent-created-at' and 'issue-created-at' with data-created-at attributes
+- Fixed remaining toLocaleString in MailPage outbox to use date-fns formatCompactDateTime
+
+#### Files Created
+- NEW: src/renderer/lib/dateFormatting.ts
+
+#### Files Modified
+- src/renderer/components/RelativeTime.tsx - uses formatAbsoluteDateTime from dateFormatting
+- src/renderer/components/CoordinatorPanel.tsx - formatTimeOnly, formatDateOnly
+- src/renderer/components/StatusBar.tsx - formatDateTime, formatCompactDateTime
+- src/renderer/components/UpdateBanner.tsx - formatDateOnly
+- src/renderer/components/OrphanedProcessDialog.tsx - formatDateTime
+- src/renderer/pages/AgentDetailPage.tsx - formatDateTime, formatTimeOnly, formatUptimeFn + data-testid
+- src/renderer/pages/AgentsPage.tsx - formatDateTime
+- src/renderer/pages/MailPage.tsx - formatRelTime, formatCompactDateTime
+- src/renderer/pages/WelcomePage.tsx - formatRelativeTime
+- src/renderer/pages/DebugPage.tsx - formatTimeOnly, formatDateTime, formatAbsoluteDateTime
+- src/renderer/pages/TasksPage.tsx - formatDateTime, formatDateOnly + data-testid
+- src/renderer/pages/AgentDefinitionsPage.tsx - formatDateTime
+
+#### Current Status
+- 335/366 features passing (added #336 and #337 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (ARIA Labels & Input Labels)
 
 #### Feature #333: ARIA labels on icon-only buttons - PASSING
