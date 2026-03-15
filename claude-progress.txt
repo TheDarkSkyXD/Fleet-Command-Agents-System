@@ -1,5 +1,39 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Stream JSON Parser & Model Picker)
+
+#### Feature #29: Stream JSON output parsing - PASSING
+- Created dedicated StreamJsonParser class at src/main/services/streamJsonParser.ts
+- Full TypeScript interfaces for all Claude CLI stream-json event types:
+  - system, assistant, tool_use, tool_result
+  - content_block_start/delta/stop, message_start/delta/stop
+  - result, error
+- Parser buffers incoming pty data, splits into lines, strips ANSI escape codes
+- JSON parsing with graceful error handling (malformed lines silently ignored)
+- Token usage extraction via static extractUsage() method
+- Integrated into AgentProcessManager: each agent gets its own parser instance
+- Parsed events broadcast to renderer via 'agent:parsed-event' IPC channel
+- Added onAgentParsedEvent to preload bridge and ElectronAPI types
+
+#### Feature #30: Model picker in agent spawn dialog - PASSING
+- Already fully implemented in SpawnDialog component
+- MODELS array: ['haiku', 'sonnet', 'opus'] with button-style selectors
+- Active model highlighted in blue, auto-updates when capability changes
+- Warning shown when model differs from capability default
+- Selected model passed through IPC to agentProcessManager.spawn() --model flag
+- data-testid="spawn-model-picker" for testing
+
+#### Files Created/Modified
+- NEW: src/main/services/streamJsonParser.ts - StreamJsonParser class with typed events
+- MODIFIED: src/main/services/agentProcessManager.ts - Integrated StreamJsonParser, added handleParsedEvent and broadcastParsedEvent
+- MODIFIED: src/preload/index.ts - Added onAgentParsedEvent bridge method
+- MODIFIED: src/shared/types/index.ts - Added onAgentParsedEvent to ElectronAPI
+
+#### Current Status
+- 111/366 features passing (added #29 and #30 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Window State & Tray Menu Verification)
 
 #### Feature #11: Window state persistence across restart - PASSING
