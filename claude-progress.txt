@@ -4139,3 +4139,30 @@
 - 275/366 features passing (added #275 and #276 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Post-Action Redirects & Tab Navigation)
+
+#### Feature #279: Post-action redirect correctness - PASSING
+- Agent spawn now navigates to agent detail view via onSelectAgent callback after successful spawn
+- Issue creation shows toast confirmation and stays on task list (appropriate behavior)
+- Issue deletion from list stays on list; deletion while detail modal is open automatically closes the modal
+- Command palette spawn action navigates to agents page (where spawn dialog is accessed)
+- Added toast import to TasksPage for user feedback
+
+#### Feature #280: Tab navigation within detail views - PASSING
+- Added data-testid="agent-detail-tabs" to tab bar container
+- Added data-testid="agent-tab-{id}" to each individual tab button (terminal, logs, identity, files, mail, performance, gates)
+- Added aria-selected and role="tab" attributes for accessibility
+- Added data-testid="agent-tab-content-{activeTab}" to tab content panel (dynamically reflects active tab)
+- Added data-testid="agent-detail-page" and data-agent-id={agentId} to page container for context verification
+- All 7 tabs maintain agent context correctly (activeTab state is independent of session data)
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Post-spawn redirect to agent detail
+- MODIFIED: src/renderer/pages/TasksPage.tsx - Delete closes detail modal, create shows toast, sonner import
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Tab data-testid/aria attributes, page data-agent-id
+
+#### Current Status
+- 279/366 features passing (added #279 and #280 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
