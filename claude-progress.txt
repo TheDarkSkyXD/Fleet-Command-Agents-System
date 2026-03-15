@@ -1034,3 +1034,34 @@
 - MODIFIED: src/shared/types/index.ts - Added DiscoveryScan, DiscoveryFinding, related types
 - MODIFIED: src/renderer/components/AppLayout.tsx - Integrated DiscoveryPage
 - MODIFIED: src/renderer/components/Sidebar.tsx - Added Discovery nav item
+
+### Session: 2026-03-14 (Agent Identity & CV Card)
+
+#### Feature #180: Persistent agent identity across sessions - PASSING
+- Agent spawn auto-creates/updates identity in agent_identities table
+- Agent stop increments sessions_completed and tracks recent tasks (last 10)
+- Added 5 IPC handlers: identity:get, identity:list, identity:upsert, identity:sessions, identity:update-expertise
+- Updated preload bridge with identity methods
+- Updated ElectronAPI interface with identity method types
+
+#### Feature #181: Agent CV viewer as profile card - PASSING
+- Built AgentCVCard component replacing placeholder in AgentDetailPage Identity tab
+- Gradient banner with capability-specific colors (purple for scout, blue for builder, etc.)
+- Profile card with avatar icon, agent name, capability badge, member-since date
+- Session count badge prominently displayed
+- Stats grid: completed sessions, expertise domains count, recent tasks count
+- Expertise domains displayed as styled tag chips
+- Recent tasks shown as monospace list with hash icons
+- Session history with state indicators, truncated IDs, task info, timestamps
+- All data loaded from real SQLite via identity IPC handlers
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added identity IPC handlers + spawn/stop identity tracking
+- MODIFIED: src/preload/index.ts - Added identity bridge methods
+- MODIFIED: src/shared/types/index.ts - Added identity methods to ElectronAPI
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Added AgentCVCard component
+
+#### Current Status
+- 67/366 features passing (added #180 and #181 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
