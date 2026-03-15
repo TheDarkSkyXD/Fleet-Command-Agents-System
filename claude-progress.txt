@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Card Animations & Mail Badge)
+
+#### Feature #243: Card entrance animations - PASSING
+- Created reusable AnimatedCard and AnimatedCardContainer components using Framer Motion
+- Staggered entrance effect: fade + slide-up, 50ms stagger delay, 250ms duration
+- Applied to 5 pages: AgentsPage (active cards), SettingsPage (profile cards), MetricsPage (summary cards), DiscoveryPage (category cards), ExpertisePage (domain cards)
+- Subtle and fast animation, no jarring visual effects
+
+#### Feature #244: Unread mail count badge on sidebar nav - PASSING
+- Badge was already implemented, enhanced with blue accent color (bg-blue-500 + shadow glow)
+- Added data-testid="mail-unread-badge" for testing
+- Polls every 5s via mail:unread-count IPC from real database
+- Shows on both collapsed (icon badge) and expanded (inline badge) sidebar modes
+- Shows 99+ for counts over 99
+
+#### Files Created
+- NEW: src/renderer/components/AnimatedCard.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - AnimatedCardContainer on card view
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - AnimatedCardContainer on profile cards
+- MODIFIED: src/renderer/pages/MetricsPage.tsx - AnimatedCardContainer on summary cards
+- MODIFIED: src/renderer/pages/DiscoveryPage.tsx - AnimatedCardContainer on category cards
+- MODIFIED: src/renderer/pages/ExpertisePage.tsx - AnimatedCardContainer on domain cards
+- MODIFIED: src/renderer/components/Sidebar.tsx - Blue accent badge, data-testid
+
+#### Current Status
+- 248/366 features passing (added #243 and #244 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Terminal Scroll-Lock & Virtualized Lists)
 
 #### Feature #238: Terminal auto-scroll with scroll-lock toggle - PASSING
