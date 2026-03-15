@@ -142,6 +142,7 @@ function QueueEntryRow({
   onViewDiff,
   onAutoResolve,
   onAiResolve,
+  onReimagine,
 }: {
   entry: MergeQueueEntry;
   position: number;
@@ -152,6 +153,7 @@ function QueueEntryRow({
   onViewDiff: (id: number) => void;
   onAutoResolve?: (id: number) => void;
   onAiResolve?: (id: number) => void;
+  onReimagine?: (id: number) => void;
 }) {
   const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
 
@@ -216,6 +218,17 @@ function QueueEntryRow({
             AI-Resolve
           </button>
         )}
+        {(entry.status === 'conflict' || entry.status === 'failed') && onReimagine && (
+          <button
+            type="button"
+            onClick={() => onReimagine(entry.id)}
+            data-testid={`reimagine-${entry.id}`}
+            className="rounded-md border border-rose-600/50 bg-rose-600/10 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-600/20 transition-colors"
+            title="Abandon branch and reimplement from scratch"
+          >
+            Reimagine
+          </button>
+        )}
         {entry.status === 'merging' && (
           <>
             <button
@@ -265,6 +278,7 @@ export function MergeQueuePage() {
     remove,
     autoResolve,
     aiResolve,
+    reimagine,
   } = useMergeStore();
 
   const [showEnqueue, setShowEnqueue] = useState(false);
@@ -315,6 +329,10 @@ export function MergeQueuePage() {
 
   const handleAiResolve = async (id: number) => {
     await aiResolve(id);
+  };
+
+  const handleReimagine = async (id: number) => {
+    await reimagine(id);
   };
 
   const handleViewDiff = useCallback(
@@ -440,6 +458,7 @@ export function MergeQueuePage() {
                 onViewDiff={handleViewDiff}
                 onAutoResolve={handleAutoResolve}
                 onAiResolve={handleAiResolve}
+                onReimagine={handleReimagine}
               />
             ))}
           </div>

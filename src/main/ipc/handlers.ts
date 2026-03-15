@@ -2172,7 +2172,7 @@ export function registerIpcHandlers(): void {
 
         if (result.success) {
           loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'clean-merge' WHERE id = ?",
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'clean-merge', completed_at = datetime('now') WHERE id = ?",
           ).run(id);
           const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
           log.info(`[IPC] merge:execute - Tier 1 clean merge succeeded for id=${id}`);
@@ -2192,14 +2192,14 @@ export function registerIpcHandlers(): void {
           };
         }
 
-        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
         log.error(`[IPC] merge:execute - merge failed for id=${id}: ${result.error}`);
         return { data: updated, error: result.error };
       } catch (error) {
         log.error('merge:execute failed:', error);
         try {
-          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+          loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         } catch {
           // ignore DB update failure on error path
         }
@@ -2230,7 +2230,7 @@ export function registerIpcHandlers(): void {
 
         if (result.success) {
           loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'auto-resolve' WHERE id = ?",
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'auto-resolve', completed_at = datetime('now') WHERE id = ?",
           ).run(id);
           const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
           log.info(`[IPC] merge:auto-resolve - Tier 2 succeeded for id=${id}`);
@@ -2246,14 +2246,14 @@ export function registerIpcHandlers(): void {
           return { data: updated, error: result.error, conflicts: result.conflictFiles };
         }
 
-        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
         log.error(`[IPC] merge:auto-resolve - failed for id=${id}: ${result.error}`);
         return { data: updated, error: result.error };
       } catch (error) {
         log.error('merge:auto-resolve failed:', error);
         try {
-          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+          loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         } catch {
           /* ignore */
         }
@@ -2284,7 +2284,7 @@ export function registerIpcHandlers(): void {
 
         if (result.success) {
           loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'ai-resolve' WHERE id = ?",
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'ai-resolve', completed_at = datetime('now') WHERE id = ?",
           ).run(id);
           const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
           log.info(`[IPC] merge:ai-resolve - Tier 3 succeeded for id=${id}`);
@@ -2300,7 +2300,7 @@ export function registerIpcHandlers(): void {
           return { data: updated, error: result.error, conflicts: result.conflictFiles };
         }
 
-        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        loggedPrepare("UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?").run(id);
         const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
         log.error(`[IPC] merge:ai-resolve - failed for id=${id}: ${result.error}`);
         return { data: updated, error: result.error };

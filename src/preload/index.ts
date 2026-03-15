@@ -55,6 +55,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('merge:auto-resolve', id, repoPath, targetBranch),
   mergeAiResolve: (id: number, repoPath?: string, targetBranch?: string) =>
     ipcRenderer.invoke('merge:ai-resolve', id, repoPath, targetBranch),
+  mergeReimagine: (id: number, repoPath?: string, targetBranch?: string) =>
+    ipcRenderer.invoke('merge:reimagine', id, repoPath, targetBranch),
 
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) =>

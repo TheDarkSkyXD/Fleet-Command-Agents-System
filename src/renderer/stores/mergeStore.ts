@@ -23,6 +23,7 @@ interface MergeState {
   markConflict: (id: number) => Promise<MergeQueueEntry | null>;
   autoResolve: (id: number) => Promise<MergeQueueEntry | null>;
   aiResolve: (id: number) => Promise<MergeQueueEntry | null>;
+  reimagine: (id: number) => Promise<MergeQueueEntry | null>;
   remove: (id: number) => Promise<boolean>;
 }
 
@@ -168,6 +169,22 @@ export const useMergeStore = create<MergeState>((set, get) => ({
   aiResolve: async (id) => {
     try {
       const result = await window.electronAPI.mergeAiResolve(id);
+      if (result.error) {
+        set({ error: result.error });
+        return null;
+      }
+      await get().fetchQueue();
+      await get().fetchHistory();
+      return result.data;
+    } catch (err) {
+      set({ error: String(err) });
+      return null;
+    }
+  },
+
+  reimagine: async (id) => {
+    try {
+      const result = await window.electronAPI.mergeReimagine(id);
       if (result.error) {
         set({ error: result.error });
         return null;

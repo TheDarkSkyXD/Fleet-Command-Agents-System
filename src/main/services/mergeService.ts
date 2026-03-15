@@ -661,6 +661,135 @@ ${content}`;
 }
 
 /**
+ * Tier 4: Reimagine from scratch - abandon the original branch and create a new implementation.
+ * When all other tiers (clean-merge, auto-resolve, AI-resolve) fail, this tier abandons
+ * the conflicting branch entirely and spawns a fresh reimplementation from the target branch.
+ *
+ * @param repoPath - Path to the git repository
+ * @param branchName - The original branch that couldn't be merged (will be abandoned)
+ * @param targetBranch - The branch to base the reimplementation on
+ * @param taskDescription - Optional description of what the branch was implementing (for the reimagine agent)
+ */
+export async function reimagineFromScratch(
+  repoPath: string,
+  branchName: string,
+  targetBranch?: string,
+  taskDescription?: string,
+): Promise<MergeResult & { reimagineBranch?: string }> {
+  const git = simpleGit(repoPath);
+
+  try {
+    // Ensure we're on the target branch
+    const currentTarget = targetBranch || 'main';
+    try {
+      await git.checkout(currentTarget);
+    } catch {
+      // If target branch doesn't exist, try 'master'
+      try {
+        await git.checkout('master');
+      } catch {
+        log.error('[Merge] Tier 4: Could not checkout target branch');
+        return {
+          success: false,
+          resolvedTier: null,
+          error: `Could not checkout target branch '${currentTarget}'`,
+          conflictFiles: [],
+        };
+      }
+    }
+
+    log.info(`[Merge] Tier 4: Reimagining ${branchName} from scratch`);
+
+    // Get the list of files that were modified in the original branch for reference
+    let originalFiles: string[] = [];
+    try {
+      const diffResult = await git.diff(['--name-only', `${currentTarget}...${branchName}`]);
+      originalFiles = diffResult.split('\n').filter((f) => f.trim().length > 0);
+      log.info(
+        `[Merge] Tier 4: Original branch modified ${originalFiles.length} file(s): ${originalFiles.join(', ')}`,
+      );
+    } catch {
+      log.warn('[Merge] Tier 4: Could not get diff of original branch files');
+    }
+
+    // Get the commit messages from the original branch for context
+    let originalCommitMessages = '';
+    try {
+      const logResult = await git.log([`${currentTarget}..${branchName}`, '--oneline']);
+      originalCommitMessages = logResult.all.map((c) => c.message).join('\n');
+      log.info(`[Merge] Tier 4: Original branch had ${logResult.all.length} commit(s)`);
+    } catch {
+      log.warn('[Merge] Tier 4: Could not get original branch commit log');
+    }
+
+    // Create a new reimagine branch from the target
+    const timestamp = Date.now();
+    const reimagineBranch = `reimagine/${branchName.replace(/^(feature|fix|reimagine)\//i, '')}--${timestamp}`;
+
+    try {
+      await git.checkoutLocalBranch(reimagineBranch);
+      log.info(`[Merge] Tier 4: Created reimagine branch: ${reimagineBranch}`);
+    } catch (branchErr) {
+      log.error(`[Merge] Tier 4: Could not create reimagine branch: ${branchErr}`);
+      return {
+        success: false,
+        resolvedTier: null,
+        error: `Failed to create reimagine branch: ${branchErr}`,
+        conflictFiles: [],
+      };
+    }
+
+    // Write a reimagine manifest file with context about what needs to be reimplemented
+    const manifest = {
+      original_branch: branchName,
+      target_branch: currentTarget,
+      reimagine_branch: reimagineBranch,
+      created_at: new Date().toISOString(),
+      original_files: originalFiles,
+      original_commits: originalCommitMessages,
+      task_description: taskDescription || `Reimplement the changes from branch '${branchName}'`,
+      status: 'pending',
+    };
+
+    const manifestPath = path.join(repoPath, '.reimagine-manifest.json');
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    await git.add('.reimagine-manifest.json');
+    await git.commit(`Reimagine: abandon '${branchName}' and start fresh implementation`);
+
+    log.info(`[Merge] Tier 4: Reimagine initiated successfully. New branch: ${reimagineBranch}`);
+
+    // Switch back to target branch so the repo is in a clean state
+    await git.checkout(currentTarget);
+
+    return {
+      success: true,
+      resolvedTier: 'reimagine',
+      error: null,
+      conflictFiles: [],
+      reimagineBranch,
+    };
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log.error(`[Merge] Tier 4 unexpected error: ${errorMessage}`);
+
+    // Try to get back to a clean state
+    try {
+      const currentTarget = targetBranch || 'main';
+      await git.checkout(currentTarget);
+    } catch {
+      /* ignore */
+    }
+
+    return {
+      success: false,
+      resolvedTier: null,
+      error: errorMessage,
+      conflictFiles: [],
+    };
+  }
+}
+
+/**
  * Invoke Claude CLI to resolve conflict content.
  * Uses `claude -p` (print mode) to send a prompt and get a response.
  */

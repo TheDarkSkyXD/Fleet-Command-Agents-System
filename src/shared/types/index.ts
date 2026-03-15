@@ -267,6 +267,7 @@ export interface MergeQueueEntry {
   status: MergeStatus;
   resolved_tier: MergeResolutionTier | null;
   enqueued_at: string;
+  completed_at: string | null;
 }
 
 export interface TaskGroup {
@@ -898,6 +899,15 @@ export interface ElectronAPI {
     repoPath?: string,
     targetBranch?: string,
   ) => Promise<{ data: MergeQueueEntry | null; error: string | null; conflicts?: string[] }>;
+  mergeReimagine: (
+    id: number,
+    repoPath?: string,
+    targetBranch?: string,
+  ) => Promise<{
+    data: MergeQueueEntry | null;
+    error: string | null;
+    reimagineBranch?: string;
+  }>;
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) => Promise<{
     data: Issue[] | null;
