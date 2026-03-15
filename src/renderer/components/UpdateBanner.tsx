@@ -2,6 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { FiDownload, FiFileText, FiRefreshCw, FiX } from 'react-icons/fi';
 import type { UpdateStatus } from '../../shared/types';
 
+/** Format bytes to human-readable string */
+function formatBytes(bytes: number | null): string {
+  if (!bytes) return '0 B';
+  if (bytes > 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes > 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
 /**
  * Simple markdown renderer for GitHub release notes.
  * Handles headers, bold, italic, links, code blocks, inline code, lists, and horizontal rules.
@@ -243,56 +252,22 @@ export function UpdateBanner() {
     return `${bps} B/s`;
   };
 
+  const progressPercent = status.downloadProgress != null ? Math.round(status.downloadProgress) : 0;
+
   return (
     <>
       <div
-        className="relative flex items-center gap-3 bg-blue-600/90 px-4 py-2 text-white text-sm"
+        className="relative flex flex-col bg-blue-600/90 text-white text-sm"
         data-testid="update-banner"
       >
-        {/* Download progress bar background */}
-        {downloading && status.downloadProgress != null && (
-          <div
-            className="absolute inset-0 bg-blue-500/50 transition-all duration-300"
-            style={{ width: `${status.downloadProgress}%` }}
-          />
-        )}
-
-        <div className="relative z-10 flex items-center gap-3 flex-1">
-          {downloaded ? (
-            <>
-              <FiRefreshCw className={`w-4 h-4 ${installing ? 'animate-spin' : ''}`} />
-              <span>
-                Fleet Command <strong>v{status.latestVersion}</strong> is ready to install.
-              </span>
-              <button
-                type="button"
-                onClick={handleViewChangelog}
-                className="ml-1 inline-flex items-center gap-1 rounded bg-white/10 px-3 py-1 text-xs font-medium hover:bg-white/20 transition-colors"
-                data-testid="view-changelog-btn"
-              >
-                <FiFileText className="w-3 h-3" />
-                View Changelog
-              </button>
-              <button
-                type="button"
-                onClick={handleInstall}
-                disabled={installing}
-                className="ml-1 inline-flex items-center gap-1 rounded bg-white/20 px-3 py-1 text-xs font-medium hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="update-install-btn"
-              >
-                <FiRefreshCw className={`w-3 h-3 ${installing ? 'animate-spin' : ''}`} />
-                {installing ? 'Installing...' : 'Restart & Update'}
-              </button>
-            </>
-          ) : downloading ? (
-            <>
-              <FiDownload className="w-4 h-4 animate-bounce" />
-              <span>
-                Downloading v{status.latestVersion}...{' '}
-                {status.downloadProgress != null && `${status.downloadProgress}%`}
-                {status.downloadSpeed ? ` (${formatSpeed(status.downloadSpeed)})` : ''}
-              </span>
-              {status.releaseNotes && (
+        <div className="flex items-center gap-3 px-4 py-2">
+          <div className="relative z-10 flex items-center gap-3 flex-1">
+            {downloaded ? (
+              <>
+                <FiRefreshCw className={`w-4 h-4 ${installing ? 'animate-spin' : ''}`} />
+                <span>
+                  Fleet Command <strong>v{status.latestVersion}</strong> is ready to install.
+                </span>
                 <button
                   type="button"
                   onClick={handleViewChangelog}
@@ -300,47 +275,100 @@ export function UpdateBanner() {
                   data-testid="view-changelog-btn"
                 >
                   <FiFileText className="w-3 h-3" />
-                  Changelog
+                  View Changelog
                 </button>
-              )}
-            </>
-          ) : (
-            <>
-              <FiDownload className="w-4 h-4" />
-              <span>
-                A new version of Fleet Command is available:{' '}
-                <strong>v{status.latestVersion}</strong>
-              </span>
-              <button
-                type="button"
-                onClick={handleViewChangelog}
-                className="ml-1 inline-flex items-center gap-1 rounded bg-white/10 px-3 py-1 text-xs font-medium hover:bg-white/20 transition-colors"
-                data-testid="view-changelog-btn"
-              >
-                <FiFileText className="w-3 h-3" />
-                View Changelog
-              </button>
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="ml-1 inline-flex items-center gap-1 rounded bg-white/20 px-3 py-1 text-xs font-medium hover:bg-white/30 transition-colors"
-                data-testid="update-download-btn"
-              >
-                <FiDownload className="w-3 h-3" />
-                Download
-              </button>
-            </>
-          )}
+                <button
+                  type="button"
+                  onClick={handleInstall}
+                  disabled={installing}
+                  className="ml-1 inline-flex items-center gap-1 rounded bg-white/20 px-3 py-1 text-xs font-medium hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="update-install-btn"
+                >
+                  <FiRefreshCw className={`w-3 h-3 ${installing ? 'animate-spin' : ''}`} />
+                  {installing ? 'Installing...' : 'Restart & Update'}
+                </button>
+              </>
+            ) : downloading ? (
+              <>
+                <FiDownload className="w-4 h-4 animate-bounce" />
+                <span>Downloading v{status.latestVersion}...</span>
+                <span
+                  className="ml-1 font-mono font-bold tabular-nums"
+                  data-testid="update-download-percent"
+                >
+                  {progressPercent}%
+                </span>
+                {status.downloadedBytes != null && status.totalBytes != null && (
+                  <span className="ml-1 text-blue-200 text-xs">
+                    ({formatBytes(status.downloadedBytes)} / {formatBytes(status.totalBytes)})
+                  </span>
+                )}
+                {status.downloadSpeed ? (
+                  <span className="ml-1 text-blue-200 text-xs">
+                    &mdash; {formatSpeed(status.downloadSpeed)}
+                  </span>
+                ) : null}
+                {status.releaseNotes && (
+                  <button
+                    type="button"
+                    onClick={handleViewChangelog}
+                    className="ml-2 inline-flex items-center gap-1 rounded bg-white/10 px-3 py-1 text-xs font-medium hover:bg-white/20 transition-colors"
+                    data-testid="view-changelog-btn"
+                  >
+                    <FiFileText className="w-3 h-3" />
+                    Changelog
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <FiDownload className="w-4 h-4" />
+                <span>
+                  A new version of Fleet Command is available:{' '}
+                  <strong>v{status.latestVersion}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleViewChangelog}
+                  className="ml-1 inline-flex items-center gap-1 rounded bg-white/10 px-3 py-1 text-xs font-medium hover:bg-white/20 transition-colors"
+                  data-testid="view-changelog-btn"
+                >
+                  <FiFileText className="w-3 h-3" />
+                  View Changelog
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="ml-1 inline-flex items-center gap-1 rounded bg-white/20 px-3 py-1 text-xs font-medium hover:bg-white/30 transition-colors"
+                  data-testid="update-download-btn"
+                >
+                  <FiDownload className="w-3 h-3" />
+                  Download
+                </button>
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="relative z-10 rounded p-1 hover:bg-white/20 transition-colors"
+            title="Dismiss"
+          >
+            <FiX className="w-4 h-4" />
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDismiss}
-          className="relative z-10 rounded p-1 hover:bg-white/20 transition-colors"
-          title="Dismiss"
-        >
-          <FiX className="w-4 h-4" />
-        </button>
+        {/* Download progress bar */}
+        {downloading && (
+          <div className="w-full h-1.5 bg-blue-800/60" data-testid="update-progress-bar">
+            <div
+              className="h-full bg-blue-300 transition-all duration-300 ease-out"
+              style={{ width: `${progressPercent}%` }}
+              data-testid="update-progress-fill"
+            />
+          </div>
+        )}
       </div>
 
       {/* Changelog Modal */}
