@@ -20,6 +20,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { CommandPalette } from './CommandPalette';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingTour } from './OnboardingTour';
+import { SetupWizard } from './SetupWizard';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
 import { UpdateBanner } from './UpdateBanner';
@@ -94,8 +95,18 @@ export function AppLayout() {
     setCurrentPage('agents');
   }, []);
 
+  // Setup wizard: show on first launch when setupCompleted is false
+  const showSetupWizard = loaded && !settings.setupCompleted;
+
+  const handleSetupComplete = useCallback(() => {
+    updateSetting('setupCompleted', true);
+  }, [updateSetting]);
+
   return (
     <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
+      {/* Setup Wizard - shown on first launch */}
+      {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
+
       {/* Update banner - appears at top when update available */}
       <UpdateBanner />
 

@@ -21,6 +21,9 @@ export interface AppSettings {
 
   // UI state
   sidebarCollapsed: boolean;
+
+  // Setup
+  setupCompleted: boolean;
 }
 
 export type AccentColorKey =
@@ -131,6 +134,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   terminalFontSize: 14,
   accentColor: 'blue',
   sidebarCollapsed: false,
+  setupCompleted: false,
 };
 
 /** Apply accent color CSS custom properties to :root */

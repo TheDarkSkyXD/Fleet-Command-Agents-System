@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fi';
 import { z } from 'zod';
 import type { ConfigProfile, QualityGate, QualityGateResult } from '../../shared/types';
+import { AuthDecisionTree } from '../components/AuthDecisionTree';
 import { useProjectStore } from '../stores/projectStore';
 import {
   ACCENT_COLORS,
@@ -84,7 +85,7 @@ const DEFAULT_PROFILE_FORM: ProfileFormData = {
 export function SettingsPage() {
   const { loaded, saving, loadSettings } = useSettingsStore();
   const [activeTab, setActiveTab] = useState<
-    'agents' | 'watchdog' | 'terminal' | 'theme' | 'profiles' | 'quality-gates'
+    'cli-status' | 'agents' | 'watchdog' | 'terminal' | 'theme' | 'profiles' | 'quality-gates'
   >('agents');
 
   useEffect(() => {
@@ -103,6 +104,7 @@ export function SettingsPage() {
   }
 
   const tabs = [
+    { id: 'cli-status' as const, label: 'CLI Status' },
     { id: 'agents' as const, label: 'Agents' },
     { id: 'watchdog' as const, label: 'Watchdog' },
     { id: 'terminal' as const, label: 'Terminal' },
@@ -150,6 +152,7 @@ export function SettingsPage() {
       </div>
 
       {/* Tab Content */}
+      {activeTab === 'cli-status' && <CliStatusSettings />}
       {activeTab === 'agents' && <AgentSettings />}
       {activeTab === 'watchdog' && <WatchdogSettings />}
       {activeTab === 'terminal' && <TerminalSettings />}
@@ -2153,6 +2156,20 @@ function QualityGatesSettings() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** CLI Status Settings - Auth decision tree */
+function CliStatusSettings() {
+  return (
+    <div data-testid="cli-status-settings">
+      <h2 className="text-lg font-semibold text-slate-100 mb-2">Claude Code CLI Status</h2>
+      <p className="text-sm text-slate-400 mb-6">
+        Fleet Command requires the Claude Code CLI to be installed and authenticated. The decision
+        tree below shows the current state.
+      </p>
+      <AuthDecisionTree />
     </div>
   );
 }

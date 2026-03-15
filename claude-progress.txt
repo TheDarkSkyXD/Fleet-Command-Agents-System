@@ -1690,3 +1690,29 @@
 #### Current Status
 - 109/366 features passing (added #21 and #23 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
+
+### Session: 2026-03-14 (Env Var Stripping and Resume)
+
+#### Feature #31: Environment variable stripping before spawn - PASSING
+- Already correctly implemented in agentProcessManager.ts lines 134-144
+- Strips all keys starting with CLAUDECODE and CLAUDE_CODE_ENTRYPOINT
+- All other env vars preserved and passed to node-pty spawn
+
+#### Feature #32: Session resume support - PASSING
+- Added resumeSessionId field to AgentSpawnOptions interface
+- spawn() method passes --resume sessionId flag when resumeSessionId is set
+- Prompt is skipped when resuming (--resume replaces -p)
+- Added resume() convenience method to AgentProcessManager
+- Added agent:resume IPC handler with full session DB tracking and event recording
+- Added agentResume preload bridge method
+- Added AgentResumeRequest type to shared types
+
+#### Files Modified
+- MODIFIED: src/main/services/agentProcessManager.ts
+- MODIFIED: src/main/ipc/handlers.ts
+- MODIFIED: src/preload/index.ts
+- MODIFIED: src/shared/types/index.ts
+
+#### Current Status
+- 113/366 features passing (added #31 and #32 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
