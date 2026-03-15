@@ -1,5 +1,32 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Sensitive Operations Confirmation & IPC Security)
+
+#### Feature #271: Sensitive operations require confirmation - PASSING
+- Added delete confirmation modal to ProfileCard in SettingsPage
+- Modal shows profile name, warning about permanent removal, Cancel/Delete buttons
+- Red-themed dialog consistent with other destructive confirmation patterns
+- Added kill confirmation dialog to OrphanedProcessDialog
+- Kill confirm shows agent name, PID, warning about data loss, Cancel/Kill buttons
+- All destructive operations now protected: stop all, nuclear cleanup, force-remove worktree, delete rules, delete prompts, delete roles, reset defaults, delete profiles, kill orphans
+- data-testid attributes on all confirmation elements
+
+#### Feature #272: IPC context bridge security - PASSING
+- Verified nodeIntegration: false in both splash and main BrowserWindow configs
+- Verified contextIsolation: true in both windows
+- Preload script uses contextBridge.exposeInMainWorld for limited API surface
+- Renderer cannot access Node.js APIs directly
+- IPC parameter validation (validateIpcParams) enforces type checking on all handlers
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Profile delete confirmation dialog
+- MODIFIED: src/renderer/components/OrphanedProcessDialog.tsx - Kill process confirmation dialog
+
+#### Current Status
+- 269/366 features passing (added #271 and #272 this session)
+- All code passes Biome lint on modified files
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Guard Enforcement Service)
 
 #### Feature #265: Agent process isolation to worktree - PASSING
