@@ -182,8 +182,10 @@ function generateName(capability: AgentCapability): string {
 
 function formatUptime(createdAt: string): string {
   const uptime = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
-  const minutes = Math.floor(uptime / 60);
+  const hours = Math.floor(uptime / 3600);
+  const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = uptime % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
   return `${minutes}m ${seconds}s`;
 }
 
@@ -454,6 +456,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Tick counter to force uptime cell re-renders every second for accurate display
+  const [uptimeTick, setUptimeTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setUptimeTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const { agentsFilters, setAgentsFilters } = useFilterStore();
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy' | 'scope'>(
     agentsFilters.viewMode,
@@ -1133,6 +1141,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       activeSessions,
       toggleSelectAll,
       toggleAgentSelection,
+      uptimeTick, // Force uptime cell re-renders every second
     ],
   );
 
@@ -1778,7 +1787,7 @@ function AgentCard({
           )}
 
           {/* Uptime */}
-          <span className="text-xs text-slate-400" data-testid="agent-card-uptime">
+          <span className="text-xs text-slate-400" data-testid="agent-card-uptime" data-created-at={session.created_at}>
             {formatUptime(session.created_at)}
           </span>
 

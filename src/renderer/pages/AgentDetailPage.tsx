@@ -708,6 +708,12 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('terminal');
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  // Tick counter to force uptime display re-renders every second for accuracy
+  const [, setUptimeTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setUptimeTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const loadSession = useCallback(async () => {
     try {
@@ -1063,7 +1069,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
               PID: {session.pid || processInfo?.pid}
             </span>
           )}
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1" data-testid="agent-detail-uptime" data-created-at={session.created_at}>
             <FiClock className="h-3 w-3" />
             {formatUptimeFn(session.created_at)}
           </span>
