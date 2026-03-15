@@ -9,6 +9,7 @@ import {
   FiTrash2,
   FiX,
 } from 'react-icons/fi';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { Message, MessagePriority, MessageType } from '../../shared/types';
 
 type MailTab = 'inbox' | 'sent' | 'all';
@@ -307,336 +308,358 @@ export function MailPage() {
         ))}
       </div>
 
-      {/* Content */}
-      <div className="flex flex-1 gap-4 overflow-hidden">
-        {/* Message list */}
-        <div
-          className={`flex flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800 ${
-            selectedMessage || showCompose ? 'w-2/5' : 'w-full'
-          } transition-all`}
-        >
-          {loading && messages.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center text-slate-500">
-              <FiRefreshCw className="mr-2 animate-spin" /> Loading messages...
-            </div>
-          ) : sortedMessages.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-500">
-              <FiInbox size={48} className="text-slate-600" />
-              <p className="text-lg font-medium">No messages</p>
-              <p className="text-sm text-slate-600">
-                Agent messages will appear here when agents communicate.
-              </p>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto">
-              {sortedMessages.map((msg) => (
-                <button
-                  type="button"
-                  key={msg.id}
-                  onClick={() => handleSelectMessage(msg)}
-                  className={`flex w-full cursor-pointer items-start gap-3 border-b border-slate-700/50 px-4 py-3 text-left transition-colors hover:bg-slate-700/50 ${
-                    selectedMessage?.id === msg.id ? 'bg-slate-700/70' : ''
-                  } ${msg.read === 0 ? 'bg-slate-800' : 'bg-slate-800/30'}`}
-                >
-                  {/* Unread indicator */}
-                  <div className="mt-1.5 flex-shrink-0">
-                    {msg.read === 0 ? (
-                      <FiCircle
-                        size={8}
-                        className="fill-blue-500 text-blue-500"
-                        aria-label="Unread"
-                      />
-                    ) : (
-                      <div className="h-2 w-2" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    {/* From/To + time */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`truncate text-sm ${
-                          msg.read === 0 ? 'font-semibold text-slate-100' : 'text-slate-300'
-                        }`}
-                      >
-                        {msg.from_agent}{' '}
-                        <span className="text-slate-500">
-                          {'\u2192'} {msg.to_agent}
-                        </span>
-                      </span>
-                      <span className="flex-shrink-0 text-xs text-slate-500">
-                        {formatDate(msg.created_at)}
-                      </span>
-                    </div>
-
-                    {/* Subject */}
-                    <p
-                      className={`mt-0.5 truncate text-sm ${
-                        msg.read === 0 ? 'font-medium text-slate-200' : 'text-slate-400'
-                      }`}
+      {/* Content - Resizable Panels */}
+      <div className="flex-1 overflow-hidden">
+        <PanelGroup direction="horizontal" autoSaveId="mail-panels">
+          {/* Message list panel */}
+          <Panel defaultSize={selectedMessage || showCompose ? 40 : 100} minSize={25}>
+            <div className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
+              {loading && messages.length === 0 ? (
+                <div className="flex flex-1 items-center justify-center text-slate-500">
+                  <FiRefreshCw className="mr-2 animate-spin" /> Loading messages...
+                </div>
+              ) : sortedMessages.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-500">
+                  <FiInbox size={48} className="text-slate-600" />
+                  <p className="text-lg font-medium">No messages</p>
+                  <p className="text-sm text-slate-600">
+                    Agent messages will appear here when agents communicate.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto">
+                  {sortedMessages.map((msg) => (
+                    <button
+                      type="button"
+                      key={msg.id}
+                      onClick={() => handleSelectMessage(msg)}
+                      className={`flex w-full cursor-pointer items-start gap-3 border-b border-slate-700/50 px-4 py-3 text-left transition-colors hover:bg-slate-700/50 ${
+                        selectedMessage?.id === msg.id ? 'bg-slate-700/70' : ''
+                      } ${msg.read === 0 ? 'bg-slate-800' : 'bg-slate-800/30'}`}
                     >
-                      {msg.subject || '(no subject)'}
-                    </p>
+                      {/* Unread indicator */}
+                      <div className="mt-1.5 flex-shrink-0">
+                        {msg.read === 0 ? (
+                          <FiCircle
+                            size={8}
+                            className="fill-blue-500 text-blue-500"
+                            aria-label="Unread"
+                          />
+                        ) : (
+                          <div className="h-2 w-2" />
+                        )}
+                      </div>
 
-                    {/* Type + Priority badges */}
-                    <div className="mt-1 flex items-center gap-2">
-                      <span
-                        className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${typeColor(msg.type)}`}
-                      >
-                        {msg.type}
-                      </span>
-                      {msg.priority !== 'normal' && (
-                        <span className={`text-[10px] font-medium ${priorityColor(msg.priority)}`}>
-                          {msg.priority.toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+                      <div className="min-w-0 flex-1">
+                        {/* From/To + time */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`truncate text-sm ${
+                              msg.read === 0 ? 'font-semibold text-slate-100' : 'text-slate-300'
+                            }`}
+                          >
+                            {msg.from_agent}{' '}
+                            <span className="text-slate-500">
+                              {'\u2192'} {msg.to_agent}
+                            </span>
+                          </span>
+                          <span className="flex-shrink-0 text-xs text-slate-500">
+                            {formatDate(msg.created_at)}
+                          </span>
+                        </div>
 
-        {/* Detail / Compose pane */}
-        {selectedMessage && !showCompose && (
-          <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
-            {/* Detail header */}
-            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => setSelectedMessage(null)}
-                className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200"
-              >
-                <FiChevronLeft size={16} /> Back
-              </button>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`rounded border px-2 py-0.5 text-xs ${typeColor(selectedMessage.type)}`}
-                >
-                  {selectedMessage.type}
-                </span>
-                <span className={`text-xs font-medium ${priorityColor(selectedMessage.priority)}`}>
-                  {selectedMessage.priority}
-                </span>
-              </div>
-            </div>
+                        {/* Subject */}
+                        <p
+                          className={`mt-0.5 truncate text-sm ${
+                            msg.read === 0 ? 'font-medium text-slate-200' : 'text-slate-400'
+                          }`}
+                        >
+                          {msg.subject || '(no subject)'}
+                        </p>
 
-            {/* Detail content */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <h2 className="mb-3 text-lg font-semibold text-slate-100">
-                {selectedMessage.subject || '(no subject)'}
-              </h2>
-
-              <div className="mb-4 space-y-1 text-sm">
-                <div className="flex gap-2">
-                  <span className="w-16 text-slate-500">From:</span>
-                  <span className="font-medium text-cyan-400">{selectedMessage.from_agent}</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-16 text-slate-500">To:</span>
-                  <span className="font-medium text-green-400">{selectedMessage.to_agent}</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-16 text-slate-500">Time:</span>
-                  <span className="text-slate-300">
-                    {new Date(selectedMessage.created_at).toLocaleString()}
-                  </span>
-                </div>
-                {selectedMessage.thread_id && (
-                  <div className="flex gap-2">
-                    <span className="w-16 text-slate-500">Thread:</span>
-                    <span className="font-mono text-xs text-slate-400">
-                      {selectedMessage.thread_id}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
-                <pre className="whitespace-pre-wrap text-sm text-slate-300">
-                  {selectedMessage.body || '(empty body)'}
-                </pre>
-              </div>
-
-              {selectedMessage.payload && (
-                <div className="mt-4">
-                  <h3 className="mb-2 text-sm font-medium text-slate-400">Payload</h3>
-                  <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
-                    <pre className="whitespace-pre-wrap font-mono text-xs text-slate-400">
-                      {selectedMessage.payload}
-                    </pre>
-                  </div>
+                        {/* Type + Priority badges */}
+                        <div className="mt-1 flex items-center gap-2">
+                          <span
+                            className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${typeColor(msg.type)}`}
+                          >
+                            {msg.type}
+                          </span>
+                          {msg.priority !== 'normal' && (
+                            <span
+                              className={`text-[10px] font-medium ${priorityColor(msg.priority)}`}
+                            >
+                              {msg.priority.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-        )}
+          </Panel>
 
-        {showCompose && (
-          <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
-            {/* Compose header */}
-            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-              <h2 className="text-sm font-semibold text-slate-200">Compose Message</h2>
-              <button
-                type="button"
-                onClick={() => setShowCompose(false)}
-                className="text-slate-400 hover:text-slate-200"
-              >
-                <FiX size={16} />
-              </button>
-            </div>
+          {/* Resize handle - only show when detail/compose is visible */}
+          {(selectedMessage || showCompose) && (
+            <PanelResizeHandle className="group mx-1 flex w-2 items-center justify-center">
+              <div className="h-8 w-1 rounded-full bg-slate-600 transition-colors group-hover:bg-blue-500 group-active:bg-blue-400" />
+            </PanelResizeHandle>
+          )}
 
-            {/* Compose form */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label
-                      htmlFor="compose-from"
-                      className="mb-1 block text-xs font-medium text-slate-400"
-                    >
-                      From Agent
-                    </label>
-                    <input
-                      id="compose-from"
-                      type="text"
-                      value={composeForm.from_agent}
-                      onChange={(e) =>
-                        setComposeForm((f) => ({ ...f, from_agent: e.target.value }))
-                      }
-                      placeholder="e.g. coordinator"
-                      className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label
-                      htmlFor="compose-to"
-                      className="mb-1 block text-xs font-medium text-slate-400"
-                    >
-                      To Agent
-                    </label>
-                    <input
-                      id="compose-to"
-                      type="text"
-                      value={composeForm.to_agent}
-                      onChange={(e) => setComposeForm((f) => ({ ...f, to_agent: e.target.value }))}
-                      placeholder="e.g. builder-1"
-                      className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="compose-subject"
-                    className="mb-1 block text-xs font-medium text-slate-400"
+          {/* Detail / Compose panel */}
+          {selectedMessage && !showCompose && (
+            <Panel defaultSize={60} minSize={30}>
+              <div className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
+                {/* Detail header */}
+                <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMessage(null)}
+                    className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200"
                   >
-                    Subject
-                  </label>
-                  <input
-                    id="compose-subject"
-                    type="text"
-                    value={composeForm.subject}
-                    onChange={(e) => setComposeForm((f) => ({ ...f, subject: e.target.value }))}
-                    placeholder="Message subject"
-                    className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label
-                      htmlFor="compose-type"
-                      className="mb-1 block text-xs font-medium text-slate-400"
+                    <FiChevronLeft size={16} /> Back
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded border px-2 py-0.5 text-xs ${typeColor(selectedMessage.type)}`}
                     >
-                      Type
-                    </label>
-                    <select
-                      id="compose-type"
-                      value={composeForm.type}
-                      onChange={(e) =>
-                        setComposeForm((f) => ({ ...f, type: e.target.value as MessageType }))
-                      }
-                      className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+                      {selectedMessage.type}
+                    </span>
+                    <span
+                      className={`text-xs font-medium ${priorityColor(selectedMessage.priority)}`}
                     >
-                      {MESSAGE_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex-1">
-                    <label
-                      htmlFor="compose-priority"
-                      className="mb-1 block text-xs font-medium text-slate-400"
-                    >
-                      Priority
-                    </label>
-                    <select
-                      id="compose-priority"
-                      value={composeForm.priority}
-                      onChange={(e) =>
-                        setComposeForm((f) => ({
-                          ...f,
-                          priority: e.target.value as MessagePriority,
-                        }))
-                      }
-                      className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
-                    >
-                      {PRIORITY_OPTIONS.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
+                      {selectedMessage.priority}
+                    </span>
                   </div>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="compose-body"
-                    className="mb-1 block text-xs font-medium text-slate-400"
-                  >
-                    Body
-                  </label>
-                  <textarea
-                    id="compose-body"
-                    value={composeForm.body}
-                    onChange={(e) => setComposeForm((f) => ({ ...f, body: e.target.value }))}
-                    placeholder="Message body..."
-                    rows={8}
-                    className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none resize-none"
-                  />
+                {/* Detail content */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  <h2 className="mb-3 text-lg font-semibold text-slate-100">
+                    {selectedMessage.subject || '(no subject)'}
+                  </h2>
+
+                  <div className="mb-4 space-y-1 text-sm">
+                    <div className="flex gap-2">
+                      <span className="w-16 text-slate-500">From:</span>
+                      <span className="font-medium text-cyan-400">
+                        {selectedMessage.from_agent}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="w-16 text-slate-500">To:</span>
+                      <span className="font-medium text-green-400">{selectedMessage.to_agent}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="w-16 text-slate-500">Time:</span>
+                      <span className="text-slate-300">
+                        {new Date(selectedMessage.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    {selectedMessage.thread_id && (
+                      <div className="flex gap-2">
+                        <span className="w-16 text-slate-500">Thread:</span>
+                        <span className="font-mono text-xs text-slate-400">
+                          {selectedMessage.thread_id}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-slate-300">
+                      {selectedMessage.body || '(empty body)'}
+                    </pre>
+                  </div>
+
+                  {selectedMessage.payload && (
+                    <div className="mt-4">
+                      <h3 className="mb-2 text-sm font-medium text-slate-400">Payload</h3>
+                      <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
+                        <pre className="whitespace-pre-wrap font-mono text-xs text-slate-400">
+                          {selectedMessage.payload}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            </Panel>
+          )}
 
-            {/* Compose footer */}
-            <div className="flex items-center justify-end gap-2 border-t border-slate-700 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCompose(false);
-                  setComposeForm(defaultCompose);
-                }}
-                className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={sending}
-                className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
-              >
-                <FiSend size={14} />
-                {sending ? 'Sending...' : 'Send'}
-              </button>
-            </div>
-          </div>
-        )}
+          {showCompose && (
+            <Panel defaultSize={60} minSize={30}>
+              <div className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
+                {/* Compose header */}
+                <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+                  <h2 className="text-sm font-semibold text-slate-200">Compose Message</h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowCompose(false)}
+                    className="text-slate-400 hover:text-slate-200"
+                  >
+                    <FiX size={16} />
+                  </button>
+                </div>
+
+                {/* Compose form */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label
+                          htmlFor="compose-from"
+                          className="mb-1 block text-xs font-medium text-slate-400"
+                        >
+                          From Agent
+                        </label>
+                        <input
+                          id="compose-from"
+                          type="text"
+                          value={composeForm.from_agent}
+                          onChange={(e) =>
+                            setComposeForm((f) => ({ ...f, from_agent: e.target.value }))
+                          }
+                          placeholder="e.g. coordinator"
+                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label
+                          htmlFor="compose-to"
+                          className="mb-1 block text-xs font-medium text-slate-400"
+                        >
+                          To Agent
+                        </label>
+                        <input
+                          id="compose-to"
+                          type="text"
+                          value={composeForm.to_agent}
+                          onChange={(e) =>
+                            setComposeForm((f) => ({ ...f, to_agent: e.target.value }))
+                          }
+                          placeholder="e.g. builder-1"
+                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="compose-subject"
+                        className="mb-1 block text-xs font-medium text-slate-400"
+                      >
+                        Subject
+                      </label>
+                      <input
+                        id="compose-subject"
+                        type="text"
+                        value={composeForm.subject}
+                        onChange={(e) => setComposeForm((f) => ({ ...f, subject: e.target.value }))}
+                        placeholder="Message subject"
+                        className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label
+                          htmlFor="compose-type"
+                          className="mb-1 block text-xs font-medium text-slate-400"
+                        >
+                          Type
+                        </label>
+                        <select
+                          id="compose-type"
+                          value={composeForm.type}
+                          onChange={(e) =>
+                            setComposeForm((f) => ({
+                              ...f,
+                              type: e.target.value as MessageType,
+                            }))
+                          }
+                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+                        >
+                          {MESSAGE_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label
+                          htmlFor="compose-priority"
+                          className="mb-1 block text-xs font-medium text-slate-400"
+                        >
+                          Priority
+                        </label>
+                        <select
+                          id="compose-priority"
+                          value={composeForm.priority}
+                          onChange={(e) =>
+                            setComposeForm((f) => ({
+                              ...f,
+                              priority: e.target.value as MessagePriority,
+                            }))
+                          }
+                          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+                        >
+                          {PRIORITY_OPTIONS.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="compose-body"
+                        className="mb-1 block text-xs font-medium text-slate-400"
+                      >
+                        Body
+                      </label>
+                      <textarea
+                        id="compose-body"
+                        value={composeForm.body}
+                        onChange={(e) => setComposeForm((f) => ({ ...f, body: e.target.value }))}
+                        placeholder="Message body..."
+                        rows={8}
+                        className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Compose footer */}
+                <div className="flex items-center justify-end gap-2 border-t border-slate-700 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCompose(false);
+                      setComposeForm(defaultCompose);
+                    }}
+                    className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={sending}
+                    className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
+                  >
+                    <FiSend size={14} />
+                    {sending ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            </Panel>
+          )}
+        </PanelGroup>
       </div>
     </div>
   );

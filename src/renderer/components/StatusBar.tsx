@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiPlay, FiSquare } from 'react-icons/fi';
+import { FiFolder, FiPlay, FiSquare } from 'react-icons/fi';
+import { useProjectStore } from '../stores/projectStore';
 import { useRunStore } from '../stores/runStore';
 
 type CliState = 'checking' | 'ready' | 'not-authenticated' | 'not-installed' | 'error';
@@ -59,6 +60,12 @@ export function StatusBar() {
   const [now, setNow] = useState(Date.now());
 
   const { activeRun, startRun, stopRun, fetchActiveRun } = useRunStore();
+  const { activeProject, loadActiveProject } = useProjectStore();
+
+  // Fetch active project on mount
+  useEffect(() => {
+    loadActiveProject();
+  }, [loadActiveProject]);
 
   // Fetch CLI status on mount
   useEffect(() => {
@@ -122,20 +129,38 @@ export function StatusBar() {
   }, [activeRun, now]);
 
   return (
-    <footer className="flex items-center justify-between border-t border-slate-700 bg-slate-950 px-4 py-1 text-xs text-slate-400">
+    <footer
+      className="flex items-center justify-between border-t border-slate-700 bg-slate-950 px-4 py-1 text-xs text-slate-400"
+      data-testid="status-bar"
+    >
       <div className="flex items-center gap-4">
-        <span className="font-medium text-slate-300">Fleet Command</span>
-        {activeRun && (
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-300">Agents: {activeRun.agent_count}</span>
-          </span>
-        )}
-        {!activeRun && <span>Active Agents: 0</span>}
+        <span
+          className="flex items-center gap-1.5 font-medium text-slate-300"
+          data-testid="status-bar-project"
+          title={
+            activeProject
+              ? `Project: ${activeProject.name}\nPath: ${activeProject.path}`
+              : 'No project selected'
+          }
+        >
+          <FiFolder className="h-3 w-3 text-blue-400" />
+          {activeProject ? activeProject.name : 'No Project'}
+        </span>
+        <span className="flex items-center gap-1.5" data-testid="status-bar-agent-count">
+          {activeRun ? (
+            <>
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-slate-300">Agents: {activeRun.agent_count}</span>
+            </>
+          ) : (
+            <span>Active Agents: 0</span>
+          )}
+        </span>
       </div>
       <div className="flex items-center gap-4">
         <span
           className="flex items-center gap-1 cursor-default"
+          data-testid="status-bar-cli"
           title={
             cliStatus
               ? `Path: ${cliStatus.path || 'N/A'}\nVersion: ${cliStatus.version || 'N/A'}\nAuth: ${cliStatus.authenticated ? 'Yes' : 'No'}`
@@ -151,7 +176,7 @@ export function StatusBar() {
 
         {/* Run controls */}
         {activeRun ? (
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-2" data-testid="status-bar-run">
             <span
               className="flex items-center gap-1 text-emerald-400"
               title={'Run ID: '.concat(activeRun.id)}
