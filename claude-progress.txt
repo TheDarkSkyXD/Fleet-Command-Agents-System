@@ -1,5 +1,30 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Message Detail View & Unread Badge)
+
+#### Feature #78: Message detail view with full body - PASSING
+- Already fully implemented in MailPage.tsx
+- Click message opens resizable detail panel with:
+  - Full body text in pre-formatted block
+  - JSON payload parsed into key-value display with expandable raw JSON
+  - Metadata: From (cyan), To (green), Time, Thread ID
+  - Reply button and View Thread button
+- No code changes needed, verified existing implementation
+
+#### Feature #79: Unread mail count badge on sidebar - PASSING
+- Already fully implemented in Sidebar.tsx
+- mailUnreadCount fetched via IPC every 5 seconds
+- Red badge on Mail nav item in both collapsed and expanded sidebar states
+- Count capped at 99+ for display
+- Badge hidden when count is 0
+- Backend mail:unread-count IPC handler queries real SQLite database
+- No code changes needed, verified existing implementation
+
+#### Current Status
+- 144/366 features passing (added #78 and #79 this session)
+- No mock data patterns in target files
+- No TypeScript errors in MailPage.tsx or Sidebar.tsx
+
 ### Session: 2026-03-14 (Structured Payloads & Group Broadcast)
 
 #### Feature #69: Structured JSON payloads per protocol type - PASSING
