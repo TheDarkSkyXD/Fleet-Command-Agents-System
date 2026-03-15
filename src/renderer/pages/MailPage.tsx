@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  FiAlertTriangle,
   FiChevronLeft,
   FiCircle,
   FiFilter,
@@ -14,7 +15,7 @@ import {
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { Message, MessagePriority, MessageType } from '../../shared/types';
 
-type MailTab = 'inbox' | 'sent' | 'all';
+type MailTab = 'inbox' | 'outbox' | 'all';
 
 interface ComposeForm {
   from_agent: string;
@@ -272,10 +273,8 @@ export function MailPage() {
     return true;
   });
 
-  // Sort chronologically (newest first)
-  const sortedMessages = [...filteredMessages].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  // Messages are already sorted by priority then created_at from the backend query
+  const sortedMessages = filteredMessages;
 
   // Auto-dismiss status messages
   useEffect(() => {
@@ -562,13 +561,25 @@ export function MailPage() {
                       type="button"
                       key={msg.id}
                       onClick={() => handleSelectMessage(msg)}
-                      className={`flex w-full cursor-pointer items-start gap-3 border-b border-slate-700/50 px-4 py-3 text-left transition-colors hover:bg-slate-700/50 ${
+                      className={`flex w-full cursor-pointer items-start gap-3 border-b px-4 py-3 text-left transition-colors hover:bg-slate-700/50 ${
                         selectedMessage?.id === msg.id ? 'bg-slate-700/70' : ''
-                      } ${msg.read === 0 ? 'bg-slate-800' : 'bg-slate-800/30'}`}
+                      } ${msg.read === 0 ? 'bg-slate-800' : 'bg-slate-800/30'} ${
+                        msg.priority === 'urgent'
+                          ? 'border-l-2 border-l-red-500 border-b-slate-700/50 bg-red-950/20'
+                          : msg.priority === 'high'
+                            ? 'border-l-2 border-l-orange-500 border-b-slate-700/50'
+                            : 'border-b-slate-700/50'
+                      }`}
                     >
-                      {/* Unread indicator */}
+                      {/* Unread / Priority indicator */}
                       <div className="mt-1.5 flex-shrink-0">
-                        {msg.read === 0 ? (
+                        {msg.priority === 'urgent' ? (
+                          <FiAlertTriangle
+                            size={12}
+                            className="text-red-400 animate-pulse"
+                            aria-label="Urgent"
+                          />
+                        ) : msg.read === 0 ? (
                           <FiCircle
                             size={8}
                             className="fill-blue-500 text-blue-500"
@@ -615,9 +626,15 @@ export function MailPage() {
                           </span>
                           {msg.priority !== 'normal' && (
                             <span
-                              className={`text-[10px] font-medium ${priorityColor(msg.priority)}`}
+                              className={`text-[10px] font-medium ${
+                                msg.priority === 'urgent'
+                                  ? 'rounded bg-red-900/60 px-1.5 py-0.5 text-red-300 border border-red-700 animate-pulse'
+                                  : priorityColor(msg.priority)
+                              }`}
                             >
-                              {msg.priority.toUpperCase()}
+                              {msg.priority === 'urgent'
+                                ? '\u26A0 URGENT'
+                                : msg.priority.toUpperCase()}
                             </span>
                           )}
                         </div>
