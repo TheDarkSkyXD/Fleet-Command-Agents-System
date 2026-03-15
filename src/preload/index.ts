@@ -256,6 +256,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
   appLogImportNdjson: (ndjsonContent: string) =>
     ipcRenderer.invoke('appLog:import-ndjson', ndjsonContent),
 
+  // Guard Rules
+  guardRuleGet: (role: string) => ipcRenderer.invoke('guardRule:get', role),
+  guardRuleUpdate: (
+    role: string,
+    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string },
+  ) => ipcRenderer.invoke('guardRule:update', role, updates),
+  guardViolationList: (filters?: {
+    capability?: string;
+    rule_type?: string;
+    severity?: string;
+    acknowledged?: boolean;
+    limit?: number;
+  }) => ipcRenderer.invoke('guardViolation:list', filters),
+  guardViolationCreate: (violation: {
+    id: string;
+    agent_name: string;
+    capability: string;
+    rule_type: string;
+    violation: string;
+    tool_attempted?: string;
+    command_attempted?: string;
+    file_attempted?: string;
+    severity?: string;
+  }) => ipcRenderer.invoke('guardViolation:create', violation),
+  guardViolationAcknowledge: (id: string) =>
+    ipcRenderer.invoke('guardViolation:acknowledge', id),
+  guardViolationPurge: () => ipcRenderer.invoke('guardViolation:purge'),
+  guardViolationStats: () => ipcRenderer.invoke('guardViolation:stats'),
+
   // Discovery
   discoveryList: () => ipcRenderer.invoke('discovery:list'),
   discoveryGet: (id: string) => ipcRenderer.invoke('discovery:get', id),

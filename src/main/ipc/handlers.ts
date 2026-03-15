@@ -2415,6 +2415,215 @@ export function registerIpcHandlers(): void {
   });
 
   // ==========================================
+  // Guard Rules & Violations
+  // ==========================================
+
+  ipcMain.handle('guardRule:get', (_event, role: string) => {
+    try {
+      const row = loggedPrepare(
+        'SELECT role, display_name, tool_allowlist, bash_restrictions, file_scope FROM agent_definitions WHERE role = ?',
+      ).get(role);
+      log.info(`[IPC] guardRule:get - SELECT guard rules for role=${role}`);
+      return { data: row || null, error: null };
+    } catch (error) {
+      log.error('guardRule:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'guardRule:update',
+    (
+      _event,
+      role: string,
+      updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string },
+    ) => {
+      try {
+        const setClauses: string[] = [];
+        const values: unknown[] = [];
+
+        if (updates.tool_allowlist !== undefined) {
+          setClauses.push('tool_allowlist = ?');
+          values.push(updates.tool_allowlist);
+        }
+        if (updates.bash_restrictions !== undefined) {
+          setClauses.push('bash_restrictions = ?');
+          values.push(updates.bash_restrictions);
+        }
+        if (updates.file_scope !== undefined) {
+          setClauses.push('file_scope = ?');
+          values.push(updates.file_scope);
+        }
+
+        if (setClauses.length === 0) {
+          return { data: null, error: 'No valid fields to update' };
+        }
+
+        setClauses.push("updated_at = datetime('now')");
+        values.push(role);
+
+        loggedPrepare(
+          `UPDATE agent_definitions SET ${setClauses.join(', ')} WHERE role = ?`,
+        ).run(...values);
+
+        const updated = loggedPrepare('SELECT * FROM agent_definitions WHERE role = ?').get(role);
+        log.info(`[IPC] guardRule:update - UPDATE guard rules for role=${role}`);
+        return { data: updated, error: null };
+      } catch (error) {
+        log.error('guardRule:update failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'guardViolation:list',
+    (
+      _event,
+      filters?: {
+        capability?: string;
+        rule_type?: string;
+        severity?: string;
+        acknowledged?: boolean;
+        limit?: number;
+      },
+    ) => {
+      try {
+        let sql = 'SELECT * FROM guard_violations WHERE 1=1';
+        const params: unknown[] = [];
+
+        if (filters?.capability) {
+          sql += ' AND capability = ?';
+          params.push(filters.capability);
+        }
+        if (filters?.rule_type) {
+          sql += ' AND rule_type = ?';
+          params.push(filters.rule_type);
+        }
+        if (filters?.severity) {
+          sql += ' AND severity = ?';
+          params.push(filters.severity);
+        }
+        if (filters?.acknowledged !== undefined) {
+          sql += ' AND acknowledged = ?';
+          params.push(filters.acknowledged ? 1 : 0);
+        }
+
+        sql += ' ORDER BY created_at DESC';
+
+        if (filters?.limit) {
+          sql += ' LIMIT ?';
+          params.push(filters.limit);
+        }
+
+        const rows = loggedPrepare(sql).all(...params);
+        log.info(`[IPC] guardViolation:list - found ${(rows as unknown[]).length} violations`);
+        return { data: rows, error: null };
+      } catch (error) {
+        log.error('guardViolation:list failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'guardViolation:create',
+    (
+      _event,
+      violation: {
+        id: string;
+        agent_name: string;
+        capability: string;
+        rule_type: string;
+        violation: string;
+        tool_attempted?: string;
+        command_attempted?: string;
+        file_attempted?: string;
+        severity?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          `INSERT INTO guard_violations (id, agent_name, capability, rule_type, violation, tool_attempted, command_attempted, file_attempted, severity)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          violation.id,
+          violation.agent_name,
+          violation.capability,
+          violation.rule_type,
+          violation.violation,
+          violation.tool_attempted ?? null,
+          violation.command_attempted ?? null,
+          violation.file_attempted ?? null,
+          violation.severity ?? 'warning',
+        );
+
+        const created = loggedPrepare('SELECT * FROM guard_violations WHERE id = ?').get(
+          violation.id,
+        );
+        log.warn(
+          `[GUARD VIOLATION] Agent "${violation.agent_name}" (${violation.capability}) violated ${violation.rule_type}: ${violation.violation}`,
+        );
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('guardViolation:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('guardViolation:acknowledge', (_event, id: string) => {
+    try {
+      loggedPrepare('UPDATE guard_violations SET acknowledged = 1 WHERE id = ?').run(id);
+      log.info(`[IPC] guardViolation:acknowledge - id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('guardViolation:acknowledge failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('guardViolation:purge', () => {
+    try {
+      loggedPrepare('DELETE FROM guard_violations').run();
+      log.info('[IPC] guardViolation:purge - all violations cleared');
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('guardViolation:purge failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('guardViolation:stats', () => {
+    try {
+      const total = (
+        loggedPrepare('SELECT COUNT(*) as cnt FROM guard_violations').get() as { cnt: number }
+      ).cnt;
+      const unacknowledged = (
+        loggedPrepare(
+          'SELECT COUNT(*) as cnt FROM guard_violations WHERE acknowledged = 0',
+        ).get() as { cnt: number }
+      ).cnt;
+      const byTypeRows = loggedPrepare(
+        'SELECT rule_type, COUNT(*) as cnt FROM guard_violations GROUP BY rule_type',
+      ).all() as Array<{ rule_type: string; cnt: number }>;
+      const bySeverityRows = loggedPrepare(
+        'SELECT severity, COUNT(*) as cnt FROM guard_violations GROUP BY severity',
+      ).all() as Array<{ severity: string; cnt: number }>;
+
+      const by_type: Record<string, number> = {};
+      for (const r of byTypeRows) by_type[r.rule_type] = r.cnt;
+      const by_severity: Record<string, number> = {};
+      for (const r of bySeverityRows) by_severity[r.severity] = r.cnt;
+
+      return { data: { total, unacknowledged, by_type, by_severity }, error: null };
+    } catch (error) {
+      log.error('guardViolation:stats failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ==========================================
   // Discovery Scans
   // ==========================================
 

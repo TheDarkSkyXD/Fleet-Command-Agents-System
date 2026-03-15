@@ -3,6 +3,7 @@ import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
 import { DebugPage } from '../pages/DebugPage';
+import { DiscoveryPage } from '../pages/DiscoveryPage';
 import { ExpertisePage } from '../pages/ExpertisePage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
@@ -106,6 +107,8 @@ function PageContent({
       return <MergeQueuePage />;
     case 'tasks':
       return <TasksPage />;
+    case 'discovery':
+      return <DiscoveryPage />;
     case 'expertise':
       return <ExpertisePage />;
     case 'metrics':
