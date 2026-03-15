@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FiChevronLeft,
   FiCircle,
+  FiFilter,
   FiInbox,
   FiMail,
   FiRefreshCw,
+  FiSearch,
   FiSend,
   FiTrash2,
   FiX,
@@ -23,6 +25,13 @@ interface ComposeForm {
   priority: MessagePriority;
 }
 
+interface MailFilters {
+  search: string;
+  type: string;
+  priority: string;
+  agent: string;
+}
+
 const defaultCompose: ComposeForm = {
   from_agent: '',
   to_agent: '',
@@ -30,6 +39,13 @@ const defaultCompose: ComposeForm = {
   body: '',
   type: 'status',
   priority: 'normal',
+};
+
+const defaultFilters: MailFilters = {
+  search: '',
+  type: '',
+  priority: '',
+  agent: '',
 };
 
 const MESSAGE_TYPES: MessageType[] = [
@@ -114,23 +130,44 @@ export function MailPage() {
     null,
   );
 
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await window.electronAPI.mailList();
-      if (result.data) {
-        setMessages(result.data);
+  // Search and filter state
+  const [filters, setFilters] = useState<MailFilters>(defaultFilters);
+  const [searchInput, setSearchInput] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const activeFilterCount = [filters.type, filters.priority, filters.agent].filter(Boolean).length;
+  const hasAnyFilter = filters.search !== '' || activeFilterCount > 0;
+
+  const loadMessages = useCallback(
+    async (currentFilters?: MailFilters) => {
+      setLoading(true);
+      try {
+        const f = currentFilters || filters;
+        const queryFilters: Record<string, unknown> = {};
+        if (f.search) queryFilters.search = f.search;
+        if (f.type) queryFilters.type = f.type;
+        if (f.priority) queryFilters.priority = f.priority;
+        if (f.agent) queryFilters.agent = f.agent;
+
+        const result = await window.electronAPI.mailList(
+          Object.keys(queryFilters).length > 0 ? queryFilters : undefined,
+        );
+        if (result.data) {
+          setMessages(result.data);
+        }
+        const countResult = await window.electronAPI.mailUnreadCount();
+        if (countResult.data !== undefined && countResult.data !== null) {
+          setUnreadCount(countResult.data);
+        }
+      } catch (err) {
+        console.error('Failed to load messages:', err);
+      } finally {
+        setLoading(false);
       }
-      const countResult = await window.electronAPI.mailUnreadCount();
-      if (countResult.data !== undefined && countResult.data !== null) {
-        setUnreadCount(countResult.data);
-      }
-    } catch (err) {
-      console.error('Failed to load messages:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [filters],
+  );
 
   useEffect(() => {
     loadMessages();
@@ -140,12 +177,37 @@ export function MailPage() {
     };
     window.electronAPI.onMailReceived(handler);
     // Poll every 10s for updates
-    const interval = setInterval(loadMessages, 10000);
+    const interval = setInterval(() => loadMessages(), 10000);
     return () => {
       clearInterval(interval);
       window.electronAPI.removeAllListeners('mail:received');
     };
   }, [loadMessages]);
+
+  // Debounced search
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      const newFilters = { ...filters, search: value };
+      setFilters(newFilters);
+      loadMessages(newFilters);
+    }, 250);
+  };
+
+  const handleFilterChange = (key: keyof MailFilters, value: string) => {
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    loadMessages(newFilters);
+  };
+
+  const clearAllFilters = () => {
+    setSearchInput('');
+    setFilters(defaultFilters);
+    loadMessages(defaultFilters);
+  };
 
   const handleMarkRead = async (msg: Message) => {
     if (msg.read === 0) {
@@ -249,7 +311,7 @@ export function MailPage() {
           </button>
           <button
             type="button"
-            onClick={loadMessages}
+            onClick={() => loadMessages()}
             className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
             title="Refresh"
           >
@@ -278,6 +340,160 @@ export function MailPage() {
           {statusMsg.text}
         </div>
       )}
+
+      {/* Search and Filter Bar */}
+      <div className="mb-3 space-y-2" data-testid="mail-search-filters">
+        {/* Search input row */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <FiSearch
+              size={14}
+              className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-500"
+            />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search messages by subject, body, or agent..."
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pr-3 pl-9 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+              data-testid="mail-search-input"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange('')}
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                <FiX size={14} />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className={`relative flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+              showFilters || activeFilterCount > 0
+                ? 'border-blue-600 bg-blue-900/30 text-blue-400'
+                : 'border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            }`}
+            data-testid="mail-filter-toggle"
+          >
+            <FiFilter size={14} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {hasAnyFilter && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+              data-testid="mail-clear-filters"
+            >
+              <FiX size={12} />
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Filter dropdowns row */}
+        {showFilters && (
+          <div
+            className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3"
+            data-testid="mail-filter-panel"
+          >
+            <div className="flex items-center gap-2">
+              <label htmlFor="filter-type" className="text-xs font-medium text-slate-400">
+                Type:
+              </label>
+              <select
+                id="filter-type"
+                value={filters.type}
+                onChange={(e) => handleFilterChange('type', e.target.value)}
+                className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-blue-500 focus:outline-none"
+                data-testid="mail-filter-type"
+              >
+                <option value="">All types</option>
+                {MESSAGE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label htmlFor="filter-priority" className="text-xs font-medium text-slate-400">
+                Priority:
+              </label>
+              <select
+                id="filter-priority"
+                value={filters.priority}
+                onChange={(e) => handleFilterChange('priority', e.target.value)}
+                className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-blue-500 focus:outline-none"
+                data-testid="mail-filter-priority"
+              >
+                <option value="">All priorities</option>
+                {PRIORITY_OPTIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label htmlFor="filter-agent" className="text-xs font-medium text-slate-400">
+                Agent:
+              </label>
+              <input
+                id="filter-agent"
+                type="text"
+                value={filters.agent}
+                onChange={(e) => handleFilterChange('agent', e.target.value)}
+                placeholder="Filter by agent name..."
+                className="w-40 rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                data-testid="mail-filter-agent"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Active filter summary */}
+        {hasAnyFilter && (
+          <div
+            className="flex items-center gap-2 text-xs text-slate-400"
+            data-testid="mail-filter-summary"
+          >
+            <span>
+              Showing {sortedMessages.length} result{sortedMessages.length !== 1 ? 's' : ''}
+            </span>
+            {filters.search && (
+              <span className="rounded-full bg-slate-700 px-2 py-0.5 text-slate-300">
+                search: &quot;{filters.search}&quot;
+              </span>
+            )}
+            {filters.type && (
+              <span className="rounded-full bg-slate-700 px-2 py-0.5 text-slate-300">
+                type: {filters.type}
+              </span>
+            )}
+            {filters.priority && (
+              <span className="rounded-full bg-slate-700 px-2 py-0.5 text-slate-300">
+                priority: {filters.priority}
+              </span>
+            )}
+            {filters.agent && (
+              <span className="rounded-full bg-slate-700 px-2 py-0.5 text-slate-300">
+                agent: {filters.agent}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 rounded-lg border border-slate-700 bg-slate-800/50 p-1">
@@ -321,10 +537,23 @@ export function MailPage() {
               ) : sortedMessages.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-500">
                   <FiInbox size={48} className="text-slate-600" />
-                  <p className="text-lg font-medium">No messages</p>
-                  <p className="text-sm text-slate-600">
-                    Agent messages will appear here when agents communicate.
+                  <p className="text-lg font-medium">
+                    {hasAnyFilter ? 'No matching messages' : 'No messages'}
                   </p>
+                  <p className="text-sm text-slate-600">
+                    {hasAnyFilter
+                      ? 'Try adjusting your search or filters.'
+                      : 'Agent messages will appear here when agents communicate.'}
+                  </p>
+                  {hasAnyFilter && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="mt-2 rounded-md border border-slate-600 px-4 py-1.5 text-sm text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto">
