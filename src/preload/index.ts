@@ -112,6 +112,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Worktrees
   worktreeList: (repoPath: string) => ipcRenderer.invoke('worktree:list', repoPath),
 
+  // Metrics
+  metricsList: () => ipcRenderer.invoke('metrics:list'),
+  metricsCreate: (metric: Record<string, unknown>) => ipcRenderer.invoke('metrics:create', metric),
+  metricsGet: (id: string) => ipcRenderer.invoke('metrics:get', id),
+  metricsBySession: (agentName: string) => ipcRenderer.invoke('metrics:by-session', agentName),
+  metricsByModel: () => ipcRenderer.invoke('metrics:by-model'),
+  metricsSummary: () => ipcRenderer.invoke('metrics:summary'),
+  metricsUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('metrics:update', id, updates),
+  metricsDelete: (id: string) => ipcRenderer.invoke('metrics:delete', id),
+
   // System
   updateCheck: () => ipcRenderer.invoke('update:check'),
   doctorRun: () => ipcRenderer.invoke('doctor:run'),

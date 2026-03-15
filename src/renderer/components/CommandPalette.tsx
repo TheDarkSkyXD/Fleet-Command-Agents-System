@@ -1,6 +1,14 @@
 import { Command } from 'cmdk';
 import { useEffect, useState } from 'react';
-import { FiCheckSquare, FiGitMerge, FiMail, FiSettings, FiTerminal, FiUsers } from 'react-icons/fi';
+import {
+  FiBarChart2,
+  FiCheckSquare,
+  FiGitMerge,
+  FiMail,
+  FiSettings,
+  FiTerminal,
+  FiUsers,
+} from 'react-icons/fi';
 
 interface CommandPaletteProps {
   onNavigate: (page: string) => void;
@@ -11,6 +19,7 @@ const navigationItems = [
   { id: 'mail', label: 'Go to Mail', icon: FiMail, group: 'Navigation' },
   { id: 'merge', label: 'Go to Merge Queue', icon: FiGitMerge, group: 'Navigation' },
   { id: 'tasks', label: 'Go to Tasks', icon: FiCheckSquare, group: 'Navigation' },
+  { id: 'metrics', label: 'Go to Metrics', icon: FiBarChart2, group: 'Navigation' },
   { id: 'debug', label: 'Go to Debug', icon: FiTerminal, group: 'Navigation' },
   { id: 'settings', label: 'Go to Settings', icon: FiSettings, group: 'Navigation' },
 ];

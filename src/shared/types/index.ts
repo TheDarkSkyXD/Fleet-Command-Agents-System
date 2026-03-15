@@ -126,6 +126,29 @@ export interface Metric {
   completed_at: string | null;
 }
 
+// Model breakdown aggregation
+export interface ModelBreakdown {
+  model_used: string;
+  session_count: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cache_read_tokens: number;
+  total_cache_creation_tokens: number;
+  total_cost: number;
+  total_duration_ms: number;
+}
+
+// Metrics summary aggregation
+export interface MetricsSummary {
+  total_sessions: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cache_read_tokens: number;
+  total_cache_creation_tokens: number;
+  total_cost: number;
+  total_duration_ms: number;
+}
+
 export interface MergeQueueEntry {
   id: number;
   branch_name: string;
@@ -264,6 +287,7 @@ export interface AgentSpawnRequest {
   branch_name?: string;
   depth?: number;
   prompt?: string;
+  file_scope?: string;
 }
 
 // Running agent process info from main process
@@ -408,6 +432,21 @@ export interface ElectronAPI {
 
   // Worktrees
   worktreeList: (repoPath: string) => Promise<{ data: Worktree[] | null; error: string | null }>;
+
+  // Metrics
+  metricsList: () => Promise<{ data: Metric[] | null; error: string | null }>;
+  metricsCreate: (
+    metric: Record<string, unknown>,
+  ) => Promise<{ data: Metric | null; error: string | null }>;
+  metricsGet: (id: string) => Promise<{ data: Metric | null; error: string | null }>;
+  metricsBySession: (agentName: string) => Promise<{ data: Metric[] | null; error: string | null }>;
+  metricsByModel: () => Promise<{ data: ModelBreakdown[] | null; error: string | null }>;
+  metricsSummary: () => Promise<{ data: MetricsSummary | null; error: string | null }>;
+  metricsUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: Metric | null; error: string | null }>;
+  metricsDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
 
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;

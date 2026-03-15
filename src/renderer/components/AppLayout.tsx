@@ -3,6 +3,7 @@ import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentsPage } from '../pages/AgentsPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
+import { MetricsPage } from '../pages/MetricsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
 import { WorktreesPage } from '../pages/WorktreesPage';
@@ -55,6 +56,8 @@ function PageContent({ page }: { page: string }) {
       return <MergeQueuePage />;
     case 'tasks':
       return <TasksPage />;
+    case 'metrics':
+      return <MetricsPage />;
     case 'settings':
       return <SettingsPage />;
     case 'debug':

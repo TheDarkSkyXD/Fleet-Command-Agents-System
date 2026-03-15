@@ -1379,6 +1379,208 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Metrics channels - token usage tracking per agent session and model breakdown
+  ipcMain.handle('metrics:list', () => {
+    try {
+      const metrics = loggedPrepare(
+        'SELECT * FROM metrics ORDER BY completed_at DESC, started_at DESC',
+      ).all();
+      log.info(
+        `[IPC] metrics:list - SELECT returned ${metrics.length} metric records from real database`,
+      );
+      return { data: metrics, error: null };
+    } catch (error) {
+      log.error('metrics:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'metrics:create',
+    (
+      _event,
+      metric: {
+        id: string;
+        agent_name?: string;
+        task_id?: string;
+        capability?: string;
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_tokens?: number;
+        cache_creation_tokens?: number;
+        model_used?: string;
+        estimated_cost?: number;
+        duration_ms?: number;
+        parent_agent?: string;
+        run_id?: string;
+        started_at?: string;
+        completed_at?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(`
+        INSERT INTO metrics (id, agent_name, task_id, capability, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, model_used, estimated_cost, duration_ms, parent_agent, run_id, started_at, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+          metric.id,
+          metric.agent_name ?? null,
+          metric.task_id ?? null,
+          metric.capability ?? null,
+          metric.input_tokens ?? 0,
+          metric.output_tokens ?? 0,
+          metric.cache_read_tokens ?? 0,
+          metric.cache_creation_tokens ?? 0,
+          metric.model_used ?? null,
+          metric.estimated_cost ?? 0,
+          metric.duration_ms ?? 0,
+          metric.parent_agent ?? null,
+          metric.run_id ?? null,
+          metric.started_at ?? null,
+          metric.completed_at ?? null,
+        );
+        const created = loggedPrepare('SELECT * FROM metrics WHERE id = ?').get(metric.id);
+        log.info(`[IPC] metrics:create - INSERT metric record into real database: id=${metric.id}`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('metrics:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('metrics:get', (_event, id: string) => {
+    try {
+      const metric = loggedPrepare('SELECT * FROM metrics WHERE id = ?').get(id);
+      log.info(`[IPC] metrics:get - SELECT metric from real database: id=${id}`);
+      return { data: metric || null, error: null };
+    } catch (error) {
+      log.error('metrics:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('metrics:by-session', (_event, agentName: string) => {
+    try {
+      const metrics = loggedPrepare(
+        'SELECT * FROM metrics WHERE agent_name = ? ORDER BY completed_at DESC, started_at DESC',
+      ).all(agentName);
+      log.info(
+        `[IPC] metrics:by-session - SELECT ${metrics.length} metrics for agent=${agentName} from real database`,
+      );
+      return { data: metrics, error: null };
+    } catch (error) {
+      log.error('metrics:by-session failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('metrics:by-model', () => {
+    try {
+      const breakdown = loggedPrepare(`
+        SELECT
+          model_used,
+          COUNT(*) as session_count,
+          SUM(input_tokens) as total_input_tokens,
+          SUM(output_tokens) as total_output_tokens,
+          SUM(cache_read_tokens) as total_cache_read_tokens,
+          SUM(cache_creation_tokens) as total_cache_creation_tokens,
+          SUM(estimated_cost) as total_cost,
+          SUM(duration_ms) as total_duration_ms
+        FROM metrics
+        WHERE model_used IS NOT NULL
+        GROUP BY model_used
+        ORDER BY total_input_tokens DESC
+      `).all();
+      log.info(
+        `[IPC] metrics:by-model - aggregated token usage by ${breakdown.length} models from real database`,
+      );
+      return { data: breakdown, error: null };
+    } catch (error) {
+      log.error('metrics:by-model failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('metrics:summary', () => {
+    try {
+      const summary = loggedPrepare(`
+        SELECT
+          COUNT(*) as total_sessions,
+          SUM(input_tokens) as total_input_tokens,
+          SUM(output_tokens) as total_output_tokens,
+          SUM(cache_read_tokens) as total_cache_read_tokens,
+          SUM(cache_creation_tokens) as total_cache_creation_tokens,
+          SUM(estimated_cost) as total_cost,
+          SUM(duration_ms) as total_duration_ms
+        FROM metrics
+      `).get();
+      log.info('[IPC] metrics:summary - aggregated total token usage from real database');
+      return { data: summary, error: null };
+    } catch (error) {
+      log.error('metrics:summary failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'metrics:update',
+    (
+      _event,
+      id: string,
+      updates: {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_tokens?: number;
+        cache_creation_tokens?: number;
+        estimated_cost?: number;
+        duration_ms?: number;
+        completed_at?: string;
+      },
+    ) => {
+      try {
+        const setClauses: string[] = [];
+        const params: unknown[] = [];
+        const allowedFields = [
+          'input_tokens',
+          'output_tokens',
+          'cache_read_tokens',
+          'cache_creation_tokens',
+          'estimated_cost',
+          'duration_ms',
+          'completed_at',
+        ];
+        for (const [key, value] of Object.entries(updates)) {
+          if (allowedFields.includes(key)) {
+            setClauses.push(`${key} = ?`);
+            params.push(value);
+          }
+        }
+        if (setClauses.length === 0) {
+          return { data: null, error: 'No valid fields to update' };
+        }
+        params.push(id);
+        loggedPrepare(`UPDATE metrics SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
+        const updated = loggedPrepare('SELECT * FROM metrics WHERE id = ?').get(id);
+        log.info(`[IPC] metrics:update - UPDATE metric in real database: id=${id}`);
+        return { data: updated, error: null };
+      } catch (error) {
+        log.error('metrics:update failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('metrics:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM metrics WHERE id = ?').run(id);
+      log.info(`[IPC] metrics:delete - DELETE metric from real database: id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('metrics:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
   log.info(
     'IPC handlers registered - all database handlers use real SQLite queries via loggedPrepare()',
   );

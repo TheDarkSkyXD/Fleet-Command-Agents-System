@@ -1,4 +1,5 @@
 import {
+  FiBarChart2,
   FiBookOpen,
   FiCheckSquare,
   FiChevronLeft,
@@ -26,6 +27,7 @@ const navItems = [
   { id: 'worktrees', label: 'Worktrees', icon: FiGitBranch },
   { id: 'definitions', label: 'Definitions', icon: FiBookOpen },
   { id: 'tasks', label: 'Tasks', icon: FiCheckSquare },
+  { id: 'metrics', label: 'Metrics', icon: FiBarChart2 },
   { id: 'debug', label: 'Debug', icon: FiTerminal },
   { id: 'settings', label: 'Settings', icon: FiSettings },
 ];

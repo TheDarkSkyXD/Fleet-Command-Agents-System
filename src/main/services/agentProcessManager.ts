@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import log from 'electron-log';
 import * as nodePty from 'node-pty';
+import { getDatabase } from '../db/database';
 import { detectClaudeCli } from './claudeCliService';
 
 /**
@@ -65,6 +66,13 @@ export interface AgentSpawnOptions {
   fileScope?: string[];
 }
 
+export interface AgentTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}
+
 export interface AgentProcess {
   id: string;
   agentName: string;
@@ -75,6 +83,8 @@ export interface AgentProcess {
   outputBuffer: string[];
   createdAt: Date;
   isRunning: boolean;
+  tokenUsage: AgentTokenUsage;
+  jsonLineBuffer: string;
 }
 
 /**
@@ -160,6 +170,13 @@ class AgentProcessManager {
       outputBuffer: [],
       createdAt: new Date(),
       isRunning: true,
+      tokenUsage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
+      jsonLineBuffer: '',
     };
 
     // Store the process
@@ -173,6 +190,9 @@ class AgentProcessManager {
         agentProcess.outputBuffer.shift();
       }
 
+      // Parse stream-json output for token usage tracking
+      this.parseStreamJsonForTokens(agentProcess, data);
+
       // Forward output to renderer via IPC
       this.broadcastOutput(options.id, data);
     });
@@ -183,6 +203,9 @@ class AgentProcessManager {
         `[AgentProcessManager] Agent exited: ${options.agentName} (PID=${pid}), exitCode=${exitCode}, signal=${signal}`,
       );
       agentProcess.isRunning = false;
+
+      // Save token usage metrics to database
+      this.saveMetrics(agentProcess, options);
 
       // Notify renderer of agent exit
       this.broadcastAgentEvent(options.id, 'exit', {
@@ -320,6 +343,92 @@ class AgentProcessManager {
   getOutput(id: string): string[] {
     const agent = this.processes.get(id);
     return agent?.outputBuffer ?? [];
+  }
+
+  /**
+   * Parse stream-json output from Claude CLI to extract token usage.
+   * Claude CLI stream-json format includes lines like:
+   * {"type":"result","usage":{"input_tokens":1234,"output_tokens":567,"cache_read_input_tokens":89,"cache_creation_input_tokens":12}}
+   */
+  private parseStreamJsonForTokens(agent: AgentProcess, data: string): void {
+    // Accumulate data - stream may split JSON across chunks
+    agent.jsonLineBuffer += data;
+
+    // Try to extract complete JSON lines
+    const lines = agent.jsonLineBuffer.split('\n');
+    // Keep the last incomplete line in buffer
+    agent.jsonLineBuffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('{')) continue;
+
+      try {
+        const parsed = JSON.parse(trimmed);
+
+        // Check for usage data in the parsed JSON
+        if (parsed.usage) {
+          const usage = parsed.usage;
+          if (typeof usage.input_tokens === 'number') {
+            agent.tokenUsage.inputTokens += usage.input_tokens;
+          }
+          if (typeof usage.output_tokens === 'number') {
+            agent.tokenUsage.outputTokens += usage.output_tokens;
+          }
+          if (typeof usage.cache_read_input_tokens === 'number') {
+            agent.tokenUsage.cacheReadTokens += usage.cache_read_input_tokens;
+          }
+          if (typeof usage.cache_creation_input_tokens === 'number') {
+            agent.tokenUsage.cacheCreationTokens += usage.cache_creation_input_tokens;
+          }
+
+          log.debug(
+            `[AgentProcessManager] Token usage update for ${agent.agentName}: in=${agent.tokenUsage.inputTokens}, out=${agent.tokenUsage.outputTokens}, cacheRead=${agent.tokenUsage.cacheReadTokens}, cacheCreate=${agent.tokenUsage.cacheCreationTokens}`,
+          );
+        }
+      } catch {
+        // Not valid JSON, ignore - this is expected for non-JSON terminal output
+      }
+    }
+  }
+
+  /**
+   * Save accumulated token usage metrics to the database when an agent session completes.
+   */
+  private saveMetrics(agent: AgentProcess, options: AgentSpawnOptions): void {
+    try {
+      const db = getDatabase();
+      const metricId = `metric-${agent.id}-${Date.now()}`;
+      const now = new Date().toISOString();
+      const durationMs = Date.now() - agent.createdAt.getTime();
+
+      db.prepare(`
+        INSERT INTO metrics (id, agent_name, task_id, capability, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, model_used, estimated_cost, duration_ms, parent_agent, run_id, started_at, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        metricId,
+        agent.agentName,
+        options.taskId ?? null,
+        agent.capability,
+        agent.tokenUsage.inputTokens,
+        agent.tokenUsage.outputTokens,
+        agent.tokenUsage.cacheReadTokens,
+        agent.tokenUsage.cacheCreationTokens,
+        agent.model,
+        0, // estimated_cost - can be calculated later based on model pricing
+        durationMs,
+        options.parentAgent ?? null,
+        options.runId ?? null,
+        agent.createdAt.toISOString(),
+        now,
+      );
+
+      log.info(
+        `[AgentProcessManager] Saved metrics for ${agent.agentName}: in=${agent.tokenUsage.inputTokens}, out=${agent.tokenUsage.outputTokens}, cacheRead=${agent.tokenUsage.cacheReadTokens}, cacheCreate=${agent.tokenUsage.cacheCreationTokens}, duration=${durationMs}ms`,
+      );
+    } catch (error) {
+      log.error(`[AgentProcessManager] Failed to save metrics for ${agent.agentName}:`, error);
+    }
   }
 
   /**
