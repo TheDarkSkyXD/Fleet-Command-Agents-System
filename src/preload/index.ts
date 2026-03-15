@@ -451,6 +451,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hookDeploy: (hookIds: string[], worktreePaths: string[]) =>
     ipcRenderer.invoke('hook:deploy', hookIds, worktreePaths),
 
+  // Window management
+  windowSetTitle: (title: string) => ipcRenderer.invoke('window:setTitle', title),
+
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),
 });

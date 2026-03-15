@@ -1,5 +1,5 @@
 import { exec, execSync } from 'node:child_process';
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
 import {
@@ -4699,6 +4699,22 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('hook:deploy failed:', error);
       return { data: null, error: String(error) };
+    }
+  });
+
+  // Window management
+  ipcMain.handle('window:setTitle', (_event, title: string) => {
+    try {
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed()) {
+          win.setTitle(title);
+        }
+      }
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('window:setTitle failed:', error);
+      return { data: false, error: String(error) };
     }
   });
 

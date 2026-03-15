@@ -1146,6 +1146,8 @@ export interface ElectronAPI {
       results: WatchdogCheckResult[];
     }) => void,
   ) => void;
+  // Window management
+  windowSetTitle: (title: string) => Promise<{ data: boolean; error: string | null }>;
   removeAllListeners: (channel: string) => void;
 }
 

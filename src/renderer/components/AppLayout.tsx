@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
@@ -15,6 +15,7 @@ import { PromptsPage } from '../pages/PromptsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
 import { WorktreesPage } from '../pages/WorktreesPage';
+import { useProjectStore } from '../stores/projectStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { CommandPalette } from './CommandPalette';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -35,6 +36,45 @@ export function AppLayout() {
       useSettingsStore.getState().loadSettings();
     }
   }, [loaded]);
+
+  // Dynamic window title: shows project name and active agent count
+  const { activeProject, loadActiveProject } = useProjectStore();
+  const [activeAgentCount, setActiveAgentCount] = useState(0);
+  const titleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    loadActiveProject();
+  }, [loadActiveProject]);
+
+  // Poll agent count every 3 seconds for window title
+  useEffect(() => {
+    async function fetchAgentCount() {
+      try {
+        const result = await window.electronAPI.agentRunningList();
+        if (result.data) {
+          setActiveAgentCount(result.data.filter((a) => a.isRunning).length);
+        }
+      } catch {
+        // Silently ignore errors
+      }
+    }
+    fetchAgentCount();
+    titleIntervalRef.current = setInterval(fetchAgentCount, 3000);
+    return () => {
+      if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
+    };
+  }, []);
+
+  // Update window title when project or agent count changes
+  useEffect(() => {
+    const projectName = activeProject?.name || 'No Project';
+    const agentSuffix =
+      activeAgentCount > 0
+        ? ` (${activeAgentCount} agent${activeAgentCount === 1 ? '' : 's'})`
+        : '';
+    const title = `Fleet Command - ${projectName}${agentSuffix}`;
+    window.electronAPI.windowSetTitle(title).catch(() => {});
+  }, [activeProject, activeAgentCount]);
 
   const handleNavigate = useCallback((page: string) => {
     setCurrentPage(page);
