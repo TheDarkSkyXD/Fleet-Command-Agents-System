@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   FiBook,
   FiChevronRight,
+  FiClock,
   FiDatabase,
   FiFilter,
   FiPlus,
   FiSearch,
   FiTag,
   FiTrash2,
+  FiUser,
   FiX,
 } from 'react-icons/fi';
 import type {
@@ -111,11 +113,14 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 }
 
 export function ExpertisePage() {
+  const [activeTab, setActiveTab] = useState<'domains' | 'timeline'>('domains');
   const [domains, setDomains] = useState<ExpertiseDomainSummary[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [records, setRecords] = useState<ExpertiseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
+  const [timelineRecords, setTimelineRecords] = useState<ExpertiseRecord[]>([]);
+  const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [globalSearchResults, setGlobalSearchResults] = useState<ExpertiseRecord[]>([]);
@@ -156,6 +161,24 @@ export function ExpertisePage() {
       console.error('Failed to load domains:', error);
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const loadTimeline = useCallback(async () => {
+    setIsLoadingTimeline(true);
+    try {
+      const result = await window.electronAPI.expertiseList({});
+      if (result.data) {
+        // Sort by created_at descending (newest first)
+        const sorted = [...result.data].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+        setTimelineRecords(sorted);
+      }
+    } catch (error) {
+      console.error('Failed to load timeline:', error);
+    } finally {
+      setIsLoadingTimeline(false);
     }
   }, []);
 
@@ -226,6 +249,12 @@ export function ExpertisePage() {
   }, [loadDomains]);
 
   useEffect(() => {
+    if (activeTab === 'timeline') {
+      loadTimeline();
+    }
+  }, [activeTab, loadTimeline]);
+
+  useEffect(() => {
     if (selectedDomain) {
       loadRecords(selectedDomain);
     }
@@ -288,6 +317,9 @@ export function ExpertisePage() {
       if (selectedDomain) {
         loadRecords(selectedDomain);
       }
+      if (activeTab === 'timeline') {
+        loadTimeline();
+      }
       if (isGlobalSearchActive && globalSearchQuery) {
         performGlobalSearch(globalSearchQuery);
       }
@@ -300,6 +332,8 @@ export function ExpertisePage() {
     showStatus,
     loadDomains,
     loadRecords,
+    activeTab,
+    loadTimeline,
     isGlobalSearchActive,
     globalSearchQuery,
     performGlobalSearch,
@@ -396,8 +430,43 @@ export function ExpertisePage() {
         </button>
       </div>
 
-      {/* Global search bar (shown on domain list view) */}
+      {/* Tabs (shown when no domain is selected) */}
       {!selectedDomain && (
+        <div
+          className="flex items-center gap-1 border-b border-slate-700"
+          data-testid="expertise-tabs"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('domains')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'domains'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+            data-testid="expertise-tab-domains"
+          >
+            <FiDatabase className="mr-1.5 inline-block" size={14} />
+            Domains
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('timeline')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'timeline'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+            data-testid="expertise-tab-timeline"
+          >
+            <FiClock className="mr-1.5 inline-block" size={14} />
+            Timeline
+          </button>
+        </div>
+      )}
+
+      {/* Global search bar (shown on domain list view) */}
+      {!selectedDomain && activeTab === 'domains' && (
         <div className="relative" data-testid="global-search-container">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
           <input
@@ -425,7 +494,7 @@ export function ExpertisePage() {
       )}
 
       {/* Global search results */}
-      {!selectedDomain && isGlobalSearchActive && (
+      {!selectedDomain && activeTab === 'domains' && isGlobalSearchActive && (
         <div data-testid="global-search-results">
           <div className="mb-3 flex items-center gap-2 text-sm text-slate-400">
             <FiSearch size={14} />
@@ -526,8 +595,148 @@ export function ExpertisePage() {
         </div>
       )}
 
+      {/* Timeline view */}
+      {!selectedDomain && activeTab === 'timeline' && (
+        <div data-testid="expertise-timeline">
+          {isLoadingTimeline ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="h-16 w-1 animate-pulse rounded bg-slate-800" />
+                  <div className="h-16 flex-1 animate-pulse rounded-lg bg-slate-800" />
+                </div>
+              ))}
+            </div>
+          ) : timelineRecords.length === 0 ? (
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-12 text-center">
+              <FiClock size={40} className="mx-auto mb-3 text-slate-500" />
+              <p className="text-lg font-medium text-slate-300">No timeline entries yet</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Record your first expertise to see it in the timeline
+              </p>
+            </div>
+          ) : (
+            <div className="relative">
+              {/* Vertical timeline line */}
+              <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-slate-700" />
+
+              <div className="space-y-1">
+                {timelineRecords.map((record, index) => {
+                  // Group by date - show date header when date changes
+                  const recordDate = new Date(record.created_at).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  });
+                  const prevDate =
+                    index > 0
+                      ? new Date(timelineRecords[index - 1].created_at).toLocaleDateString(
+                          'en-US',
+                          { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' },
+                        )
+                      : null;
+                  const showDateHeader = recordDate !== prevDate;
+
+                  return (
+                    <div key={record.id}>
+                      {showDateHeader && (
+                        <div className="flex items-center gap-3 py-3 pl-0">
+                          <div className="flex h-[31px] w-[31px] items-center justify-center rounded-full bg-slate-800 border border-slate-600 z-10">
+                            <FiClock size={14} className="text-slate-400" />
+                          </div>
+                          <span className="text-sm font-semibold text-slate-300">{recordDate}</span>
+                        </div>
+                      )}
+                      <div className="flex gap-3 pl-0">
+                        {/* Timeline dot */}
+                        <div className="flex h-[31px] w-[31px] flex-shrink-0 items-center justify-center z-10">
+                          <div
+                            className={`h-2.5 w-2.5 rounded-full ${
+                              TYPE_COLORS[record.type]
+                                ?.split(' ')
+                                .find((c) => c.startsWith('text-'))
+                                ?.replace('text-', 'bg-') || 'bg-slate-500'
+                            }`}
+                          />
+                        </div>
+                        {/* Timeline entry card */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedRecordId(expandedRecordId === record.id ? null : record.id);
+                          }}
+                          className="flex-1 mb-1 rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-left transition-colors hover:border-slate-600 hover:bg-slate-800"
+                          data-testid={`timeline-entry-${record.id}`}
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-slate-100">{record.title}</span>
+                            <DomainBadge domain={record.domain} />
+                            <TypeBadge type={record.type} />
+                            <ClassificationBadge classification={record.classification} />
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500">
+                            {record.agent_name ? (
+                              <span className="flex items-center gap-1 text-slate-400">
+                                <FiUser size={11} />
+                                {record.agent_name}
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-slate-500">
+                                <FiUser size={11} />
+                                Manual entry
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <FiClock size={11} />
+                              {new Date(record.created_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                            <FiChevronRight
+                              size={12}
+                              className={`ml-auto transition-transform ${expandedRecordId === record.id ? 'rotate-90' : ''}`}
+                            />
+                          </div>
+
+                          {/* Expanded content */}
+                          {expandedRecordId === record.id && (
+                            <div className="mt-3 border-t border-slate-700 pt-3">
+                              <p className="whitespace-pre-wrap text-sm text-slate-300">
+                                {record.content}
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                                {record.source_file && (
+                                  <span className="flex items-center gap-1">
+                                    <FiDatabase size={12} />
+                                    {record.source_file}
+                                  </span>
+                                )}
+                                {record.tags && (
+                                  <span className="flex items-center gap-1">
+                                    <FiTag size={12} />
+                                    {record.tags}
+                                  </span>
+                                )}
+                                <span>ID: {record.id}</span>
+                                <span>Updated: {new Date(record.updated_at).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Domain list view */}
-      {!selectedDomain && !isGlobalSearchActive && (
+      {!selectedDomain && activeTab === 'domains' && !isGlobalSearchActive && (
         <div>
           {domains.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-12 text-center">
