@@ -1,5 +1,25 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Runtime Registry & Model Resolution Chain)
+
+#### Feature #209: Runtime registry with adapter interface - PASSING
+- Created RuntimeRegistry class with register/unregister/getAdapter/listAdapters/resolveModel methods
+- Created ClaudeCodeAdapter implementing RuntimeAdapter interface with spawn, detect, parse methods
+- Registered Claude Code adapter at app startup
+- Added IPC handlers: runtime:list, runtime:get-default, runtime:set-default, runtime:resolve-model
+- Runtime selector UI in spawn dialog with detection status indicators
+- Updated AgentProcessManager to use registry for CLI detection and spawn args
+
+#### Feature #210: Model resolution chain - PASSING
+- Three-tier model resolution: explicit flag > capability config > runtime default
+- IPC agent:spawn handler reads capability config from app_settings
+- Dedicated runtime:resolve-model IPC endpoint for renderer
+
+#### Current Status
+- 223/366 features passing (added #209 and #210 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Toast Notifications & Hover Tooltips)
 
 #### Feature #212: In-app toast notifications via sonner - PASSING
