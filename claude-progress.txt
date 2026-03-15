@@ -1,5 +1,39 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Custom Agent Roles & Overlay Preview)
+
+#### Feature #157: Create custom agent roles - PASSING
+- CreateRoleModal already implemented with full form: role name, display name, description, default model (haiku/sonnet/opus), capability grid (18 capabilities), tool allowlist, bash restrictions, file scope
+- Backend agentDef:create IPC handler validates required fields, checks for duplicate roles, INSERTs into agent_definitions table via loggedPrepare (real SQLite)
+- agentDef:delete and agentDef:update IPC handlers also present
+- Preload bridge: agentDefCreate, agentDefDelete, agentDefUpdate
+- ElectronAPI types defined for all 3 new methods
+- Custom roles appear with "Custom" badge in role list, can be deleted (built-in roles protected by BUILT_IN_ROLES set)
+- "New Role" button in page header opens CreateRoleModal
+- Code was already committed by previous agents as part of agent definitions work
+
+#### Feature #158: Preview rendered agent overlay - PASSING
+- OverlayPreviewModal implemented with 3-layer overlay preview system
+- Layer 1 (Base): Core agent instructions shared by all agents
+- Layer 2 (Profile): Role-specific overlay showing capabilities, tools, restrictions, file scope, model
+- Layer 3 (Task): Task-specific overlay template with worktree/branch/parent context
+- "Final Rendered" tab shows all 3 layers combined with --- separators
+- Tab-based navigation between layers with color-coded tabs
+- "Preview Overlay" button on RoleDetail panel with FiLayers icon
+- Markdown syntax highlighting via highlightMarkdown function
+- Code was already committed by previous agents as part of agent definitions work
+
+#### Files Already Committed
+- src/renderer/pages/AgentDefinitionsPage.tsx - CreateRoleModal, OverlayPreviewModal, BUILT_IN_ROLES, enhanced RoleDetail
+- src/main/ipc/handlers.ts - agentDef:create, agentDef:delete, agentDef:update handlers
+- src/preload/index.ts - agentDefCreate, agentDefDelete, agentDefUpdate bridges
+- src/shared/types/index.ts - ElectronAPI type definitions for new methods
+
+#### Current Status
+- 194/366 features passing (added #157 and #158 this session)
+- All code passes TypeScript check (no new errors in changed files)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Session Handoff Tracking & Instruction Editor)
 
 #### Feature #154: Session handoff tracking - PASSING
