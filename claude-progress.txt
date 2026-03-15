@@ -1959,3 +1959,24 @@
 - 126/366 features passing (added #51 and #52 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Semantic & Protocol Message Types)
+
+#### Feature #65: Semantic message types - PASSING
+- All 4 semantic types (status, question, result, error) already fully implemented
+- DB schema CHECK constraint, TypeScript MessageType union type
+- mail:send stores type correctly, mail:list filters by type
+- UI typeColor() provides type-specific styling (error=red, question=purple, status=slate)
+- Compose form type selector and message badges in list/detail views
+
+#### Feature #66: Protocol message types - PASSING
+- All 8 protocol types (worker_done, merge_ready, merged, merge_failed, escalation, health_check, dispatch, assign) fully implemented
+- Desktop notifications triggered for merge_ready and merge_failed
+- coordinator:poll-mail processes each protocol type with appropriate actions
+- dispatch supports structured JSON payload
+- UI color-coding: green (worker_done/merged), blue (dispatch/assign), orange (escalation), cyan (merge_ready), yellow (health_check), red (merge_failed)
+
+#### Current Status
+- 135/366 features passing (added #65 and #66 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
