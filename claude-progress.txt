@@ -5194,3 +5194,33 @@
 - 352/366 features passing (added #353 and #354 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Keyboard Shortcuts & Default Project Path)
+
+#### Feature #355: Keyboard shortcut customization - PASSING
+- Created keyboardShortcutsStore with 10 default shortcuts (command palette + 9 navigation)
+- Created useKeyboardShortcuts hook for global key event handling with capture phase
+- Added Keyboard Shortcuts tab in Settings with toggle, click-to-record, conflict detection, reset
+- Updated CommandPalette to use customizable shortcut from store instead of hardcoded Ctrl+K
+- Wired navigation shortcuts (Ctrl+1-7, Ctrl+comma, Ctrl+Shift+D) in AppLayout
+
+#### Feature #356: Default project path setting - PASSING
+- Added defaultProjectPath to AppSettings interface with empty string default
+- Added DefaultProjectPathSetting component in Settings > Project Config tab
+- Pre-fills project path in ProjectSwitcher create form when default is set
+- Pre-fills project path in SetupWizard when default is set
+
+#### Files Modified
+- NEW: src/renderer/stores/keyboardShortcutsStore.ts
+- NEW: src/renderer/hooks/useKeyboardShortcuts.ts
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Keyboard Shortcuts tab + Default Project Path
+- MODIFIED: src/renderer/components/AppLayout.tsx - global navigation shortcuts
+- MODIFIED: src/renderer/components/CommandPalette.tsx - customizable shortcut binding
+- MODIFIED: src/renderer/stores/settingsStore.ts - defaultProjectPath field
+- MODIFIED: src/renderer/components/ProjectSwitcher.tsx - pre-fill default path
+- MODIFIED: src/renderer/components/SetupWizard.tsx - pre-fill default path
+
+#### Current Status
+- 355/366 features passing (added #355 and #356 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
