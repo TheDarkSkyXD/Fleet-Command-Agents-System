@@ -1,5 +1,46 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (App Log Viewer & NDJSON Import)
+
+#### Feature #125: App log viewer with level filtering - PASSING
+- Created app_logs table in SQLite with id, level, message, source, agent_name, data, created_at
+- Added indexes on level, agent_name, created_at for query performance
+- IPC handlers: appLog:list (with level/agent/search/time filters), appLog:create, appLog:agents, appLog:purge
+- Built AppLogPanel as new "Logs" tab in DebugPage (default tab)
+- Level filtering via clickable summary cards (debug/info/warn/error) showing counts
+- Cards toggle filter on click with color-coded active state
+- Also available as dropdown selector
+- Log entries expandable to show full details (ID, timestamp, level, source, agent, message, data)
+- Color-coded log entries: error rows have red border, warn rows amber border
+
+#### Feature #128: Searchable NDJSON log viewer - PASSING
+- Import NDJSON button reads .ndjson/.jsonl/.log/.txt/.json files
+- Parses each JSON line with flexible field mapping:
+  - message: message/msg/text or full JSON stringify
+  - level: level/severity (normalized to debug/info/warn/error)
+  - agent: agent_name/agentName/agent
+  - timestamp: timestamp/time/created_at/ts
+  - source: source/logger/module
+- Full original JSON stored in data column for reference
+- Search input with keyword highlighting (yellow marks)
+- Time range filter with datetime-local start/end inputs
+- Agent name dropdown filter populated from distinct agents in DB
+- All filters combine in SQL WHERE clause
+- Transaction-based bulk import for performance
+- Status messages for import success/failure with auto-dismiss
+
+#### Files Created/Modified
+- MODIFIED: src/main/db/database.ts - Added app_logs table with 3 indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added 5 appLog IPC handlers
+- MODIFIED: src/preload/index.ts - Added appLog bridge methods
+- MODIFIED: src/shared/types/index.ts - Added AppLogEntry interface + ElectronAPI methods
+- MODIFIED: src/renderer/pages/DebugPage.tsx - Added AppLogPanel with Logs tab, LogEntryRow, LogSkeleton
+
+#### Current Status
+- 56/366 features passing (added #125 and #128 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Lead Agent Spawning & Hierarchy Tree)
 
 #### Feature #36: Spawn lead agent - PASSING
