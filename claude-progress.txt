@@ -2253,3 +2253,33 @@
 - 153/366 features passing (added #96 and #112 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Merge Dependency Blocking and Branch Config)
+
+#### Feature #91: Failed merge blocks subsequent merges - PASSING
+- Added depends_on column to merge_queue table (SQLite migration in database.ts)
+- merge:queue IPC handler computes blocked status by checking if any dependency has failed status
+- merge:execute IPC handler rejects execution of blocked entries with descriptive error message
+- EnqueueDialog updated to allow selecting dependencies from existing pending/merging queue entries
+- QueueEntryRow shows BlockedBadge (orange), dependency chips (color-coded by dep status), blocking message
+- Merge button disabled with tooltip when entry is blocked by a failed dependency
+- Stats dashboard extended to 6-column grid showing Blocked count
+
+#### Feature #92: Merge target branch configuration - PASSING
+- Added merge:get-target-branch and merge:set-target-branch IPC handlers persisting to app_settings
+- Added mergeGetTargetBranch and mergeSetTargetBranch preload bridge methods and ElectronAPI types
+- Created TargetBranchSelector component with inline click-to-edit UI
+- Default shows (current branch) when no target configured
+- All merge operations (execute, auto-resolve, ai-resolve, reimagine) pass configured target branch
+
+#### Files Modified
+- MODIFIED: src/main/db/database.ts - Added depends_on migration
+- MODIFIED: src/main/ipc/handlers.ts - Blocked status computation, dependency check, target branch handlers
+- MODIFIED: src/preload/index.ts - Added depends_on to enqueue, target branch bridge methods
+- MODIFIED: src/shared/types/index.ts - Added depends_on, blocked fields, target branch API types
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Blocking UI, dependency selector, target branch config
+
+#### Current Status
+- 155/366 features passing (added #91 and #92 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
