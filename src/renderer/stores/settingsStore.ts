@@ -6,6 +6,12 @@ export interface AppSettings {
   maxConcurrentAgents: number;
   maxAgentsPerLead: number;
 
+  // Watchdog settings
+  watchdogEnabled: boolean;
+  watchdogIntervalMs: number;
+  watchdogStaleThresholdMs: number;
+  watchdogZombieThresholdMs: number;
+
   // Terminal settings
   terminalFontFamily: string;
   terminalFontSize: number;
@@ -15,6 +21,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxHierarchyDepth: 2,
   maxConcurrentAgents: 10,
   maxAgentsPerLead: 5,
+  watchdogEnabled: true,
+  watchdogIntervalMs: 30000,
+  watchdogStaleThresholdMs: 300000,
+  watchdogZombieThresholdMs: 900000,
   terminalFontFamily: 'JetBrains Mono, Fira Code, monospace',
   terminalFontSize: 14,
 };

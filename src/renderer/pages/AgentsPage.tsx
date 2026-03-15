@@ -485,14 +485,42 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         accessorKey: 'state',
         header: 'Status',
         enableSorting: true,
-        cell: ({ getValue }) => {
-          const state = getValue<string>();
+        cell: ({ row }) => {
+          const state = row.original.state;
+          const escalation = row.original.escalation_level || 0;
+          const stalledAt = row.original.stalled_at;
+          const stalledDuration = stalledAt
+            ? Math.floor((Date.now() - new Date(stalledAt).getTime()) / 1000)
+            : 0;
+          const stalledMin = Math.floor(stalledDuration / 60);
+          const stalledSec = stalledDuration % 60;
+
           return (
-            <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[state] || ''}`}
-            >
-              {state}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[state] || ''}`}
+              >
+                {state}
+              </span>
+              {state === 'stalled' && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs text-amber-400"
+                  title={`Stalled for ${stalledMin}m ${stalledSec}s (escalation level ${escalation})`}
+                >
+                  <FiAlertTriangle className="h-3 w-3" />
+                  {stalledMin > 0 ? `${stalledMin}m` : `${stalledSec}s`}
+                </span>
+              )}
+              {state === 'zombie' && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs text-red-400 font-semibold animate-pulse"
+                  title={`Zombie agent - stalled for ${stalledMin}m ${stalledSec}s, will be terminated`}
+                >
+                  <FiZap className="h-3 w-3" />
+                  ZOMBIE
+                </span>
+              )}
+            </div>
           );
         },
       },
@@ -998,6 +1026,29 @@ function AgentCard({
           >
             {session.state}
           </span>
+
+          {/* Stale alert */}
+          {session.state === 'stalled' && (
+            <span
+              className="inline-flex items-center gap-1 text-xs text-amber-400"
+              title={`Agent stalled (escalation level ${session.escalation_level})`}
+            >
+              <FiAlertTriangle className="h-3 w-3" />
+              {session.stalled_at &&
+                `${Math.floor((Date.now() - new Date(session.stalled_at).getTime()) / 60000)}m`}
+            </span>
+          )}
+
+          {/* Zombie alert */}
+          {session.state === 'zombie' && (
+            <span
+              className="inline-flex items-center gap-1 text-xs text-red-400 font-semibold animate-pulse"
+              title="Zombie agent - being terminated"
+            >
+              <FiZap className="h-3 w-3" />
+              ZOMBIE
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

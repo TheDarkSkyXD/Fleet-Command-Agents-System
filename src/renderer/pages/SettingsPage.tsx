@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  FiAlertTriangle,
   FiCheck,
   FiEdit2,
+  FiEye,
   FiPlus,
   FiRefreshCw,
   FiSave,
@@ -71,7 +73,9 @@ const DEFAULT_PROFILE_FORM: ProfileFormData = {
 
 export function SettingsPage() {
   const { loaded, saving, loadSettings } = useSettingsStore();
-  const [activeTab, setActiveTab] = useState<'agents' | 'terminal' | 'profiles'>('agents');
+  const [activeTab, setActiveTab] = useState<'agents' | 'watchdog' | 'terminal' | 'profiles'>(
+    'agents',
+  );
 
   useEffect(() => {
     if (!loaded) {
@@ -90,6 +94,7 @@ export function SettingsPage() {
 
   const tabs = [
     { id: 'agents' as const, label: 'Agents' },
+    { id: 'watchdog' as const, label: 'Watchdog' },
     { id: 'terminal' as const, label: 'Terminal' },
     { id: 'profiles' as const, label: 'Profiles' },
   ];
@@ -126,6 +131,7 @@ export function SettingsPage() {
 
       {/* Tab Content */}
       {activeTab === 'agents' && <AgentSettings />}
+      {activeTab === 'watchdog' && <WatchdogSettings />}
       {activeTab === 'terminal' && <TerminalSettings />}
       {activeTab === 'profiles' && <ProfilesSettings />}
     </div>
@@ -775,6 +781,247 @@ function ProfileFormFields({
         </div>
       </div>
     </>
+  );
+}
+
+// ── Watchdog Settings Tab ────────────────────────────────────────────
+
+function WatchdogSettings() {
+  const { settings, updateSetting } = useSettingsStore();
+  const [watchdogStatus, setWatchdogStatus] = useState<{
+    running: boolean;
+    checkCount: number;
+    lastCheckAt: string | null;
+    trackedAgents: number;
+  } | null>(null);
+
+  // Load watchdog status on mount
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        const result = await window.electronAPI.watchdogStatus();
+        if (result.data) {
+          setWatchdogStatus(result.data);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadStatus();
+    const interval = setInterval(loadStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Apply watchdog config changes to the backend
+  const applyWatchdogConfig = useCallback(async () => {
+    try {
+      await window.electronAPI.watchdogConfigure({
+        enabled: settings.watchdogEnabled,
+        intervalMs: settings.watchdogIntervalMs,
+        staleThresholdMs: settings.watchdogStaleThresholdMs,
+        zombieThresholdMs: settings.watchdogZombieThresholdMs,
+      });
+      // Refresh status
+      const result = await window.electronAPI.watchdogStatus();
+      if (result.data) {
+        setWatchdogStatus(result.data);
+      }
+    } catch {
+      // ignore
+    }
+  }, [settings]);
+
+  // Helper to format ms to human-readable
+  const formatDuration = (ms: number): string => {
+    const seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSec = seconds % 60;
+    return remainingSec > 0 ? `${minutes}m ${remainingSec}s` : `${minutes}m`;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Status banner */}
+      {watchdogStatus && (
+        <div
+          className={`rounded-lg border px-4 py-3 flex items-center justify-between ${
+            watchdogStatus.running
+              ? 'border-emerald-700 bg-emerald-900/20'
+              : 'border-amber-700 bg-amber-900/20'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FiEye
+              className={watchdogStatus.running ? 'text-emerald-400' : 'text-amber-400'}
+              size={16}
+            />
+            <span
+              className={`text-sm font-medium ${watchdogStatus.running ? 'text-emerald-300' : 'text-amber-300'}`}
+            >
+              {watchdogStatus.running ? 'Watchdog Active' : 'Watchdog Stopped'}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-slate-400">
+            <span>Checks: {watchdogStatus.checkCount}</span>
+            <span>Tracking: {watchdogStatus.trackedAgents} agents</span>
+            {watchdogStatus.lastCheckAt && (
+              <span>Last check: {new Date(watchdogStatus.lastCheckAt).toLocaleTimeString()}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FiAlertTriangle className="text-amber-400" size={20} />
+          <h2 className="text-lg font-semibold text-slate-100">Watchdog Health Monitor</h2>
+        </div>
+        <p className="text-sm text-slate-400 mb-6">
+          The watchdog daemon monitors agent activity and applies progressive nudging when agents
+          become stalled. Agents with no output beyond the stale threshold are flagged, and those
+          exceeding the zombie threshold are terminated.
+        </p>
+
+        {/* Enable/Disable */}
+        <SettingRow
+          label="Enable Watchdog"
+          description="Enable or disable the watchdog health monitoring daemon."
+        >
+          <button
+            type="button"
+            onClick={() => updateSetting('watchdogEnabled', !settings.watchdogEnabled)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              settings.watchdogEnabled ? 'bg-blue-600' : 'bg-slate-600'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.watchdogEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </SettingRow>
+
+        {/* Check Interval */}
+        <SettingRow
+          label="Check Interval"
+          description={`How often the watchdog checks agent health. Current: ${formatDuration(settings.watchdogIntervalMs)}`}
+        >
+          <div className="flex items-center gap-2">
+            <NumberInput
+              value={Math.round(settings.watchdogIntervalMs / 1000)}
+              min={5}
+              max={300}
+              onChange={(v) => updateSetting('watchdogIntervalMs', v * 1000)}
+            />
+            <span className="text-xs text-slate-400">sec</span>
+          </div>
+        </SettingRow>
+
+        {/* Stale Threshold */}
+        <SettingRow
+          label="Stale Threshold"
+          description={`Duration of inactivity before an agent is flagged as stalled. Current: ${formatDuration(settings.watchdogStaleThresholdMs)}`}
+        >
+          <div className="flex items-center gap-2">
+            <NumberInput
+              value={Math.round(settings.watchdogStaleThresholdMs / 60000)}
+              min={1}
+              max={60}
+              onChange={(v) => updateSetting('watchdogStaleThresholdMs', v * 60000)}
+            />
+            <span className="text-xs text-slate-400">min</span>
+          </div>
+        </SettingRow>
+
+        {/* Zombie Threshold */}
+        <SettingRow
+          label="Zombie Threshold"
+          description={`Duration of inactivity before a stalled agent is terminated. Current: ${formatDuration(settings.watchdogZombieThresholdMs)}. Must be greater than stale threshold.`}
+        >
+          <div className="flex items-center gap-2">
+            <NumberInput
+              value={Math.round(settings.watchdogZombieThresholdMs / 60000)}
+              min={2}
+              max={120}
+              onChange={(v) => updateSetting('watchdogZombieThresholdMs', v * 60000)}
+            />
+            <span className="text-xs text-slate-400">min</span>
+          </div>
+        </SettingRow>
+
+        {/* Escalation levels preview */}
+        <div className="mt-6 pt-4 border-t border-slate-700">
+          <p className="text-sm text-slate-300 font-medium mb-3">Escalation Timeline</p>
+          <div className="flex items-center gap-0">
+            {[
+              {
+                label: 'Warning',
+                time: formatDuration(settings.watchdogStaleThresholdMs),
+                color: 'amber',
+              },
+              {
+                label: 'Nudge',
+                time: formatDuration(
+                  settings.watchdogStaleThresholdMs +
+                    (settings.watchdogZombieThresholdMs - settings.watchdogStaleThresholdMs) * 0.33,
+                ),
+                color: 'amber',
+              },
+              {
+                label: 'Escalate',
+                time: formatDuration(
+                  settings.watchdogStaleThresholdMs +
+                    (settings.watchdogZombieThresholdMs - settings.watchdogStaleThresholdMs) * 0.66,
+                ),
+                color: 'orange',
+              },
+              {
+                label: 'Terminate',
+                time: formatDuration(settings.watchdogZombieThresholdMs),
+                color: 'red',
+              },
+            ].map((step, i) => (
+              <div key={step.label} className="flex items-center">
+                {i > 0 && <div className="w-8 h-0.5 bg-slate-600" />}
+                <div className="flex flex-col items-center">
+                  <div className={`w-3 h-3 rounded-full bg-${step.color}-500`} />
+                  <span className={`text-xs text-${step.color}-400 mt-1 font-medium`}>
+                    {step.label}
+                  </span>
+                  <span className="text-xs text-slate-500">{step.time}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Apply & Reset Buttons */}
+      <div className="flex justify-between">
+        <button
+          type="button"
+          onClick={applyWatchdogConfig}
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+        >
+          <FiSave size={14} />
+          Apply to Watchdog
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            updateSetting('watchdogEnabled', DEFAULT_SETTINGS.watchdogEnabled);
+            updateSetting('watchdogIntervalMs', DEFAULT_SETTINGS.watchdogIntervalMs);
+            updateSetting('watchdogStaleThresholdMs', DEFAULT_SETTINGS.watchdogStaleThresholdMs);
+            updateSetting('watchdogZombieThresholdMs', DEFAULT_SETTINGS.watchdogZombieThresholdMs);
+          }}
+          className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+        >
+          Reset Watchdog Settings to Defaults
+        </button>
+      </div>
+    </div>
   );
 }
 
