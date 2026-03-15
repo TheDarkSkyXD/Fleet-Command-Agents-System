@@ -1,5 +1,33 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Merge Queue & Clean Merge)
+
+#### Feature #80: FIFO merge queue SQLite-backed - PASSING
+- Added IPC handlers: merge:enqueue, merge:next, merge:complete, merge:fail, merge:conflict, merge:remove
+- Created Zustand mergeStore (src/renderer/stores/mergeStore.ts)
+- Built MergeQueuePage with enqueue dialog, stats cards, queue/history tabs, status badges
+- FIFO ordering enforced by enqueued_at column with ASC ordering in all queries
+- Integrated into AppLayout as the 'merge' page
+
+#### Feature #84: Tier 1 clean merge execution - PASSING
+- Created src/main/services/mergeService.ts with executeCleanMerge() and previewMerge()
+- executeCleanMerge() uses simple-git to perform `git merge [branch] --no-edit`
+- Updated merge:execute IPC to be async, performs real git merge
+- On success: status='merged', resolved_tier='clean-merge'
+- On conflict: aborts merge, sets status='conflict', reports conflicted files
+- On failure: sets status='failed'
+- previewMerge() does dry-run with --no-commit --no-ff then aborts
+- Updated preload and types with repoPath/targetBranch optional params
+
+#### Files Created/Modified
+- NEW: src/main/services/mergeService.ts - Git merge service with simple-git
+- NEW: src/renderer/stores/mergeStore.ts - Zustand store for merge queue
+- NEW: src/renderer/pages/MergeQueuePage.tsx - Full merge queue UI
+- MODIFIED: src/main/ipc/handlers.ts - Added merge IPC handlers
+- MODIFIED: src/preload/index.ts - Exposed new merge IPC channels
+- MODIFIED: src/shared/types/index.ts - Updated ElectronAPI types
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated MergeQueuePage
+
 ### Session: 2026-03-14 (Issue/Task CRUD & Claim)
 
 #### Feature #113: Create task/issue with title type priority - PASSING
