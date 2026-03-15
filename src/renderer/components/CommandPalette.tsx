@@ -1,12 +1,19 @@
 import { Command } from 'cmdk';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  FiActivity,
+  FiAnchor,
   FiBarChart2,
   FiBook,
+  FiBookOpen,
   FiCheckSquare,
+  FiFileText,
   FiFolder,
+  FiGitBranch,
   FiGitMerge,
+  FiHeart,
   FiMail,
+  FiSearch,
   FiSettings,
   FiShield,
   FiTerminal,
@@ -19,16 +26,188 @@ interface CommandPaletteProps {
 }
 
 const navigationItems = [
-  { id: 'agents', label: 'Go to Agents', icon: FiUsers, group: 'Navigation' },
-  { id: 'mail', label: 'Go to Mail', icon: FiMail, group: 'Navigation' },
-  { id: 'merge', label: 'Go to Merge Queue', icon: FiGitMerge, group: 'Navigation' },
-  { id: 'guard-rules', label: 'Go to Guard Rules', icon: FiShield, group: 'Navigation' },
-  { id: 'tasks', label: 'Go to Tasks', icon: FiCheckSquare, group: 'Navigation' },
-  { id: 'expertise', label: 'Go to Expertise', icon: FiBook, group: 'Navigation' },
-  { id: 'metrics', label: 'Go to Metrics', icon: FiBarChart2, group: 'Navigation' },
-  { id: 'debug', label: 'Go to Debug', icon: FiTerminal, group: 'Navigation' },
-  { id: 'settings', label: 'Go to Settings', icon: FiSettings, group: 'Navigation' },
+  {
+    id: 'agents',
+    label: 'Go to Agents',
+    keywords: ['agents', 'agent', 'workers', 'swarm'],
+    icon: FiUsers,
+    group: 'Navigation',
+  },
+  {
+    id: 'mail',
+    label: 'Go to Mail',
+    keywords: ['mail', 'messages', 'inbox', 'outbox'],
+    icon: FiMail,
+    group: 'Navigation',
+  },
+  {
+    id: 'merge',
+    label: 'Go to Merge Queue',
+    keywords: ['merge', 'queue', 'git', 'branch'],
+    icon: FiGitMerge,
+    group: 'Navigation',
+  },
+  {
+    id: 'worktrees',
+    label: 'Go to Worktrees',
+    keywords: ['worktrees', 'worktree', 'branches', 'git'],
+    icon: FiGitBranch,
+    group: 'Navigation',
+  },
+  {
+    id: 'definitions',
+    label: 'Go to Definitions',
+    keywords: ['definitions', 'definition', 'agent types', 'roles'],
+    icon: FiBookOpen,
+    group: 'Navigation',
+  },
+  {
+    id: 'guard-rules',
+    label: 'Go to Guard Rules',
+    keywords: ['guard', 'rules', 'security', 'permissions'],
+    icon: FiShield,
+    group: 'Navigation',
+  },
+  {
+    id: 'hooks',
+    label: 'Go to Hooks',
+    keywords: ['hooks', 'hook', 'lifecycle', 'events'],
+    icon: FiAnchor,
+    group: 'Navigation',
+  },
+  {
+    id: 'tasks',
+    label: 'Go to Tasks',
+    keywords: ['tasks', 'task', 'todo', 'tracker'],
+    icon: FiCheckSquare,
+    group: 'Navigation',
+  },
+  {
+    id: 'discovery',
+    label: 'Go to Discovery',
+    keywords: ['discovery', 'discover', 'scan', 'find'],
+    icon: FiSearch,
+    group: 'Navigation',
+  },
+  {
+    id: 'prompts',
+    label: 'Go to Prompts',
+    keywords: ['prompts', 'prompt', 'templates'],
+    icon: FiFileText,
+    group: 'Navigation',
+  },
+  {
+    id: 'expertise',
+    label: 'Go to Expertise',
+    keywords: ['expertise', 'knowledge', 'domains'],
+    icon: FiBook,
+    group: 'Navigation',
+  },
+  {
+    id: 'events',
+    label: 'Go to Event Feed',
+    keywords: ['events', 'event', 'feed', 'activity', 'log'],
+    icon: FiActivity,
+    group: 'Navigation',
+  },
+  {
+    id: 'metrics',
+    label: 'Go to Metrics',
+    keywords: ['metrics', 'stats', 'statistics', 'dashboard', 'analytics'],
+    icon: FiBarChart2,
+    group: 'Navigation',
+  },
+  {
+    id: 'doctor',
+    label: 'Go to Doctor',
+    keywords: ['doctor', 'health', 'diagnostics', 'check'],
+    icon: FiHeart,
+    group: 'Navigation',
+  },
+  {
+    id: 'debug',
+    label: 'Go to Debug',
+    keywords: ['debug', 'debugger', 'console', 'terminal', 'logs'],
+    icon: FiTerminal,
+    group: 'Navigation',
+  },
+  {
+    id: 'settings',
+    label: 'Go to Settings',
+    keywords: ['settings', 'preferences', 'config', 'configuration'],
+    icon: FiSettings,
+    group: 'Navigation',
+  },
 ];
+
+/**
+ * Fuzzy search with smart ranking: exact > starts-with > contains > fuzzy
+ * Returns a score 0-1 where higher is better, or 0 for no match.
+ */
+function fuzzyScore(query: string, text: string): number {
+  const q = query.toLowerCase();
+  const t = text.toLowerCase();
+
+  // Exact match (highest priority)
+  if (t === q) return 1;
+
+  // Starts with query
+  if (t.startsWith(q)) return 0.8;
+
+  // Word in text starts with query
+  const words = t.split(/\s+/);
+  for (const word of words) {
+    if (word.startsWith(q)) return 0.7;
+  }
+
+  // Contains query as substring
+  if (t.includes(q)) return 0.6;
+
+  // Fuzzy match: all characters of query appear in order in text
+  let qi = 0;
+  let consecutiveBonus = 0;
+  let lastMatchIndex = -2;
+  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+    if (t[ti] === q[qi]) {
+      if (ti === lastMatchIndex + 1) consecutiveBonus += 0.02;
+      lastMatchIndex = ti;
+      qi++;
+    }
+  }
+
+  if (qi === q.length) {
+    // All characters matched - base score 0.3 + bonus for consecutive chars
+    return Math.min(0.5, 0.3 + consecutiveBonus);
+  }
+
+  return 0; // No match
+}
+
+/**
+ * Custom filter for cmdk that checks label and keywords with smart ranking.
+ * Returns a score 0-1 for ranking results.
+ */
+function customFilter(value: string, search: string): number {
+  if (!search) return 1;
+
+  // value is the Command.Item value prop (the label)
+  const labelScore = fuzzyScore(search, value);
+
+  // Also check against the item id/keywords by looking up the item
+  const item = navigationItems.find((i) => i.label === value);
+  let keywordScore = 0;
+  if (item) {
+    // Check page id directly
+    keywordScore = Math.max(keywordScore, fuzzyScore(search, item.id));
+    // Check all keywords
+    for (const kw of item.keywords) {
+      keywordScore = Math.max(keywordScore, fuzzyScore(search, kw));
+    }
+  }
+
+  // Return the best score between label and keywords
+  return Math.max(labelScore, keywordScore);
+}
 
 export function CommandPalette({ onNavigate }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
@@ -48,10 +227,13 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  function handleSelect(itemId: string) {
-    onNavigate(itemId);
-    setOpen(false);
-  }
+  const handleSelect = useCallback(
+    (itemId: string) => {
+      onNavigate(itemId);
+      setOpen(false);
+    },
+    [onNavigate],
+  );
 
   if (!open) return null;
 
@@ -69,6 +251,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       {/* Command palette */}
       <Command
         className="relative z-50 w-full max-w-lg overflow-hidden rounded-xl border border-slate-600 bg-slate-800 shadow-2xl shadow-black/50"
+        filter={customFilter}
         onKeyDown={(e: React.KeyboardEvent) => {
           if (e.key === 'Escape') {
             e.preventDefault();
