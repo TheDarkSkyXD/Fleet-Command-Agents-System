@@ -10,10 +10,46 @@ log.transports.file.level = 'info';
 log.transports.console.level = 'debug';
 
 let mainWindow: BrowserWindow | null = null;
+let splashWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
 const isDev = !app.isPackaged;
+
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 420,
+    height: 360,
+    frame: false,
+    transparent: false,
+    resizable: false,
+    movable: true,
+    center: true,
+    show: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#0f172a',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  // Load the splash HTML
+  const splashPath = isDev
+    ? path.join(__dirname, '../../resources/splash.html')
+    : path.join(process.resourcesPath, 'resources/splash.html');
+
+  splashWindow.loadFile(splashPath);
+
+  splashWindow.once('ready-to-show', () => {
+    splashWindow?.show();
+  });
+
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+}
 
 function createWindow() {
   // Load saved window state
@@ -53,6 +89,11 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => {
+    // Close splash screen and show main window
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.close();
+      splashWindow = null;
+    }
     mainWindow?.show();
   });
 
@@ -108,6 +149,9 @@ function createTray() {
 app.whenReady().then(async () => {
   log.info('Fleet Command starting...');
 
+  // Show splash screen immediately
+  createSplashWindow();
+
   // Initialize database
   try {
     await initDatabase();
@@ -119,7 +163,7 @@ app.whenReady().then(async () => {
   // Register IPC handlers
   registerIpcHandlers();
 
-  // Create window and tray
+  // Create window and tray (splash closes when main window is ready)
   createWindow();
   createTray();
 

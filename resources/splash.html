@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fleet Command</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    .splash-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-container {
+      position: relative;
+      width: 96px;
+      height: 96px;
+    }
+
+    .logo-ring {
+      position: absolute;
+      inset: 0;
+      border: 3px solid transparent;
+      border-top-color: #3b82f6;
+      border-right-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1.5s linear infinite;
+    }
+
+    .logo-ring-outer {
+      position: absolute;
+      inset: -8px;
+      border: 2px solid transparent;
+      border-bottom-color: #60a5fa;
+      border-left-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 2s linear infinite reverse;
+      opacity: 0.5;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .logo-icon {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg {
+      width: 40px;
+      height: 40px;
+      fill: none;
+      stroke: #60a5fa;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .app-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .app-subtitle {
+      font-size: 12px;
+      color: #64748b;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: -12px;
+    }
+
+    .loading-bar-container {
+      width: 200px;
+      height: 3px;
+      background: #1e293b;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .loading-bar {
+      height: 100%;
+      width: 40%;
+      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      border-radius: 2px;
+      animation: loading 1.2s ease-in-out infinite;
+    }
+
+    @keyframes loading {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
+    .status-text {
+      font-size: 11px;
+      color: #475569;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    .version {
+      position: absolute;
+      bottom: 16px;
+      right: 20px;
+      font-size: 10px;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+  <div class="splash-container">
+    <div class="logo-container">
+      <div class="logo-ring-outer"></div>
+      <div class="logo-ring"></div>
+      <div class="logo-icon">
+        <!-- Fleet/agents icon -->
+        <svg viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      </div>
+    </div>
+
+    <div class="app-title">Fleet Command</div>
+    <div class="app-subtitle">Agent Orchestration System</div>
+
+    <div class="loading-bar-container">
+      <div class="loading-bar"></div>
+    </div>
+
+    <div class="status-text">Initializing systems...</div>
+  </div>
+
+  <div class="version">v0.1.0</div>
+</body>
+</html>
