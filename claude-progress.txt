@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Command Palette Live Updates & Issue Detail View)
+
+#### Feature #111: Command palette live-updating results - PASSING
+- Added live polling of running agents (agentRunningList) every 3 seconds while palette is open
+- New "Running Agents" section shows each agent by name, capability, model with animated pulse indicator
+- "System Status" section shows real-time running agent count and unread mail count
+- Uses refreshLiveState callback with setInterval for continuous updates
+- Data refreshes immediately on palette open and polls while open
+- When agents are stopped, reopening palette reflects the new state
+
+#### Feature #114: View issue details - PASSING
+- Added IssueDetailModal component with full issue detail view
+- Clicking any issue card opens the detail modal
+- Shows: title, ID (hash), status with badge, type, priority with icon, assigned agent, full description
+- Quick status change buttons to transition between open/in_progress/closed/blocked
+- Timestamps section showing created, updated, and closed dates
+- Group badge indicator if issue is part of a task group
+- Action buttons (claim/delete) have stopPropagation to prevent opening detail view
+- Issue cards have blue hover border and cursor-pointer for click affordance
+
+#### Files Modified
+- MODIFIED: src/renderer/components/CommandPalette.tsx - Live polling, running agents section, system status
+- MODIFIED: src/renderer/pages/TasksPage.tsx - IssueDetailModal component, onSelect prop on IssueCard
+
+#### Current Status
+- 167/366 features passing (added #111 and #114 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Force Remove Unmerged Worktrees & Open in VS Code)
 
 #### Feature #100: Force-remove unmerged worktrees with confirmation - PASSING
