@@ -225,26 +225,22 @@ export function registerIpcHandlers(): void {
         ).run(options.id);
 
         // Upsert agent identity for persistent identity across sessions
-        const existingIdentity = loggedPrepare(
-          'SELECT * FROM agent_identities WHERE name = ?',
-        ).get(options.agent_name);
+        const existingIdentity = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(
+          options.agent_name,
+        );
         if (existingIdentity) {
           // Update capability if changed, update timestamp
           loggedPrepare(
             `UPDATE agent_identities SET capability = ?, updated_at = datetime('now') WHERE name = ?`,
           ).run(options.capability, options.agent_name);
-          log.info(
-            `[IPC] agent:spawn - updated existing identity for ${options.agent_name}`,
-          );
+          log.info(`[IPC] agent:spawn - updated existing identity for ${options.agent_name}`);
         } else {
           // Create new identity record
           loggedPrepare(
             `INSERT INTO agent_identities (name, capability, sessions_completed, expertise_domains, recent_tasks)
              VALUES (?, ?, 0, '[]', '[]')`,
           ).run(options.agent_name, options.capability);
-          log.info(
-            `[IPC] agent:spawn - created new identity for ${options.agent_name}`,
-          );
+          log.info(`[IPC] agent:spawn - created new identity for ${options.agent_name}`);
         }
 
         const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(options.id);
@@ -294,6 +290,41 @@ export function registerIpcHandlers(): void {
         runId: (session?.run_id as string) ?? undefined,
         data: JSON.stringify({ reason: 'manual_stop' }),
       });
+
+      // Update agent identity: increment sessions_completed and track recent task
+      if (session?.agent_name) {
+        const agentName = session.agent_name as string;
+        const taskId = (session.task_id as string) || null;
+        try {
+          loggedPrepare(
+            `UPDATE agent_identities SET sessions_completed = sessions_completed + 1, updated_at = datetime('now') WHERE name = ?`,
+          ).run(agentName);
+
+          // Append to recent_tasks (keep last 10)
+          if (taskId) {
+            const identity = loggedPrepare(
+              'SELECT recent_tasks FROM agent_identities WHERE name = ?',
+            ).get(agentName) as { recent_tasks: string } | undefined;
+            if (identity) {
+              let tasks: string[] = [];
+              try {
+                tasks = JSON.parse(identity.recent_tasks || '[]');
+              } catch {
+                tasks = [];
+              }
+              tasks.unshift(taskId);
+              if (tasks.length > 10) tasks = tasks.slice(0, 10);
+              loggedPrepare('UPDATE agent_identities SET recent_tasks = ? WHERE name = ?').run(
+                JSON.stringify(tasks),
+                agentName,
+              );
+            }
+          }
+          log.info(`[IPC] agent:stop - updated identity for ${agentName}: sessions_completed++`);
+        } catch (identityErr) {
+          log.warn(`[IPC] agent:stop - failed to update identity for ${agentName}:`, identityErr);
+        }
+      }
 
       return { data: session, error: null };
     } catch (error) {
@@ -2977,6 +3008,465 @@ export function registerIpcHandlers(): void {
       return { data: updated, error: null };
     } catch (error) {
       log.error('expertise:update failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ── Agent Identity ────────────────────────────────────────────
+  ipcMain.handle('identity:get', (_event, name: string) => {
+    try {
+      const identity = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(name);
+      log.info(`[IPC] identity:get - SELECT identity name=${name}`);
+      return { data: identity || null, error: null };
+    } catch (error) {
+      log.error('identity:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('identity:list', () => {
+    try {
+      const identities = loggedPrepare(
+        'SELECT * FROM agent_identities ORDER BY updated_at DESC',
+      ).all();
+      log.info(`[IPC] identity:list - SELECT all identities (${(identities as unknown[]).length})`);
+      return { data: identities, error: null };
+    } catch (error) {
+      log.error('identity:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'identity:upsert',
+    (
+      _event,
+      identity: {
+        name: string;
+        capability: string;
+        expertise_domains?: string;
+        recent_tasks?: string;
+      },
+    ) => {
+      try {
+        const existing = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(
+          identity.name,
+        );
+        if (existing) {
+          const updates: string[] = [];
+          const values: unknown[] = [];
+          if (identity.capability) {
+            updates.push('capability = ?');
+            values.push(identity.capability);
+          }
+          if (identity.expertise_domains !== undefined) {
+            updates.push('expertise_domains = ?');
+            values.push(identity.expertise_domains);
+          }
+          if (identity.recent_tasks !== undefined) {
+            updates.push('recent_tasks = ?');
+            values.push(identity.recent_tasks);
+          }
+          updates.push("updated_at = datetime('now')");
+          values.push(identity.name);
+          loggedPrepare(`UPDATE agent_identities SET ${updates.join(', ')} WHERE name = ?`).run(
+            ...values,
+          );
+        } else {
+          loggedPrepare(
+            `INSERT INTO agent_identities (name, capability, sessions_completed, expertise_domains, recent_tasks)
+             VALUES (?, ?, 0, ?, ?)`,
+          ).run(
+            identity.name,
+            identity.capability,
+            identity.expertise_domains ?? '[]',
+            identity.recent_tasks ?? '[]',
+          );
+        }
+        const result = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(
+          identity.name,
+        );
+        log.info(
+          `[IPC] identity:upsert - ${existing ? 'UPDATE' : 'INSERT'} identity: ${identity.name}`,
+        );
+        return { data: result, error: null };
+      } catch (error) {
+        log.error('identity:upsert failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('identity:sessions', (_event, agentName: string) => {
+    try {
+      const sessions = loggedPrepare(
+        `SELECT * FROM sessions WHERE agent_name = ? ORDER BY created_at DESC LIMIT 20`,
+      ).all(agentName);
+      log.info(
+        `[IPC] identity:sessions - SELECT sessions for ${agentName} (${(sessions as unknown[]).length})`,
+      );
+      return { data: sessions, error: null };
+    } catch (error) {
+      log.error('identity:sessions failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('identity:update-expertise', (_event, name: string, domains: string) => {
+    try {
+      loggedPrepare(
+        `UPDATE agent_identities SET expertise_domains = ?, updated_at = datetime('now') WHERE name = ?`,
+      ).run(domains, name);
+      const result = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(name);
+      log.info(`[IPC] identity:update-expertise - UPDATE expertise for ${name}`);
+      return { data: result, error: null };
+    } catch (error) {
+      log.error('identity:update-expertise failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ===== Prompts =====
+
+  ipcMain.handle('prompt:list', () => {
+    try {
+      const prompts = loggedPrepare('SELECT * FROM prompts ORDER BY name ASC').all();
+      log.info(`[IPC] prompt:list - SELECT returned ${(prompts as unknown[]).length} prompts`);
+      return { data: prompts, error: null };
+    } catch (error) {
+      log.error('prompt:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('prompt:get', (_event, id: string) => {
+    try {
+      const prompt = loggedPrepare('SELECT * FROM prompts WHERE id = ?').get(id);
+      log.info(`[IPC] prompt:get - SELECT prompt id=${id}`);
+      return { data: prompt || null, error: null };
+    } catch (error) {
+      log.error('prompt:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'prompt:create',
+    (
+      _event,
+      prompt: {
+        id: string;
+        name: string;
+        description?: string;
+        content: string;
+        type: string;
+        parent_id?: string;
+        tags?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          `INSERT INTO prompts (id, name, description, content, type, parent_id, tags)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          prompt.id,
+          prompt.name,
+          prompt.description ?? null,
+          prompt.content,
+          prompt.type,
+          prompt.parent_id ?? null,
+          prompt.tags ?? null,
+        );
+
+        // Also create version 1
+        const versionId = `pv-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          `INSERT INTO prompt_versions (id, prompt_id, version, content, change_summary)
+           VALUES (?, ?, 1, ?, 'Initial version')`,
+        ).run(versionId, prompt.id, prompt.content);
+
+        const created = loggedPrepare('SELECT * FROM prompts WHERE id = ?').get(prompt.id);
+        log.info(`[IPC] prompt:create - INSERT prompt id=${prompt.id}`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('prompt:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('prompt:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      const existing = loggedPrepare('SELECT * FROM prompts WHERE id = ?').get(id) as
+        | { version: number; content: string }
+        | undefined;
+      if (!existing) {
+        return { data: null, error: 'Prompt not found' };
+      }
+
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+
+      const allowedFields = [
+        'name',
+        'description',
+        'content',
+        'type',
+        'parent_id',
+        'is_active',
+        'tags',
+      ];
+      for (const field of allowedFields) {
+        if (updates[field] !== undefined) {
+          setClauses.push(`${field} = ?`);
+          values.push(updates[field]);
+        }
+      }
+
+      // If content changed, bump version and create version record
+      const contentChanged = updates.content !== undefined && updates.content !== existing.content;
+      if (contentChanged) {
+        const newVersion = existing.version + 1;
+        setClauses.push('version = ?');
+        values.push(newVersion);
+
+        const versionId = `pv-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          `INSERT INTO prompt_versions (id, prompt_id, version, content, change_summary)
+             VALUES (?, ?, ?, ?, ?)`,
+        ).run(
+          versionId,
+          id,
+          newVersion,
+          updates.content as string,
+          (updates.change_summary as string) || `Version ${newVersion}`,
+        );
+      }
+
+      if (setClauses.length === 0) {
+        const current = loggedPrepare('SELECT * FROM prompts WHERE id = ?').get(id);
+        return { data: current, error: null };
+      }
+
+      setClauses.push("updated_at = datetime('now')");
+      values.push(id);
+
+      loggedPrepare(`UPDATE prompts SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+
+      const updated = loggedPrepare('SELECT * FROM prompts WHERE id = ?').get(id);
+      log.info(`[IPC] prompt:update - UPDATE prompt id=${id}, contentChanged=${contentChanged}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('prompt:update failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('prompt:delete', (_event, id: string) => {
+    try {
+      // Delete versions first
+      loggedPrepare('DELETE FROM prompt_versions WHERE prompt_id = ?').run(id);
+      // Unlink children (set parent_id to null)
+      loggedPrepare('UPDATE prompts SET parent_id = NULL WHERE parent_id = ?').run(id);
+      loggedPrepare('DELETE FROM prompts WHERE id = ?').run(id);
+      log.info(`[IPC] prompt:delete - DELETE prompt id=${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('prompt:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('prompt:version-list', (_event, promptId: string) => {
+    try {
+      const versions = loggedPrepare(
+        'SELECT * FROM prompt_versions WHERE prompt_id = ? ORDER BY version DESC',
+      ).all(promptId);
+      log.info(
+        `[IPC] prompt:version-list - SELECT returned ${(versions as unknown[]).length} versions for prompt ${promptId}`,
+      );
+      return { data: versions, error: null };
+    } catch (error) {
+      log.error('prompt:version-list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('prompt:version-get', (_event, id: string) => {
+    try {
+      const version = loggedPrepare('SELECT * FROM prompt_versions WHERE id = ?').get(id);
+      log.info(`[IPC] prompt:version-get - SELECT version id=${id}`);
+      return { data: version || null, error: null };
+    } catch (error) {
+      log.error('prompt:version-get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ─── Hooks ───────────────────────────────────────────────
+
+  ipcMain.handle('hook:list', (_event, filters?: { project_id?: string; hook_type?: string }) => {
+    try {
+      let sql = 'SELECT * FROM hooks WHERE 1=1';
+      const params: unknown[] = [];
+      if (filters?.project_id) {
+        sql += ' AND project_id = ?';
+        params.push(filters.project_id);
+      }
+      if (filters?.hook_type) {
+        sql += ' AND hook_type = ?';
+        params.push(filters.hook_type);
+      }
+      sql += ' ORDER BY hook_type, name';
+      const rows = loggedPrepare(sql).all(...params);
+      log.info(`[IPC] hook:list - returned ${(rows as unknown[]).length} hooks`);
+      return { data: rows, error: null };
+    } catch (error) {
+      log.error('hook:list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('hook:get', (_event, id: string) => {
+    try {
+      const hook = loggedPrepare('SELECT * FROM hooks WHERE id = ?').get(id);
+      return { data: hook || null, error: null };
+    } catch (error) {
+      log.error('hook:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'hook:create',
+    (
+      _event,
+      hook: {
+        id: string;
+        project_id?: string;
+        hook_type: string;
+        name: string;
+        description?: string;
+        script_content?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          `INSERT INTO hooks (id, project_id, hook_type, name, description, script_content)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        ).run(
+          hook.id,
+          hook.project_id ?? null,
+          hook.hook_type,
+          hook.name,
+          hook.description ?? null,
+          hook.script_content ?? '',
+        );
+        const created = loggedPrepare('SELECT * FROM hooks WHERE id = ?').get(hook.id);
+        log.info(`[IPC] hook:create - created hook ${hook.name} (${hook.hook_type})`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('hook:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('hook:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      const fields: string[] = [];
+      const values: unknown[] = [];
+      for (const [key, val] of Object.entries(updates)) {
+        if (
+          [
+            'hook_type',
+            'name',
+            'description',
+            'script_content',
+            'is_installed',
+            'project_id',
+            'target_worktrees',
+            'installed_at',
+          ].includes(key)
+        ) {
+          fields.push(`${key} = ?`);
+          values.push(val);
+        }
+      }
+      if (fields.length === 0) {
+        return { data: null, error: 'No valid fields to update' };
+      }
+      fields.push("updated_at = datetime('now')");
+      values.push(id);
+      loggedPrepare(`UPDATE hooks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+      const updated = loggedPrepare('SELECT * FROM hooks WHERE id = ?').get(id);
+      log.info(`[IPC] hook:update - updated hook ${id}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('hook:update failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('hook:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM hooks WHERE id = ?').run(id);
+      log.info(`[IPC] hook:delete - deleted hook ${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('hook:delete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('hook:deploy', (_event, hookIds: string[], worktreePaths: string[]) => {
+    try {
+      const results: Array<{ hookId: string; worktree: string; success: boolean; error?: string }> =
+        [];
+      for (const hookId of hookIds) {
+        const hook = loggedPrepare('SELECT * FROM hooks WHERE id = ?').get(hookId) as
+          | {
+              id: string;
+              hook_type: string;
+              name: string;
+              script_content: string;
+              target_worktrees: string | null;
+            }
+          | undefined;
+        if (!hook) {
+          for (const wt of worktreePaths) {
+            results.push({ hookId, worktree: wt, success: false, error: 'Hook not found' });
+          }
+          continue;
+        }
+        // Mark hook as installed and record target worktrees
+        const allTargets = worktreePaths;
+        loggedPrepare(
+          `UPDATE hooks SET is_installed = 1, target_worktrees = ?, installed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+        ).run(JSON.stringify(allTargets), hookId);
+
+        for (const wt of worktreePaths) {
+          try {
+            // Write the hook script to the worktree's .claude/hooks directory
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const hooksDir = path.join(wt, '.claude', 'hooks');
+            fs.mkdirSync(hooksDir, { recursive: true });
+            const hookFileName = `${hook.hook_type}_${hook.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.sh`;
+            const hookFilePath = path.join(hooksDir, hookFileName);
+            fs.writeFileSync(hookFilePath, hook.script_content, { mode: 0o755 });
+            results.push({ hookId, worktree: wt, success: true });
+          } catch (err) {
+            results.push({ hookId, worktree: wt, success: false, error: String(err) });
+          }
+        }
+      }
+      log.info(
+        `[IPC] hook:deploy - deployed ${hookIds.length} hooks to ${worktreePaths.length} worktrees`,
+      );
+      return { data: results, error: null };
+    } catch (error) {
+      log.error('hook:deploy failed:', error);
       return { data: null, error: String(error) };
     }
   });

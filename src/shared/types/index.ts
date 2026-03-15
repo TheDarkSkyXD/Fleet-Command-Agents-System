@@ -326,6 +326,36 @@ export interface ExpertiseDomainSummary {
   types: Record<string, number>;
 }
 
+// Prompt types
+export type PromptType = 'system' | 'user' | 'agent' | 'task' | 'template';
+
+export interface Prompt {
+  id: string;
+  name: string;
+  description: string | null;
+  content: string;
+  type: PromptType;
+  parent_id: string | null;
+  version: number;
+  is_active: number;
+  tags: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PromptVersion {
+  id: string;
+  prompt_id: string;
+  version: number;
+  content: string;
+  change_summary: string | null;
+  created_at: string;
+}
+
+export interface PromptTreeNode extends Prompt {
+  children: PromptTreeNode[];
+}
+
 // Guard violation types
 export type GuardRuleType = 'tool_allowlist' | 'bash_restriction' | 'file_scope';
 export type GuardViolationSeverity = 'info' | 'warning' | 'critical';
@@ -376,6 +406,30 @@ export interface DiscoveryFinding {
   line_number: number | null;
   severity: FindingSeverity;
   created_at: string;
+}
+
+// Hook types
+export type HookType = 'SessionStart' | 'UserPromptSubmit' | 'PreToolUse';
+
+export interface Hook {
+  id: string;
+  project_id: string | null;
+  hook_type: HookType;
+  name: string;
+  description: string | null;
+  script_content: string;
+  is_installed: number;
+  target_worktrees: string | null; // JSON array
+  installed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HookDeployResult {
+  hookId: string;
+  worktree: string;
+  success: boolean;
+  error?: string;
 }
 
 // App log entry
@@ -769,6 +823,28 @@ export interface ElectronAPI {
     severity?: string;
   }) => Promise<{ data: DiscoveryFinding | null; error: string | null }>;
 
+  // Prompts
+  promptList: () => Promise<{ data: Prompt[] | null; error: string | null }>;
+  promptGet: (id: string) => Promise<{ data: Prompt | null; error: string | null }>;
+  promptCreate: (prompt: {
+    id: string;
+    name: string;
+    description?: string;
+    content: string;
+    type: string;
+    parent_id?: string;
+    tags?: string;
+  }) => Promise<{ data: Prompt | null; error: string | null }>;
+  promptUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: Prompt | null; error: string | null }>;
+  promptDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  promptVersionList: (
+    promptId: string,
+  ) => Promise<{ data: PromptVersion[] | null; error: string | null }>;
+  promptVersionGet: (id: string) => Promise<{ data: PromptVersion | null; error: string | null }>;
+
   // Guard Rules
   guardRuleGet: (role: string) => Promise<{
     data: {
@@ -814,6 +890,30 @@ export interface ElectronAPI {
     error: string | null;
   }>;
 
+  // Hooks
+  hookList: (filters?: { project_id?: string; hook_type?: string }) => Promise<{
+    data: Hook[] | null;
+    error: string | null;
+  }>;
+  hookGet: (id: string) => Promise<{ data: Hook | null; error: string | null }>;
+  hookCreate: (hook: {
+    id: string;
+    project_id?: string;
+    hook_type: string;
+    name: string;
+    description?: string;
+    script_content?: string;
+  }) => Promise<{ data: Hook | null; error: string | null }>;
+  hookUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: Hook | null; error: string | null }>;
+  hookDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  hookDeploy: (
+    hookIds: string[],
+    worktreePaths: string[],
+  ) => Promise<{ data: HookDeployResult[] | null; error: string | null }>;
+
   // Checkpoints
   checkpointList: () => Promise<{ data: Checkpoint[] | null; error: string | null }>;
   checkpointGet: (agentName: string) => Promise<{ data: Checkpoint | null; error: string | null }>;
@@ -834,6 +934,23 @@ export interface ElectronAPI {
   }) => Promise<{ data: boolean; error: string | null }>;
   notificationSetEnabled: (enabled: boolean) => Promise<{ data: boolean; error: string | null }>;
   notificationIsSupported: () => Promise<{ data: boolean; error: string | null }>;
+
+  // Agent Identity
+  identityGet: (name: string) => Promise<{ data: AgentIdentity | null; error: string | null }>;
+  identityList: () => Promise<{ data: AgentIdentity[] | null; error: string | null }>;
+  identityUpsert: (identity: {
+    name: string;
+    capability: string;
+    expertise_domains?: string;
+    recent_tasks?: string;
+  }) => Promise<{ data: AgentIdentity | null; error: string | null }>;
+  identitySessions: (
+    agentName: string,
+  ) => Promise<{ data: Session[] | null; error: string | null }>;
+  identityUpdateExpertise: (
+    name: string,
+    domains: string,
+  ) => Promise<{ data: AgentIdentity | null; error: string | null }>;
 
   onAgentUpdate: (callback: (data: unknown) => void) => void;
   onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => void;

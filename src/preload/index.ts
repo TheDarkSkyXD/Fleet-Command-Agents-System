@@ -256,6 +256,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   appLogImportNdjson: (ndjsonContent: string) =>
     ipcRenderer.invoke('appLog:import-ndjson', ndjsonContent),
 
+  // Prompts
+  promptList: () => ipcRenderer.invoke('prompt:list'),
+  promptGet: (id: string) => ipcRenderer.invoke('prompt:get', id),
+  promptCreate: (prompt: {
+    id: string;
+    name: string;
+    description?: string;
+    content: string;
+    type: string;
+    parent_id?: string;
+    tags?: string;
+  }) => ipcRenderer.invoke('prompt:create', prompt),
+  promptUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('prompt:update', id, updates),
+  promptDelete: (id: string) => ipcRenderer.invoke('prompt:delete', id),
+  promptVersionList: (promptId: string) => ipcRenderer.invoke('prompt:version-list', promptId),
+  promptVersionGet: (id: string) => ipcRenderer.invoke('prompt:version-get', id),
+
   // Guard Rules
   guardRuleGet: (role: string) => ipcRenderer.invoke('guardRule:get', role),
   guardRuleUpdate: (
@@ -348,6 +366,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   notificationSetEnabled: (enabled: boolean) =>
     ipcRenderer.invoke('notification:set-enabled', enabled),
   notificationIsSupported: () => ipcRenderer.invoke('notification:is-supported'),
+
+  // Agent Identity
+  identityGet: (name: string) => ipcRenderer.invoke('identity:get', name),
+  identityList: () => ipcRenderer.invoke('identity:list'),
+  identityUpsert: (identity: {
+    name: string;
+    capability: string;
+    expertise_domains?: string;
+    recent_tasks?: string;
+  }) => ipcRenderer.invoke('identity:upsert', identity),
+  identitySessions: (agentName: string) => ipcRenderer.invoke('identity:sessions', agentName),
+  identityUpdateExpertise: (name: string, domains: string) =>
+    ipcRenderer.invoke('identity:update-expertise', name, domains),
+
+  // Hooks
+  hookList: (filters?: { project_id?: string; hook_type?: string }) =>
+    ipcRenderer.invoke('hook:list', filters),
+  hookGet: (id: string) => ipcRenderer.invoke('hook:get', id),
+  hookCreate: (hook: {
+    id: string;
+    project_id?: string;
+    hook_type: string;
+    name: string;
+    description?: string;
+    script_content?: string;
+  }) => ipcRenderer.invoke('hook:create', hook),
+  hookUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('hook:update', id, updates),
+  hookDelete: (id: string) => ipcRenderer.invoke('hook:delete', id),
+  hookDeploy: (hookIds: string[], worktreePaths: string[]) =>
+    ipcRenderer.invoke('hook:deploy', hookIds, worktreePaths),
 
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),
