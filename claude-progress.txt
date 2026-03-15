@@ -1,5 +1,44 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Loading Spinners & Desktop Layout)
+
+#### Feature #325: Loading spinner on buttons during async operations - PASSING
+- Added FiLoader animate-spin icon to async buttons across 7 files
+- PromptsPage: create prompt and save buttons swap icon to spinner
+- MailPage: send, purge by agent, and purge all buttons show spinner
+- TasksPage: create issue and create group buttons show spinner
+- WelcomePage: create & open button shows CSS spinner
+- MergeQueuePage: dry-run button shows CSS spinner
+- AgentDefinitionsPage: save and create role buttons swap icon to spinner
+- ProjectConfigEditor: save button swaps icon to spinner
+
+#### Feature #326: Desktop layout at 1920px width - PASSING
+- Layout uses flex-1 for content area, expanding to fill all available space at 1920px
+- Sidebar w-56 (224px) with full labels when expanded, w-16 collapsed
+- Content area gets ~1696px at 1920px width with no max-width constraints
+- Added data-testid attributes: app-root, app-main-area, app-content-area, app-sidebar
+- Sidebar has data-collapsed attribute for state tracking
+- Widened AgentDetailPage identity panel from max-w-2xl to max-w-4xl
+- Tables use w-full table-fixed, grids span full width
+- Electron window: minWidth 1024, defaultWidth 1400
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/PromptsPage.tsx - FiLoader import, spinner on create/save
+- MODIFIED: src/renderer/pages/MailPage.tsx - FiLoader import, spinner on send/purge
+- MODIFIED: src/renderer/pages/TasksPage.tsx - spinner on create issue/group
+- MODIFIED: src/renderer/pages/WelcomePage.tsx - CSS spinner on create button
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - CSS spinner on dry-run
+- MODIFIED: src/renderer/pages/AgentDefinitionsPage.tsx - FiLoader import, spinner on save/create
+- MODIFIED: src/renderer/components/ProjectConfigEditor.tsx - FiLoader import, spinner on save
+- MODIFIED: src/renderer/components/AppLayout.tsx - data-testid on layout elements
+- MODIFIED: src/renderer/components/Sidebar.tsx - data-testid and data-collapsed
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - max-w-4xl on identity panel
+
+#### Current Status
+- 324/366 features passing (added #325 and #326 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Numeric Validation & Agent Name Format)
 
 #### Feature #321: Numeric field validation - PASSING
