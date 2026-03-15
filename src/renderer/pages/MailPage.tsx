@@ -427,7 +427,8 @@ export function MailPage() {
       ];
       msgContextMenu.show(e, items);
     },
-    [handleReply, handleMarkRead, msgContextMenu],
+    // biome-ignore lint/correctness/useExhaustiveDependencies: handleReply/handleMarkRead are inline functions, context menu captures latest values
+    [msgContextMenu],
   );
 
   // Filter messages by tab

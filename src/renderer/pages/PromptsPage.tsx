@@ -302,7 +302,9 @@ function TreeNode({
         )}
 
         <FiFile size={14} className="flex-shrink-0 text-slate-500" />
-        <span className="truncate font-medium">{node.name}</span>
+        <span className="truncate font-medium" title={node.name}>
+          {node.name}
+        </span>
         <TypeBadge type={node.type} />
         {!node.is_active && <span className="text-xs text-slate-500 italic">inactive</span>}
         {hasChildren && (
@@ -381,7 +383,12 @@ function CreatePromptDialog({
       <div className="w-full max-w-xl rounded-lg border border-slate-700 bg-slate-800 p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-100">Create New Prompt</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-200"
+            title="Close"
+          >
             <FiX size={20} />
           </button>
         </div>
@@ -771,7 +778,9 @@ function VersionHistoryPanel({
               </span>
             </div>
             {v.change_summary && (
-              <p className="truncate text-xs text-slate-400">{v.change_summary}</p>
+              <p className="truncate text-xs text-slate-400" title={v.change_summary}>
+                {v.change_summary}
+              </p>
             )}
           </div>
         </button>

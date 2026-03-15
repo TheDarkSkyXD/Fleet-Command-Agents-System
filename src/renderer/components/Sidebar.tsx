@@ -86,6 +86,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
           onClick={onToggleCollapse}
           className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <FiChevronRight size={16} /> : <FiChevronLeft size={16} />}
         </button>

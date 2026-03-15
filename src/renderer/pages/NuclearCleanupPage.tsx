@@ -363,7 +363,10 @@ export function NuclearCleanupPage() {
                       size={12}
                       className={wt.isMerged ? 'text-green-400' : 'text-amber-400'}
                     />
-                    <span className="text-slate-300 font-mono truncate">
+                    <span
+                      className="text-slate-300 font-mono truncate"
+                      title={wt.branch || wt.path}
+                    >
                       {wt.branch || wt.path}
                     </span>
                     {!wt.isMerged && (

@@ -387,7 +387,10 @@ export function WorktreesPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <FiGitBranch size={16} className="text-blue-400 shrink-0" />
-                    <span className="font-medium text-slate-100 truncate">
+                    <span
+                      className="font-medium text-slate-100 truncate"
+                      title={wt.branch || '(detached HEAD)'}
+                    >
                       {wt.branch || '(detached HEAD)'}
                     </span>
                     {wt.isMain && (
@@ -404,14 +407,18 @@ export function WorktreesPage() {
                       {wt.headCommitShort || 'unknown'}
                     </code>
                     {wt.headMessage && (
-                      <span className="text-xs text-slate-500 truncate">{wt.headMessage}</span>
+                      <span className="text-xs text-slate-500 truncate" title={wt.headMessage}>
+                        {wt.headMessage}
+                      </span>
                     )}
                   </div>
 
                   {/* Path */}
                   <div className="flex items-center gap-2">
                     <FiFolder size={13} className="text-slate-500 shrink-0" />
-                    <span className="text-xs text-slate-500 truncate font-mono">{wt.path}</span>
+                    <span className="text-xs text-slate-500 truncate font-mono" title={wt.path}>
+                      {wt.path}
+                    </span>
                   </div>
                 </div>
 
@@ -562,14 +569,20 @@ export function WorktreesPage() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <FiFolder size={14} className="text-slate-500" />
-                <span className="text-slate-400 font-mono text-xs truncate">
+                <span
+                  className="text-slate-400 font-mono text-xs truncate"
+                  title={forceRemoveTarget.path}
+                >
                   {forceRemoveTarget.path}
                 </span>
               </div>
               {forceRemoveTarget.headMessage && (
                 <div className="flex items-center gap-2 text-sm">
                   <FiGitCommit size={14} className="text-slate-500" />
-                  <span className="text-slate-500 text-xs truncate">
+                  <span
+                    className="text-slate-500 text-xs truncate"
+                    title={forceRemoveTarget.headMessage}
+                  >
                     {forceRemoveTarget.headMessage}
                   </span>
                 </div>

@@ -313,7 +313,9 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
                     ) : (
                       <span className="h-3 w-3 shrink-0" />
                     )}
-                    <span className="truncate">{p.name}</span>
+                    <span className="truncate" title={p.name}>
+                      {p.name}
+                    </span>
                     <span className="ml-auto text-slate-500 shrink-0">{p.default_model}</span>
                   </button>
                 ))}

@@ -927,7 +927,10 @@ export function TasksPage() {
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-medium text-slate-50 truncate">
+                              <h3
+                                className="text-sm font-medium text-slate-50 truncate"
+                                title={group.name}
+                              >
                                 {group.name}
                               </h3>
                               <span
@@ -1090,7 +1093,10 @@ export function TasksPage() {
                                     <StatusIcon size={10} />
                                     {status.label}
                                   </span>
-                                  <span className="text-xs text-slate-200 truncate">
+                                  <span
+                                    className="text-xs text-slate-200 truncate"
+                                    title={issue.title}
+                                  >
                                     {issue.title}
                                   </span>
                                 </div>
@@ -1203,7 +1209,9 @@ export function TasksPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <FiCheckCircle size={16} className="text-green-400 flex-shrink-0" />
-                          <h3 className="font-medium text-slate-100 truncate">{issue.title}</h3>
+                          <h3 className="font-medium text-slate-100 truncate" title={issue.title}>
+                            {issue.title}
+                          </h3>
                         </div>
                         {issue.close_summary && (
                           <div
@@ -1539,7 +1547,10 @@ function KanbanCard({
       {/* Bottom row: agent + date */}
       <div className="flex items-center justify-between mt-2 text-[10px] text-slate-500">
         {issue.assigned_agent ? (
-          <span className="inline-flex items-center gap-1 text-amber-400 truncate max-w-[60%]">
+          <span
+            className="inline-flex items-center gap-1 text-amber-400 truncate max-w-[60%]"
+            title={issue.assigned_agent}
+          >
             <FiUser size={10} />
             {issue.assigned_agent}
           </span>
@@ -1653,7 +1664,9 @@ function IssueCard({
               })()}
           </div>
 
-          <h3 className="text-sm font-medium text-slate-50 truncate">{issue.title}</h3>
+          <h3 className="text-sm font-medium text-slate-50 truncate" title={issue.title}>
+            {issue.title}
+          </h3>
 
           {issue.description && (
             <p className="text-xs text-slate-400 mt-1 line-clamp-2">{issue.description}</p>
@@ -1855,7 +1868,9 @@ function DependencyManager({
                   className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
                 >
                   <st.icon size={12} className={st.color} />
-                  <span className="text-slate-300 truncate">{i.title}</span>
+                  <span className="text-slate-300 truncate" title={i.title}>
+                    {i.title}
+                  </span>
                 </button>
               );
             })}
@@ -1877,7 +1892,9 @@ function DependencyManager({
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <StIcon size={12} className={st.color} />
-                    <span className="text-sm text-slate-300 truncate">{dep.title}</span>
+                    <span className="text-sm text-slate-300 truncate" title={dep.title}>
+                      {dep.title}
+                    </span>
                     <span className={`text-[10px] ${st.color}`}>{st.label}</span>
                   </div>
                   <button
@@ -2007,6 +2024,7 @@ function IssueDetailModal({
             type="button"
             onClick={onClose}
             className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+            title="Close"
           >
             <FiX size={18} />
           </button>

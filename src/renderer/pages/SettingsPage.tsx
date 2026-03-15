@@ -606,6 +606,7 @@ function ProfileCreateDialog({
             type="button"
             onClick={onClose}
             className="rounded-md p-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+            title="Close"
           >
             <FiX size={20} />
           </button>

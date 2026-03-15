@@ -119,8 +119,7 @@ function buildTree(sessions: Session[]): TreeNode[] {
   };
   const sortNodes = (nodes: TreeNode[]) => {
     nodes.sort(
-      (a, b) =>
-        (capOrder[a.session.capability] ?? 9) - (capOrder[b.session.capability] ?? 9),
+      (a, b) => (capOrder[a.session.capability] ?? 9) - (capOrder[b.session.capability] ?? 9),
     );
     for (const n of nodes) sortNodes(n.children);
   };
@@ -160,13 +159,8 @@ function TreeNodeComponent({
       <div className="flex items-stretch">
         {/* Connection lines for parent levels */}
         {parentLines.map((showLine, i) => (
-          <div
-            key={`line-${session.id}-${i}`}
-            className="w-6 flex-shrink-0 relative"
-          >
-            {showLine && (
-              <div className="absolute left-3 top-0 bottom-0 w-px bg-slate-600/50" />
-            )}
+          <div key={`line-${session.id}-${i}`} className="w-6 flex-shrink-0 relative">
+            {showLine && <div className="absolute left-3 top-0 bottom-0 w-px bg-slate-600/50" />}
           </div>
         ))}
 
@@ -225,14 +219,15 @@ function TreeNodeComponent({
           <span className={`flex-shrink-0 ${textColor}`}>{icon}</span>
 
           {/* Agent name */}
-          <span className="text-sm font-medium text-slate-200 group-hover:text-white truncate">
+          <span
+            className="text-sm font-medium text-slate-200 group-hover:text-white truncate"
+            title={session.agent_name}
+          >
             {session.agent_name}
           </span>
 
           {/* Capability badge */}
-          <span
-            className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${capColor}`}
-          >
+          <span className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${capColor}`}>
             {session.capability}
           </span>
 
@@ -333,13 +328,8 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
       {/* Footer stats */}
       <div className="border-t border-slate-700 px-4 py-2 flex items-center gap-4 text-xs text-slate-500">
         <span>Total: {sessions.length} agents</span>
-        <span>
-          Roots: {tree.length}
-        </span>
-        <span>
-          Max depth:{' '}
-          {sessions.reduce((max, s) => Math.max(max, s.depth || 0), 0)}
-        </span>
+        <span>Roots: {tree.length}</span>
+        <span>Max depth: {sessions.reduce((max, s) => Math.max(max, s.depth || 0), 0)}</span>
       </div>
     </div>
   );

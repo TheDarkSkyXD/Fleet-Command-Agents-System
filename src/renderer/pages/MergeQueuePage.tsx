@@ -98,7 +98,9 @@ function HistoryEntryRow({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-sm text-slate-50 truncate">{entry.branch_name}</span>
+              <span className="font-mono text-sm text-slate-50 truncate" title={entry.branch_name}>
+                {entry.branch_name}
+              </span>
               <OutcomeBadge status={entry.status} />
               {entry.rolled_back === 1 && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-400">
@@ -330,7 +332,10 @@ function EnqueueDialog({
                       onChange={() => toggleDep(dep.id)}
                       className="rounded border-slate-500 bg-slate-800 text-blue-500 focus:ring-blue-500"
                     />
-                    <span className="font-mono text-xs text-slate-300 truncate">
+                    <span
+                      className="font-mono text-xs text-slate-300 truncate"
+                      title={`#${dep.id} ${dep.branch_name}`}
+                    >
                       #{dep.id} {dep.branch_name}
                     </span>
                     <StatusBadge status={dep.status} />

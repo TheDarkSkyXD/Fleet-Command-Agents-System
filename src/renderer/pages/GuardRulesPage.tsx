@@ -678,7 +678,10 @@ export function GuardRulesPage() {
                     <span className="text-sm font-medium capitalize">{def.display_name}</span>
                     <span className="text-xs text-slate-500">{allowlist.length} tools</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">
+                  <p
+                    className="text-xs text-slate-500 mt-0.5 truncate"
+                    title={def.file_scope || 'No scope set'}
+                  >
                     {def.file_scope || 'No scope set'}
                   </p>
                 </button>
@@ -961,7 +964,14 @@ export function GuardRulesPage() {
                       {boundaries.length} {boundaries.length === 1 ? 'rule' : 'rules'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">
+                  <p
+                    className="text-xs text-slate-500 mt-0.5 truncate"
+                    title={
+                      boundaries.length > 0
+                        ? boundaries.map((b) => boundaryTypeLabels[b.type] || b.type).join(', ')
+                        : 'No boundaries set'
+                    }
+                  >
                     {boundaries.length > 0
                       ? boundaries.map((b) => boundaryTypeLabels[b.type] || b.type).join(', ')
                       : 'No boundaries set'}
@@ -1487,6 +1497,7 @@ export function GuardRulesPage() {
                 type="button"
                 onClick={closeAddRuleModal}
                 className="text-slate-400 hover:text-slate-200 transition-colors"
+                title="Close"
               >
                 <FiX size={18} />
               </button>

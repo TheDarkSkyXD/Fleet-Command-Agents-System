@@ -825,6 +825,7 @@ function CreateRoleModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+            title="Close"
           >
             <FiX size={18} />
           </button>
@@ -1105,6 +1106,7 @@ function OverlayPreviewModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+            title="Close"
           >
             <FiX size={18} />
           </button>

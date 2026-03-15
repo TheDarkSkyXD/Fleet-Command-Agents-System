@@ -16,7 +16,9 @@ import {
   FiCheckCircle,
   FiChevronDown,
   FiChevronUp,
+  FiClipboard,
   FiCpu,
+  FiEye,
   FiFilter,
   FiGitBranch,
   FiGrid,
@@ -29,8 +31,15 @@ import {
   FiX,
   FiZap,
 } from 'react-icons/fi';
-import type { AgentCapability, AgentProcessInfo, RuntimeInfo, ScopeOverlap, Session } from '../../shared/types';
+import type {
+  AgentCapability,
+  AgentProcessInfo,
+  RuntimeInfo,
+  ScopeOverlap,
+  Session,
+} from '../../shared/types';
 import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
+import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
 import { useProjectStore } from '../stores/projectStore';
@@ -597,6 +606,55 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     [loadSessions],
   );
 
+  // Context menu for right-click on agents
+  const agentContextMenu = useContextMenu();
+
+  const handleAgentContextMenu = useCallback(
+    (e: React.MouseEvent, session: Session) => {
+      const items: ContextMenuItem[] = [];
+
+      if (session.state !== 'completed') {
+        items.push({
+          id: 'stop',
+          label: 'Stop',
+          icon: <FiSquare className="h-3.5 w-3.5" />,
+          danger: true,
+          onClick: () => requestStopAgent(session.id, session.agent_name),
+        });
+
+        items.push({
+          id: 'nudge',
+          label: 'Nudge',
+          icon: <FiZap className="h-3.5 w-3.5" />,
+          onClick: () => handleNudgeAgent(session.id),
+          disabled: session.state !== 'stalled',
+        });
+
+        items.push({ id: 'sep-1', label: '', separator: true, onClick: () => {} });
+      }
+
+      items.push({
+        id: 'inspect',
+        label: 'Inspect',
+        icon: <FiEye className="h-3.5 w-3.5" />,
+        onClick: () => onSelectAgent?.(session.id),
+      });
+
+      items.push({
+        id: 'copy-id',
+        label: 'Copy ID',
+        icon: <FiClipboard className="h-3.5 w-3.5" />,
+        onClick: () => {
+          navigator.clipboard.writeText(session.id);
+          toast.success('Agent ID copied to clipboard');
+        },
+      });
+
+      agentContextMenu.show(e, items);
+    },
+    [requestStopAgent, handleNudgeAgent, onSelectAgent, agentContextMenu],
+  );
+
   // Table columns definition
   const columns = useMemo<ColumnDef<Session>[]>(
     () => [
@@ -605,7 +663,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         header: () => (
           <input
             type="checkbox"
-            checked={activeSessions.length > 0 && activeSessions.every((s) => selectedAgents.has(s.id))}
+            checked={
+              activeSessions.length > 0 && activeSessions.every((s) => selectedAgents.has(s.id))
+            }
             onChange={(e) => {
               e.stopPropagation();
               toggleSelectAll();
@@ -804,7 +864,15 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         },
       },
     ],
-    [runningProcesses, requestStopAgent, handleNudgeAgent, selectedAgents, activeSessions, toggleSelectAll, toggleAgentSelection],
+    [
+      runningProcesses,
+      requestStopAgent,
+      handleNudgeAgent,
+      selectedAgents,
+      activeSessions,
+      toggleSelectAll,
+      toggleAgentSelection,
+    ],
   );
 
   const table = useReactTable({
@@ -913,6 +981,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
               type="button"
               onClick={() => setGlobalFilter('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              title="Clear search"
             >
               <FiX className="h-3.5 w-3.5" />
             </button>
@@ -1053,6 +1122,11 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                     key={row.id}
                     className="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer"
                     onClick={() => onSelectAgent?.(row.original.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') onSelectAgent?.(row.original.id);
+                    }}
+                    onContextMenu={(e) => handleAgentContextMenu(e, row.original)}
+                    tabIndex={0}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="px-4 py-3">
@@ -1103,6 +1177,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                         onStop={() => requestStopAgent(session.id, session.agent_name)}
                         onNudge={() => handleNudgeAgent(session.id)}
                         onSelect={() => onSelectAgent?.(session.id)}
+                        onContextMenu={(e) => handleAgentContextMenu(e, session)}
                       />
                     );
                   })}
@@ -1176,7 +1251,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           onCapabilityChange={(cap) => {
             setSpawnCapability(cap);
             const modelDefaults = appSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS;
-            setSpawnModel(modelDefaults[cap as keyof typeof modelDefaults] || CAPABILITY_DEFAULTS[cap].model);
+            setSpawnModel(
+              modelDefaults[cap as keyof typeof modelDefaults] || CAPABILITY_DEFAULTS[cap].model,
+            );
           }}
           onModelChange={setSpawnModel}
           onRuntimeChange={setSpawnRuntime}
@@ -1226,6 +1303,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           onCancel={cancelStop}
         />
       )}
+
+      {/* Right-click context menu */}
+      <ContextMenu menu={agentContextMenu.menu} onClose={agentContextMenu.hide} />
     </div>
   );
 }
@@ -1257,6 +1337,7 @@ function AgentCard({
   onStop,
   onNudge,
   onSelect,
+  onContextMenu,
 }: {
   session: Session;
   processInfo?: AgentProcessInfo;
@@ -1266,6 +1347,7 @@ function AgentCard({
   onStop: () => void;
   onNudge: () => void;
   onSelect?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const agentModel = session.model || processInfo?.model || null;
   const borderAccent = CAPABILITY_BORDER_ACCENT[session.capability] || 'border-l-slate-500';
@@ -1274,6 +1356,7 @@ function AgentCard({
     <div
       className={`rounded-lg border border-l-[3px] ${borderAccent} bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors ${isSelected ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-700'}`}
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onSelect?.();
       }}
@@ -1487,7 +1570,10 @@ function SpawnDialog({
 }) {
   const capabilityInfo = CAPABILITY_DEFAULTS[capability];
   const { settings: spawnSettings } = useSettingsStore();
-  const configuredDefault = (spawnSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS)[capability as keyof typeof DEFAULT_MODEL_DEFAULTS] ?? capabilityInfo.model;
+  const configuredDefault =
+    (spawnSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS)[
+      capability as keyof typeof DEFAULT_MODEL_DEFAULTS
+    ] ?? capabilityInfo.model;
   const [showTreePicker, setShowTreePicker] = useState(capability === 'builder');
   const [scopeOverlaps, setScopeOverlaps] = useState<ScopeOverlap[]>([]);
   const [checkingOverlaps, setCheckingOverlaps] = useState(false);
@@ -1541,6 +1627,7 @@ function SpawnDialog({
             type="button"
             onClick={onClose}
             className="rounded-md p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+            title="Close"
           >
             <FiX className="h-5 w-5" />
           </button>

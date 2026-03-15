@@ -157,8 +157,12 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
                   className={`shrink-0 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}`}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="truncate font-medium text-[13px]">{project.name}</div>
-                  <div className="truncate text-[11px] text-slate-500 mt-0.5">{project.path}</div>
+                  <div className="truncate font-medium text-[13px]" title={project.name}>
+                    {project.name}
+                  </div>
+                  <div className="truncate text-[11px] text-slate-500 mt-0.5" title={project.path}>
+                    {project.path}
+                  </div>
                 </div>
                 {isSwitching ? (
                   <FiLoader size={14} className="shrink-0 text-blue-400 animate-spin" />
@@ -253,7 +257,10 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
         data-testid="project-switcher"
       >
         <FiFolder size={14} className="text-blue-400 shrink-0" />
-        <span className="flex-1 truncate text-slate-200 font-medium">
+        <span
+          className="flex-1 truncate text-slate-200 font-medium"
+          title={activeProject?.name || ''}
+        >
           {loading ? (
             <span className="flex items-center gap-1.5 text-slate-400">
               <FiLoader size={12} className="animate-spin" />

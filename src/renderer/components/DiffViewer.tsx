@@ -34,7 +34,9 @@ function FileReviewHeader({
 }) {
   return (
     <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800/80 px-4 py-2">
-      <span className="font-mono text-sm text-slate-300 truncate mr-4">{fileName}</span>
+      <span className="font-mono text-sm text-slate-300 truncate mr-4" title={fileName}>
+        {fileName}
+      </span>
       <div className="flex items-center gap-2 shrink-0">
         {decision === 'approved' && (
           <span className="text-xs font-medium text-emerald-400 mr-2">Approved</span>

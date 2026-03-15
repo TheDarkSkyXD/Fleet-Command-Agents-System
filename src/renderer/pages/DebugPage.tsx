@@ -774,7 +774,7 @@ function LogEntryRow({
         >
           {entry.level}
         </span>
-        <span className="flex-1 truncate text-sm text-slate-200 font-mono">
+        <span className="flex-1 truncate text-sm text-slate-200 font-mono" title={entry.message}>
           {highlightMessage(entry.message)}
         </span>
         {entry.agent_name && (
@@ -1671,7 +1671,9 @@ function ErrorAggregationPanel() {
                   : 'border-slate-700 bg-slate-800 hover:border-slate-600'
               }`}
             >
-              <div className="text-xs text-slate-400 truncate">{summary.agentName}</div>
+              <div className="text-xs text-slate-400 truncate" title={summary.agentName}>
+                {summary.agentName}
+              </div>
               <div className="mt-1 text-lg font-bold text-red-400">{summary.errorCount}</div>
             </button>
           ))}

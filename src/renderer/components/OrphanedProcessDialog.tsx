@@ -159,7 +159,10 @@ export function OrphanedProcessDialog() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-white truncate">
+                          <span
+                            className="text-sm font-semibold text-white truncate"
+                            title={orphan.agentName}
+                          >
                             {orphan.agentName}
                           </span>
                           <span className="inline-flex items-center rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-300">
@@ -225,7 +228,10 @@ export function OrphanedProcessDialog() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-300 truncate">
+                        <span
+                          className="text-sm font-medium text-gray-300 truncate"
+                          title={orphan.agentName}
+                        >
                           {orphan.agentName}
                         </span>
                         <span className="inline-flex items-center rounded-full bg-gray-600 px-2 py-0.5 text-xs text-gray-400">

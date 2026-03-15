@@ -363,7 +363,10 @@ export function CoordinatorPanel() {
                 <div className="space-y-1 max-h-24 overflow-y-auto">
                   {lastPollResult.messages_processed.slice(0, 5).map((msg) => (
                     <div key={msg.message_id} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300 font-mono truncate max-w-[120px]">
+                      <span
+                        className="text-slate-300 font-mono truncate max-w-[120px]"
+                        title={msg.from_agent}
+                      >
                         {msg.from_agent}
                       </span>
                       <span
@@ -411,7 +414,10 @@ export function CoordinatorPanel() {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-300 font-mono truncate">
+                          <span
+                            className="text-slate-300 font-mono truncate"
+                            title={lead.agent_name}
+                          >
                             {lead.agent_name}
                           </span>
                           <span
@@ -429,7 +435,9 @@ export function CoordinatorPanel() {
                           </span>
                         </div>
                         {lead.objective && (
-                          <p className="text-slate-500 truncate mt-0.5">{lead.objective}</p>
+                          <p className="text-slate-500 truncate mt-0.5" title={lead.objective}>
+                            {lead.objective}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -460,7 +468,10 @@ export function CoordinatorPanel() {
                     return (
                       <div key={stream.id} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-300 truncate max-w-[180px]">
+                          <span
+                            className="text-slate-300 truncate max-w-[180px]"
+                            title={stream.name}
+                          >
                             {streamLabel}
                           </span>
                           <span className="text-slate-500 text-[10px]">
@@ -567,7 +578,10 @@ export function CoordinatorPanel() {
                             <div className="mt-0.5">{sourceIcon}</div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-1">
-                                <span className="text-xs text-slate-200 truncate">
+                                <span
+                                  className="text-xs text-slate-200 truncate"
+                                  title={entry.summary}
+                                >
                                   {entry.summary}
                                 </span>
                                 <span
@@ -578,7 +592,10 @@ export function CoordinatorPanel() {
                                 </span>
                               </div>
                               {entry.detail && (
-                                <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                <p
+                                  className="text-[10px] text-slate-500 mt-0.5 truncate"
+                                  title={entry.detail}
+                                >
                                   {entry.detail}
                                 </p>
                               )}
@@ -713,7 +730,12 @@ export function CoordinatorPanel() {
         {error && (
           <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400 flex items-start justify-between gap-2">
             <span>{error}</span>
-            <button type="button" onClick={() => setError(null)} className="shrink-0">
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="shrink-0"
+              title="Dismiss error"
+            >
               <FiX className="h-3.5 w-3.5" />
             </button>
           </div>

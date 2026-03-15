@@ -409,6 +409,7 @@ export function ExpertisePage() {
               type="button"
               onClick={handleBackToDomains}
               className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              title="Back to domains"
             >
               <FiChevronRight size={18} className="rotate-180" />
             </button>

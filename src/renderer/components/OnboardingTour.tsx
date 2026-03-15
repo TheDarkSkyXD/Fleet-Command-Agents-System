@@ -244,6 +244,7 @@ export function OnboardingTour() {
             onClick={handleDismiss}
             className="rounded-md p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
             aria-label="Dismiss tour"
+            title="Dismiss tour"
           >
             <FiX className="h-4 w-4" />
           </button>
