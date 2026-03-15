@@ -34,6 +34,34 @@ const DANGEROUS_GIT_PATTERNS = [
 const FILE_TOOLS = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep']);
 
 /**
+ * Write-related tool names that modify files (used for file scope enforcement).
+ */
+const WRITE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
+
+/**
+ * Normalize a tool allowlist entry for comparison.
+ * Handles variants like "Bash (read-only)" matching "Bash" tool calls.
+ * The allowlist may contain qualified entries like "Bash (read-only + tests)".
+ */
+function isToolAllowed(toolName: string, allowlist: string[]): boolean {
+  if (allowlist.length === 0) {
+    // No allowlist configured = all tools allowed (permissive default)
+    return true;
+  }
+
+  for (const allowed of allowlist) {
+    // Exact match
+    if (allowed === toolName) return true;
+    // Qualified match: "Bash (read-only)" allows "Bash" tool calls
+    // The restriction is on what bash commands can do, not the tool itself
+    const baseTool = allowed.split(' ')[0];
+    if (baseTool === toolName) return true;
+  }
+
+  return false;
+}
+
+/**
  * Guard Enforcement Service
  *
  * Monitors agent tool calls in real-time via stream-json events and enforces:
@@ -272,6 +300,70 @@ class GuardEnforcementService {
   }
 
   /**
+   * Check if a file path is within the agent's assigned file scope.
+   * File scope is an array of file paths/patterns that the agent is allowed to modify.
+   * This enforces builder-level file scope restrictions beyond worktree boundaries.
+   *
+   * @param filePath - The file being modified
+   * @param fileScope - Array of allowed file paths/glob patterns
+   * @param worktreePath - The agent's worktree root (used to resolve relative paths)
+   * @returns { allowed: boolean, reason: string }
+   */
+  validateFileScope(
+    filePath: string,
+    fileScope: string[],
+    worktreePath?: string,
+  ): { allowed: boolean; reason: string } {
+    if (fileScope.length === 0) {
+      return { allowed: true, reason: 'No file scope restrictions configured' };
+    }
+
+    const normalizedFile = path.resolve(filePath);
+
+    for (const scopeEntry of fileScope) {
+      // Resolve scope entries relative to worktree if not absolute
+      const resolvedScope = path.isAbsolute(scopeEntry)
+        ? path.resolve(scopeEntry)
+        : worktreePath
+          ? path.resolve(worktreePath, scopeEntry)
+          : path.resolve(scopeEntry);
+
+      // Check exact file match
+      if (normalizedFile === resolvedScope) {
+        return { allowed: true, reason: 'File is within assigned scope' };
+      }
+
+      // Check directory match (scope entry is a directory containing the file)
+      if (normalizedFile.startsWith(resolvedScope + path.sep)) {
+        return { allowed: true, reason: 'File is within assigned scope directory' };
+      }
+
+      // Check glob-style wildcard match (e.g., "src/components/*.tsx")
+      if (scopeEntry.includes('*')) {
+        const globBase = scopeEntry.split('*')[0];
+        const resolvedGlobBase = path.isAbsolute(globBase)
+          ? path.resolve(globBase)
+          : worktreePath
+            ? path.resolve(worktreePath, globBase)
+            : path.resolve(globBase);
+        const extension = scopeEntry.split('*').pop() || '';
+
+        if (
+          normalizedFile.startsWith(resolvedGlobBase) &&
+          (!extension || normalizedFile.endsWith(extension))
+        ) {
+          return { allowed: true, reason: 'File matches assigned scope pattern' };
+        }
+      }
+    }
+
+    return {
+      allowed: false,
+      reason: `File '${filePath}' is outside assigned file scope. Allowed: [${fileScope.join(', ')}]`,
+    };
+  }
+
+  /**
    * Enforce guard rules on a tool_use event from an agent.
    * Called when a stream-json event indicates an agent is attempting a tool call.
    *
@@ -280,6 +372,7 @@ class GuardEnforcementService {
    * @param toolName - The tool being called (e.g., 'Read', 'Bash', 'Write')
    * @param toolInput - The tool's input parameters
    * @param worktreePath - The agent's assigned worktree path
+   * @param fileScope - Optional array of file paths the agent is allowed to modify (for builder scope enforcement)
    * @returns { allowed: boolean, violation?: string } - Whether the tool call is allowed
    */
   enforceToolCall(
@@ -288,8 +381,28 @@ class GuardEnforcementService {
     toolName: string,
     toolInput: Record<string, unknown> | undefined,
     worktreePath?: string,
+    fileScope?: string[],
   ): { allowed: boolean; violation?: string } {
-    // 1. Check path boundaries for file-related tools
+    const rules = this.loadRules(capability);
+
+    // 1. Check tool allowlist - block tools not in the role's permitted list
+    if (!isToolAllowed(toolName, rules.tool_allowlist)) {
+      const violation = `Tool '${toolName}' is not in ${capability}'s allowlist. Permitted tools: [${rules.tool_allowlist.join(', ')}]`;
+      this.recordViolation({
+        agentName,
+        capability,
+        ruleType: 'tool_allowlist',
+        violation,
+        toolAttempted: toolName,
+        severity: WRITE_TOOLS.has(toolName) ? 'warning' : 'info',
+      });
+      log.warn(
+        `[GuardEnforcement] TOOL ALLOWLIST VIOLATION: Agent '${agentName}' (${capability}) attempted disallowed tool '${toolName}'`,
+      );
+      return { allowed: false, violation };
+    }
+
+    // 2. Check path boundaries for file-related tools
     if (FILE_TOOLS.has(toolName) && toolInput) {
       const filePath =
         (toolInput.file_path as string) ||
@@ -314,9 +427,29 @@ class GuardEnforcementService {
           return { allowed: false, violation: pathCheck.reason };
         }
       }
+
+      // 3. Check file scope enforcement for write tools (builder file scope)
+      if (WRITE_TOOLS.has(toolName) && filePath && fileScope && fileScope.length > 0) {
+        const scopeCheck = this.validateFileScope(filePath, fileScope, worktreePath);
+        if (!scopeCheck.allowed) {
+          this.recordViolation({
+            agentName,
+            capability,
+            ruleType: 'file_scope',
+            violation: scopeCheck.reason,
+            toolAttempted: toolName,
+            fileAttempted: filePath,
+            severity: 'warning',
+          });
+          log.warn(
+            `[GuardEnforcement] FILE SCOPE VIOLATION: Agent '${agentName}' (${capability}) attempted ${toolName} on '${filePath}' outside assigned scope`,
+          );
+          return { allowed: false, violation: scopeCheck.reason };
+        }
+      }
     }
 
-    // 2. Check bash command restrictions
+    // 4. Check bash command restrictions
     if (toolName === 'Bash' && toolInput) {
       const command = (toolInput.command as string) || (toolInput.cmd as string) || '';
       if (command) {

@@ -74,6 +74,83 @@ const boundaryTypeColors: Record<string, string> = {
   glob: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
 };
 
+function ToolAllowlistTester({ role }: { role: string }) {
+  const [testTool, setTestTool] = useState('');
+  const [testResult, setTestResult] = useState<{
+    allowed: boolean;
+    reason: string;
+  } | null>(null);
+
+  const handleTest = async () => {
+    if (!testTool.trim() || !role) return;
+    const result = await window.electronAPI.guardCheckTool(role, testTool.trim());
+    if (result.data) {
+      setTestResult(result.data);
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-slate-700 pt-4">
+      <h4 className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+        Test Tool Access
+      </h4>
+      <div className="flex gap-2">
+        <select
+          value={testTool}
+          onChange={(e) => {
+            setTestTool(e.target.value);
+            setTestResult(null);
+          }}
+          data-testid="test-tool-select"
+          className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200"
+        >
+          <option value="">Select a tool...</option>
+          {ALL_TOOLS.map((t) => (
+            <option key={t} value={t.split(' ')[0]}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={!testTool.trim()}
+          data-testid="test-tool-btn"
+          className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <FiShield size={14} />
+          Test
+        </button>
+      </div>
+      {testResult && (
+        <div
+          className={`mt-2 rounded-lg border px-3 py-2 text-sm ${
+            testResult.allowed
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+              : 'border-red-500/30 bg-red-500/10 text-red-400'
+          }`}
+          data-testid="test-tool-result"
+        >
+          <div className="flex items-center gap-2">
+            {testResult.allowed ? (
+              <>
+                <FiCheckCircle size={14} />
+                <span className="font-medium">ALLOWED</span>
+              </>
+            ) : (
+              <>
+                <FiXCircle size={14} />
+                <span className="font-medium">BLOCKED</span>
+              </>
+            )}
+          </div>
+          <p className="text-xs mt-1 opacity-80">{testResult.reason}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BashRestrictionTester({ role }: { role: string }) {
   const [testCommand, setTestCommand] = useState('');
   const [testResult, setTestResult] = useState<{
@@ -826,6 +903,9 @@ export function GuardRulesPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* Test tool against allowlist */}
+                  <ToolAllowlistTester role={selectedRole || ''} />
                 </div>
 
                 {/* Bash Restrictions Section */}

@@ -710,6 +710,7 @@ class AgentProcessManager {
           toolEvent.name,
           toolEvent.input,
           agent.spawnOptions.worktreePath,
+          agent.spawnOptions.fileScope,
         );
         if (!result.allowed) {
           // Broadcast the violation to the renderer for real-time display
@@ -735,6 +736,7 @@ class AgentProcessManager {
           blockEvent.content_block.name,
           blockEvent.content_block.input,
           agent.spawnOptions.worktreePath,
+          agent.spawnOptions.fileScope,
         );
         if (!result.allowed) {
           this.broadcastAgentEvent(agent.id, 'guard_violation', {
