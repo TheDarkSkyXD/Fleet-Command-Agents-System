@@ -624,11 +624,15 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         return;
       }
 
-      // Success - close dialog and refresh
+      // Success - close dialog, refresh, and navigate to agent detail
       setShowSpawnDialog(false);
       toast.success(`Agent "${agentName}" spawned successfully`);
       await loadSessions();
       await loadRunningProcesses();
+      // Navigate to the newly spawned agent's detail view
+      if (onSelectAgent) {
+        onSelectAgent(agentName);
+      }
     } catch (err) {
       setSpawnError(String(err));
       toast.error('Failed to spawn agent');

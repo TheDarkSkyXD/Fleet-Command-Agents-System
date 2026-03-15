@@ -23,6 +23,7 @@ import {
   FiUser,
   FiX,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type { Issue, IssuePriority, IssueStatus, IssueType, TaskGroup } from '../../shared/types';
 
 // ID generator (simple nanoid-like)
@@ -211,6 +212,7 @@ export function TasksPage() {
         setIssues((prev) => [result.data as Issue, ...prev]);
         setForm({ title: '', description: '', type: 'task', priority: 'medium' });
         setShowCreateForm(false);
+        toast.success(`Issue "${(result.data as Issue).title}" created`);
       }
     } catch (err) {
       console.error('Failed to create issue:', err);
@@ -223,6 +225,10 @@ export function TasksPage() {
     try {
       await window.electronAPI.issueDelete(id);
       setIssues((prev) => prev.filter((i) => i.id !== id));
+      // Close detail modal if the deleted issue was being viewed
+      if (selectedIssueId === id) {
+        setSelectedIssueId(null);
+      }
     } catch (err) {
       console.error('Failed to delete issue:', err);
     }

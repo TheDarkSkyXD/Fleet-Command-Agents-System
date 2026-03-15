@@ -886,7 +886,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
   const isRunning = session.state !== 'completed' && (processInfo?.isRunning ?? false);
 
   return (
-    <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 96px)' }}>
+    <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 96px)' }} data-testid="agent-detail-page" data-agent-id={agentId}>
       {/* Header */}
       <div className="flex-shrink-0 space-y-3 pb-4">
         <Breadcrumbs
@@ -1060,7 +1060,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       </div>
 
       {/* Tabs */}
-      <div className="flex-shrink-0 flex border-b border-slate-700 gap-0">
+      <div className="flex-shrink-0 flex border-b border-slate-700 gap-0" data-testid="agent-detail-tabs">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -1071,6 +1071,9 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
                 ? 'text-blue-400 border-blue-400 bg-blue-500/5'
                 : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-800'
             }`}
+            data-testid={`agent-tab-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            role="tab"
           >
             {tab.icon}
             {tab.label}
@@ -1079,7 +1082,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden" data-testid={`agent-tab-content-${activeTab}`}>
         {activeTab === 'terminal' && <AgentTerminal agentId={agentId} isRunning={isRunning} />}
         {activeTab === 'logs' && <AgentLogsTab agentName={session.agent_name} />}
         {activeTab === 'identity' && (
