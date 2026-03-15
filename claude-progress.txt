@@ -1857,3 +1857,29 @@
 - 121/366 features passing (added #41 and #46 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (PID Tracking & Transcript Path)
+
+#### Feature #51: Agent PID tracking and liveness monitoring - PASSING
+- Already fully implemented in prior sessions
+- PID stored in sessions table on agent spawn (agentProcess.pid)
+- WatchdogService performs periodic PID liveness checks via process.kill(pid, 0)
+- Progressive escalation: Level 0 → 1 (warn) → 2 (nudge) → 3 (escalate) → 4 (terminate/zombie)
+- State updates to 'zombie' when PID detected dead
+- agent:process-info IPC handler exposes PID to renderer
+
+#### Feature #52: Transcript path tracking per agent - PASSING
+- Computed transcript_path during agent:spawn using SHA-256 hash of working directory
+- Path format: ~/.claude/projects/<dir-hash-16-chars>/sessions/<session-id>/
+- Stored in sessions table INSERT alongside PID, model, and file_scope
+- Added top-level imports for node:crypto (createHash), node:os, node:path to handlers.ts
+- Cleaned up redundant local path re-imports in file-tree and hooks handlers
+- transcript_path column and Session type already existed from schema setup
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added transcript_path computation and storage, added imports
+
+#### Current Status
+- 126/366 features passing (added #51 and #52 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
