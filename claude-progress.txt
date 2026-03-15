@@ -1,5 +1,23 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Bulk Operations & Task Decomposition)
+
+#### Feature #53: Bulk agent operations select and stop - PASSING
+- Added checkbox column to table view with select-all header checkbox
+- Checkboxes in card view for each active agent
+- "Stop Selected (N)" button with bulk stop confirmation dialog
+- Bulk stop handler stops each selected agent via Promise.all
+
+#### Feature #58: Auto-task decomposition by coordinator - PASSING
+- Coordinator auto-decomposes work into 3 streams on start (Infrastructure, Features, Quality)
+- Each stream creates a task group with 4 issues in SQLite
+- Work Streams section in CoordinatorPanel shows progress bars
+- Added coordinator:decompose and coordinator:workStreams IPC handlers
+- Duplicate decomposition prevented by checking existing streams
+
+#### Current Status
+- 133/366 features passing (added #53 and #58 this session)
+
 ### Session: 2026-03-14 (Merge Authorization & Mail Notification)
 
 #### Feature #61: Merge authorization and execution triggers - PASSING
