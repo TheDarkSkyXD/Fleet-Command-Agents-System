@@ -298,6 +298,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   watchdogEscalationStates: () => ipcRenderer.invoke('watchdog:escalation-states'),
   watchdogResetEscalation: (agentId: string) =>
     ipcRenderer.invoke('watchdog:reset-escalation', agentId),
+  // Watchdog Tier 1: AI Triage
+  watchdogTriage: (agentId: string, options?: { lineCount?: number; timeoutMs?: number }) =>
+    ipcRenderer.invoke('watchdog:triage', agentId, options),
+  watchdogTriageConfig: () => ipcRenderer.invoke('watchdog:triage-config'),
+  watchdogTriageConfigure: (updates: { lineCount?: number; timeoutMs?: number }) =>
+    ipcRenderer.invoke('watchdog:triage-configure', updates),
+  // Watchdog Tier 2: Monitor Patrol
+  watchdogPatrolStart: (intervalMs?: number) =>
+    ipcRenderer.invoke('watchdog:patrol-start', intervalMs),
+  watchdogPatrolStop: () => ipcRenderer.invoke('watchdog:patrol-stop'),
+  watchdogPatrolStatus: () => ipcRenderer.invoke('watchdog:patrol-status'),
+  watchdogPatrolNow: () => ipcRenderer.invoke('watchdog:patrol-now'),
+  watchdogPatrolHistory: (limit?: number) => ipcRenderer.invoke('watchdog:patrol-history', limit),
 
   // Events (renderer -> main)
   onAgentUpdate: (callback: (data: unknown) => void) =>
@@ -346,6 +359,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }>;
     }) => void,
   ) => ipcRenderer.on('watchdog:update', (_event, data) => callback(data)),
+  onWatchdogTriageResult: (callback: (data: unknown) => void) =>
+    ipcRenderer.on('watchdog:triage-result', (_event, data) => callback(data)),
+  onWatchdogPatrolResult: (callback: (data: unknown) => void) =>
+    ipcRenderer.on('watchdog:patrol-result', (_event, data) => callback(data)),
 
   // Notification navigation events (main -> renderer)
   onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) =>

@@ -1,7 +1,9 @@
+import { type ChildProcess, execFile } from 'node:child_process';
 import { BrowserWindow } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
 import { type AgentProcess, agentProcessManager } from './agentProcessManager';
+import { detectClaudeCli } from './claudeCliService';
 import { notificationService } from './notificationService';
 
 /**
@@ -53,6 +55,56 @@ interface AgentEscalationState {
   levelTimestamps: Record<number, number>;
   /** Last time we saw activity from this agent */
   lastActivityAt: number;
+}
+
+/**
+ * Tier 1 AI triage classification result.
+ */
+export type TriageClassification = 'retry' | 'terminate' | 'extend';
+
+/**
+ * Tier 1 AI triage result for an agent error.
+ */
+export interface TriageResult {
+  agentId: string;
+  agentName: string;
+  classification: TriageClassification;
+  reason: string;
+  linesAnalyzed: number;
+  triageDurationMs: number;
+  timedOut: boolean;
+  timestamp: string;
+}
+
+/**
+ * Tier 2 monitor patrol health report for an agent.
+ */
+export interface PatrolHealthReport {
+  agentId: string;
+  agentName: string;
+  capability: string;
+  pid: number;
+  pidAlive: boolean;
+  ptyRunning: boolean;
+  outputLineCount: number;
+  stalledDurationMs: number | null;
+  escalationLevel: EscalationLevel;
+  anomalies: string[];
+  healthy: boolean;
+  timestamp: string;
+}
+
+/**
+ * Tier 2 monitor patrol result.
+ */
+export interface PatrolResult {
+  patrolId: string;
+  agentReports: PatrolHealthReport[];
+  totalAgents: number;
+  healthyAgents: number;
+  unhealthyAgents: number;
+  anomalyCount: number;
+  timestamp: string;
 }
 
 const DEFAULT_CONFIG: WatchdogConfig = {
@@ -640,6 +692,553 @@ class WatchdogService {
           results,
         });
       }
+    }
+  }
+
+  // ── Tier 1: AI Failure Triage ─────────────────────────────────────────
+
+  /** Default number of output lines to analyze for triage */
+  private triageLineCount = 50;
+  /** Default triage timeout in milliseconds */
+  private triageTimeoutMs = 30000;
+  /** Active triage processes for cleanup */
+  private activeTriageProcesses: Map<string, ChildProcess> = new Map();
+
+  /**
+   * Trigger Tier 1 AI triage for an agent error.
+   * Analyzes the last N lines of agent output using Claude CLI
+   * and classifies the error as retry/terminate/extend.
+   *
+   * Falls back to 'extend' on timeout (default 30s).
+   */
+  async triageAgentError(
+    agentId: string,
+    options?: { lineCount?: number; timeoutMs?: number },
+  ): Promise<TriageResult> {
+    const lineCount = options?.lineCount ?? this.triageLineCount;
+    const timeoutMs = options?.timeoutMs ?? this.triageTimeoutMs;
+    const startTime = Date.now();
+
+    const agent = agentProcessManager.get(agentId);
+    if (!agent) {
+      log.warn(`[Watchdog T1] Agent ${agentId} not found for triage`);
+      return {
+        agentId,
+        agentName: 'unknown',
+        classification: 'extend',
+        reason: 'Agent not found in process manager',
+        linesAnalyzed: 0,
+        triageDurationMs: Date.now() - startTime,
+        timedOut: false,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    // Extract last N lines of output
+    const outputLines = agent.outputBuffer.slice(-lineCount);
+    const outputText = outputLines.join('\n');
+    const linesAnalyzed = outputLines.length;
+
+    log.info(
+      `[Watchdog T1] Starting AI triage for agent ${agent.agentName} (${linesAnalyzed} lines, timeout=${timeoutMs}ms)`,
+    );
+
+    try {
+      const classification = await this.runAiTriage(agent, outputText, timeoutMs);
+      const duration = Date.now() - startTime;
+
+      const result: TriageResult = {
+        agentId: agent.id,
+        agentName: agent.agentName,
+        classification: classification.classification,
+        reason: classification.reason,
+        linesAnalyzed,
+        triageDurationMs: duration,
+        timedOut: false,
+        timestamp: new Date().toISOString(),
+      };
+
+      log.info(
+        `[Watchdog T1] Triage complete for ${agent.agentName}: ${result.classification} (${duration}ms) - ${result.reason}`,
+      );
+
+      // Record triage event
+      this.recordWatchdogEvent(agent, 'ai_triage', 1, {
+        classification: result.classification,
+        reason: result.reason,
+        linesAnalyzed,
+        triageDurationMs: duration,
+        timedOut: false,
+      });
+
+      // Broadcast triage result to renderer
+      this.broadcastTriageResult(result);
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const isTimeout = duration >= timeoutMs - 100; // Within 100ms of timeout
+
+      log.warn(
+        `[Watchdog T1] Triage ${isTimeout ? 'timed out' : 'failed'} for ${agent.agentName} after ${duration}ms, falling back to 'extend': ${error}`,
+      );
+
+      const result: TriageResult = {
+        agentId: agent.id,
+        agentName: agent.agentName,
+        classification: 'extend',
+        reason: isTimeout
+          ? `Triage timed out after ${Math.round(duration / 1000)}s, defaulting to extend`
+          : `Triage failed: ${error instanceof Error ? error.message : String(error)}`,
+        linesAnalyzed,
+        triageDurationMs: duration,
+        timedOut: isTimeout,
+        timestamp: new Date().toISOString(),
+      };
+
+      this.recordWatchdogEvent(agent, 'ai_triage_fallback', 1, {
+        classification: 'extend',
+        reason: result.reason,
+        linesAnalyzed,
+        triageDurationMs: duration,
+        timedOut: isTimeout,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      this.broadcastTriageResult(result);
+
+      return result;
+    }
+  }
+
+  /**
+   * Run the AI triage classification using Claude CLI.
+   * Returns the classification and reasoning.
+   */
+  private runAiTriage(
+    agent: AgentProcess,
+    outputText: string,
+    timeoutMs: number,
+  ): Promise<{ classification: TriageClassification; reason: string }> {
+    return new Promise((resolve, reject) => {
+      const cliResult = detectClaudeCli(false);
+      if (!cliResult.found || !cliResult.path) {
+        reject(new Error('Claude CLI not found'));
+        return;
+      }
+
+      const prompt = `You are an AI failure triage system. Analyze the following agent output and classify the error.
+
+Agent: ${agent.agentName} (${agent.capability})
+PID: ${agent.pid}
+
+Last output:
+\`\`\`
+${outputText.substring(0, 4000)}
+\`\`\`
+
+Classify this agent's state as ONE of:
+- "retry" - Transient error that may resolve on retry (network timeout, rate limit, temporary file lock)
+- "terminate" - Fatal error that won't recover (invalid config, missing permissions, corrupted state, auth failure)
+- "extend" - Agent is working but slow, or error is ambiguous - give more time
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"classification": "retry|terminate|extend", "reason": "brief explanation"}`;
+
+      const args = ['--print', prompt, '--output-format', 'text', '--max-turns', '1'];
+
+      let stdout = '';
+      let stderr = '';
+      let settled = false;
+
+      const child = execFile(
+        cliResult.path,
+        args,
+        {
+          timeout: timeoutMs,
+          maxBuffer: 1024 * 1024,
+          env: { ...process.env },
+        },
+        (error, stdoutData, stderrData) => {
+          // Clean up tracking
+          this.activeTriageProcesses.delete(agent.id);
+
+          if (settled) return;
+          settled = true;
+
+          stdout = stdoutData || '';
+          stderr = stderrData || '';
+
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          // Parse the classification from Claude's response
+          try {
+            const parsed = this.parseTriageResponse(stdout);
+            resolve(parsed);
+          } catch (parseError) {
+            reject(parseError);
+          }
+        },
+      );
+
+      // Track active triage process for cleanup
+      if (child) {
+        this.activeTriageProcesses.set(agent.id, child);
+      }
+
+      // Explicit timeout fallback (in case execFile timeout doesn't fire)
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          this.activeTriageProcesses.delete(agent.id);
+          if (child && !child.killed) {
+            child.kill('SIGTERM');
+          }
+          reject(new Error(`Triage timed out after ${timeoutMs}ms`));
+        }
+      }, timeoutMs + 500);
+    });
+  }
+
+  /**
+   * Parse the triage response from Claude CLI output.
+   */
+  private parseTriageResponse(output: string): {
+    classification: TriageClassification;
+    reason: string;
+  } {
+    const trimmed = output.trim();
+
+    // Try to extract JSON from the response
+    const jsonMatch = trimmed.match(/\{[\s\S]*?"classification"[\s\S]*?\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const classification = parsed.classification?.toLowerCase?.();
+        if (
+          classification === 'retry' ||
+          classification === 'terminate' ||
+          classification === 'extend'
+        ) {
+          return {
+            classification,
+            reason: parsed.reason || 'No reason provided',
+          };
+        }
+      } catch {
+        // Fall through to text parsing
+      }
+    }
+
+    // Text-based fallback parsing
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('terminate') || lower.includes('fatal') || lower.includes('unrecoverable')) {
+      return {
+        classification: 'terminate',
+        reason: 'Parsed from text response: fatal/unrecoverable error detected',
+      };
+    }
+    if (lower.includes('retry') || lower.includes('transient') || lower.includes('try again')) {
+      return {
+        classification: 'retry',
+        reason: 'Parsed from text response: transient error detected',
+      };
+    }
+
+    // Default to extend if we can't parse
+    return {
+      classification: 'extend',
+      reason: 'Could not parse classification, defaulting to extend',
+    };
+  }
+
+  /**
+   * Broadcast a triage result to all renderer windows.
+   */
+  private broadcastTriageResult(result: TriageResult): void {
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('watchdog:triage-result', result);
+      }
+    }
+  }
+
+  /**
+   * Get the triage configuration.
+   */
+  getTriageConfig(): { lineCount: number; timeoutMs: number } {
+    return {
+      lineCount: this.triageLineCount,
+      timeoutMs: this.triageTimeoutMs,
+    };
+  }
+
+  /**
+   * Update the triage configuration.
+   */
+  updateTriageConfig(updates: { lineCount?: number; timeoutMs?: number }): void {
+    if (updates.lineCount !== undefined) {
+      this.triageLineCount = Math.max(10, Math.min(200, updates.lineCount));
+    }
+    if (updates.timeoutMs !== undefined) {
+      this.triageTimeoutMs = Math.max(5000, Math.min(120000, updates.timeoutMs));
+    }
+    log.info(
+      `[Watchdog T1] Triage config updated: lineCount=${this.triageLineCount}, timeoutMs=${this.triageTimeoutMs}`,
+    );
+  }
+
+  // ── Tier 2: Monitor Agent Patrol ──────────────────────────────────────
+
+  /** Patrol interval handle */
+  private patrolIntervalHandle: ReturnType<typeof setInterval> | null = null;
+  /** Default patrol interval (60s) */
+  private patrolIntervalMs = 60000;
+  /** Patrol check count */
+  private patrolCount = 0;
+  /** Last patrol timestamp */
+  private lastPatrolAt: string | null = null;
+  /** Patrol history (last N results) */
+  private patrolHistory: PatrolResult[] = [];
+  private maxPatrolHistory = 50;
+
+  /**
+   * Start the Tier 2 monitor agent patrol.
+   * Runs continuously as a sentinel, checking all active agents
+   * and generating health reports.
+   */
+  startPatrol(intervalMs?: number): void {
+    if (this.patrolIntervalHandle) {
+      log.warn('[Watchdog T2] Patrol already running, stopping first...');
+      this.stopPatrol();
+    }
+
+    this.patrolIntervalMs = intervalMs ?? this.patrolIntervalMs;
+
+    log.info(`[Watchdog T2] Starting monitor patrol: interval=${this.patrolIntervalMs}ms`);
+
+    // Run first patrol immediately
+    this.runPatrol();
+
+    // Schedule recurring patrols
+    this.patrolIntervalHandle = setInterval(() => {
+      this.runPatrol();
+    }, this.patrolIntervalMs);
+  }
+
+  /**
+   * Stop the monitor patrol.
+   */
+  stopPatrol(): void {
+    if (this.patrolIntervalHandle) {
+      clearInterval(this.patrolIntervalHandle);
+      this.patrolIntervalHandle = null;
+      log.info('[Watchdog T2] Monitor patrol stopped');
+    }
+  }
+
+  /**
+   * Check if the monitor patrol is running.
+   */
+  isPatrolRunning(): boolean {
+    return this.patrolIntervalHandle !== null;
+  }
+
+  /**
+   * Get the patrol status.
+   */
+  getPatrolStatus(): {
+    running: boolean;
+    intervalMs: number;
+    patrolCount: number;
+    lastPatrolAt: string | null;
+    historySize: number;
+  } {
+    return {
+      running: this.isPatrolRunning(),
+      intervalMs: this.patrolIntervalMs,
+      patrolCount: this.patrolCount,
+      lastPatrolAt: this.lastPatrolAt,
+      historySize: this.patrolHistory.length,
+    };
+  }
+
+  /**
+   * Get the patrol history.
+   */
+  getPatrolHistory(limit?: number): PatrolResult[] {
+    const count = limit ?? this.patrolHistory.length;
+    return this.patrolHistory.slice(-count);
+  }
+
+  /**
+   * Run a single patrol check across all active agents.
+   * Generates a health report for each agent and flags anomalies.
+   */
+  runPatrol(): PatrolResult {
+    const now = Date.now();
+    this.patrolCount++;
+    this.lastPatrolAt = new Date(now).toISOString();
+
+    const agents = agentProcessManager.getAll();
+    const reports: PatrolHealthReport[] = [];
+
+    for (const agent of agents) {
+      const report = this.generateHealthReport(agent, now);
+      reports.push(report);
+    }
+
+    const healthyCount = reports.filter((r) => r.healthy).length;
+    const unhealthyCount = reports.filter((r) => !r.healthy).length;
+    const anomalyCount = reports.reduce((sum, r) => sum + r.anomalies.length, 0);
+
+    const patrolResult: PatrolResult = {
+      patrolId: `patrol-${this.patrolCount}-${Date.now()}`,
+      agentReports: reports,
+      totalAgents: agents.length,
+      healthyAgents: healthyCount,
+      unhealthyAgents: unhealthyCount,
+      anomalyCount,
+      timestamp: new Date(now).toISOString(),
+    };
+
+    // Store in history
+    this.patrolHistory.push(patrolResult);
+    if (this.patrolHistory.length > this.maxPatrolHistory) {
+      this.patrolHistory.shift();
+    }
+
+    // Log patrol summary
+    if (anomalyCount > 0 || unhealthyCount > 0) {
+      log.warn(
+        `[Watchdog T2] Patrol #${this.patrolCount}: ${agents.length} agents, ${healthyCount} healthy, ${unhealthyCount} unhealthy, ${anomalyCount} anomalies`,
+      );
+    } else {
+      log.debug(`[Watchdog T2] Patrol #${this.patrolCount}: ${agents.length} agents, all healthy`);
+    }
+
+    // Broadcast patrol result to renderer
+    this.broadcastPatrolResult(patrolResult);
+
+    // Record event if there are anomalies
+    if (anomalyCount > 0) {
+      this.recordPatrolEvent(patrolResult);
+    }
+
+    return patrolResult;
+  }
+
+  /**
+   * Generate a health report for a single agent.
+   */
+  private generateHealthReport(agent: AgentProcess, now: number): PatrolHealthReport {
+    const pidAlive = this.checkPidAlive(agent.pid);
+    const ptyRunning = agent.isRunning;
+    const escalationState = this.escalationStates.get(agent.id);
+    const escalationLevel: EscalationLevel = escalationState?.level ?? 0;
+    const stalledDurationMs = escalationState?.stalledSince
+      ? now - escalationState.stalledSince
+      : null;
+
+    // Detect anomalies
+    const anomalies: string[] = [];
+
+    // Anomaly: Process dead but marked running
+    if (!pidAlive && agent.isRunning) {
+      anomalies.push('Process PID is dead but agent is marked as running');
+    }
+
+    // Anomaly: PTY not running
+    if (!ptyRunning && agent.isRunning) {
+      anomalies.push('PTY process is not running but agent is marked as running');
+    }
+
+    // Anomaly: High escalation level
+    if (escalationLevel >= 2) {
+      anomalies.push(`Escalation level ${escalationLevel} - agent may be stalled`);
+    }
+
+    // Anomaly: Empty output buffer (agent may not be producing output)
+    if (agent.outputBuffer.length === 0 && now - agent.createdAt.getTime() > 60000) {
+      anomalies.push('No output produced after 60s of running');
+    }
+
+    // Anomaly: Very long stall
+    if (stalledDurationMs && stalledDurationMs > this.config.staleThresholdMs) {
+      anomalies.push(
+        `Stalled for ${Math.round(stalledDurationMs / 1000)}s (threshold: ${Math.round(this.config.staleThresholdMs / 1000)}s)`,
+      );
+    }
+
+    const healthy = pidAlive && ptyRunning && anomalies.length === 0;
+
+    return {
+      agentId: agent.id,
+      agentName: agent.agentName,
+      capability: agent.capability,
+      pid: agent.pid,
+      pidAlive,
+      ptyRunning,
+      outputLineCount: agent.outputBuffer.length,
+      stalledDurationMs,
+      escalationLevel,
+      anomalies,
+      healthy,
+      timestamp: new Date(now).toISOString(),
+    };
+  }
+
+  /**
+   * Broadcast patrol result to all renderer windows.
+   */
+  private broadcastPatrolResult(result: PatrolResult): void {
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('watchdog:patrol-result', result);
+      }
+    }
+  }
+
+  /**
+   * Record a patrol event with anomalies in the events table.
+   */
+  private recordPatrolEvent(result: PatrolResult): void {
+    try {
+      const db = getDatabase();
+      const id = `evt-patrol-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const anomalyAgents = result.agentReports
+        .filter((r) => r.anomalies.length > 0)
+        .map((r) => ({ name: r.agentName, anomalies: r.anomalies }));
+
+      db.prepare(
+        `INSERT INTO events (id, run_id, agent_name, session_id, event_type, tool_name, tool_args, tool_duration_ms, level, data)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        null,
+        'watchdog-patrol',
+        null,
+        'patrol_anomaly',
+        null,
+        null,
+        null,
+        'warn',
+        JSON.stringify({
+          patrolId: result.patrolId,
+          totalAgents: result.totalAgents,
+          healthyAgents: result.healthyAgents,
+          unhealthyAgents: result.unhealthyAgents,
+          anomalyCount: result.anomalyCount,
+          anomalyAgents,
+        }),
+      );
+    } catch (error) {
+      log.error('[Watchdog T2] Failed to record patrol event:', error);
     }
   }
 }

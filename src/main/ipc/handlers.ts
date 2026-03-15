@@ -5692,6 +5692,103 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // ── Watchdog Tier 1: AI Triage ──────────────────────────────────────
+
+  ipcMain.handle(
+    'watchdog:triage',
+    async (_event, agentId: string, options?: { lineCount?: number; timeoutMs?: number }) => {
+      try {
+        const result = await watchdogService.triageAgentError(agentId, options);
+        log.info(
+          `[IPC] watchdog:triage - agent=${agentId}, classification=${result.classification}`,
+        );
+        return { data: result, error: null };
+      } catch (error) {
+        log.error('watchdog:triage failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('watchdog:triage-config', () => {
+    try {
+      return { data: watchdogService.getTriageConfig(), error: null };
+    } catch (error) {
+      log.error('watchdog:triage-config failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'watchdog:triage-configure',
+    (_event, updates: { lineCount?: number; timeoutMs?: number }) => {
+      try {
+        watchdogService.updateTriageConfig(updates);
+        log.info('[IPC] watchdog:triage-configure - triage config updated');
+        return { data: watchdogService.getTriageConfig(), error: null };
+      } catch (error) {
+        log.error('watchdog:triage-configure failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ── Watchdog Tier 2: Monitor Patrol ─────────────────────────────────
+
+  ipcMain.handle('watchdog:patrol-start', (_event, intervalMs?: number) => {
+    try {
+      watchdogService.startPatrol(intervalMs);
+      log.info('[IPC] watchdog:patrol-start - monitor patrol started');
+      return { data: watchdogService.getPatrolStatus(), error: null };
+    } catch (error) {
+      log.error('watchdog:patrol-start failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:patrol-stop', () => {
+    try {
+      watchdogService.stopPatrol();
+      log.info('[IPC] watchdog:patrol-stop - monitor patrol stopped');
+      return { data: watchdogService.getPatrolStatus(), error: null };
+    } catch (error) {
+      log.error('watchdog:patrol-stop failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:patrol-status', () => {
+    try {
+      return { data: watchdogService.getPatrolStatus(), error: null };
+    } catch (error) {
+      log.error('watchdog:patrol-status failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:patrol-now', () => {
+    try {
+      const result = watchdogService.runPatrol();
+      log.info(
+        `[IPC] watchdog:patrol-now - manual patrol: ${result.totalAgents} agents, ${result.anomalyCount} anomalies`,
+      );
+      return { data: result, error: null };
+    } catch (error) {
+      log.error('watchdog:patrol-now failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:patrol-history', (_event, limit?: number) => {
+    try {
+      const history = watchdogService.getPatrolHistory(limit);
+      return { data: history, error: null };
+    } catch (error) {
+      log.error('watchdog:patrol-history failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // ─── Notification Handlers ───────────────────────────────────────────
 
   // Load notification preferences from settings on startup

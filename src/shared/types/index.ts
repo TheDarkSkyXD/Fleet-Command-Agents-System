@@ -1270,6 +1270,40 @@ export interface ElectronAPI {
     data: boolean;
     error: string | null;
   }>;
+  // Watchdog Tier 1: AI Triage
+  watchdogTriage: (
+    agentId: string,
+    options?: { lineCount?: number; timeoutMs?: number },
+  ) => Promise<{ data: TriageResult | null; error: string | null }>;
+  watchdogTriageConfig: () => Promise<{
+    data: TriageConfig | null;
+    error: string | null;
+  }>;
+  watchdogTriageConfigure: (updates: {
+    lineCount?: number;
+    timeoutMs?: number;
+  }) => Promise<{ data: TriageConfig | null; error: string | null }>;
+  // Watchdog Tier 2: Monitor Patrol
+  watchdogPatrolStart: (intervalMs?: number) => Promise<{
+    data: PatrolStatus | null;
+    error: string | null;
+  }>;
+  watchdogPatrolStop: () => Promise<{
+    data: PatrolStatus | null;
+    error: string | null;
+  }>;
+  watchdogPatrolStatus: () => Promise<{
+    data: PatrolStatus | null;
+    error: string | null;
+  }>;
+  watchdogPatrolNow: () => Promise<{
+    data: PatrolResult | null;
+    error: string | null;
+  }>;
+  watchdogPatrolHistory: (limit?: number) => Promise<{
+    data: PatrolResult[] | null;
+    error: string | null;
+  }>;
 
   // Expertise
   expertiseList: (filters?: {
@@ -1542,6 +1576,8 @@ export interface ElectronAPI {
       results: WatchdogCheckResult[];
     }) => void,
   ) => void;
+  onWatchdogTriageResult: (callback: (data: TriageResult) => void) => void;
+  onWatchdogPatrolResult: (callback: (data: PatrolResult) => void) => void;
   // Notification navigation events (main -> renderer)
   onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => void;
   // Agent Instruction Files
@@ -1650,6 +1686,59 @@ export interface WatchdogStatus {
   checkCount: number;
   lastCheckAt: string | null;
   trackedAgents: number;
+}
+
+// Watchdog Tier 1: AI Triage types
+export type TriageClassification = 'retry' | 'terminate' | 'extend';
+
+export interface TriageResult {
+  agentId: string;
+  agentName: string;
+  classification: TriageClassification;
+  reason: string;
+  linesAnalyzed: number;
+  triageDurationMs: number;
+  timedOut: boolean;
+  timestamp: string;
+}
+
+export interface TriageConfig {
+  lineCount: number;
+  timeoutMs: number;
+}
+
+// Watchdog Tier 2: Monitor Patrol types
+export interface PatrolHealthReport {
+  agentId: string;
+  agentName: string;
+  capability: string;
+  pid: number;
+  pidAlive: boolean;
+  ptyRunning: boolean;
+  outputLineCount: number;
+  stalledDurationMs: number | null;
+  escalationLevel: EscalationLevel;
+  anomalies: string[];
+  healthy: boolean;
+  timestamp: string;
+}
+
+export interface PatrolResult {
+  patrolId: string;
+  agentReports: PatrolHealthReport[];
+  totalAgents: number;
+  healthyAgents: number;
+  unhealthyAgents: number;
+  anomalyCount: number;
+  timestamp: string;
+}
+
+export interface PatrolStatus {
+  running: boolean;
+  intervalMs: number;
+  patrolCount: number;
+  lastPatrolAt: string | null;
+  historySize: number;
 }
 
 export interface SessionHandoff {
