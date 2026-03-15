@@ -1,5 +1,45 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Path Boundaries & Run History)
+
+#### Feature #173: Path boundary enforcement rules - PASSING
+- Added path_boundaries column to agent_definitions table with migration
+- Created PathBoundaryRule type (worktree/directory/glob boundary types)
+- New "Path Boundaries" tab in Guard Rules page with:
+  - Agent capability selector (left panel)
+  - Boundary CRUD with worktree root, directory, and glob pattern types
+  - Worktree enforcement info panel explaining boundary behavior
+  - Edit mode with add/remove boundary rules
+  - Path access test tool with real-time validation via IPC
+- Added guardRule:path-boundary-validate IPC handler checking file paths against boundaries
+- Default worktree boundary seeded for all 7 agent roles
+- Added path_boundary filter to violations tab dropdown
+
+#### Feature #178: List run history - PASSING
+- Enhanced StatusBar run history dropdown with comprehensive run info:
+  - Start time (month/day/hour:minute format)
+  - End time (hour:minute format)
+  - Calculated duration (Xm Ys format)
+  - Agent count per run with FiUsers icon
+  - Status badges (active=green pulse, completed=blue check, failed=red X)
+- Two-row layout per run entry (row 1: ID + status, row 2: timestamps + agents)
+- Wider dropdown (w-96) with max-h-80 for scrolling
+- Empty state with icon and helpful message
+- Run count shown in dropdown header
+
+#### Files Created/Modified
+- MODIFIED: src/shared/types/index.ts - PathBoundaryRule type, path_boundaries on AgentDefinition, guardPathBoundaryValidate ElectronAPI
+- MODIFIED: src/main/db/database.ts - path_boundaries column migration, seed data with default boundaries
+- MODIFIED: src/main/ipc/handlers.ts - path_boundaries in guardRule:get/update, guardRule:path-boundary-validate handler
+- MODIFIED: src/preload/index.ts - guardPathBoundaryValidate bridge method
+- MODIFIED: src/renderer/pages/GuardRulesPage.tsx - Path Boundaries tab with full CRUD and test UI
+- MODIFIED: src/renderer/components/StatusBar.tsx - Enhanced run history with timestamps, agent counts
+
+#### Current Status
+- ~201/366 features passing (added #173 and #178 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Mark Run Completed & Agent Performance History)
 
 #### Feature #179: Mark run as completed - PASSING
