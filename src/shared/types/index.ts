@@ -731,6 +731,7 @@ export interface AgentSpawnRequest {
   agent_name: string;
   capability: AgentCapability;
   model?: string;
+  runtime?: string;
   run_id?: string;
   task_id?: string;
   parent_agent?: string;

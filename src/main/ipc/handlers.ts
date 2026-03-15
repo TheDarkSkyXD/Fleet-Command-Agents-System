@@ -188,6 +188,7 @@ export function registerIpcHandlers(): void {
         agent_name: string;
         capability: string;
         model?: string;
+        runtime?: string;
         run_id?: string;
         task_id?: string;
         parent_agent?: string;
@@ -200,7 +201,29 @@ export function registerIpcHandlers(): void {
     ) => {
       try {
         const capability = options.capability as AgentCapability;
-        const model = options.model || getDefaultModel(capability);
+        // Use runtime registry model resolution chain:
+        // explicit model > capability config from settings > runtime default
+        const runtimeId = options.runtime || runtimeRegistry.getDefaultRuntimeId();
+        let capabilityConfigModel: string | undefined;
+        try {
+          const setting = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
+            'app_settings',
+          ) as { value: string } | undefined;
+          if (setting) {
+            const parsed = JSON.parse(setting.value);
+            if (parsed?.modelDefaultsPerCapability?.[capability]) {
+              capabilityConfigModel = parsed.modelDefaultsPerCapability[capability];
+            }
+          }
+        } catch {
+          // Ignore settings read errors - will use runtime default
+        }
+        const model = runtimeRegistry.resolveModel(
+          runtimeId,
+          capability,
+          options.model,
+          capabilityConfigModel,
+        );
 
         // Enforce hierarchy depth limit
         const requestedDepth = options.depth ?? 0;
@@ -265,6 +288,8 @@ export function registerIpcHandlers(): void {
           agentName: options.agent_name,
           capability,
           model,
+          runtime: runtimeId,
+          capabilityConfigModel,
           worktreePath: options.worktree_path,
           branchName: options.branch_name,
           taskId: options.task_id,

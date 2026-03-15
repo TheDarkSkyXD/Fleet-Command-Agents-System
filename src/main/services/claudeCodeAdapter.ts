@@ -74,9 +74,7 @@ export class ClaudeCodeAdapter implements RuntimeAdapter {
     // The main parsing is done by StreamJsonParser in agentProcessManager.
     // This adapter method can be used for runtime-specific pre-processing.
     try {
-      const lines = data
-        .split('\n')
-        .filter((line) => line.trim().length > 0);
+      const lines = data.split('\n').filter((line) => line.trim().length > 0);
       const events: RuntimeOutputEvent[] = [];
 
       for (const line of lines) {

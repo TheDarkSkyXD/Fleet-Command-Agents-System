@@ -109,9 +109,7 @@ class RuntimeRegistry {
       log.warn(`[RuntimeRegistry] Overwriting existing adapter: ${adapter.id}`);
     }
     this.adapters.set(adapter.id, adapter);
-    log.info(
-      `[RuntimeRegistry] Registered adapter: ${adapter.id} (${adapter.displayName})`,
-    );
+    log.info(`[RuntimeRegistry] Registered adapter: ${adapter.id} (${adapter.displayName})`);
   }
 
   /**
@@ -144,9 +142,7 @@ class RuntimeRegistry {
    */
   setDefaultRuntime(id: string): void {
     if (!this.adapters.has(id)) {
-      throw new Error(
-        `[RuntimeRegistry] Cannot set default: adapter '${id}' is not registered.`,
-      );
+      throw new Error(`[RuntimeRegistry] Cannot set default: adapter '${id}' is not registered.`);
     }
     this.defaultRuntimeId = id;
     log.info(`[RuntimeRegistry] Default runtime set to: ${id}`);
@@ -220,16 +216,12 @@ class RuntimeRegistry {
 
     // Resolution chain: explicit > capability config > runtime default
     if (explicitModel) {
-      log.debug(
-        `[RuntimeRegistry] Model resolved via explicit flag: ${explicitModel}`,
-      );
+      log.debug(`[RuntimeRegistry] Model resolved via explicit flag: ${explicitModel}`);
       return explicitModel;
     }
 
     if (capabilityConfigModel) {
-      log.debug(
-        `[RuntimeRegistry] Model resolved via capability config: ${capabilityConfigModel}`,
-      );
+      log.debug(`[RuntimeRegistry] Model resolved via capability config: ${capabilityConfigModel}`);
       return capabilityConfigModel;
     }
 

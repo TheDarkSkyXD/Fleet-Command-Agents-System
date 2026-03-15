@@ -116,6 +116,26 @@ const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> 
   zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
+/** Human-readable state descriptions for hover tooltips */
+const STATE_TOOLTIPS: Record<string, string> = {
+  booting: 'Agent is starting up and initializing',
+  working: 'Agent is actively processing tasks',
+  completed: 'Agent has finished all assigned work',
+  stalled: 'Agent appears stuck or unresponsive',
+  zombie: 'Agent process is dead but session remains',
+};
+
+/** Human-readable capability descriptions for hover tooltips */
+const CAPABILITY_TOOLTIPS: Record<string, string> = {
+  scout: 'Explores codebase and gathers information',
+  builder: 'Writes and modifies code to implement features',
+  reviewer: 'Reviews code changes for quality and correctness',
+  lead: 'Coordinates and delegates work to other agents',
+  merger: 'Handles git merge operations and conflict resolution',
+  coordinator: 'Orchestrates the entire agent swarm',
+  monitor: 'Watches for issues and reports anomalies',
+};
+
 const MODELS = ['haiku', 'sonnet', 'opus'];
 
 const ALL_CAPABILITIES: AgentCapability[] = [
@@ -625,10 +645,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             <div
               className={`flex items-center justify-center ${stateInfo?.className || 'text-slate-400'}`}
               data-testid={`agent-state-icon-${row.original.state}`}
+              title={STATE_TOOLTIPS[row.original.state] || row.original.state}
             >
               {stateInfo?.icon || (
                 <div
                   className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[row.original.state] || 'bg-slate-400'}`}
+                  title={STATE_TOOLTIPS[row.original.state] || row.original.state}
                 />
               )}
             </div>
@@ -653,6 +675,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           return (
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${CAPABILITY_COLORS[cap] || 'bg-slate-500/20 text-slate-400'}`}
+              title={CAPABILITY_TOOLTIPS[cap] || cap}
             >
               {cap}
             </span>
@@ -677,6 +700,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             <div className="flex items-center gap-1.5">
               <span
                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[state] || ''}`}
+                title={STATE_TOOLTIPS[state] || state}
               >
                 {state}
               </span>
@@ -1278,6 +1302,7 @@ function AgentCard({
           <div
             className={`flex items-center ${STATE_ICONS[session.state]?.className || 'text-slate-400'}`}
             data-testid={`agent-state-dot-${session.state}`}
+            title={STATE_TOOLTIPS[session.state] || session.state}
           >
             {STATE_ICONS[session.state]?.icon || (
               <div
@@ -1295,6 +1320,7 @@ function AgentCard({
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${CAPABILITY_COLORS[session.capability] || 'bg-slate-500/20 text-slate-400'}`}
             data-testid="agent-card-capability"
+            title={CAPABILITY_TOOLTIPS[session.capability] || session.capability}
           >
             {session.capability}
           </span>
@@ -1303,6 +1329,7 @@ function AgentCard({
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[session.state] || ''}`}
             data-testid="agent-card-state"
+            title={STATE_TOOLTIPS[session.state] || session.state}
           >
             {session.state}
           </span>
@@ -1408,6 +1435,8 @@ function AgentCard({
 function SpawnDialog({
   capability,
   model,
+  runtime,
+  availableRuntimes,
   name,
   taskId,
   fileScope,
@@ -1420,6 +1449,7 @@ function SpawnDialog({
   error,
   onCapabilityChange,
   onModelChange,
+  onRuntimeChange,
   onNameChange,
   onTaskIdChange,
   onFileScopeChange,
@@ -1431,6 +1461,8 @@ function SpawnDialog({
 }: {
   capability: AgentCapability;
   model: string;
+  runtime: string;
+  availableRuntimes: RuntimeInfo[];
   name: string;
   taskId: string;
   fileScope: string;
@@ -1443,6 +1475,7 @@ function SpawnDialog({
   error: string | null;
   onCapabilityChange: (c: AgentCapability) => void;
   onModelChange: (m: string) => void;
+  onRuntimeChange: (r: string) => void;
   onNameChange: (n: string) => void;
   onTaskIdChange: (t: string) => void;
   onFileScopeChange: (f: string) => void;
@@ -1536,6 +1569,36 @@ function SpawnDialog({
             </div>
             <p className="mt-1.5 text-xs text-slate-500">{capabilityInfo.description}</p>
           </div>
+
+          {/* Runtime selector */}
+          {availableRuntimes.length > 0 && (
+            <div data-testid="spawn-runtime-selector">
+              <span className="block text-sm font-medium text-slate-300 mb-2">Runtime</span>
+              <div className="flex gap-2">
+                {availableRuntimes.map((rt) => (
+                  <button
+                    key={rt.id}
+                    type="button"
+                    onClick={() => onRuntimeChange(rt.id)}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      runtime === rt.id
+                        ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400'
+                        : 'border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span>{rt.displayName}</span>
+                      {rt.detected ? (
+                        <span className="text-[10px] text-emerald-500">● detected</span>
+                      ) : (
+                        <span className="text-[10px] text-red-400">● not found</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Model picker */}
           <div>
