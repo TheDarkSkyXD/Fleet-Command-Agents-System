@@ -1,5 +1,31 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Back Navigation & 404 Page)
+
+#### Feature #277: Back button behavior after navigation - PASSING
+- Implemented browser-style back navigation using pushState for all page transitions
+- handleNavigate, handleSelectAgent, handleProjectOpened, and notification clicks all push to browser history
+- popstate listener handles back/forward events, updating page and agent state from hash
+- handleBackFromDetail now uses window.history.back() instead of hardcoding 'agents'
+- Initial history entry set via replaceState on mount
+- Module-level initialState parsing avoids stale closure issues
+
+#### Feature #278: 404 handling for invalid routes - PASSING
+- Enhanced PageContent default case with styled 404 page
+- Circular badge with "404" text, "Page Not Found" heading
+- Shows the invalid route name in monospace font
+- "Go to Agents" button navigates back to home via onNavigateHome prop
+- data-testid attributes: not-found-page, not-found-home-button
+- App does not crash on invalid/unknown routes
+
+#### Files Modified
+- MODIFIED: src/renderer/components/AppLayout.tsx - Navigation history, popstate, 404 page, onNavigateHome
+
+#### Current Status
+- 275/366 features passing (added #277 and #278 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Tool Allowlist & File Scope Enforcement)
 
 #### Feature #267: Scouts cannot write files - PASSING
