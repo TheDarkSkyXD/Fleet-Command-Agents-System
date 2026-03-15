@@ -2007,3 +2007,30 @@
 - 135/366 features passing (added #62 and #71 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Mail Priority & Thread Conversations)
+
+#### Feature #67: Priority levels on messages - PASSING
+- Backend mail:list query now sorts by priority (urgent>high>normal>low) then created_at DESC
+- Urgent messages: red left border, pulsing alert triangle icon, animated URGENT badge
+- High priority messages: orange left border accent
+- DB schema, types, filtering, and compose form priority selector were already in place
+
+#### Feature #68: Thread-based mail conversations - PASSING
+- Added mail:thread IPC handler: fetches all messages by thread_id, returns reply count
+- Added mailThread preload bridge and ElectronAPI type
+- Every sent message auto-gets thread_id (msg ID for new threads, inherited for replies)
+- Reply button swaps from/to, adds Re: prefix, preserves thread_id
+- View Thread button loads full conversation chronologically with ORIGINAL badge
+- Compose header shows 'Reply to Thread' with thread badge indicator
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Priority sorting in mail:list, mail:thread handler
+- MODIFIED: src/preload/index.ts - mailThread bridge method
+- MODIFIED: src/shared/types/index.ts - mailThread ElectronAPI type
+- MODIFIED: src/renderer/pages/MailPage.tsx - Priority visuals, thread view, reply button
+
+#### Current Status
+- 135/366 features passing (added #67 and #68 this session)
+- All code passes Biome lint and type check (no new errors)
+- No mock data patterns in codebase
