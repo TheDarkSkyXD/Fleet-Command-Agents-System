@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Progress Estimation & Run Completion)
+
+#### Feature #260: Per-agent progress estimation - PASSING
+- Added estimateAgentProgress() function using heuristic-based estimation (uptime + output lines)
+- Expected durations per capability: scout 4m, builder 12m, reviewer 5m, lead 15m, merger 7m
+- Progress phases: Initializing, Analyzing, Implementing, Finalizing, Wrapping up
+- Coordinator/monitor agents show "Ongoing" with pulsing indicator (percent=-1)
+- AgentProgressBar component with color-coded bars (blue→cyan→emerald as progress increases)
+- Progress bar shown on agent cards and in table view progress column
+- data-testid attributes on all progress elements
+
+#### Feature #261: Per-run completion percentage - PASSING
+- Added run:progress IPC endpoint querying session completion stats per run
+- Returns total, completed, working counts and percentage
+- Status bar shows progress bar and percentage next to active run info
+- Polls every 5 seconds for updated completion data
+- Added runProgress to preload, ElectronAPI types
+- Added outputLines to agent:running-list response for progress estimation
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - estimateAgentProgress(), AgentProgressBar component, progress table column, card progress bar
+- MODIFIED: src/main/ipc/handlers.ts - run:progress IPC handler, outputLines in agent:running-list
+- MODIFIED: src/preload/index.ts - runProgress preload binding
+- MODIFIED: src/shared/types/index.ts - runProgress type definition
+- MODIFIED: src/renderer/components/StatusBar.tsx - Run completion percentage display with progress bar
+
+#### Current Status
+- 260/366 features passing (added #260 and #261 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Styled Modals for Stop All and Cleanup)
 
 #### Feature #262: Styled modal for stop all agents - PASSING
