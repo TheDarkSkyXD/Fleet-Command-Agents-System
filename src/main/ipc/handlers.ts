@@ -4034,9 +4034,16 @@ export function registerIpcHandlers(): void {
         let isMerged = false;
         if (branch && !isFirst) {
           try {
-            const mainBranch = blocks[0]?.split('\n').find((l: string) => l.startsWith('branch '))?.substring(7).replace('refs/heads/', '') || 'main';
+            const mainBranch =
+              blocks[0]
+                ?.split('\n')
+                .find((l: string) => l.startsWith('branch '))
+                ?.substring(7)
+                .replace('refs/heads/', '') || 'main';
             const mergedFromMain = await git.raw(['branch', '--merged', mainBranch]);
-            isMerged = mergedFromMain.split('\n').some((b: string) => b.trim().replace('* ', '') === branch);
+            isMerged = mergedFromMain
+              .split('\n')
+              .some((b: string) => b.trim().replace('* ', '') === branch);
           } catch {
             /* ignore - assume not merged */
           }
@@ -4225,53 +4232,59 @@ export function registerIpcHandlers(): void {
   });
 
   // Force-remove worktree with unmerged branch - removes worktree and deletes unmerged branch
-  ipcMain.handle('worktree:force-remove', async (_event, repoPath: string, worktreePath: string) => {
-    try {
-      const simpleGit = (await import('simple-git')).default;
-      const git = simpleGit(repoPath);
+  ipcMain.handle(
+    'worktree:force-remove',
+    async (_event, repoPath: string, worktreePath: string) => {
+      try {
+        const simpleGit = (await import('simple-git')).default;
+        const git = simpleGit(repoPath);
 
-      // Get the branch name for this worktree before removing it
-      const listResult = await git.raw(['worktree', 'list', '--porcelain']);
-      const blocks = listResult.trim().split('\n\n');
-      let branchToDelete: string | null = null;
+        // Get the branch name for this worktree before removing it
+        const listResult = await git.raw(['worktree', 'list', '--porcelain']);
+        const blocks = listResult.trim().split('\n\n');
+        let branchToDelete: string | null = null;
 
-      for (const block of blocks) {
-        const lines = block.trim().split('\n');
-        let wtPath = '';
-        let branch: string | null = null;
-        for (const line of lines) {
-          if (line.startsWith('worktree ')) wtPath = line.substring(9);
-          else if (line.startsWith('branch ')) branch = line.substring(7).replace('refs/heads/', '');
+        for (const block of blocks) {
+          const lines = block.trim().split('\n');
+          let wtPath = '';
+          let branch: string | null = null;
+          for (const line of lines) {
+            if (line.startsWith('worktree ')) wtPath = line.substring(9);
+            else if (line.startsWith('branch '))
+              branch = line.substring(7).replace('refs/heads/', '');
+          }
+          // Normalize paths for comparison
+          if (wtPath.replace(/\\/g, '/') === worktreePath.replace(/\\/g, '/')) {
+            branchToDelete = branch;
+            break;
+          }
         }
-        // Normalize paths for comparison
-        if (wtPath.replace(/\\/g, '/') === worktreePath.replace(/\\/g, '/')) {
-          branchToDelete = branch;
-          break;
+
+        // Force remove the worktree
+        await git.raw(['worktree', 'remove', worktreePath, '--force']);
+        log.info(`[IPC] worktree:force-remove - force removed worktree ${worktreePath}`);
+
+        // Also delete the branch (force delete since it may be unmerged)
+        let branchDeleted = false;
+        if (branchToDelete) {
+          try {
+            await git.raw(['branch', '-D', branchToDelete]);
+            branchDeleted = true;
+            log.info(`[IPC] worktree:force-remove - deleted unmerged branch ${branchToDelete}`);
+          } catch (branchErr) {
+            log.warn(
+              `[IPC] worktree:force-remove - could not delete branch ${branchToDelete}: ${branchErr}`,
+            );
+          }
         }
+
+        return { data: { removed: true, path: worktreePath, branchDeleted }, error: null };
+      } catch (error) {
+        log.error('worktree:force-remove failed:', error);
+        return { data: null, error: String(error) };
       }
-
-      // Force remove the worktree
-      await git.raw(['worktree', 'remove', worktreePath, '--force']);
-      log.info(`[IPC] worktree:force-remove - force removed worktree ${worktreePath}`);
-
-      // Also delete the branch (force delete since it may be unmerged)
-      let branchDeleted = false;
-      if (branchToDelete) {
-        try {
-          await git.raw(['branch', '-D', branchToDelete]);
-          branchDeleted = true;
-          log.info(`[IPC] worktree:force-remove - deleted unmerged branch ${branchToDelete}`);
-        } catch (branchErr) {
-          log.warn(`[IPC] worktree:force-remove - could not delete branch ${branchToDelete}: ${branchErr}`);
-        }
-      }
-
-      return { data: { removed: true, path: worktreePath, branchDeleted }, error: null };
-    } catch (error) {
-      log.error('worktree:force-remove failed:', error);
-      return { data: null, error: String(error) };
-    }
-  });
+    },
+  );
 
   // Open worktree directory in VS Code
   ipcMain.handle('worktree:open-vscode', async (_event, worktreePath: string) => {
@@ -4286,7 +4299,10 @@ export function registerIpcHandlers(): void {
       return { data: { opened: true }, error: null };
     } catch (error) {
       log.error('worktree:open-vscode failed:', error);
-      return { data: null, error: `Failed to open VS Code. Make sure VS Code is installed and 'code' command is in PATH. Error: ${String(error)}` };
+      return {
+        data: null,
+        error: `Failed to open VS Code. Make sure VS Code is installed and 'code' command is in PATH. Error: ${String(error)}`,
+      };
     }
   });
 
@@ -4325,7 +4341,10 @@ export function registerIpcHandlers(): void {
         return { data: { config, path: configPath }, error: null };
       } catch (readErr: unknown) {
         if ((readErr as NodeJS.ErrnoException).code === 'ENOENT') {
-          return { data: null, error: `Config file not found. Initialize .overstory directory first.` };
+          return {
+            data: null,
+            error: 'Config file not found. Initialize .overstory directory first.',
+          };
         }
         throw readErr;
       }
@@ -4336,29 +4355,32 @@ export function registerIpcHandlers(): void {
   });
 
   // Project config write - write .overstory/config.json to project directory
-  ipcMain.handle('project:config-write', async (_event, projectPath: string, config: Record<string, unknown>) => {
-    try {
-      const fs = await import('node:fs/promises');
-      const nodePath = await import('node:path');
-      const configPath = nodePath.join(projectPath, '.overstory', 'config.json');
-
-      // Verify .overstory directory exists
-      const overstoryDir = nodePath.join(projectPath, '.overstory');
+  ipcMain.handle(
+    'project:config-write',
+    async (_event, projectPath: string, config: Record<string, unknown>) => {
       try {
-        await fs.access(overstoryDir);
-      } catch {
-        return { data: null, error: `.overstory directory does not exist. Initialize it first.` };
-      }
+        const fs = await import('node:fs/promises');
+        const nodePath = await import('node:path');
+        const configPath = nodePath.join(projectPath, '.overstory', 'config.json');
 
-      // Write config with pretty-printing
-      await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
-      log.info(`[IPC] project:config-write - saved config to ${configPath}`);
-      return { data: { saved: true, path: configPath }, error: null };
-    } catch (error) {
-      log.error('project:config-write failed:', error);
-      return { data: null, error: String(error) };
-    }
-  });
+        // Verify .overstory directory exists
+        const overstoryDir = nodePath.join(projectPath, '.overstory');
+        try {
+          await fs.access(overstoryDir);
+        } catch {
+          return { data: null, error: '.overstory directory does not exist. Initialize it first.' };
+        }
+
+        // Write config with pretty-printing
+        await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+        log.info(`[IPC] project:config-write - saved config to ${configPath}`);
+        return { data: { saved: true, path: configPath }, error: null };
+      } catch (error) {
+        log.error('project:config-write failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   // Metrics channels - token usage tracking per agent session and model breakdown
   ipcMain.handle('metrics:list', () => {

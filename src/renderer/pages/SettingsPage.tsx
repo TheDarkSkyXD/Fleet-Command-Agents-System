@@ -18,6 +18,7 @@ import {
 import { z } from 'zod';
 import type { ConfigProfile, QualityGate, QualityGateResult } from '../../shared/types';
 import { AuthDecisionTree } from '../components/AuthDecisionTree';
+import { ProjectConfigEditor } from '../components/ProjectConfigEditor';
 import { useProjectStore } from '../stores/projectStore';
 import {
   ACCENT_COLORS,
@@ -85,7 +86,14 @@ const DEFAULT_PROFILE_FORM: ProfileFormData = {
 export function SettingsPage() {
   const { loaded, saving, loadSettings } = useSettingsStore();
   const [activeTab, setActiveTab] = useState<
-    'cli-status' | 'agents' | 'watchdog' | 'terminal' | 'theme' | 'profiles' | 'quality-gates'
+    | 'cli-status'
+    | 'agents'
+    | 'watchdog'
+    | 'terminal'
+    | 'theme'
+    | 'profiles'
+    | 'quality-gates'
+    | 'project-config'
   >('agents');
 
   useEffect(() => {
@@ -111,6 +119,7 @@ export function SettingsPage() {
     { id: 'theme' as const, label: 'Theme' },
     { id: 'profiles' as const, label: 'Profiles' },
     { id: 'quality-gates' as const, label: 'Quality Gates' },
+    { id: 'project-config' as const, label: 'Project Config' },
   ];
 
   return (
@@ -159,6 +168,7 @@ export function SettingsPage() {
       {activeTab === 'theme' && <ThemeSettings />}
       {activeTab === 'profiles' && <ProfilesSettings />}
       {activeTab === 'quality-gates' && <QualityGatesSettings />}
+      {activeTab === 'project-config' && <ProjectConfigEditor />}
     </div>
   );
 }

@@ -485,9 +485,7 @@ export function WorktreesPage() {
                             : 'text-red-400 hover:bg-red-500/20 hover:text-red-300 border-red-500/20'
                         }`}
                         title={
-                          !wt.isMerged
-                            ? 'Force remove (unmerged branch)'
-                            : 'Remove this worktree'
+                          !wt.isMerged ? 'Force remove (unmerged branch)' : 'Remove this worktree'
                         }
                       >
                         <FiTrash2
@@ -539,9 +537,10 @@ export function WorktreesPage() {
                   Force Remove Unmerged Worktree?
                 </h3>
                 <p className="mt-1 text-sm text-slate-400">
-                  This worktree has an <span className="text-orange-400 font-medium">unmerged branch</span> that
-                  has not been merged into the main branch. Removing it will permanently delete all
-                  unmerged changes.
+                  This worktree has an{' '}
+                  <span className="text-orange-400 font-medium">unmerged branch</span> that has not
+                  been merged into the main branch. Removing it will permanently delete all unmerged
+                  changes.
                 </p>
               </div>
             </div>

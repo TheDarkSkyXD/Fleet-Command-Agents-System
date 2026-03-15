@@ -1027,7 +1027,10 @@ export interface ElectronAPI {
   worktreeForceRemove: (
     repoPath: string,
     worktreePath: string,
-  ) => Promise<{ data: { removed: boolean; path: string; branchDeleted: boolean } | null; error: string | null }>;
+  ) => Promise<{
+    data: { removed: boolean; path: string; branchDeleted: boolean } | null;
+    error: string | null;
+  }>;
   worktreeOpenVSCode: (
     worktreePath: string,
   ) => Promise<{ data: { opened: boolean } | null; error: string | null }>;
