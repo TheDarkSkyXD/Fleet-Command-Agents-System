@@ -12,7 +12,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
   background-color: #0f172a;
   color: #f8fafc;
   overflow: hidden;
@@ -41,7 +41,7 @@ body {
 
 /* Monospace font for terminals and code */
 .font-mono {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
 }
 
 /* Focus ring styles for accessibility */
@@ -52,7 +52,8 @@ body {
 
 /* Animation for agent status pulse */
 @keyframes status-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

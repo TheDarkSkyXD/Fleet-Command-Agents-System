@@ -1,5 +1,12 @@
 // Agent capability types
-export type AgentCapability = 'scout' | 'builder' | 'reviewer' | 'lead' | 'merger' | 'coordinator' | 'monitor';
+export type AgentCapability =
+  | 'scout'
+  | 'builder'
+  | 'reviewer'
+  | 'lead'
+  | 'merger'
+  | 'coordinator'
+  | 'monitor';
 
 // Agent state machine
 export type AgentState = 'booting' | 'working' | 'completed' | 'stalled' | 'zombie';
@@ -162,19 +169,48 @@ export interface Checkpoint {
 }
 
 // Electron API type for renderer process
+// Health check response
+export interface HealthCheckResponse {
+  status: 'healthy' | 'unhealthy';
+  database: 'connected' | 'disconnected' | 'error';
+  walMode?: string;
+  foreignKeys?: boolean;
+  dbPath?: string;
+  timestamp: string;
+  error?: string;
+}
+
+// Database status response
+export interface DbStatusResponse {
+  status: 'connected' | 'disconnected';
+  walMode?: string;
+  foreignKeys?: boolean;
+  tables?: string[];
+  tableDetails?: Record<string, { columns: string[]; rowCount: number }>;
+  dbPath?: string;
+  error?: string;
+}
+
 export interface ElectronAPI {
-  healthCheck: () => Promise<{ status: string; database: string }>;
+  healthCheck: () => Promise<HealthCheckResponse>;
+  dbStatus: () => Promise<DbStatusResponse>;
   agentList: () => Promise<{ data: Session[] | null; error: string | null }>;
   agentDetail: (id: string) => Promise<{ data: Session | null; error: string | null }>;
-  agentSpawn: (options: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>;
+  agentSpawn: (
+    options: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: string | null }>;
   agentStop: (name: string) => Promise<{ data: unknown; error: string | null }>;
   agentStopAll: () => Promise<{ data: unknown; error: string | null }>;
   agentNudge: (name: string) => Promise<{ data: unknown; error: string | null }>;
-  mailList: (filters?: Record<string, unknown>) => Promise<{ data: Message[] | null; error: string | null }>;
+  mailList: (
+    filters?: Record<string, unknown>,
+  ) => Promise<{ data: Message[] | null; error: string | null }>;
   mailUnreadCount: () => Promise<{ data: number; error: string | null }>;
   mailSend: (message: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>;
   mailMarkRead: (id: string) => Promise<{ data: unknown; error: string | null }>;
-  mailPurge: (options?: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>;
+  mailPurge: (
+    options?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: string | null }>;
   mergeQueue: () => Promise<{ data: MergeQueueEntry[] | null; error: string | null }>;
   mergeExecute: (id: number) => Promise<{ data: unknown; error: string | null }>;
   mergePreview: (id: number) => Promise<{ data: unknown; error: string | null }>;

@@ -39,7 +39,10 @@ function PageContent({ page }: { page: string }) {
           <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
             <p className="text-lg mb-2">No agents running</p>
             <p className="text-sm">Spawn an agent to get started</p>
-            <button className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors">
+            <button
+              type="button"
+              className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+            >
               Spawn Agent
             </button>
           </div>

@@ -1,8 +1,8 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron';
-import path from 'path';
+import path from 'node:path';
+import { BrowserWindow, Menu, Tray, app, nativeImage } from 'electron';
 import log from 'electron-log';
 import windowStateKeeper from 'electron-window-state';
-import { initDatabase } from './db/database';
+import { closeDatabase, initDatabase } from './db/database';
 import { registerIpcHandlers } from './ipc/handlers';
 
 // Configure logging
@@ -11,6 +11,7 @@ log.transports.console.level = 'debug';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let isQuitting = false;
 
 const isDev = !app.isPackaged;
 
@@ -57,7 +58,7 @@ function createWindow() {
 
   // Handle close to tray
   mainWindow.on('close', (event) => {
-    if (tray && !app.isQuitting) {
+    if (tray && !isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -90,7 +91,7 @@ function createTray() {
     {
       label: 'Quit',
       click: () => {
-        app.isQuitting = true;
+        isQuitting = true;
         app.quit();
       },
     },
@@ -136,14 +137,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  app.isQuitting = true;
+  isQuitting = true;
+  // Close database gracefully to ensure WAL checkpoint
+  closeDatabase();
 });
-
-// Extend app type for isQuitting
-declare module 'electron' {
-  interface App {
-    isQuitting: boolean;
-  }
-}
-
-app.isQuitting = false;

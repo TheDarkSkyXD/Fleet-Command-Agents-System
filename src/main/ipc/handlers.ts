@@ -61,9 +61,7 @@ export function registerIpcHandlers(): void {
         const columns = loggedPrepare(`PRAGMA table_info("${tableName}")`).all() as {
           name: string;
         }[];
-        const countResult = loggedPrepare(
-          `SELECT COUNT(*) as count FROM "${tableName}"`,
-        ).get() as {
+        const countResult = loggedPrepare(`SELECT COUNT(*) as count FROM "${tableName}"`).get() as {
           count: number;
         };
         tableDetails[tableName] = {
@@ -90,9 +88,7 @@ export function registerIpcHandlers(): void {
   // Agent channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle('agent:list', () => {
     try {
-      const sessions = loggedPrepare(
-        'SELECT * FROM sessions ORDER BY created_at DESC',
-      ).all();
+      const sessions = loggedPrepare('SELECT * FROM sessions ORDER BY created_at DESC').all();
       log.info(`[IPC] agent:list - SELECT returned ${sessions.length} sessions from real database`);
       return { data: sessions, error: null };
     } catch (error) {
@@ -223,7 +219,9 @@ export function registerIpcHandlers(): void {
       ).get() as {
         count: number;
       };
-      log.info(`[IPC] mail:unread-count - SELECT COUNT returned ${result.count} from real database`);
+      log.info(
+        `[IPC] mail:unread-count - SELECT COUNT returned ${result.count} from real database`,
+      );
       return { data: result.count, error: null };
     } catch (error) {
       log.error('mail:unread-count failed:', error);

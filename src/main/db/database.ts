@@ -1,5 +1,5 @@
+import path from 'node:path';
 import Database from 'better-sqlite3';
-import path from 'path';
 import { app } from 'electron';
 import log from 'electron-log';
 

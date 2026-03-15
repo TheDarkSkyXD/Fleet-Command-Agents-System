@@ -1,4 +1,13 @@
-import { FiUsers, FiMail, FiGitMerge, FiCheckSquare, FiSettings, FiTerminal, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import {
+  FiCheckSquare,
+  FiChevronLeft,
+  FiChevronRight,
+  FiGitMerge,
+  FiMail,
+  FiSettings,
+  FiTerminal,
+  FiUsers,
+} from 'react-icons/fi';
 
 interface SidebarProps {
   currentPage: string;
@@ -29,6 +38,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
           <span className="text-sm font-bold text-slate-50 tracking-wide">FLEET COMMAND</span>
         )}
         <button
+          type="button"
           onClick={onToggleCollapse}
           className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -44,6 +54,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
           const isActive = currentPage === item.id;
           return (
             <button
+              type="button"
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
