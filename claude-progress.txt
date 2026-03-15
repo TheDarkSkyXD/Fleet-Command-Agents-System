@@ -1065,3 +1065,29 @@
 - 67/366 features passing (added #180 and #181 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Error Boundaries & Retry UI)
+
+#### Feature #232: React error boundary wrapping major sections - PASSING
+- Created ErrorBoundary class component (src/renderer/components/ErrorBoundary.tsx)
+- Wraps Sidebar, StatusBar, page content area, and each individual page
+- App-level ErrorBoundary in App.tsx catches top-level crashes
+- Logs errors to console with section name for debugging
+- getDerivedStateFromError + componentDidCatch lifecycle methods
+
+#### Feature #233: Graceful error screens with retry buttons - PASSING
+- ErrorFallback component with warning icon, friendly message, error details box
+- No raw stack traces shown - just error message in styled container
+- Try Again button resets error state to re-render crashed component
+- Section name shown in message (e.g. 'Agents encountered an unexpected error')
+- data-testid attributes for testability
+
+#### Files Created/Modified
+- NEW: src/renderer/components/ErrorBoundary.tsx - ErrorBoundary class + ErrorFallback UI
+- MODIFIED: src/renderer/components/AppLayout.tsx - Wrapped all sections with ErrorBoundary
+- MODIFIED: src/renderer/App.tsx - Added app-level ErrorBoundary
+
+#### Current Status
+- 71/366 features passing (added #232 and #233 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase

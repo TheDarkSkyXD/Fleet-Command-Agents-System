@@ -276,6 +276,20 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS hooks (
+      id TEXT PRIMARY KEY,
+      project_id TEXT,
+      hook_type TEXT NOT NULL CHECK(hook_type IN ('SessionStart', 'UserPromptSubmit', 'PreToolUse')),
+      name TEXT NOT NULL,
+      description TEXT,
+      script_content TEXT NOT NULL DEFAULT '',
+      is_installed INTEGER NOT NULL DEFAULT 0,
+      target_worktrees TEXT,
+      installed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS expertise_records (
       id TEXT PRIMARY KEY,
       domain TEXT NOT NULL,
@@ -326,6 +340,9 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_guard_violations_type ON guard_violations(rule_type);
     CREATE INDEX IF NOT EXISTS idx_guard_violations_severity ON guard_violations(severity);
     CREATE INDEX IF NOT EXISTS idx_guard_violations_created ON guard_violations(created_at);
+    CREATE INDEX IF NOT EXISTS idx_hooks_project ON hooks(project_id);
+    CREATE INDEX IF NOT EXISTS idx_hooks_type ON hooks(hook_type);
+    CREATE INDEX IF NOT EXISTS idx_hooks_installed ON hooks(is_installed);
     CREATE INDEX IF NOT EXISTS idx_expertise_domain ON expertise_records(domain);
     CREATE INDEX IF NOT EXISTS idx_expertise_type ON expertise_records(type);
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);
