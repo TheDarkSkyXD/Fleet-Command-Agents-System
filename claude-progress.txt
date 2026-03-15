@@ -1,5 +1,35 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Structured Payloads & Group Broadcast)
+
+#### Feature #69: Structured JSON payloads per protocol type - PASSING
+- Added TypeScript interfaces for all 8 protocol payload types (WorkerDonePayload, MergeReadyPayload, etc.)
+- Added PAYLOAD_TEMPLATES map with JSON template strings for compose form hints
+- Enhanced worker_done handler in coordinator:poll-mail to parse {taskId, summary, filesModified} payload
+- Added JSON payload textarea to mail compose form (visible for protocol types only)
+- Insert Template button pre-fills type-specific JSON structure
+- Live JSON validation indicator (Valid/Invalid JSON)
+- Enhanced payload display in message detail: parsed key-value view, JSON badge, collapsible raw JSON
+
+#### Feature #72: Group broadcast addresses - PASSING
+- Added resolveRecipients() function that detects group addresses and queries active sessions by capability
+- Group addresses: @all, @builders, @scouts, @reviewers, @leads, @mergers, @coordinator, @monitor
+- mail:send fans out messages - creates individual copies for each resolved recipient with unique IDs
+- @all sends to all active non-completed agents (excluding sender)
+- Added GROUP_BROADCAST_ADDRESSES constant and GroupBroadcastAddress type to shared types
+- Compose form To field has datalist with group address suggestions
+- Broadcast warning indicator shown when @ prefix detected
+
+#### Files Modified
+- MODIFIED: src/shared/types/index.ts - Protocol payload interfaces, PAYLOAD_TEMPLATES, GROUP_BROADCAST_ADDRESSES
+- MODIFIED: src/main/ipc/handlers.ts - worker_done payload parsing, resolveRecipients(), broadcast mail:send
+- MODIFIED: src/renderer/pages/MailPage.tsx - Payload compose field, JSON display, group address UI
+
+#### Current Status
+- 138/366 features passing (added #69 and #72 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Mail Check Context Injection & Mark All Read)
 
 #### Feature #73: Mail check with context injection - PASSING
