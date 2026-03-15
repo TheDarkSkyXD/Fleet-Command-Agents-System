@@ -2263,8 +2263,8 @@ export function registerIpcHandlers(): void {
         if (filters?.unreadOnly) {
           conditions.push('read = 0');
         }
-        if (filters?.search) {
-          const searchTerm = `%${filters.search}%`;
+        if (filters?.search?.trim()) {
+          const searchTerm = `%${filters.search.trim().slice(0, 200)}%`;
           conditions.push(
             '(subject LIKE ? OR body LIKE ? OR from_agent LIKE ? OR to_agent LIKE ?)',
           );
@@ -6970,9 +6970,9 @@ export function registerIpcHandlers(): void {
           sql += ' AND agent_name = ?';
           params.push(filters.agent_name);
         }
-        if (filters?.search) {
+        if (filters?.search?.trim()) {
           sql += ' AND (message LIKE ? OR data LIKE ? OR source LIKE ?)';
-          const searchPattern = `%${filters.search}%`;
+          const searchPattern = `%${filters.search.trim().slice(0, 200)}%`;
           params.push(searchPattern, searchPattern, searchPattern);
         }
         if (filters?.start_time) {
@@ -7800,9 +7800,9 @@ export function registerIpcHandlers(): void {
           sql += ' AND classification = ?';
           params.push(filters.classification);
         }
-        if (filters?.search) {
+        if (filters?.search?.trim()) {
           sql += ' AND (title LIKE ? OR content LIKE ? OR domain LIKE ?)';
-          const searchTerm = `%${filters.search}%`;
+          const searchTerm = `%${filters.search.trim().slice(0, 200)}%`;
           params.push(searchTerm, searchTerm, searchTerm);
         }
 

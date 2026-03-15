@@ -52,6 +52,7 @@ import { FileTreePicker } from '../components/FileTreePicker';
 import { ScopeTreeViewer } from '../components/ScopeTreeViewer';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { handleIpcError } from '../lib/ipcErrorHandler';
+import { useFilterStore } from '../stores/filterStore';
 import { useProjectStore } from '../stores/projectStore';
 import { DEFAULT_MODEL_DEFAULTS, useSettingsStore } from '../stores/settingsStore';
 
@@ -452,13 +453,19 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy' | 'scope'>('table');
+  const { agentsFilters, setAgentsFilters } = useFilterStore();
+  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy' | 'scope'>(agentsFilters.viewMode);
 
-  // Table state
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [capabilityFilter, setCapabilityFilter] = useState<string>('all');
+  // Table state - initialized from persistent filter store
+  const [sorting, setSorting] = useState<SortingState>(agentsFilters.sorting);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(agentsFilters.columnFilters);
+  const [globalFilter, setGlobalFilter] = useState(agentsFilters.globalFilter);
+  const [capabilityFilter, setCapabilityFilter] = useState<string>(agentsFilters.capabilityFilter);
+
+  // Sync filter state back to store on changes
+  useEffect(() => {
+    setAgentsFilters({ viewMode, sorting, columnFilters, globalFilter, capabilityFilter });
+  }, [viewMode, sorting, columnFilters, globalFilter, capabilityFilter, setAgentsFilters]);
 
   // Spawn dialog state
   const [spawnCapability, setSpawnCapability] = useState<AgentCapability>('scout');
@@ -1217,6 +1224,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             type="text"
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
+            maxLength={200}
             placeholder="Search agents by name..."
             data-testid="agent-global-filter"
             className="w-full rounded-lg border border-slate-600 bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"

@@ -191,7 +191,7 @@ export function ExpertisePage() {
       try {
         const filters: { domain?: string; type?: string; search?: string } = { domain };
         if (typeFilter) filters.type = typeFilter;
-        if (searchQuery) filters.search = searchQuery;
+        if (searchQuery.trim()) filters.search = searchQuery.trim();
 
         const result = await window.electronAPI.expertiseList(filters);
         if (result.data) {
@@ -490,6 +490,7 @@ export function ExpertisePage() {
             type="text"
             value={globalSearchQuery}
             onChange={(e) => setGlobalSearchQuery(e.target.value)}
+            maxLength={200}
             placeholder="Search expertise across all domains..."
             className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2.5 pl-10 pr-10 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
             data-testid="global-expertise-search"
@@ -969,6 +970,7 @@ export function ExpertisePage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                maxLength={200}
                 placeholder="Search records..."
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                 data-testid="expertise-search"
@@ -1002,7 +1004,7 @@ export function ExpertisePage() {
           ) : records.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-8 text-center">
               <p className="text-slate-400">
-                No records found{typeFilter || searchQuery ? ' matching your filters' : ''}
+                No records found{typeFilter || searchQuery.trim() ? ' matching your filters' : ''}
               </p>
             </div>
           ) : (

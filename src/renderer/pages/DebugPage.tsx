@@ -366,7 +366,7 @@ function AppLogPanel() {
       } = { limit: 500 };
       if (levelFilter) filters.level = levelFilter;
       if (agentFilter) filters.agent_name = agentFilter;
-      if (searchQuery) filters.search = searchQuery;
+      if (searchQuery.trim()) filters.search = searchQuery.trim();
       if (startTime) filters.start_time = startTime;
       if (endTime) filters.end_time = endTime;
 
@@ -473,7 +473,7 @@ function AppLogPanel() {
     });
   };
 
-  const hasFilters = levelFilter || agentFilter || searchQuery || startTime || endTime;
+  const hasFilters = levelFilter || agentFilter || searchQuery.trim() || startTime || endTime;
 
   const levelCounts = {
     debug: logs.filter((l) => l.level === 'debug').length,
@@ -564,6 +564,7 @@ function AppLogPanel() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            maxLength={200}
             placeholder="Search logs by keyword..."
             className="w-full rounded-md border border-slate-600 bg-slate-800 py-1.5 pl-10 pr-3 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
           />
@@ -821,7 +822,7 @@ function LogEntryRow({
 
   // Highlight search matches in message
   const highlightMessage = (text: string) => {
-    if (!searchQuery) return text;
+    if (!searchQuery.trim()) return text;
     const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
     return parts.map((part) => {
