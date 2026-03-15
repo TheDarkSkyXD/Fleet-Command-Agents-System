@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
@@ -15,6 +15,7 @@ import { PromptsPage } from '../pages/PromptsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
 import { WorktreesPage } from '../pages/WorktreesPage';
+import { useSettingsStore } from '../stores/settingsStore';
 import { CommandPalette } from './CommandPalette';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingTour } from './OnboardingTour';
@@ -24,8 +25,16 @@ import { UpdateBanner } from './UpdateBanner';
 
 export function AppLayout() {
   const [currentPage, setCurrentPage] = useState('agents');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { settings, loaded, updateSetting } = useSettingsStore();
+  const sidebarCollapsed = settings.sidebarCollapsed;
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+
+  // Load settings on mount (includes sidebar collapsed state)
+  useEffect(() => {
+    if (!loaded) {
+      useSettingsStore.getState().loadSettings();
+    }
+  }, [loaded]);
 
   const handleNavigate = useCallback((page: string) => {
     setCurrentPage(page);
@@ -58,7 +67,7 @@ export function AppLayout() {
             currentPage={currentPage === 'agent-detail' ? 'agents' : currentPage}
             onNavigate={handleNavigate}
             collapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onToggleCollapse={() => updateSetting('sidebarCollapsed', !sidebarCollapsed)}
           />
         </ErrorBoundary>
 

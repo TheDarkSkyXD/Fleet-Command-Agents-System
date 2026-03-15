@@ -102,6 +102,13 @@ function createWindow() {
     mainWindow?.show();
   });
 
+  // Minimize to tray instead of taskbar
+  mainWindow.on('minimize', (event: Electron.Event) => {
+    event.preventDefault();
+    mainWindow?.hide();
+    log.info('Window minimized to system tray');
+  });
+
   // Handle close with dialog offering three options
   mainWindow.on('close', (event) => {
     if (!isQuitting && mainWindow) {

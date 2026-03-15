@@ -18,6 +18,9 @@ export interface AppSettings {
 
   // Theme settings
   accentColor: string;
+
+  // UI state
+  sidebarCollapsed: boolean;
 }
 
 export type AccentColorKey =
@@ -127,6 +130,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   terminalFontFamily: 'JetBrains Mono, Fira Code, monospace',
   terminalFontSize: 14,
   accentColor: 'blue',
+  sidebarCollapsed: false,
 };
 
 /** Apply accent color CSS custom properties to :root */
