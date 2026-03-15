@@ -2,7 +2,7 @@ import { exec, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
 import {
@@ -3973,6 +3973,7 @@ export function registerIpcHandlers(): void {
         isBare: boolean;
         agentName: string | null;
         status: 'clean' | 'dirty' | 'unknown';
+        isMerged: boolean;
       }> = [];
 
       const blocks = result.trim().split('\n\n');
@@ -4029,6 +4030,18 @@ export function registerIpcHandlers(): void {
           }
         }
 
+        // Check if branch is merged into main/default branch
+        let isMerged = false;
+        if (branch && !isFirst) {
+          try {
+            const mainBranch = blocks[0]?.split('\n').find((l: string) => l.startsWith('branch '))?.substring(7).replace('refs/heads/', '') || 'main';
+            const mergedFromMain = await git.raw(['branch', '--merged', mainBranch]);
+            isMerged = mergedFromMain.split('\n').some((b: string) => b.trim().replace('* ', '') === branch);
+          } catch {
+            /* ignore - assume not merged */
+          }
+        }
+
         worktrees.push({
           path: wtPath,
           branch,
@@ -4039,6 +4052,7 @@ export function registerIpcHandlers(): void {
           isBare: bare,
           agentName,
           status,
+          isMerged,
         });
         isFirst = false;
       }
@@ -4206,6 +4220,142 @@ export function registerIpcHandlers(): void {
       return { data: { removed, errors }, error: null };
     } catch (error) {
       log.error('worktree:clean-completed failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Force-remove worktree with unmerged branch - removes worktree and deletes unmerged branch
+  ipcMain.handle('worktree:force-remove', async (_event, repoPath: string, worktreePath: string) => {
+    try {
+      const simpleGit = (await import('simple-git')).default;
+      const git = simpleGit(repoPath);
+
+      // Get the branch name for this worktree before removing it
+      const listResult = await git.raw(['worktree', 'list', '--porcelain']);
+      const blocks = listResult.trim().split('\n\n');
+      let branchToDelete: string | null = null;
+
+      for (const block of blocks) {
+        const lines = block.trim().split('\n');
+        let wtPath = '';
+        let branch: string | null = null;
+        for (const line of lines) {
+          if (line.startsWith('worktree ')) wtPath = line.substring(9);
+          else if (line.startsWith('branch ')) branch = line.substring(7).replace('refs/heads/', '');
+        }
+        // Normalize paths for comparison
+        if (wtPath.replace(/\\/g, '/') === worktreePath.replace(/\\/g, '/')) {
+          branchToDelete = branch;
+          break;
+        }
+      }
+
+      // Force remove the worktree
+      await git.raw(['worktree', 'remove', worktreePath, '--force']);
+      log.info(`[IPC] worktree:force-remove - force removed worktree ${worktreePath}`);
+
+      // Also delete the branch (force delete since it may be unmerged)
+      let branchDeleted = false;
+      if (branchToDelete) {
+        try {
+          await git.raw(['branch', '-D', branchToDelete]);
+          branchDeleted = true;
+          log.info(`[IPC] worktree:force-remove - deleted unmerged branch ${branchToDelete}`);
+        } catch (branchErr) {
+          log.warn(`[IPC] worktree:force-remove - could not delete branch ${branchToDelete}: ${branchErr}`);
+        }
+      }
+
+      return { data: { removed: true, path: worktreePath, branchDeleted }, error: null };
+    } catch (error) {
+      log.error('worktree:force-remove failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Open worktree directory in VS Code
+  ipcMain.handle('worktree:open-vscode', async (_event, worktreePath: string) => {
+    try {
+      const { exec: execAsync } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const execPromise = promisify(execAsync);
+
+      // Use 'code' CLI command which is available when VS Code is installed
+      await execPromise(`code "${worktreePath}"`);
+      log.info(`[IPC] worktree:open-vscode - opened ${worktreePath} in VS Code`);
+      return { data: { opened: true }, error: null };
+    } catch (error) {
+      log.error('worktree:open-vscode failed:', error);
+      return { data: null, error: `Failed to open VS Code. Make sure VS Code is installed and 'code' command is in PATH. Error: ${String(error)}` };
+    }
+  });
+
+  // Open worktree directory in system file explorer
+  ipcMain.handle('worktree:open-explorer', async (_event, worktreePath: string) => {
+    try {
+      const fs = await import('node:fs');
+      // Verify the path exists before trying to open it
+      if (!fs.existsSync(worktreePath)) {
+        return { data: null, error: `Directory does not exist: ${worktreePath}` };
+      }
+      const errorMessage = await shell.openPath(worktreePath);
+      if (errorMessage) {
+        log.error(`[IPC] worktree:open-explorer - shell.openPath returned error: ${errorMessage}`);
+        return { data: null, error: errorMessage };
+      }
+      log.info(`[IPC] worktree:open-explorer - opened ${worktreePath} in file explorer`);
+      return { data: { opened: true }, error: null };
+    } catch (error) {
+      log.error('worktree:open-explorer failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Project config read - read .overstory/config.json from project directory
+  ipcMain.handle('project:config-read', async (_event, projectPath: string) => {
+    try {
+      const fs = await import('node:fs/promises');
+      const nodePath = await import('node:path');
+      const configPath = nodePath.join(projectPath, '.overstory', 'config.json');
+
+      try {
+        const content = await fs.readFile(configPath, 'utf-8');
+        const config = JSON.parse(content);
+        log.info(`[IPC] project:config-read - loaded config from ${configPath}`);
+        return { data: { config, path: configPath }, error: null };
+      } catch (readErr: unknown) {
+        if ((readErr as NodeJS.ErrnoException).code === 'ENOENT') {
+          return { data: null, error: `Config file not found. Initialize .overstory directory first.` };
+        }
+        throw readErr;
+      }
+    } catch (error) {
+      log.error('project:config-read failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Project config write - write .overstory/config.json to project directory
+  ipcMain.handle('project:config-write', async (_event, projectPath: string, config: Record<string, unknown>) => {
+    try {
+      const fs = await import('node:fs/promises');
+      const nodePath = await import('node:path');
+      const configPath = nodePath.join(projectPath, '.overstory', 'config.json');
+
+      // Verify .overstory directory exists
+      const overstoryDir = nodePath.join(projectPath, '.overstory');
+      try {
+        await fs.access(overstoryDir);
+      } catch {
+        return { data: null, error: `.overstory directory does not exist. Initialize it first.` };
+      }
+
+      // Write config with pretty-printing
+      await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+      log.info(`[IPC] project:config-write - saved config to ${configPath}`);
+      return { data: { saved: true, path: configPath }, error: null };
+    } catch (error) {
+      log.error('project:config-write failed:', error);
       return { data: null, error: String(error) };
     }
   });

@@ -369,6 +369,7 @@ export interface Worktree {
   isBare: boolean;
   agentName: string | null;
   status: 'clean' | 'dirty' | 'unknown';
+  isMerged: boolean;
 }
 
 // File tree node for file scope picker
@@ -1023,12 +1024,32 @@ export interface ElectronAPI {
     data: { removed: string[]; errors: Array<{ path: string; error: string }> } | null;
     error: string | null;
   }>;
+  worktreeForceRemove: (
+    repoPath: string,
+    worktreePath: string,
+  ) => Promise<{ data: { removed: boolean; path: string; branchDeleted: boolean } | null; error: string | null }>;
+  worktreeOpenVSCode: (
+    worktreePath: string,
+  ) => Promise<{ data: { opened: boolean } | null; error: string | null }>;
+  worktreeOpenExplorer: (
+    worktreePath: string,
+  ) => Promise<{ data: { opened: boolean } | null; error: string | null }>;
 
   // Project initialization
   projectInitOverstory: (projectPath: string) => Promise<{
     data: { initialized: boolean; alreadyExisted: boolean } | null;
     error: string | null;
   }>;
+
+  // Project configuration
+  projectConfigRead: (projectPath: string) => Promise<{
+    data: { config: Record<string, unknown>; path: string } | null;
+    error: string | null;
+  }>;
+  projectConfigWrite: (
+    projectPath: string,
+    config: Record<string, unknown>,
+  ) => Promise<{ data: { saved: boolean; path: string } | null; error: string | null }>;
 
   // Metrics
   metricsList: () => Promise<{ data: Metric[] | null; error: string | null }>;

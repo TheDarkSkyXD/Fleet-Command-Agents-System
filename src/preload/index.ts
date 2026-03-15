@@ -188,10 +188,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('worktree:remove', repoPath, worktreePath),
   worktreeCleanCompleted: (repoPath: string) =>
     ipcRenderer.invoke('worktree:clean-completed', repoPath),
+  worktreeForceRemove: (repoPath: string, worktreePath: string) =>
+    ipcRenderer.invoke('worktree:force-remove', repoPath, worktreePath),
+  worktreeOpenVSCode: (worktreePath: string) =>
+    ipcRenderer.invoke('worktree:open-vscode', worktreePath),
+  worktreeOpenExplorer: (worktreePath: string) =>
+    ipcRenderer.invoke('worktree:open-explorer', worktreePath),
 
   // Project initialization
   projectInitOverstory: (projectPath: string) =>
     ipcRenderer.invoke('project:init-overstory', projectPath),
+
+  // Project configuration
+  projectConfigRead: (projectPath: string) =>
+    ipcRenderer.invoke('project:config-read', projectPath),
+  projectConfigWrite: (projectPath: string, config: Record<string, unknown>) =>
+    ipcRenderer.invoke('project:config-write', projectPath, config),
 
   // Metrics
   metricsList: () => ipcRenderer.invoke('metrics:list'),

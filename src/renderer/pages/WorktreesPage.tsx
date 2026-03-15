@@ -2,13 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   FiAlertTriangle,
   FiCheck,
+  FiCode,
+  FiExternalLink,
   FiFolder,
   FiFolderPlus,
   FiGitBranch,
   FiGitCommit,
+  FiGitMerge,
   FiRefreshCw,
   FiTrash2,
   FiUser,
+  FiX,
 } from 'react-icons/fi';
 import type { Worktree } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
@@ -29,6 +33,8 @@ export function WorktreesPage() {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const [forceRemoveTarget, setForceRemoveTarget] = useState<Worktree | null>(null);
+  const [forceRemoving, setForceRemoving] = useState(false);
 
   const loadWorktrees = useCallback(async () => {
     if (!activeProject) {
@@ -157,6 +163,71 @@ export function WorktreesPage() {
       setCleaningAll(false);
     }
   }, [activeProject, loadWorktrees]);
+
+  const handleForceRemoveWorktree = useCallback(
+    async (wt: Worktree) => {
+      if (!activeProject) return;
+      // If unmerged, show confirmation dialog
+      if (!wt.isMerged) {
+        setForceRemoveTarget(wt);
+        return;
+      }
+      // If merged, just do normal remove
+      handleRemoveWorktree(wt.path);
+    },
+    [activeProject, handleRemoveWorktree],
+  );
+
+  const confirmForceRemove = useCallback(async () => {
+    if (!activeProject || !forceRemoveTarget) return;
+    setForceRemoving(true);
+    setCleanResult(null);
+    try {
+      const result = await window.electronAPI.worktreeForceRemove(
+        activeProject.path,
+        forceRemoveTarget.path,
+      );
+      if (result.error) {
+        setCleanResult({ type: 'error', message: `Force remove failed: ${result.error}` });
+      } else {
+        const branchMsg = result.data?.branchDeleted
+          ? ` Branch "${forceRemoveTarget.branch}" deleted.`
+          : '';
+        setCleanResult({
+          type: 'success',
+          message: `Force removed worktree: ${forceRemoveTarget.path}.${branchMsg}`,
+        });
+        await loadWorktrees();
+      }
+    } catch (err) {
+      setCleanResult({ type: 'error', message: String(err) });
+    } finally {
+      setForceRemoving(false);
+      setForceRemoveTarget(null);
+    }
+  }, [activeProject, forceRemoveTarget, loadWorktrees]);
+
+  const handleOpenVSCode = useCallback(async (worktreePath: string) => {
+    try {
+      const result = await window.electronAPI.worktreeOpenVSCode(worktreePath);
+      if (result.error) {
+        setCleanResult({ type: 'error', message: result.error });
+      }
+    } catch (err) {
+      setCleanResult({ type: 'error', message: `Failed to open VS Code: ${String(err)}` });
+    }
+  }, []);
+
+  const handleOpenExplorer = useCallback(async (worktreePath: string) => {
+    try {
+      const result = await window.electronAPI.worktreeOpenExplorer(worktreePath);
+      if (result.error) {
+        setCleanResult({ type: 'error', message: result.error });
+      }
+    } catch (err) {
+      setCleanResult({ type: 'error', message: `Failed to open explorer: ${String(err)}` });
+    }
+  }, []);
 
   const statusColor = (status: Worktree['status']) => {
     switch (status) {
@@ -336,14 +407,30 @@ export function WorktreesPage() {
                   </div>
                 </div>
 
-                {/* Right side: status + agent + clean button */}
+                {/* Right side: status + agent + actions */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  {/* Status badge */}
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${statusColor(wt.status)}`}
-                  >
-                    {statusLabel(wt.status)}
-                  </span>
+                  {/* Status badges */}
+                  <div className="flex items-center gap-1.5">
+                    {/* Merged/Unmerged badge */}
+                    {!wt.isMain && wt.branch && (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${
+                          wt.isMerged
+                            ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30'
+                            : 'text-orange-400 bg-orange-400/10 border-orange-400/30'
+                        }`}
+                      >
+                        <FiGitMerge size={10} />
+                        {wt.isMerged ? 'Merged' : 'Unmerged'}
+                      </span>
+                    )}
+                    {/* Clean/dirty status badge */}
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${statusColor(wt.status)}`}
+                    >
+                      {statusLabel(wt.status)}
+                    </span>
+                  </div>
 
                   {/* Agent assignment */}
                   {wt.agentName ? (
@@ -358,22 +445,63 @@ export function WorktreesPage() {
                     </div>
                   )}
 
-                  {/* Clean button - show for non-main, unassigned worktrees */}
-                  {!wt.isMain && !wt.agentName && (
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1.5">
+                    {/* Open in Explorer button */}
                     <button
                       type="button"
-                      onClick={() => handleRemoveWorktree(wt.path)}
-                      disabled={removingPaths.has(wt.path)}
-                      className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-red-500/20"
-                      title="Remove this worktree"
+                      onClick={() => handleOpenExplorer(wt.path)}
+                      className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 transition-colors border border-purple-500/20"
+                      title="Open in file explorer"
                     >
-                      <FiTrash2
-                        size={11}
-                        className={removingPaths.has(wt.path) ? 'animate-spin' : ''}
-                      />
-                      {removingPaths.has(wt.path) ? 'Removing...' : 'Clean'}
+                      <FiExternalLink size={11} />
+                      Explorer
                     </button>
-                  )}
+
+                    {/* Open in VS Code button */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenVSCode(wt.path)}
+                      className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors border border-blue-500/20"
+                      title="Open in VS Code"
+                    >
+                      <FiCode size={11} />
+                      VS Code
+                    </button>
+
+                    {/* Remove button - show for non-main, unassigned worktrees */}
+                    {!wt.isMain && !wt.agentName && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          wt.isMerged
+                            ? handleRemoveWorktree(wt.path)
+                            : handleForceRemoveWorktree(wt)
+                        }
+                        disabled={removingPaths.has(wt.path)}
+                        className={`flex items-center gap-1 rounded px-2 py-0.5 text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors border ${
+                          !wt.isMerged
+                            ? 'text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 border-orange-500/20'
+                            : 'text-red-400 hover:bg-red-500/20 hover:text-red-300 border-red-500/20'
+                        }`}
+                        title={
+                          !wt.isMerged
+                            ? 'Force remove (unmerged branch)'
+                            : 'Remove this worktree'
+                        }
+                      >
+                        <FiTrash2
+                          size={11}
+                          className={removingPaths.has(wt.path) ? 'animate-spin' : ''}
+                        />
+                        {removingPaths.has(wt.path)
+                          ? 'Removing...'
+                          : !wt.isMerged
+                            ? 'Force Remove'
+                            : 'Clean'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -395,6 +523,73 @@ export function WorktreesPage() {
               {completedWorktrees.length} available for cleanup
             </span>
           )}
+        </div>
+      )}
+
+      {/* Force Remove Confirmation Dialog */}
+      {forceRemoveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-orange-500/30 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="rounded-full bg-orange-500/20 p-2">
+                <FiAlertTriangle size={20} className="text-orange-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-100">
+                  Force Remove Unmerged Worktree?
+                </h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  This worktree has an <span className="text-orange-400 font-medium">unmerged branch</span> that
+                  has not been merged into the main branch. Removing it will permanently delete all
+                  unmerged changes.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 mb-4 space-y-1.5">
+              <div className="flex items-center gap-2 text-sm">
+                <FiGitBranch size={14} className="text-blue-400" />
+                <span className="text-slate-300 font-mono text-xs">
+                  {forceRemoveTarget.branch || '(detached)'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <FiFolder size={14} className="text-slate-500" />
+                <span className="text-slate-400 font-mono text-xs truncate">
+                  {forceRemoveTarget.path}
+                </span>
+              </div>
+              {forceRemoveTarget.headMessage && (
+                <div className="flex items-center gap-2 text-sm">
+                  <FiGitCommit size={14} className="text-slate-500" />
+                  <span className="text-slate-500 text-xs truncate">
+                    {forceRemoveTarget.headMessage}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setForceRemoveTarget(null)}
+                disabled={forceRemoving}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 transition-colors border border-slate-700"
+              >
+                <FiX size={14} />
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmForceRemove}
+                disabled={forceRemoving}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-orange-100 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <FiTrash2 size={14} className={forceRemoving ? 'animate-spin' : ''} />
+                {forceRemoving ? 'Removing...' : 'Force Remove'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
