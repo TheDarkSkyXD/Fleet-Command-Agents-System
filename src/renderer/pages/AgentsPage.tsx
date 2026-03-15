@@ -194,6 +194,7 @@ export function AgentsPage() {
   const [spawnModel, setSpawnModel] = useState('haiku');
   const [spawnName, setSpawnName] = useState('');
   const [spawnTaskId, setSpawnTaskId] = useState('');
+  const [spawnFileScope, setSpawnFileScope] = useState('');
   const [spawnPrompt, setSpawnPrompt] = useState('');
   const [isSpawning, setIsSpawning] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
@@ -261,6 +262,7 @@ export function AgentsPage() {
     setSpawnModel('haiku');
     setSpawnName('');
     setSpawnTaskId('');
+    setSpawnFileScope('');
     setSpawnPrompt('');
     setSpawnError(null);
     setShowSpawnDialog(true);
@@ -280,6 +282,7 @@ export function AgentsPage() {
         capability: spawnCapability,
         model: spawnModel,
         task_id: spawnTaskId.trim() || undefined,
+        file_scope: spawnFileScope.trim() || undefined,
         prompt: spawnPrompt.trim() || undefined,
       });
 
@@ -484,6 +487,7 @@ export function AgentsPage() {
           <button
             type="button"
             onClick={openSpawnDialog}
+            data-testid="spawn-agent-button"
             className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
           >
             <FiPlay className="h-4 w-4" />
@@ -746,6 +750,7 @@ export function AgentsPage() {
           model={spawnModel}
           name={spawnName}
           taskId={spawnTaskId}
+          fileScope={spawnFileScope}
           prompt={spawnPrompt}
           isSpawning={isSpawning}
           error={spawnError}
@@ -753,6 +758,7 @@ export function AgentsPage() {
           onModelChange={setSpawnModel}
           onNameChange={setSpawnName}
           onTaskIdChange={setSpawnTaskId}
+          onFileScopeChange={setSpawnFileScope}
           onPromptChange={setSpawnPrompt}
           onSpawn={handleSpawn}
           onClose={() => setShowSpawnDialog(false)}
@@ -839,6 +845,7 @@ function SpawnDialog({
   model,
   name,
   taskId,
+  fileScope,
   prompt,
   isSpawning,
   error,
@@ -846,6 +853,7 @@ function SpawnDialog({
   onModelChange,
   onNameChange,
   onTaskIdChange,
+  onFileScopeChange,
   onPromptChange,
   onSpawn,
   onClose,
@@ -854,6 +862,7 @@ function SpawnDialog({
   model: string;
   name: string;
   taskId: string;
+  fileScope: string;
   prompt: string;
   isSpawning: boolean;
   error: string | null;
@@ -861,6 +870,7 @@ function SpawnDialog({
   onModelChange: (m: string) => void;
   onNameChange: (n: string) => void;
   onTaskIdChange: (t: string) => void;
+  onFileScopeChange: (f: string) => void;
   onPromptChange: (p: string) => void;
   onSpawn: () => void;
   onClose: () => void;
@@ -869,7 +879,10 @@ function SpawnDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-800 shadow-2xl">
+      <div
+        className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-800 shadow-2xl"
+        data-testid="spawn-dialog"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4">
           <div className="flex items-center gap-2">
@@ -890,7 +903,7 @@ function SpawnDialog({
           {/* Capability selector */}
           <div>
             <span className="block text-sm font-medium text-slate-300 mb-2">Capability</span>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2" data-testid="spawn-capability-selector">
               {(Object.keys(CAPABILITY_DEFAULTS) as AgentCapability[]).map((cap) => (
                 <button
                   key={cap}
@@ -912,7 +925,7 @@ function SpawnDialog({
           {/* Model picker */}
           <div>
             <span className="block text-sm font-medium text-slate-300 mb-2">Model</span>
-            <div className="flex gap-2">
+            <div className="flex gap-2" data-testid="spawn-model-picker">
               {MODELS.map((m) => (
                 <button
                   key={m}
@@ -949,6 +962,7 @@ function SpawnDialog({
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
               placeholder={`e.g. swift-${capability}-001`}
+              data-testid="spawn-name-input"
               className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -967,8 +981,31 @@ function SpawnDialog({
               value={taskId}
               onChange={(e) => onTaskIdChange(e.target.value)}
               placeholder="e.g. TASK-42"
+              data-testid="spawn-task-id-input"
               className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+          </div>
+
+          {/* File scope */}
+          <div>
+            <label
+              htmlFor="spawn-file-scope"
+              className="block text-sm font-medium text-slate-300 mb-1"
+            >
+              File Scope <span className="text-slate-500 font-normal">(optional)</span>
+            </label>
+            <input
+              id="spawn-file-scope"
+              type="text"
+              value={fileScope}
+              onChange={(e) => onFileScopeChange(e.target.value)}
+              placeholder="e.g. src/components/**, src/utils/*.ts"
+              data-testid="spawn-file-scope"
+              className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Glob patterns restricting which files this agent can modify
+            </p>
           </div>
 
           {/* Initial prompt */}

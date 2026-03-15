@@ -8,6 +8,7 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
 import { WorktreesPage } from '../pages/WorktreesPage';
 import { CommandPalette } from './CommandPalette';
+import { OnboardingTour } from './OnboardingTour';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
 
@@ -38,6 +39,9 @@ export function AppLayout() {
 
       {/* Command Palette (Ctrl+K / Cmd+K) */}
       <CommandPalette onNavigate={setCurrentPage} />
+
+      {/* Onboarding Tour (shows on first launch) */}
+      {currentPage === 'agents' && <OnboardingTour />}
     </div>
   );
 }
