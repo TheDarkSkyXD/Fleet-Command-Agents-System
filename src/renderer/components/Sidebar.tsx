@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   FiActivity,
   FiAnchor,
@@ -45,6 +46,24 @@ const navItems = [
 ];
 
 export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }: SidebarProps) {
+  const [mailUnreadCount, setMailUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const result = await window.electronAPI.mailUnreadCount();
+        if (result.data !== null && result.data !== undefined) {
+          setMailUnreadCount(result.data);
+        }
+      } catch {
+        // ignore errors
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <aside
       className={`flex flex-col border-r border-slate-700 bg-slate-950 transition-all duration-200 ${
@@ -89,8 +108,24 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
               } ${collapsed ? 'justify-center' : ''}`}
               title={collapsed ? item.label : undefined}
             >
-              <Icon size={18} />
-              {!collapsed && <span>{item.label}</span>}
+              <span className="relative">
+                <Icon size={18} />
+                {item.id === 'mail' && mailUnreadCount > 0 && collapsed && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white">
+                    {mailUnreadCount > 99 ? '99+' : mailUnreadCount}
+                  </span>
+                )}
+              </span>
+              {!collapsed && (
+                <span className="flex flex-1 items-center justify-between">
+                  <span>{item.label}</span>
+                  {item.id === 'mail' && mailUnreadCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {mailUnreadCount > 99 ? '99+' : mailUnreadCount}
+                    </span>
+                  )}
+                </span>
+              )}
             </button>
           );
         })}
