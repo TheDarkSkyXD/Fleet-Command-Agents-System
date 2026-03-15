@@ -132,6 +132,11 @@ function EnqueueDialog({
   );
 }
 
+interface PreviewResult {
+  canMerge: boolean;
+  conflicts: string[];
+}
+
 function QueueEntryRow({
   entry,
   position,
@@ -143,6 +148,9 @@ function QueueEntryRow({
   onAutoResolve,
   onAiResolve,
   onReimagine,
+  onPreview,
+  previewResult,
+  previewLoading,
 }: {
   entry: MergeQueueEntry;
   position: number;
@@ -154,111 +162,166 @@ function QueueEntryRow({
   onAutoResolve?: (id: number) => void;
   onAiResolve?: (id: number) => void;
   onReimagine?: (id: number) => void;
+  onPreview?: (id: number) => void;
+  previewResult?: PreviewResult | null;
+  previewLoading?: boolean;
 }) {
   const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 p-4 hover:bg-slate-800 transition-colors">
-      <div className="flex items-center gap-4">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-mono text-slate-300">
-          {position}
-        </span>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-slate-50">{entry.branch_name}</span>
-            <StatusBadge status={entry.status} />
-          </div>
-          <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
-            {entry.agent_name && <span>Agent: {entry.agent_name}</span>}
-            {entry.task_id && <span>Task: {entry.task_id}</span>}
-            {entry.resolved_tier && <span>Tier: {entry.resolved_tier}</span>}
-            <span>Enqueued: {new Date(entry.enqueued_at).toLocaleString()}</span>
-          </div>
-          {filesModified.length > 0 && (
-            <div className="mt-1 text-xs text-slate-500">
-              {filesModified.length} file{filesModified.length !== 1 ? 's' : ''} modified
+    <div className="rounded-lg border border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-colors">
+      <div className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-4">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-mono text-slate-300">
+            {position}
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm text-slate-50">{entry.branch_name}</span>
+              <StatusBadge status={entry.status} />
             </div>
+            <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
+              {entry.agent_name && <span>Agent: {entry.agent_name}</span>}
+              {entry.task_id && <span>Task: {entry.task_id}</span>}
+              {entry.resolved_tier && <span>Tier: {entry.resolved_tier}</span>}
+              <span>Enqueued: {new Date(entry.enqueued_at).toLocaleString()}</span>
+            </div>
+            {filesModified.length > 0 && (
+              <div className="mt-1 text-xs text-slate-500">
+                {filesModified.length} file{filesModified.length !== 1 ? 's' : ''} modified
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onViewDiff(entry.id)}
+            className="rounded-md border border-cyan-600/50 bg-cyan-600/10 px-3 py-1.5 text-xs font-medium text-cyan-400 hover:bg-cyan-600/20 transition-colors"
+          >
+            View Diff
+          </button>
+          {entry.status === 'pending' && onPreview && (
+            <button
+              type="button"
+              onClick={() => onPreview(entry.id)}
+              disabled={previewLoading}
+              data-testid={`dry-run-${entry.id}`}
+              className="rounded-md border border-teal-600/50 bg-teal-600/10 px-3 py-1.5 text-xs font-medium text-teal-400 hover:bg-teal-600/20 transition-colors disabled:opacity-50"
+              title="Check for conflicts without performing the merge"
+            >
+              {previewLoading ? 'Checking...' : 'Dry-Run'}
+            </button>
+          )}
+          {entry.status === 'pending' && (
+            <button
+              type="button"
+              onClick={() => onExecute(entry.id)}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 transition-colors"
+            >
+              Merge
+            </button>
+          )}
+          {entry.status === 'conflict' && onAutoResolve && (
+            <button
+              type="button"
+              onClick={() => onAutoResolve(entry.id)}
+              data-testid={`auto-resolve-${entry.id}`}
+              className="rounded-md border border-amber-600/50 bg-amber-600/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-600/20 transition-colors"
+            >
+              Auto-Resolve
+            </button>
+          )}
+          {entry.status === 'conflict' && onAiResolve && (
+            <button
+              type="button"
+              onClick={() => onAiResolve(entry.id)}
+              data-testid={`ai-resolve-${entry.id}`}
+              className="rounded-md border border-violet-600/50 bg-violet-600/10 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-600/20 transition-colors"
+            >
+              AI-Resolve
+            </button>
+          )}
+          {(entry.status === 'conflict' || entry.status === 'failed') && onReimagine && (
+            <button
+              type="button"
+              onClick={() => onReimagine(entry.id)}
+              data-testid={`reimagine-${entry.id}`}
+              className="rounded-md border border-rose-600/50 bg-rose-600/10 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-600/20 transition-colors"
+              title="Abandon branch and reimplement from scratch"
+            >
+              Reimagine
+            </button>
+          )}
+          {entry.status === 'merging' && (
+            <>
+              <button
+                type="button"
+                onClick={() => onComplete(entry.id)}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 transition-colors"
+              >
+                Complete
+              </button>
+              <button
+                type="button"
+                onClick={() => onFail(entry.id)}
+                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 transition-colors"
+              >
+                Fail
+              </button>
+            </>
+          )}
+          {(entry.status === 'pending' ||
+            entry.status === 'failed' ||
+            entry.status === 'conflict') && (
+            <button
+              type="button"
+              onClick={() => onRemove(entry.id)}
+              className="rounded-md border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+            >
+              Remove
+            </button>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onViewDiff(entry.id)}
-          className="rounded-md border border-cyan-600/50 bg-cyan-600/10 px-3 py-1.5 text-xs font-medium text-cyan-400 hover:bg-cyan-600/20 transition-colors"
+      {/* Dry-run preview result */}
+      {previewResult && (
+        <div
+          data-testid={`preview-result-${entry.id}`}
+          className={`mx-4 mb-4 rounded-md border p-3 text-sm ${
+            previewResult.canMerge
+              ? 'border-emerald-600/30 bg-emerald-600/10 text-emerald-400'
+              : 'border-amber-600/30 bg-amber-600/10 text-amber-400'
+          }`}
         >
-          View Diff
-        </button>
-        {entry.status === 'pending' && (
-          <button
-            type="button"
-            onClick={() => onExecute(entry.id)}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 transition-colors"
-          >
-            Merge
-          </button>
-        )}
-        {entry.status === 'conflict' && onAutoResolve && (
-          <button
-            type="button"
-            onClick={() => onAutoResolve(entry.id)}
-            data-testid={`auto-resolve-${entry.id}`}
-            className="rounded-md border border-amber-600/50 bg-amber-600/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-600/20 transition-colors"
-          >
-            Auto-Resolve
-          </button>
-        )}
-        {entry.status === 'conflict' && onAiResolve && (
-          <button
-            type="button"
-            onClick={() => onAiResolve(entry.id)}
-            data-testid={`ai-resolve-${entry.id}`}
-            className="rounded-md border border-violet-600/50 bg-violet-600/10 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-600/20 transition-colors"
-          >
-            AI-Resolve
-          </button>
-        )}
-        {(entry.status === 'conflict' || entry.status === 'failed') && onReimagine && (
-          <button
-            type="button"
-            onClick={() => onReimagine(entry.id)}
-            data-testid={`reimagine-${entry.id}`}
-            className="rounded-md border border-rose-600/50 bg-rose-600/10 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-600/20 transition-colors"
-            title="Abandon branch and reimplement from scratch"
-          >
-            Reimagine
-          </button>
-        )}
-        {entry.status === 'merging' && (
-          <>
-            <button
-              type="button"
-              onClick={() => onComplete(entry.id)}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 transition-colors"
-            >
-              Complete
-            </button>
-            <button
-              type="button"
-              onClick={() => onFail(entry.id)}
-              className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 transition-colors"
-            >
-              Fail
-            </button>
-          </>
-        )}
-        {(entry.status === 'pending' ||
-          entry.status === 'failed' ||
-          entry.status === 'conflict') && (
-          <button
-            type="button"
-            onClick={() => onRemove(entry.id)}
-            className="rounded-md border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
-          >
-            Remove
-          </button>
-        )}
-      </div>
+          {previewResult.canMerge ? (
+            <div className="flex items-center gap-2">
+              <span className="text-emerald-400">&#10003;</span>
+              <span>Merge can proceed cleanly &mdash; no conflicts detected</span>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2 font-medium">
+                <span className="text-amber-400">&#9888;</span>
+                <span>
+                  Conflicts detected in {previewResult.conflicts.length} file
+                  {previewResult.conflicts.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {previewResult.conflicts.length > 0 && (
+                <ul className="mt-2 space-y-0.5 pl-6 text-xs font-mono text-amber-300/80">
+                  {previewResult.conflicts.map((file) => (
+                    <li key={file}>{file}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-xs text-slate-400">
+                No changes were made to the target branch.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -285,6 +348,8 @@ export function MergeQueuePage() {
   const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
   const [diffData, setDiffData] = useState<{ diff: string; branchName: string } | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
+  const [previewResults, setPreviewResults] = useState<Record<number, PreviewResult>>({});
+  const [previewLoadingId, setPreviewLoadingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchQueue();
@@ -333,6 +398,29 @@ export function MergeQueuePage() {
 
   const handleReimagine = async (id: number) => {
     await reimagine(id);
+  };
+
+  const handlePreview = async (id: number) => {
+    setPreviewLoadingId(id);
+    try {
+      const result = await window.electronAPI.mergePreview(id);
+      if (result.error) {
+        console.error('Preview failed:', result.error);
+      } else if (result.data) {
+        const { canMerge, conflicts } = result.data as {
+          canMerge: boolean;
+          conflicts: string[];
+        };
+        setPreviewResults((prev) => ({
+          ...prev,
+          [id]: { canMerge, conflicts },
+        }));
+      }
+    } catch (err) {
+      console.error('Preview error:', err);
+    } finally {
+      setPreviewLoadingId(null);
+    }
   };
 
   const handleViewDiff = useCallback(
@@ -459,6 +547,9 @@ export function MergeQueuePage() {
                 onAutoResolve={handleAutoResolve}
                 onAiResolve={handleAiResolve}
                 onReimagine={handleReimagine}
+                onPreview={handlePreview}
+                previewResult={previewResults[entry.id] || null}
+                previewLoading={previewLoadingId === entry.id}
               />
             ))}
           </div>
