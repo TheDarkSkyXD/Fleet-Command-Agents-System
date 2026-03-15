@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { SettingsPage } from '../pages/SettingsPage';
+import { CommandPalette } from './CommandPalette';
+import { HealthStateMachine } from './HealthStateMachine';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
 
@@ -26,6 +29,9 @@ export function AppLayout() {
 
       {/* Status bar */}
       <StatusBar />
+
+      {/* Command Palette (Ctrl+K / Cmd+K) */}
+      <CommandPalette onNavigate={setCurrentPage} />
     </div>
   );
 }
@@ -34,7 +40,7 @@ function PageContent({ page }: { page: string }) {
   switch (page) {
     case 'agents':
       return (
-        <div>
+        <div className="space-y-6">
           <h1 className="text-2xl font-bold text-slate-50 mb-4">Agents</h1>
           <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
             <p className="text-lg mb-2">No agents running</p>
@@ -46,6 +52,9 @@ function PageContent({ page }: { page: string }) {
               Spawn Agent
             </button>
           </div>
+
+          {/* Health State Machine Visualization */}
+          <HealthStateMachine />
         </div>
       );
     case 'mail':
@@ -76,14 +85,7 @@ function PageContent({ page }: { page: string }) {
         </div>
       );
     case 'settings':
-      return (
-        <div>
-          <h1 className="text-2xl font-bold text-slate-50 mb-4">Settings</h1>
-          <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
-            <p className="text-slate-400">Settings will be configured here</p>
-          </div>
-        </div>
-      );
+      return <SettingsPage />;
     case 'debug':
       return (
         <div>
