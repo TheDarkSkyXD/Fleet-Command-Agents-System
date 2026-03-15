@@ -1446,6 +1446,20 @@ export interface ElectronAPI {
   ) => void;
   // Notification navigation events (main -> renderer)
   onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => void;
+  // Session Handoffs
+  sessionHandoffCreate: (handoff: {
+    from_session: string;
+    to_session: string;
+    reason?: string;
+  }) => Promise<{ data: SessionHandoff | null; error: string | null }>;
+  sessionHandoffList: () => Promise<{ data: SessionHandoff[] | null; error: string | null }>;
+  sessionHandoffGet: (
+    id: string,
+  ) => Promise<{ data: SessionHandoff | null; error: string | null }>;
+  sessionHandoffBySession: (
+    sessionId: string,
+  ) => Promise<{ data: SessionHandoff[] | null; error: string | null }>;
+
   // Window management
   windowSetTitle: (title: string) => Promise<{ data: boolean; error: string | null }>;
 
@@ -1493,6 +1507,14 @@ export interface WatchdogStatus {
   checkCount: number;
   lastCheckAt: string | null;
   trackedAgents: number;
+}
+
+export interface SessionHandoff {
+  id: string;
+  from_session: string;
+  to_session: string;
+  reason: string | null;
+  created_at: string;
 }
 
 declare global {

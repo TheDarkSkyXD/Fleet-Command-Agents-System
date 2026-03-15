@@ -322,6 +322,14 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS session_handoffs (
+      id TEXT PRIMARY KEY,
+      from_session TEXT NOT NULL,
+      to_session TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS expertise_records (
       id TEXT PRIMARY KEY,
       domain TEXT NOT NULL,
@@ -386,6 +394,9 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_quality_gate_results_session ON quality_gate_results(session_id);
     CREATE INDEX IF NOT EXISTS idx_quality_gate_results_project ON quality_gate_results(project_id);
     CREATE INDEX IF NOT EXISTS idx_quality_gate_results_status ON quality_gate_results(status);
+    CREATE INDEX IF NOT EXISTS idx_session_handoffs_from ON session_handoffs(from_session);
+    CREATE INDEX IF NOT EXISTS idx_session_handoffs_to ON session_handoffs(to_session);
+    CREATE INDEX IF NOT EXISTS idx_session_handoffs_created ON session_handoffs(created_at);
     CREATE INDEX IF NOT EXISTS idx_expertise_domain ON expertise_records(domain);
     CREATE INDEX IF NOT EXISTS idx_expertise_type ON expertise_records(type);
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);

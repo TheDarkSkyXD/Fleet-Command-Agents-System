@@ -518,6 +518,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Dialog
   dialogSelectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 
+  // Session Handoffs
+  sessionHandoffCreate: (handoff: {
+    from_session: string;
+    to_session: string;
+    reason?: string;
+  }) => ipcRenderer.invoke('session:handoff-create', handoff),
+  sessionHandoffList: () => ipcRenderer.invoke('session:handoff-list'),
+  sessionHandoffGet: (id: string) => ipcRenderer.invoke('session:handoff-get', id),
+  sessionHandoffBySession: (sessionId: string) =>
+    ipcRenderer.invoke('session:handoff-by-session', sessionId),
+
   // Window management
   windowSetTitle: (title: string) => ipcRenderer.invoke('window:setTitle', title),
 

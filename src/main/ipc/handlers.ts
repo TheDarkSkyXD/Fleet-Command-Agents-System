@@ -6970,10 +6970,7 @@ export function registerIpcHandlers(): void {
   // Session handoff tracking
   ipcMain.handle(
     'session:handoff-create',
-    (
-      _event,
-      handoff: { from_session: string; to_session: string; reason?: string },
-    ) => {
+    (_event, handoff: { from_session: string; to_session: string; reason?: string }) => {
       try {
         const id = `handoff-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
         loggedPrepare(
