@@ -1,5 +1,35 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Scope Overlap Detection)
+
+#### Feature #255: Visual file tree with scope assignment - PASSING
+- Already fully implemented in FileTreePicker.tsx with all required functionality
+- Tree rendering, checkboxes, individual/folder selection, scope summary all present
+- Integrated into SpawnDialog with toggle between tree picker and text input
+
+#### Feature #256: Scope overlap detection - PASSING
+- Added file_scope column to sessions table with migration for existing DBs
+- Store file_scope when spawning agents via agent:spawn IPC handler
+- Created scope:checkOverlap IPC handler that queries active builder sessions
+- Overlap detection checks exact path match and parent directory containment
+- Added ScopeOverlap type to shared types, scopeCheckOverlap to preload bridge
+- SpawnDialog shows amber warning banner when overlapping files detected
+- Warning identifies conflicting builder names and overlapping paths
+- Debounced 300ms overlap check on both tree picker and text input changes
+- Message warns about merge conflicts, allows user to continue anyway
+
+#### Files Modified
+- MODIFIED: src/main/db/database.ts - Added file_scope column to sessions + migration
+- MODIFIED: src/main/ipc/handlers.ts - Added file_scope to spawn, added scope:checkOverlap handler
+- MODIFIED: src/preload/index.ts - Added scopeCheckOverlap bridge method
+- MODIFIED: src/shared/types/index.ts - Added file_scope to Session, ScopeOverlap type, scopeCheckOverlap to ElectronAPI
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Added overlap detection UI in SpawnDialog
+
+#### Current Status
+- 83/366 features passing (added #255 and #256 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Merge Queue Visualization & Onboarding Tour)
 
 #### Feature #81: Merge queue visualization - PASSING
