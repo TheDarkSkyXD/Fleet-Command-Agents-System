@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Checkpoint Save & Restore)
+
+#### Feature #151: Checkpoint save on app close - PASSING
+- Added `saveCheckpoints()` method to AgentProcessManager
+- Saves all tracked agents' state to `checkpoints` table via UPSERT
+- Stores: agent_name, task_id, session_id, progress_summary (JSON with state/capability/model/duration/tokenUsage), files_modified, current_branch, pending_work
+- Called from `before-quit` handler and close dialog "Stop All & Close" path
+- Added `spawnOptions` field to AgentProcess interface to retain spawn context
+- Added IPC handlers: checkpoint:list, checkpoint:get, checkpoint:save-now, checkpoint:delete
+- Updated preload bridge and shared types
+
+#### Feature #152: Checkpoint restore on app restart - PASSING
+- Created `src/main/services/checkpointService.ts` with CheckpointService class
+- `restore()` reads checkpoints from DB, checks process liveness via `process.kill(pid, 0)`
+- Returns RecoveryStatus with checkpointsFound, processesAlive, restored details
+- Integrated into app startup (after DB init, before window creation)
+- Added IPC handlers: checkpoint:recovery-status, checkpoint:clear-all
+- Added RecoveryStatus and CheckpointRestoreResult types to shared types
+- Updated preload bridge with new methods
+
+#### Files Created/Modified
+- NEW: src/main/services/checkpointService.ts - Checkpoint restore service
+- MODIFIED: src/main/services/agentProcessManager.ts - Added saveCheckpoints(), spawnOptions field
+- MODIFIED: src/main/index.ts - Checkpoint save on quit, restore on startup
+- MODIFIED: src/main/ipc/handlers.ts - Added checkpoint and recovery IPC handlers
+- MODIFIED: src/preload/index.ts - Added checkpoint bridge methods
+- MODIFIED: src/shared/types/index.ts - Added checkpoint types to ElectronAPI
+
+#### Current Status
+- Features passing: 55 + 2 = 57 (added #151 and #152)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Stale & Zombie Agent Detection)
 
 #### Feature #131: Stale agent detection - PASSING
