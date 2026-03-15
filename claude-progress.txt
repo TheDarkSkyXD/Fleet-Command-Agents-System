@@ -3468,3 +3468,32 @@
 - 219/366 features passing (added #214 and #215 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Right-Click Context Menus)
+
+#### Feature #220: Right-click context menu on agents - PASSING
+- Created reusable ContextMenu component (src/renderer/components/ContextMenu.tsx)
+- useContextMenu hook manages menu state and viewport-aware positioning
+- Context menu items support icons, disabled state, danger styling, separators
+- Menu closes on click outside, Escape key, or item selection
+- Added onContextMenu handler to table rows and AgentCard components
+- Menu options: Stop (danger), Nudge (disabled when not stalled), Inspect (navigates to detail), Copy ID (clipboard)
+- data-testid attributes on menu and all menu items
+
+#### Feature #221: Right-click context menu on messages - PASSING
+- Added context menu to message rows in MailPage
+- Menu options: Reply (opens compose with thread context), Mark as Read (disabled when already read), Copy Content (copies body/subject to clipboard)
+- Reuses shared ContextMenu component
+- Toast notifications on clipboard copy actions
+
+#### Files Created
+- NEW: src/renderer/components/ContextMenu.tsx - Reusable context menu component and hook
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Context menu on agent table rows and cards
+- MODIFIED: src/renderer/pages/MailPage.tsx - Context menu on message items
+
+#### Current Status
+- 229/366 features passing (added #220 and #221 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build
+- No mock data patterns in codebase
