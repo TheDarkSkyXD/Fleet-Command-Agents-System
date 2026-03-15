@@ -5252,3 +5252,27 @@
 - 355/366 features passing (added #357 and #358 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Domain Context Loading & Prompt Emit)
+
+#### Feature #359: Domain-scoped context loading - PASSING
+- Added expertise:load-context IPC handler that loads expertise records filtered by domain
+- Groups records by classification (foundational first, then tactical, then observational)
+- Formats records into structured context payload for agent priming
+- Added Load Context buttons on ExpertisePage domain cards
+- Added context preview panel with copy-to-clipboard functionality
+- Added preload bridge and type definitions for expertiseLoadContext
+
+#### Feature #360: Emit rendered prompts to files - PASSING
+- Added prompt:emit IPC handler with full inheritance chain resolution
+- Merges content from parent chain (root -> ... -> self)
+- Resolves template variables ({{var}}, ${var}, {var}) with provided substitutions
+- Reports unresolved variables in response metadata
+- Shows save dialog with .md/.txt file filters
+- Added Emit to File button in PromptDetail panel header with loading state
+- Added preload bridge and type definitions for promptEmit
+
+#### Current Status
+- 357/366 features passing (added #359 and #360 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
