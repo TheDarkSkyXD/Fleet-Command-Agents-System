@@ -115,7 +115,11 @@ function validateIpcParams(
         log.warn(msg);
         return { valid: false, error: `Invalid parameter: ${req.name} must be a non-empty string` };
       }
-    } else if (typeof value !== req.type) {
+    } else if (
+      (req.type === 'number' && typeof value !== 'number') ||
+      (req.type === 'boolean' && typeof value !== 'boolean') ||
+      (req.type === 'object' && typeof value !== 'object')
+    ) {
       const msg = `[IPC] ${channel} - REJECTED: parameter '${req.name}' must be type ${req.type}`;
       log.warn(msg);
       return { valid: false, error: `Invalid parameter type: ${req.name} must be ${req.type}` };
@@ -1304,7 +1308,7 @@ export function registerIpcHandlers(): void {
               `[IPC] coordinator:ask - received reply for correlationId=${correlationId} after ${Date.now() - startTime}ms`,
             );
 
-            loggedPrepare(`UPDATE messages SET read = 1 WHERE id = ?`).run(reply.id);
+            loggedPrepare('UPDATE messages SET read = 1 WHERE id = ?').run(reply.id);
 
             return {
               data: {
