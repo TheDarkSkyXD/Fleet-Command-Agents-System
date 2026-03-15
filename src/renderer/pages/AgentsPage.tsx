@@ -1,5 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FiActivity, FiCpu, FiPlay, FiSquare, FiX, FiZap } from 'react-icons/fi';
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  FiActivity,
+  FiChevronDown,
+  FiChevronUp,
+  FiCpu,
+  FiFilter,
+  FiGrid,
+  FiList,
+  FiPlay,
+  FiSearch,
+  FiSquare,
+  FiX,
+  FiZap,
+} from 'react-icons/fi';
 import type { AgentCapability, AgentProcessInfo, Session } from '../../shared/types';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 
@@ -63,7 +86,25 @@ const STATE_COLORS: Record<string, string> = {
   zombie: 'bg-red-500/20 text-red-400',
 };
 
+const STATE_DOT_COLORS: Record<string, string> = {
+  booting: 'bg-blue-400 animate-pulse',
+  working: 'bg-green-400 animate-pulse',
+  completed: 'bg-slate-400',
+  stalled: 'bg-amber-400',
+  zombie: 'bg-red-400',
+};
+
 const MODELS = ['haiku', 'sonnet', 'opus'];
+
+const ALL_CAPABILITIES: AgentCapability[] = [
+  'scout',
+  'builder',
+  'reviewer',
+  'lead',
+  'merger',
+  'coordinator',
+  'monitor',
+];
 
 function generateId(): string {
   return `agent-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -75,11 +116,78 @@ function generateName(capability: AgentCapability): string {
   return `${adj}-${capability}-${Math.floor(Math.random() * 1000)}`;
 }
 
+function formatUptime(createdAt: string): string {
+  const uptime = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
+  const minutes = Math.floor(uptime / 60);
+  const seconds = uptime % 60;
+  return `${minutes}m ${seconds}s`;
+}
+
+/** Skeleton rows for table loading state */
+function AgentTableSkeleton() {
+  return (
+    <div className="space-y-2" data-testid="agent-list-skeleton">
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="flex items-center gap-4 rounded-lg border border-slate-700 bg-slate-800 p-4 animate-pulse"
+        >
+          <div className="h-2.5 w-2.5 rounded-full bg-slate-600" />
+          <div className="h-4 w-32 rounded bg-slate-600" />
+          <div className="h-5 w-16 rounded-full bg-slate-600" />
+          <div className="h-5 w-16 rounded-full bg-slate-600" />
+          <div className="flex-1" />
+          <div className="h-4 w-16 rounded bg-slate-600" />
+          <div className="h-4 w-14 rounded bg-slate-600" />
+          <div className="h-7 w-7 rounded bg-slate-600" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Skeleton cards for card view loading state */
+function AgentCardSkeleton() {
+  return (
+    <div className="grid gap-3" data-testid="agent-card-skeleton">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="rounded-lg border border-slate-700 bg-slate-800 p-4 animate-pulse">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-2.5 w-2.5 rounded-full bg-slate-600" />
+              <div className="h-5 w-28 rounded bg-slate-600" />
+              <div className="h-5 w-16 rounded-full bg-slate-600" />
+              <div className="h-5 w-16 rounded-full bg-slate-600" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-4 w-12 rounded bg-slate-600" />
+              <div className="h-4 w-14 rounded bg-slate-600" />
+              <div className="h-7 w-7 rounded bg-slate-600" />
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-4">
+            <div className="h-3 w-20 rounded bg-slate-700" />
+            <div className="h-3 w-32 rounded bg-slate-700" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AgentsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [runningProcesses, setRunningProcesses] = useState<AgentProcessInfo[]>([]);
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+
+  // Table state
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [capabilityFilter, setCapabilityFilter] = useState<string>('all');
 
   // Spawn dialog state
   const [spawnCapability, setSpawnCapability] = useState<AgentCapability>('scout');
@@ -98,6 +206,8 @@ export function AgentsPage() {
       }
     } catch (err) {
       console.error('Failed to load sessions:', err);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -133,6 +243,18 @@ export function AgentsPage() {
       setSpawnModel(defaults.model);
     }
   }, [spawnCapability]);
+
+  // Apply capability filter as a column filter
+  useEffect(() => {
+    if (capabilityFilter === 'all') {
+      setColumnFilters((prev) => prev.filter((f) => f.id !== 'capability'));
+    } else {
+      setColumnFilters((prev) => {
+        const without = prev.filter((f) => f.id !== 'capability');
+        return [...without, { id: 'capability', value: capabilityFilter }];
+      });
+    }
+  }, [capabilityFilter]);
 
   const openSpawnDialog = () => {
     setSpawnCapability('scout');
@@ -178,15 +300,18 @@ export function AgentsPage() {
     }
   };
 
-  const handleStop = async (sessionId: string) => {
-    try {
-      await window.electronAPI.agentStop(sessionId);
-      await loadSessions();
-      await loadRunningProcesses();
-    } catch (err) {
-      setError(String(err));
-    }
-  };
+  const handleStop = useCallback(
+    async (sessionId: string) => {
+      try {
+        await window.electronAPI.agentStop(sessionId);
+        await loadSessions();
+        await loadRunningProcesses();
+      } catch (err) {
+        setError(String(err));
+      }
+    },
+    [loadSessions, loadRunningProcesses],
+  );
 
   const handleStopAll = async () => {
     try {
@@ -198,6 +323,140 @@ export function AgentsPage() {
     }
   };
 
+  // Table columns definition
+  const columns = useMemo<ColumnDef<Session>[]>(
+    () => [
+      {
+        id: 'state_indicator',
+        header: '',
+        size: 30,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div
+            className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[row.original.state] || 'bg-slate-400'}`}
+          />
+        ),
+      },
+      {
+        accessorKey: 'agent_name',
+        header: 'Name',
+        enableSorting: true,
+        cell: ({ getValue }) => (
+          <span className="font-medium text-slate-50">{getValue<string>()}</span>
+        ),
+      },
+      {
+        accessorKey: 'capability',
+        header: 'Capability',
+        enableSorting: true,
+        filterFn: 'equalsString',
+        cell: ({ getValue }) => {
+          const cap = getValue<string>();
+          return (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${CAPABILITY_COLORS[cap] || 'bg-slate-500/20 text-slate-400'}`}
+            >
+              {cap}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'state',
+        header: 'Status',
+        enableSorting: true,
+        cell: ({ getValue }) => {
+          const state = getValue<string>();
+          return (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[state] || ''}`}
+            >
+              {state}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'pid',
+        header: 'PID',
+        enableSorting: true,
+        accessorFn: (row) => {
+          const proc = runningProcesses.find((p) => p.id === row.id);
+          return row.pid || proc?.pid || null;
+        },
+        cell: ({ getValue }) => {
+          const pid = getValue<number | null>();
+          return pid ? (
+            <span className="text-xs text-slate-500 font-mono">{pid}</span>
+          ) : (
+            <span className="text-xs text-slate-600">-</span>
+          );
+        },
+      },
+      {
+        id: 'uptime',
+        header: 'Uptime',
+        enableSorting: true,
+        accessorFn: (row) => new Date(row.created_at).getTime(),
+        cell: ({ row }) => (
+          <span className="text-xs text-slate-500">{formatUptime(row.original.created_at)}</span>
+        ),
+      },
+      {
+        id: 'task',
+        header: 'Task',
+        enableSorting: true,
+        accessorFn: (row) => row.task_id || '',
+        cell: ({ getValue }) => {
+          const taskId = getValue<string>();
+          return taskId ? (
+            <span className="text-xs text-slate-400">{taskId}</span>
+          ) : (
+            <span className="text-xs text-slate-600">-</span>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: '',
+        size: 40,
+        enableSorting: false,
+        cell: ({ row }) => {
+          if (row.original.state === 'completed') return null;
+          return (
+            <button
+              type="button"
+              onClick={() => handleStop(row.original.id)}
+              className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
+              title="Stop agent"
+            >
+              <FiSquare className="h-3.5 w-3.5" />
+            </button>
+          );
+        },
+      },
+    ],
+    [runningProcesses, handleStop],
+  );
+
+  const table = useReactTable({
+    data: sessions,
+    columns,
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    globalFilterFn: 'includesString',
+  });
+
+  const filteredRows = table.getRowModel().rows;
   const activeSessions = sessions.filter((s) => s.state !== 'completed');
   const completedSessions = sessions.filter((s) => s.state === 'completed');
 
@@ -246,27 +505,85 @@ export function AgentsPage() {
       {/* Coordinator Panel */}
       <CoordinatorPanel />
 
-      {/* Active Agents */}
-      {activeSessions.length > 0 ? (
-        <div className="space-y-3">
-          <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-            Active Agents
-          </h2>
-          <div className="grid gap-3">
-            {activeSessions.map((session) => {
-              const proc = runningProcesses.find((p) => p.id === session.id);
-              return (
-                <AgentCard
-                  key={session.id}
-                  session={session}
-                  processInfo={proc}
-                  onStop={() => handleStop(session.id)}
-                />
-              );
-            })}
-          </div>
+      {/* Filter bar */}
+      <div className="flex items-center gap-3">
+        {/* Global search */}
+        <div className="relative flex-1 max-w-sm">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            placeholder="Search agents by name..."
+            className="w-full rounded-lg border border-slate-600 bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          {globalFilter && (
+            <button
+              type="button"
+              onClick={() => setGlobalFilter('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+            >
+              <FiX className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-      ) : (
+
+        {/* Capability filter */}
+        <div className="relative">
+          <FiFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <select
+            value={capabilityFilter}
+            onChange={(e) => setCapabilityFilter(e.target.value)}
+            className="rounded-lg border border-slate-600 bg-slate-800 pl-9 pr-8 py-2 text-sm text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
+          >
+            <option value="all">All Capabilities</option>
+            {ALL_CAPABILITIES.map((cap) => (
+              <option key={cap} value={cap}>
+                {cap.charAt(0).toUpperCase() + cap.slice(1)}
+              </option>
+            ))}
+          </select>
+          <FiChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        </div>
+
+        {/* View mode toggle */}
+        <div className="flex rounded-lg border border-slate-600 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            className={`p-2 transition-colors ${
+              viewMode === 'table'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+            }`}
+            title="Table view"
+          >
+            <FiList className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className={`p-2 transition-colors ${
+              viewMode === 'cards'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+            }`}
+            title="Card view"
+          >
+            <FiGrid className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Loading skeleton */}
+      {isLoading ? (
+        viewMode === 'table' ? (
+          <AgentTableSkeleton />
+        ) : (
+          <AgentCardSkeleton />
+        )
+      ) : sessions.length === 0 ? (
+        /* Empty state */
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
           <FiCpu className="h-12 w-12 mx-auto mb-3 text-slate-600" />
           <p className="text-lg mb-2">No agents running</p>
@@ -279,34 +596,146 @@ export function AgentsPage() {
             Spawn Agent
           </button>
         </div>
-      )}
-
-      {/* Completed Agents */}
-      {completedSessions.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-            Completed ({completedSessions.length})
-          </h2>
-          <div className="grid gap-2">
-            {completedSessions.slice(0, 10).map((session) => (
-              <div
-                key={session.id}
-                className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 p-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${CAPABILITY_COLORS[session.capability] || 'bg-slate-500/20 text-slate-400'}`}
+      ) : viewMode === 'table' ? (
+        /* Table view with @tanstack/react-table */
+        <div className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden">
+          <table className="w-full">
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b border-slate-700">
+                  {headerGroup.headers.map((header) => (
+                    <th
+                      key={header.id}
+                      className={`px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider ${
+                        header.column.getCanSort()
+                          ? 'cursor-pointer select-none hover:text-slate-200'
+                          : ''
+                      }`}
+                      style={header.getSize() !== 150 ? { width: header.getSize() } : undefined}
+                      onClick={header.column.getToggleSortingHandler()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          header.column.getToggleSortingHandler()?.(e);
+                        }
+                      }}
+                      tabIndex={header.column.getCanSort() ? 0 : undefined}
+                    >
+                      <div className="flex items-center gap-1">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.column.getIsSorted() === 'asc' && (
+                          <FiChevronUp className="h-3 w-3 text-blue-400" />
+                        )}
+                        {header.column.getIsSorted() === 'desc' && (
+                          <FiChevronDown className="h-3 w-3 text-blue-400" />
+                        )}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {filteredRows.length > 0 ? (
+                filteredRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors"
                   >
-                    {session.capability}
-                  </span>
-                  <span className="text-sm text-slate-300">{session.agent_name}</span>
-                </div>
-                <span className="text-xs text-slate-500">
-                  {session.completed_at ? new Date(session.completed_at).toLocaleString() : ''}
-                </span>
-              </div>
-            ))}
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-4 py-8 text-center text-sm text-slate-500"
+                  >
+                    No agents match your filters
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {/* Table footer with count */}
+          <div className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500">
+            Showing {filteredRows.length} of {sessions.length} agents
           </div>
+        </div>
+      ) : (
+        /* Card view */
+        <div className="space-y-4">
+          {filteredRows.filter((r) => r.original.state !== 'completed').length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+                Active Agents
+              </h2>
+              <div className="grid gap-3">
+                {filteredRows
+                  .filter((r) => r.original.state !== 'completed')
+                  .map((row) => {
+                    const session = row.original;
+                    const proc = runningProcesses.find((p) => p.id === session.id);
+                    return (
+                      <AgentCard
+                        key={session.id}
+                        session={session}
+                        processInfo={proc}
+                        onStop={() => handleStop(session.id)}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {filteredRows.filter((r) => r.original.state === 'completed').length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+                Completed ({filteredRows.filter((r) => r.original.state === 'completed').length})
+              </h2>
+              <div className="grid gap-2">
+                {filteredRows
+                  .filter((r) => r.original.state === 'completed')
+                  .slice(0, 10)
+                  .map((row) => {
+                    const session = row.original;
+                    return (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 p-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${CAPABILITY_COLORS[session.capability] || 'bg-slate-500/20 text-slate-400'}`}
+                          >
+                            {session.capability}
+                          </span>
+                          <span className="text-sm text-slate-300">{session.agent_name}</span>
+                        </div>
+                        <span className="text-xs text-slate-500">
+                          {session.completed_at
+                            ? new Date(session.completed_at).toLocaleString()
+                            : ''}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {filteredRows.length === 0 && (
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-sm text-slate-500">
+              No agents match your filters
+            </div>
+          )}
         </div>
       )}
 
@@ -342,25 +771,13 @@ function AgentCard({
   processInfo?: AgentProcessInfo;
   onStop: () => void;
 }) {
-  const uptime = Math.floor((Date.now() - new Date(session.created_at).getTime()) / 1000);
-  const minutes = Math.floor(uptime / 60);
-  const seconds = uptime % 60;
-
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* State indicator */}
           <div
-            className={`h-2.5 w-2.5 rounded-full ${
-              session.state === 'working'
-                ? 'bg-green-400 animate-pulse'
-                : session.state === 'booting'
-                  ? 'bg-blue-400 animate-pulse'
-                  : session.state === 'stalled'
-                    ? 'bg-amber-400'
-                    : 'bg-red-400'
-            }`}
+            className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[session.state] || 'bg-slate-400'}`}
           />
 
           {/* Agent name */}
@@ -393,9 +810,7 @@ function AgentCard({
           )}
 
           {/* Uptime */}
-          <span className="text-xs text-slate-500">
-            {minutes}m {seconds}s
-          </span>
+          <span className="text-xs text-slate-500">{formatUptime(session.created_at)}</span>
 
           {/* Stop button */}
           <button
