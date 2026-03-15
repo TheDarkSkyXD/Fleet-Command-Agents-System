@@ -28,6 +28,90 @@ export type MessageType =
 
 export type MessagePriority = 'low' | 'normal' | 'high' | 'urgent';
 
+// Protocol message payload schemas (structured JSON per protocol type)
+export interface WorkerDonePayload {
+  taskId: string;
+  summary: string;
+  filesModified: string[];
+}
+
+export interface MergeReadyPayload {
+  branch: string;
+  files: string[];
+  task_id?: string;
+}
+
+export interface MergedPayload {
+  branch: string;
+  merge_commit?: string;
+  conflicts_resolved?: number;
+}
+
+export interface MergeFailedPayload {
+  branch: string;
+  reason: string;
+  conflicting_files?: string[];
+}
+
+export interface EscalationPayload {
+  level: number;
+  reason: string;
+  agent_session_id?: string;
+}
+
+export interface DispatchPayload {
+  objective: string;
+  lead_session_id?: string;
+}
+
+export interface AssignPayload {
+  task_id: string;
+  file_scope?: string[];
+  instructions?: string;
+}
+
+export interface HealthCheckPayload {
+  status: 'ok' | 'degraded' | 'failing';
+  uptime_seconds?: number;
+  memory_usage_mb?: number;
+}
+
+// Map of protocol types to their payload interfaces
+export type ProtocolPayloadMap = {
+  worker_done: WorkerDonePayload;
+  merge_ready: MergeReadyPayload;
+  merged: MergedPayload;
+  merge_failed: MergeFailedPayload;
+  escalation: EscalationPayload;
+  dispatch: DispatchPayload;
+  assign: AssignPayload;
+  health_check: HealthCheckPayload;
+};
+
+// Protocol message type identifiers
+export const PROTOCOL_TYPES: MessageType[] = [
+  'worker_done',
+  'merge_ready',
+  'merged',
+  'merge_failed',
+  'escalation',
+  'health_check',
+  'dispatch',
+  'assign',
+];
+
+// Payload template hints for compose form
+export const PAYLOAD_TEMPLATES: Record<string, string> = {
+  worker_done: JSON.stringify({ taskId: '', summary: '', filesModified: [] }, null, 2),
+  merge_ready: JSON.stringify({ branch: '', files: [] }, null, 2),
+  merged: JSON.stringify({ branch: '', merge_commit: '', conflicts_resolved: 0 }, null, 2),
+  merge_failed: JSON.stringify({ branch: '', reason: '', conflicting_files: [] }, null, 2),
+  escalation: JSON.stringify({ level: 1, reason: '' }, null, 2),
+  dispatch: JSON.stringify({ objective: '' }, null, 2),
+  assign: JSON.stringify({ task_id: '', file_scope: [], instructions: '' }, null, 2),
+  health_check: JSON.stringify({ status: 'ok', uptime_seconds: 0 }, null, 2),
+};
+
 // Merge statuses
 export type MergeStatus = 'pending' | 'merging' | 'merged' | 'conflict' | 'failed';
 export type MergeResolutionTier = 'clean-merge' | 'auto-resolve' | 'ai-resolve' | 'reimagine';
@@ -749,9 +833,21 @@ export interface ElectronAPI {
   mailUnreadCount: () => Promise<{ data: number; error: string | null }>;
   mailSend: (message: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>;
   mailMarkRead: (id: string) => Promise<{ data: unknown; error: string | null }>;
+  mailCheck: (
+    agentId: string,
+    agentName: string,
+  ) => Promise<{
+    data: { injected: number; messages: Message[]; contextWritten: boolean } | null;
+    error: string | null;
+  }>;
+  mailMarkAllRead: (agentName?: string) => Promise<{ data: unknown; error: string | null }>;
   mailPurge: (
     options?: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: string | null }>;
+  mailThread: (threadId: string) => Promise<{
+    data: { messages: Message[]; replyCount: number } | null;
+    error: string | null;
+  }>;
   mergeQueue: () => Promise<{ data: MergeQueueEntry[] | null; error: string | null }>;
   mergeEnqueue: (entry: {
     branch_name: string;

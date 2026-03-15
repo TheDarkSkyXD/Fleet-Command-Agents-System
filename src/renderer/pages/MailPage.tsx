@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FiAlertTriangle,
+  FiCheckCircle,
   FiChevronLeft,
   FiCircle,
+  FiCornerUpLeft,
   FiFilter,
   FiInbox,
   FiMail,
+  FiMessageSquare,
   FiRefreshCw,
   FiSearch,
   FiSend,
@@ -14,6 +17,7 @@ import {
 } from 'react-icons/fi';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { Message, MessagePriority, MessageType } from '../../shared/types';
+import { PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
 
 type MailTab = 'inbox' | 'outbox' | 'all';
 
@@ -24,6 +28,8 @@ interface ComposeForm {
   body: string;
   type: MessageType;
   priority: MessagePriority;
+  thread_id: string;
+  payload: string;
 }
 
 interface MailFilters {
@@ -33,6 +39,8 @@ interface MailFilters {
   agent: string;
 }
 
+const isProtocolType = (type: MessageType): boolean => PROTOCOL_TYPES.includes(type);
+
 const defaultCompose: ComposeForm = {
   from_agent: '',
   to_agent: '',
@@ -40,7 +48,22 @@ const defaultCompose: ComposeForm = {
   body: '',
   type: 'status',
   priority: 'normal',
+  thread_id: '',
+  payload: '',
 };
+
+/** Attempt to format a JSON string for display */
+function formatPayloadJson(raw: string): {
+  parsed: Record<string, unknown> | null;
+  formatted: string;
+} {
+  try {
+    const parsed = JSON.parse(raw);
+    return { parsed, formatted: JSON.stringify(parsed, null, 2) };
+  } catch {
+    return { parsed: null, formatted: raw };
+  }
+}
 
 const defaultFilters: MailFilters = {
   search: '',
@@ -130,6 +153,12 @@ export function MailPage() {
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null,
   );
+
+  // Thread state
+  const [threadMessages, setThreadMessages] = useState<Message[]>([]);
+  const [threadReplyCount, setThreadReplyCount] = useState(0);
+  const [showThread, setShowThread] = useState(false);
+  const [loadingThread, setLoadingThread] = useState(false);
 
   // Search and filter state
   const [filters, setFilters] = useState<MailFilters>(defaultFilters);
@@ -234,6 +263,8 @@ export function MailPage() {
     setSending(true);
     try {
       const id = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      // Use message ID as thread_id for new threads (no existing thread_id)
+      const threadId = composeForm.thread_id || id;
       const result = await window.electronAPI.mailSend({
         id,
         from_agent: composeForm.from_agent.trim(),
@@ -242,6 +273,8 @@ export function MailPage() {
         body: composeForm.body.trim() || null,
         type: composeForm.type,
         priority: composeForm.priority,
+        thread_id: threadId,
+        payload: composeForm.payload.trim() || undefined,
       });
       if (result.error) {
         setStatusMsg({ type: 'error', text: `Failed to send: ${result.error}` });
@@ -258,12 +291,57 @@ export function MailPage() {
     }
   };
 
+  const handleMarkAllRead = async () => {
+    const result = await window.electronAPI.mailMarkAllRead();
+    if (result.error) {
+      setStatusMsg({ type: 'error', text: `Failed: ${result.error}` });
+    } else {
+      setMessages((prev) => prev.map((m) => ({ ...m, read: 1 })));
+      setUnreadCount(0);
+      if (selectedMessage) {
+        setSelectedMessage({ ...selectedMessage, read: 1 });
+      }
+      setStatusMsg({ type: 'success', text: 'All messages marked as read' });
+    }
+  };
+
   const handlePurge = async () => {
     if (!confirm('Delete all messages? This cannot be undone.')) return;
     await window.electronAPI.mailPurge();
     setMessages([]);
     setUnreadCount(0);
     setSelectedMessage(null);
+  };
+
+  const loadThread = async (threadId: string) => {
+    setLoadingThread(true);
+    try {
+      const result = await window.electronAPI.mailThread(threadId);
+      if (result.data) {
+        setThreadMessages(result.data.messages);
+        setThreadReplyCount(result.data.replyCount);
+        setShowThread(true);
+      }
+    } catch (err) {
+      console.error('Failed to load thread:', err);
+    } finally {
+      setLoadingThread(false);
+    }
+  };
+
+  const handleReply = (msg: Message) => {
+    const threadId = msg.thread_id || msg.id;
+    setComposeForm({
+      ...defaultCompose,
+      from_agent: msg.to_agent,
+      to_agent: msg.from_agent,
+      subject: msg.subject ? `Re: ${msg.subject.replace(/^Re: /, '')}` : '',
+      type: msg.type,
+      priority: msg.priority,
+      thread_id: threadId,
+    });
+    setShowCompose(true);
+    setShowThread(false);
   };
 
   // Filter messages by tab
@@ -316,6 +394,16 @@ export function MailPage() {
           >
             <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+              title="Mark all as read"
+            >
+              <FiCheckCircle size={14} />
+            </button>
+          )}
           <button
             type="button"
             onClick={handlePurge}
@@ -685,12 +773,35 @@ export function MailPage() {
                 <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
                   <button
                     type="button"
-                    onClick={() => setSelectedMessage(null)}
+                    onClick={() => {
+                      setSelectedMessage(null);
+                      setShowThread(false);
+                    }}
                     className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200"
                   >
                     <FiChevronLeft size={16} /> Back
                   </button>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleReply(selectedMessage)}
+                      className="flex items-center gap-1 rounded-md border border-slate-600 px-2.5 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-700 hover:text-slate-100"
+                      title="Reply to this message"
+                    >
+                      <FiCornerUpLeft size={12} /> Reply
+                    </button>
+                    {selectedMessage.thread_id && (
+                      <button
+                        type="button"
+                        onClick={() => loadThread(selectedMessage.thread_id as string)}
+                        disabled={loadingThread}
+                        className="flex items-center gap-1 rounded-md border border-cyan-700 bg-cyan-900/30 px-2.5 py-1 text-xs text-cyan-300 transition-colors hover:bg-cyan-900/50"
+                        title="View thread conversation"
+                      >
+                        <FiMessageSquare size={12} />
+                        {loadingThread ? 'Loading...' : 'View Thread'}
+                      </button>
+                    )}
                     <span
                       className={`rounded border px-2 py-0.5 text-xs ${typeColor(selectedMessage.type)}`}
                     >
@@ -743,13 +854,122 @@ export function MailPage() {
                     </pre>
                   </div>
 
-                  {selectedMessage.payload && (
-                    <div className="mt-4">
-                      <h3 className="mb-2 text-sm font-medium text-slate-400">Payload</h3>
-                      <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
-                        <pre className="whitespace-pre-wrap font-mono text-xs text-slate-400">
-                          {selectedMessage.payload}
-                        </pre>
+                  {selectedMessage.payload &&
+                    (() => {
+                      const { parsed, formatted } = formatPayloadJson(selectedMessage.payload);
+                      return (
+                        <div className="mt-4">
+                          <h3 className="mb-2 text-sm font-medium text-slate-400">
+                            Payload
+                            {parsed && (
+                              <span className="ml-2 rounded bg-emerald-900/40 px-1.5 py-0.5 text-xs text-emerald-400">
+                                JSON
+                              </span>
+                            )}
+                          </h3>
+                          {parsed ? (
+                            <div className="rounded-lg border border-slate-700 bg-slate-950 p-4">
+                              <div className="space-y-1">
+                                {Object.entries(parsed).map(([key, value]) => (
+                                  <div key={key} className="flex gap-2 text-xs">
+                                    <span className="shrink-0 font-mono text-cyan-400">{key}:</span>
+                                    <span className="font-mono text-emerald-300">
+                                      {Array.isArray(value)
+                                        ? value.length > 0
+                                          ? `[${value.map((v) => JSON.stringify(v)).join(', ')}]`
+                                          : '[]'
+                                        : typeof value === 'object' && value !== null
+                                          ? JSON.stringify(value, null, 2)
+                                          : String(value)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              <details className="mt-3">
+                                <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-400">
+                                  Raw JSON
+                                </summary>
+                                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-slate-400">
+                                  {formatted}
+                                </pre>
+                              </details>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
+                              <pre className="whitespace-pre-wrap font-mono text-xs text-slate-400">
+                                {formatted}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                  {/* Thread conversation view */}
+                  {showThread && threadMessages.length > 0 && (
+                    <div className="mt-6">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                          <FiMessageSquare size={14} className="text-cyan-400" />
+                          Thread Conversation
+                          <span className="rounded-full bg-cyan-900/40 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                            {threadReplyCount} {threadReplyCount === 1 ? 'reply' : 'replies'}
+                          </span>
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowThread(false)}
+                          className="text-xs text-slate-500 hover:text-slate-300"
+                        >
+                          Hide thread
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {threadMessages.map((tmsg, idx) => (
+                          <div
+                            key={tmsg.id}
+                            className={`rounded-lg border p-3 ${
+                              tmsg.id === selectedMessage.id
+                                ? 'border-cyan-700 bg-cyan-950/30'
+                                : 'border-slate-700 bg-slate-900/50'
+                            }`}
+                          >
+                            <div className="mb-1.5 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-cyan-400">
+                                  {tmsg.from_agent}
+                                </span>
+                                <span className="text-[10px] text-slate-600">{'\u2192'}</span>
+                                <span className="text-xs font-medium text-green-400">
+                                  {tmsg.to_agent}
+                                </span>
+                                {idx === 0 && (
+                                  <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
+                                    ORIGINAL
+                                  </span>
+                                )}
+                                {tmsg.priority !== 'normal' && (
+                                  <span
+                                    className={`text-[10px] font-medium ${priorityColor(tmsg.priority)}`}
+                                  >
+                                    {tmsg.priority.toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-500">
+                                {formatDate(tmsg.created_at)}
+                              </span>
+                            </div>
+                            {tmsg.subject && (
+                              <p className="mb-1 text-xs font-medium text-slate-300">
+                                {tmsg.subject}
+                              </p>
+                            )}
+                            <pre className="whitespace-pre-wrap text-xs text-slate-400">
+                              {tmsg.body || '(empty)'}
+                            </pre>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -763,7 +983,17 @@ export function MailPage() {
               <div className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
                 {/* Compose header */}
                 <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-                  <h2 className="text-sm font-semibold text-slate-200">Compose Message</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-slate-200">
+                      {composeForm.thread_id ? 'Reply to Thread' : 'Compose Message'}
+                    </h2>
+                    {composeForm.thread_id && (
+                      <span className="rounded bg-cyan-900/40 px-1.5 py-0.5 text-[10px] font-medium text-cyan-300">
+                        <FiMessageSquare size={10} className="mr-1 inline" />
+                        thread
+                      </span>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowCompose(false)}
@@ -897,10 +1127,54 @@ export function MailPage() {
                         value={composeForm.body}
                         onChange={(e) => setComposeForm((f) => ({ ...f, body: e.target.value }))}
                         placeholder="Message body..."
-                        rows={8}
+                        rows={isProtocolType(composeForm.type) ? 4 : 8}
                         className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none resize-none"
                       />
                     </div>
+
+                    {isProtocolType(composeForm.type) && (
+                      <div>
+                        <div className="mb-1 flex items-center justify-between">
+                          <label
+                            htmlFor="compose-payload"
+                            className="block text-xs font-medium text-slate-400"
+                          >
+                            JSON Payload
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const template = PAYLOAD_TEMPLATES[composeForm.type];
+                              if (template) {
+                                setComposeForm((f) => ({ ...f, payload: template }));
+                              }
+                            }}
+                            className="text-xs text-blue-400 hover:text-blue-300"
+                          >
+                            Insert Template
+                          </button>
+                        </div>
+                        <textarea
+                          id="compose-payload"
+                          value={composeForm.payload}
+                          onChange={(e) =>
+                            setComposeForm((f) => ({ ...f, payload: e.target.value }))
+                          }
+                          placeholder={PAYLOAD_TEMPLATES[composeForm.type] || '{"key": "value"}'}
+                          rows={5}
+                          className="w-full rounded-md border border-slate-600 bg-slate-950 px-3 py-2 font-mono text-xs text-emerald-300 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none resize-none"
+                        />
+                        {composeForm.payload.trim() &&
+                          (() => {
+                            try {
+                              JSON.parse(composeForm.payload);
+                              return <p className="mt-1 text-xs text-emerald-500">Valid JSON</p>;
+                            } catch {
+                              return <p className="mt-1 text-xs text-red-400">Invalid JSON</p>;
+                            }
+                          })()}
+                      </div>
+                    )}
                   </div>
                 </div>
 

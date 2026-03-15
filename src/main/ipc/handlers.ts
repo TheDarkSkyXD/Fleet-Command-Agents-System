@@ -1194,7 +1194,54 @@ export function registerIpcHandlers(): void {
             break;
           }
           case 'worker_done': {
-            actionTaken = 'worker_completion_noted';
+            // Parse structured payload: {taskId, summary, filesModified}
+            const workerPayload = msg.payload as string | null;
+            let workerTaskId: string | null = null;
+            let workerSummary: string | null = null;
+            let workerFilesModified: string[] | null = null;
+
+            if (workerPayload) {
+              try {
+                const parsed = JSON.parse(workerPayload);
+                workerTaskId = parsed.taskId ?? null;
+                workerSummary = parsed.summary ?? null;
+                workerFilesModified = parsed.filesModified ?? null;
+              } catch {
+                // payload not valid JSON, use body as summary fallback
+                workerSummary = msgBody;
+              }
+            }
+
+            // Mark the agent's session as completed if found
+            const workerSession = loggedPrepare(
+              `SELECT * FROM sessions WHERE agent_name = ? AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+            ).get(fromAgent) as Record<string, unknown> | undefined;
+
+            if (workerSession) {
+              loggedPrepare(
+                `UPDATE sessions SET state = 'completed', updated_at = datetime('now') WHERE id = ?`,
+              ).run(workerSession.id);
+            }
+
+            // Record structured completion event
+            recordEvent({
+              eventType: 'custom',
+              agentName: coordinatorName,
+              sessionId: coordinatorId,
+              data: JSON.stringify({
+                action: 'worker_done_processed',
+                from_agent: fromAgent,
+                task_id: workerTaskId,
+                summary: workerSummary,
+                files_modified: workerFilesModified,
+              }),
+            });
+
+            log.info(
+              `[IPC] coordinator:poll-mail - worker_done from ${fromAgent}: task=${workerTaskId}, files=${workerFilesModified?.length ?? 0}`,
+            );
+
+            actionTaken = 'worker_completion_processed';
             break;
           }
           case 'error': {
@@ -1805,6 +1852,118 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Mail check with context injection - fetch unread messages for an agent and inject into terminal
+  ipcMain.handle('mail:check', (_event, agentId: string, agentName: string) => {
+    try {
+      // Fetch unread messages addressed to this agent
+      const unreadMessages = loggedPrepare(
+        'SELECT * FROM messages WHERE to_agent = ? AND read = 0 ORDER BY created_at ASC',
+      ).all(agentName) as Array<{
+        id: string;
+        from_agent: string;
+        to_agent: string;
+        subject: string | null;
+        body: string | null;
+        type: string;
+        priority: string;
+        created_at: string;
+      }>;
+
+      if (unreadMessages.length === 0) {
+        log.info(`[IPC] mail:check - No unread messages for agent ${agentName}`);
+        return { data: { injected: 0, messages: [] }, error: null };
+      }
+
+      // Format messages for context injection
+      const formattedLines: string[] = [
+        '',
+        `--- MAIL CHECK: ${unreadMessages.length} unread message(s) for ${agentName} ---`,
+      ];
+
+      for (const msg of unreadMessages) {
+        const priorityTag = msg.priority !== 'normal' ? ` [${msg.priority.toUpperCase()}]` : '';
+        formattedLines.push(`  From: ${msg.from_agent}${priorityTag}`);
+        formattedLines.push(`  Type: ${msg.type} | Time: ${msg.created_at}`);
+        if (msg.subject) {
+          formattedLines.push(`  Subject: ${msg.subject}`);
+        }
+        if (msg.body) {
+          formattedLines.push(`  Body: ${msg.body}`);
+        }
+        formattedLines.push('  ---');
+      }
+
+      formattedLines.push('--- END MAIL ---');
+      formattedLines.push('');
+
+      const contextPayload = formattedLines.join('\n');
+
+      // Inject into agent's terminal context
+      const written = agentProcessManager.write(agentId, contextPayload);
+
+      if (written) {
+        // Mark all injected messages as read
+        const messageIds = unreadMessages.map((m) => m.id);
+        const placeholders = messageIds.map(() => '?').join(',');
+        loggedPrepare(`UPDATE messages SET read = 1 WHERE id IN (${placeholders})`).run(
+          ...messageIds,
+        );
+
+        // Record mail_received events
+        for (const msg of unreadMessages) {
+          recordEvent({
+            eventType: 'mail_received',
+            agentName,
+            data: JSON.stringify({
+              from: msg.from_agent,
+              subject: msg.subject,
+              type: msg.type,
+            }),
+          });
+        }
+
+        log.info(
+          `[IPC] mail:check - Injected ${unreadMessages.length} messages into agent ${agentName} (${agentId}) context`,
+        );
+      } else {
+        log.warn(
+          `[IPC] mail:check - Agent ${agentName} (${agentId}) not running, could not inject context`,
+        );
+      }
+
+      return {
+        data: {
+          injected: written ? unreadMessages.length : 0,
+          messages: unreadMessages,
+          contextWritten: written,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('mail:check failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Mark all messages as read for an agent
+  ipcMain.handle('mail:mark-all-read', (_event, agentName?: string) => {
+    try {
+      if (agentName) {
+        loggedPrepare('UPDATE messages SET read = 1 WHERE to_agent = ? AND read = 0').run(
+          agentName,
+        );
+        log.info(`[IPC] mail:mark-all-read - Marked all messages for ${agentName} as read`);
+      } else {
+        loggedPrepare('UPDATE messages SET read = 1 WHERE read = 0').run();
+        log.info('[IPC] mail:mark-all-read - Marked all messages as read');
+      }
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('mail:mark-all-read failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
   ipcMain.handle(
     'mail:purge',
     (_event, options?: { agentName?: string; olderThanDays?: number }) => {
@@ -1829,6 +1988,23 @@ export function registerIpcHandlers(): void {
       }
     },
   );
+
+  // Mail thread - get all messages in a thread ordered chronologically
+  ipcMain.handle('mail:thread', (_event, threadId: string) => {
+    try {
+      const messages = loggedPrepare(
+        'SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at ASC',
+      ).all(threadId);
+      const replyCount = Math.max(0, messages.length - 1);
+      log.info(
+        `[IPC] mail:thread - SELECT returned ${messages.length} messages (${replyCount} replies) for thread ${threadId}`,
+      );
+      return { data: { messages, replyCount }, error: null };
+    } catch (error) {
+      log.error('mail:thread failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
 
   // Merge channels - all use real SQLite queries via loggedPrepare
 
