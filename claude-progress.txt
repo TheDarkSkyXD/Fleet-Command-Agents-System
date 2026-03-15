@@ -1,5 +1,29 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Rapid Click Guards & Resubmit Prevention)
+
+#### Feature #304: Rapid delete clicks handled safely - PASSING
+- Added stopLockRef guard to confirmStop in AgentsPage (prevents rapid stop button double-execution)
+- Added per-item deleteLockRef guard to handleDelete in TasksPage (tracks in-flight deletes per ID)
+- Added per-item deleteGroupLockRef guard to handleDeleteGroup in TasksPage
+- All guards use ref-based locking for protection against React batching race conditions
+- Backend agent:stop already handles gracefully with WHERE state NOT IN ('completed')
+
+#### Feature #305: Back and resubmit prevention - PASSING
+- Added createLockRef guard to handleCreate in TasksPage (prevents duplicate form submissions)
+- Create button already disabled via creating state, ref guard adds extra race condition protection
+- Form resets after successful creation (title cleared, form hidden) so back-nav shows empty form
+- Unique ID generation via generateId('issue') ensures no true duplicates even in edge cases
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - stopLockRef guard in confirmStop
+- MODIFIED: src/renderer/pages/TasksPage.tsx - deleteLockRef, deleteGroupLockRef, createLockRef guards
+
+#### Current Status
+- 306/366 features passing (added #304 and #305 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Form Dirty Tracking & 404 Deep Links)
 
 #### Feature #300: Refresh mid-form preserves or warns - PASSING
