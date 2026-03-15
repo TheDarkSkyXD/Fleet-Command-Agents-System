@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
+import { DebugPage } from '../pages/DebugPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { MetricsPage } from '../pages/MetricsPage';
@@ -105,14 +106,7 @@ function PageContent({
     case 'settings':
       return <SettingsPage />;
     case 'debug':
-      return (
-        <div>
-          <h1 className="text-2xl font-bold text-slate-50 mb-4">Debug</h1>
-          <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
-            <p className="text-slate-400">Debug terminal and log viewer</p>
-          </div>
-        </div>
-      );
+      return <DebugPage />;
     default:
       return (
         <div className="text-slate-400">

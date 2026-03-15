@@ -433,10 +433,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           return (
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleStop(row.original.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); handleStop(row.original.id); }}
               className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
               title="Stop agent"
             >
@@ -655,9 +652,6 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                     key={row.id}
                     className="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer"
                     onClick={() => onSelectAgent?.(row.original.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') onSelectAgent?.(row.original.id);
-                    }}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="px-4 py-3">
@@ -795,9 +789,9 @@ function AgentCard({
     <div
       className="rounded-lg border border-slate-700 bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors"
       onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onSelect?.();
-      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') onSelect?.(); }}
+      tabIndex={0}
+      role="button"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -841,10 +835,7 @@ function AgentCard({
           {/* Stop button */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStop();
-            }}
+            onClick={(e) => { e.stopPropagation(); onStop(); }}
             className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
             title="Stop agent"
           >

@@ -207,6 +207,15 @@ class AgentProcessManager {
       // Save token usage metrics to database
       this.saveMetrics(agentProcess, options);
 
+      // Record session_end event
+      this.recordEvent({
+        eventType: 'session_end',
+        agentName: options.agentName,
+        sessionId: options.id,
+        runId: options.runId,
+        data: JSON.stringify({ exitCode, signal, reason: 'process_exit' }),
+      });
+
       // Notify renderer of agent exit
       this.broadcastAgentEvent(options.id, 'exit', {
         exitCode,
@@ -346,9 +355,48 @@ class AgentProcessManager {
   }
 
   /**
-   * Parse stream-json output from Claude CLI to extract token usage.
+   * Record an event in the events table.
+   */
+  private recordEvent(params: {
+    eventType: string;
+    agentName?: string;
+    sessionId?: string;
+    runId?: string;
+    toolName?: string;
+    toolArgs?: string;
+    toolDurationMs?: number;
+    level?: string;
+    data?: string;
+  }): void {
+    try {
+      const db = getDatabase();
+      const id = `evt-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      db.prepare(
+        `INSERT INTO events (id, run_id, agent_name, session_id, event_type, tool_name, tool_args, tool_duration_ms, level, data)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        params.runId ?? null,
+        params.agentName ?? null,
+        params.sessionId ?? null,
+        params.eventType,
+        params.toolName ?? null,
+        params.toolArgs ?? null,
+        params.toolDurationMs ?? null,
+        params.level ?? 'info',
+        params.data ?? null,
+      );
+    } catch (error) {
+      log.error('[AgentProcessManager] Failed to record event:', error);
+    }
+  }
+
+  /**
+   * Parse stream-json output from Claude CLI to extract token usage and tool events.
    * Claude CLI stream-json format includes lines like:
    * {"type":"result","usage":{"input_tokens":1234,"output_tokens":567,"cache_read_input_tokens":89,"cache_creation_input_tokens":12}}
+   * {"type":"tool_use","name":"Read","input":{...}}
+   * {"type":"tool_result","name":"Read","duration_ms":123}
    */
   private parseStreamJsonForTokens(agent: AgentProcess, data: string): void {
     // Accumulate data - stream may split JSON across chunks
@@ -385,6 +433,52 @@ class AgentProcessManager {
           log.debug(
             `[AgentProcessManager] Token usage update for ${agent.agentName}: in=${agent.tokenUsage.inputTokens}, out=${agent.tokenUsage.outputTokens}, cacheRead=${agent.tokenUsage.cacheReadTokens}, cacheCreate=${agent.tokenUsage.cacheCreationTokens}`,
           );
+        }
+
+        // Track tool_start events (tool_use messages from Claude CLI)
+        if (parsed.type === 'tool_use' && parsed.name) {
+          this.recordEvent({
+            eventType: 'tool_start',
+            agentName: agent.agentName,
+            sessionId: agent.id,
+            toolName: parsed.name,
+            toolArgs: parsed.input ? JSON.stringify(parsed.input).substring(0, 500) : undefined,
+          });
+        }
+
+        // Track tool_end events (tool_result messages from Claude CLI)
+        if (parsed.type === 'tool_result' && parsed.name) {
+          this.recordEvent({
+            eventType: 'tool_end',
+            agentName: agent.agentName,
+            sessionId: agent.id,
+            toolName: parsed.name,
+            toolDurationMs: typeof parsed.duration_ms === 'number' ? parsed.duration_ms : undefined,
+          });
+        }
+
+        // Also detect content_block_start with tool_use type
+        if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
+          this.recordEvent({
+            eventType: 'tool_start',
+            agentName: agent.agentName,
+            sessionId: agent.id,
+            toolName: parsed.content_block.name,
+            toolArgs: parsed.content_block.input
+              ? JSON.stringify(parsed.content_block.input).substring(0, 500)
+              : undefined,
+          });
+        }
+
+        // Detect content_block_stop after tool_use - marks tool_end
+        if (parsed.type === 'content_block_stop' && parsed.content_block?.type === 'tool_result') {
+          this.recordEvent({
+            eventType: 'tool_end',
+            agentName: agent.agentName,
+            sessionId: agent.id,
+            toolName: parsed.content_block.name ?? 'unknown',
+            toolDurationMs: typeof parsed.duration_ms === 'number' ? parsed.duration_ms : undefined,
+          });
         }
       } catch {
         // Not valid JSON, ignore - this is expected for non-JSON terminal output

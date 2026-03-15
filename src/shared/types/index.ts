@@ -251,6 +251,16 @@ export interface AgentDefinition {
   updated_at: string;
 }
 
+// Tool stats aggregation
+export interface ToolStats {
+  tool_name: string;
+  usage_count: number;
+  avg_duration_ms: number | null;
+  min_duration_ms: number | null;
+  max_duration_ms: number | null;
+  total_duration_ms: number | null;
+}
+
 // Electron API type for renderer process
 // Health check response
 export interface HealthCheckResponse {
@@ -447,6 +457,26 @@ export interface ElectronAPI {
     updates: Record<string, unknown>,
   ) => Promise<{ data: Metric | null; error: string | null }>;
   metricsDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+
+  // Events
+  eventList: (filters?: { eventType?: string; agentName?: string; limit?: number }) => Promise<{
+    data: Event[] | null;
+    error: string | null;
+  }>;
+  eventCreate: (eventData: {
+    event_type: string;
+    agent_name?: string;
+    session_id?: string;
+    run_id?: string;
+    tool_name?: string;
+    tool_args?: string;
+    tool_duration_ms?: number;
+    level?: string;
+    data?: string;
+  }) => Promise<{ data: boolean; error: string | null }>;
+  eventToolStats: () => Promise<{ data: ToolStats[] | null; error: string | null }>;
+  eventBySession: (sessionId: string) => Promise<{ data: Event[] | null; error: string | null }>;
+  eventPurge: () => Promise<{ data: boolean; error: string | null }>;
 
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;

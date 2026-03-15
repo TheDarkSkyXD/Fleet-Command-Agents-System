@@ -25,6 +25,44 @@ function loggedPrepare(sql: string) {
   return db.prepare(sql);
 }
 
+/**
+ * Record an event in the events table.
+ * Used to track tool_start, tool_end, session_start, session_end, mail events.
+ */
+function recordEvent(params: {
+  eventType: string;
+  agentName?: string;
+  sessionId?: string;
+  runId?: string;
+  toolName?: string;
+  toolArgs?: string;
+  toolDurationMs?: number;
+  level?: string;
+  data?: string;
+}): void {
+  try {
+    const id = `evt-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    loggedPrepare(
+      `INSERT INTO events (id, run_id, agent_name, session_id, event_type, tool_name, tool_args, tool_duration_ms, level, data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      params.runId ?? null,
+      params.agentName ?? null,
+      params.sessionId ?? null,
+      params.eventType,
+      params.toolName ?? null,
+      params.toolArgs ?? null,
+      params.toolDurationMs ?? null,
+      params.level ?? 'info',
+      params.data ?? null,
+    );
+    log.debug(`[Event] Recorded: ${params.eventType} for ${params.agentName ?? 'system'}`);
+  } catch (error) {
+    log.error(`[Event] Failed to record event ${params.eventType}:`, error);
+  }
+}
+
 export function registerIpcHandlers(): void {
   // Health check - verifies DB connection and WAL mode
   ipcMain.handle('health:check', () => {
@@ -181,6 +219,16 @@ export function registerIpcHandlers(): void {
         log.info(
           `[IPC] agent:spawn - spawned node-pty process: ${options.agent_name} (${options.capability}), model=${model}, PID=${agentProcess.pid}`,
         );
+
+        // Record session_start event
+        recordEvent({
+          eventType: 'session_start',
+          agentName: options.agent_name,
+          sessionId: options.id,
+          runId: options.run_id,
+          data: JSON.stringify({ capability: options.capability, model, pid: agentProcess.pid }),
+        });
+
         return {
           data: { ...(session as Record<string, unknown>), model, pid: agentProcess.pid },
           error: null,
@@ -201,8 +249,20 @@ export function registerIpcHandlers(): void {
         `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
         WHERE id = ? AND state NOT IN ('completed')`,
       ).run(agentId);
-      const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(agentId);
+      const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(agentId) as
+        | Record<string, unknown>
+        | undefined;
       log.info(`[IPC] agent:stop - stopped pty process and updated session: ${agentId}`);
+
+      // Record session_end event
+      recordEvent({
+        eventType: 'session_end',
+        agentName: (session?.agent_name as string) ?? agentId,
+        sessionId: agentId,
+        runId: (session?.run_id as string) ?? undefined,
+        data: JSON.stringify({ reason: 'manual_stop' }),
+      });
+
       return { data: session, error: null };
     } catch (error) {
       log.error('agent:stop failed:', error);
@@ -466,6 +526,18 @@ export function registerIpcHandlers(): void {
         log.info(
           `[IPC] mail:send - INSERT message into real database: ${message.from_agent} -> ${message.to_agent}`,
         );
+
+        // Record mail_sent event
+        recordEvent({
+          eventType: 'mail_sent',
+          agentName: message.from_agent,
+          data: JSON.stringify({
+            to: message.to_agent,
+            subject: message.subject,
+            type: message.type,
+          }),
+        });
+
         return { data: true, error: null };
       } catch (error) {
         log.error('mail:send failed:', error);
@@ -1577,6 +1649,129 @@ export function registerIpcHandlers(): void {
       return { data: true, error: null };
     } catch (error) {
       log.error('metrics:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  // Event channels - event store tracking for tool usage, sessions, mail
+  ipcMain.handle(
+    'event:list',
+    (_event, filters?: { eventType?: string; agentName?: string; limit?: number }) => {
+      try {
+        let query = 'SELECT * FROM events';
+        const conditions: string[] = [];
+        const params: unknown[] = [];
+
+        if (filters?.eventType) {
+          conditions.push('event_type = ?');
+          params.push(filters.eventType);
+        }
+        if (filters?.agentName) {
+          conditions.push('agent_name = ?');
+          params.push(filters.agentName);
+        }
+        if (conditions.length > 0) {
+          query += ` WHERE ${conditions.join(' AND ')}`;
+        }
+        query += ' ORDER BY created_at DESC';
+        if (filters?.limit) {
+          query += ` LIMIT ${Number(filters.limit)}`;
+        }
+
+        const events = loggedPrepare(query).all(...params);
+        log.info(`[IPC] event:list - SELECT returned ${events.length} events from real database`);
+        return { data: events, error: null };
+      } catch (error) {
+        log.error('event:list failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'event:create',
+    (
+      _event,
+      eventData: {
+        event_type: string;
+        agent_name?: string;
+        session_id?: string;
+        run_id?: string;
+        tool_name?: string;
+        tool_args?: string;
+        tool_duration_ms?: number;
+        level?: string;
+        data?: string;
+      },
+    ) => {
+      try {
+        recordEvent({
+          eventType: eventData.event_type,
+          agentName: eventData.agent_name,
+          sessionId: eventData.session_id,
+          runId: eventData.run_id,
+          toolName: eventData.tool_name,
+          toolArgs: eventData.tool_args,
+          toolDurationMs: eventData.tool_duration_ms,
+          level: eventData.level,
+          data: eventData.data,
+        });
+        log.info(`[IPC] event:create - recorded ${eventData.event_type} event`);
+        return { data: true, error: null };
+      } catch (error) {
+        log.error('event:create failed:', error);
+        return { data: false, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('event:tool-stats', () => {
+    try {
+      const stats = loggedPrepare(`
+        SELECT
+          tool_name,
+          COUNT(*) as usage_count,
+          AVG(tool_duration_ms) as avg_duration_ms,
+          MIN(tool_duration_ms) as min_duration_ms,
+          MAX(tool_duration_ms) as max_duration_ms,
+          SUM(tool_duration_ms) as total_duration_ms
+        FROM events
+        WHERE event_type = 'tool_end' AND tool_name IS NOT NULL
+        GROUP BY tool_name
+        ORDER BY usage_count DESC
+      `).all();
+      log.info(
+        `[IPC] event:tool-stats - aggregated tool stats for ${stats.length} tools from real database`,
+      );
+      return { data: stats, error: null };
+    } catch (error) {
+      log.error('event:tool-stats failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('event:by-session', (_event, sessionId: string) => {
+    try {
+      const events = loggedPrepare(
+        'SELECT * FROM events WHERE session_id = ? ORDER BY created_at ASC',
+      ).all(sessionId);
+      log.info(
+        `[IPC] event:by-session - SELECT returned ${events.length} events for session=${sessionId}`,
+      );
+      return { data: events, error: null };
+    } catch (error) {
+      log.error('event:by-session failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('event:purge', () => {
+    try {
+      loggedPrepare('DELETE FROM events').run();
+      log.info('[IPC] event:purge - DELETE all events from real database');
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('event:purge failed:', error);
       return { data: false, error: String(error) };
     }
   });

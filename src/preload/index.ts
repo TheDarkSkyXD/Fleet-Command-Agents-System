@@ -123,6 +123,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('metrics:update', id, updates),
   metricsDelete: (id: string) => ipcRenderer.invoke('metrics:delete', id),
 
+  // Events
+  eventList: (filters?: { eventType?: string; agentName?: string; limit?: number }) =>
+    ipcRenderer.invoke('event:list', filters),
+  eventCreate: (eventData: {
+    event_type: string;
+    agent_name?: string;
+    session_id?: string;
+    run_id?: string;
+    tool_name?: string;
+    tool_args?: string;
+    tool_duration_ms?: number;
+    level?: string;
+    data?: string;
+  }) => ipcRenderer.invoke('event:create', eventData),
+  eventToolStats: () => ipcRenderer.invoke('event:tool-stats'),
+  eventBySession: (sessionId: string) => ipcRenderer.invoke('event:by-session', sessionId),
+  eventPurge: () => ipcRenderer.invoke('event:purge'),
+
   // System
   updateCheck: () => ipcRenderer.invoke('update:check'),
   doctorRun: () => ipcRenderer.invoke('doctor:run'),
