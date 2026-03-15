@@ -67,6 +67,49 @@ function ClassificationBadge({ classification }: { classification: ExpertiseClas
   );
 }
 
+function DomainBadge({ domain }: { domain: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 text-xs font-medium">
+      {domain}
+    </span>
+  );
+}
+
+/**
+ * Highlights occurrences of a search query within text.
+ * Returns an array of React elements with <mark> tags around matches.
+ */
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  if (!query || query.trim().length === 0) {
+    return <>{text}</>;
+  }
+
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escapedQuery})`, 'gi');
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        const isMatch = regex.test(part);
+        // Reset regex lastIndex since it's stateful with 'g' flag
+        regex.lastIndex = 0;
+        return isMatch ? (
+          <mark
+            key={`${i}-${part}`}
+            className="bg-yellow-500/30 text-yellow-200 rounded px-0.5"
+            data-testid="search-highlight"
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={`${i}-${part}`}>{part}</span>
+        );
+      })}
+    </>
+  );
+}
+
 export function ExpertisePage() {
   const [domains, setDomains] = useState<ExpertiseDomainSummary[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
@@ -74,6 +117,10 @@ export function ExpertisePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [globalSearchResults, setGlobalSearchResults] = useState<ExpertiseRecord[]>([]);
+  const [isGlobalSearching, setIsGlobalSearching] = useState(false);
+  const [isGlobalSearchActive, setIsGlobalSearchActive] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
@@ -133,6 +180,47 @@ export function ExpertisePage() {
     [typeFilter, searchQuery],
   );
 
+  const performGlobalSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setGlobalSearchResults([]);
+      setIsGlobalSearchActive(false);
+      return;
+    }
+    setIsGlobalSearching(true);
+    setIsGlobalSearchActive(true);
+    try {
+      const result = await window.electronAPI.expertiseList({ search: query.trim() });
+      if (result.data) {
+        // Sort by relevance: title matches first, then content matches
+        const sorted = [...result.data].sort((a, b) => {
+          const queryLower = query.toLowerCase();
+          const aTitleMatch = a.title.toLowerCase().includes(queryLower) ? 1 : 0;
+          const bTitleMatch = b.title.toLowerCase().includes(queryLower) ? 1 : 0;
+          if (aTitleMatch !== bTitleMatch) return bTitleMatch - aTitleMatch;
+          // Then by domain match
+          const aDomainMatch = a.domain.toLowerCase().includes(queryLower) ? 1 : 0;
+          const bDomainMatch = b.domain.toLowerCase().includes(queryLower) ? 1 : 0;
+          if (aDomainMatch !== bDomainMatch) return bDomainMatch - aDomainMatch;
+          // Then by recency
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        });
+        setGlobalSearchResults(sorted);
+      }
+    } catch (error) {
+      console.error('Global search failed:', error);
+    } finally {
+      setIsGlobalSearching(false);
+    }
+  }, []);
+
+  // Debounce global search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      performGlobalSearch(globalSearchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [globalSearchQuery, performGlobalSearch]);
+
   useEffect(() => {
     loadDomains();
   }, [loadDomains]);
@@ -154,6 +242,9 @@ export function ExpertisePage() {
     setSearchQuery('');
     setTypeFilter('');
     setExpandedRecordId(null);
+    setGlobalSearchQuery('');
+    setGlobalSearchResults([]);
+    setIsGlobalSearchActive(false);
   }, []);
 
   const handleCreate = useCallback(async () => {
@@ -197,10 +288,22 @@ export function ExpertisePage() {
       if (selectedDomain) {
         loadRecords(selectedDomain);
       }
+      if (isGlobalSearchActive && globalSearchQuery) {
+        performGlobalSearch(globalSearchQuery);
+      }
     } catch (error) {
       showStatus('error', `Failed to create: ${error}`);
     }
-  }, [newRecord, selectedDomain, showStatus, loadDomains, loadRecords]);
+  }, [
+    newRecord,
+    selectedDomain,
+    showStatus,
+    loadDomains,
+    loadRecords,
+    isGlobalSearchActive,
+    globalSearchQuery,
+    performGlobalSearch,
+  ]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -215,11 +318,22 @@ export function ExpertisePage() {
         if (selectedDomain) {
           loadRecords(selectedDomain);
         }
+        if (isGlobalSearchActive && globalSearchQuery) {
+          performGlobalSearch(globalSearchQuery);
+        }
       } catch (error) {
         showStatus('error', `Failed to delete: ${error}`);
       }
     },
-    [selectedDomain, showStatus, loadDomains, loadRecords],
+    [
+      selectedDomain,
+      showStatus,
+      loadDomains,
+      loadRecords,
+      isGlobalSearchActive,
+      globalSearchQuery,
+      performGlobalSearch,
+    ],
   );
 
   // Skeleton loader
@@ -282,8 +396,138 @@ export function ExpertisePage() {
         </button>
       </div>
 
-      {/* Domain list view */}
+      {/* Global search bar (shown on domain list view) */}
       {!selectedDomain && (
+        <div className="relative" data-testid="global-search-container">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+          <input
+            type="text"
+            value={globalSearchQuery}
+            onChange={(e) => setGlobalSearchQuery(e.target.value)}
+            placeholder="Search expertise across all domains..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2.5 pl-10 pr-10 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+            data-testid="global-expertise-search"
+          />
+          {globalSearchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setGlobalSearchQuery('');
+                setGlobalSearchResults([]);
+                setIsGlobalSearchActive(false);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 hover:text-slate-300"
+            >
+              <FiX size={14} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Global search results */}
+      {!selectedDomain && isGlobalSearchActive && (
+        <div data-testid="global-search-results">
+          <div className="mb-3 flex items-center gap-2 text-sm text-slate-400">
+            <FiSearch size={14} />
+            {isGlobalSearching ? (
+              <span>Searching...</span>
+            ) : (
+              <span>
+                {globalSearchResults.length} result{globalSearchResults.length !== 1 ? 's' : ''}{' '}
+                across {new Set(globalSearchResults.map((r) => r.domain)).size} domain
+                {new Set(globalSearchResults.map((r) => r.domain)).size !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {isGlobalSearching ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-20 animate-pulse rounded-lg bg-slate-800" />
+              ))}
+            </div>
+          ) : globalSearchResults.length === 0 ? (
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-8 text-center">
+              <p className="text-slate-400">No results found for &quot;{globalSearchQuery}&quot;</p>
+            </div>
+          ) : (
+            <div className="space-y-2" data-testid="global-search-records-list">
+              {globalSearchResults.map((record) => (
+                <div
+                  key={record.id}
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 transition-colors hover:border-slate-600"
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedRecordId(expandedRecordId === record.id ? null : record.id)
+                    }
+                    className="flex w-full items-center gap-3 p-3 text-left"
+                    data-testid={`search-result-${record.id}`}
+                  >
+                    <FiChevronRight
+                      size={14}
+                      className={`flex-shrink-0 text-slate-500 transition-transform ${expandedRecordId === record.id ? 'rotate-90' : ''}`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-slate-100 truncate">
+                          <HighlightedText text={record.title} query={globalSearchQuery} />
+                        </span>
+                        <DomainBadge domain={record.domain} />
+                        <TypeBadge type={record.type} />
+                        <ClassificationBadge classification={record.classification} />
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-3 text-xs text-slate-500">
+                        {record.agent_name && <span>by {record.agent_name}</span>}
+                        <span>{new Date(record.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(record.id);
+                      }}
+                      className="flex-shrink-0 rounded p-1.5 text-slate-500 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+                      title="Delete record"
+                    >
+                      <FiTrash2 size={14} />
+                    </button>
+                  </button>
+
+                  {expandedRecordId === record.id && (
+                    <div className="border-t border-slate-700 p-4">
+                      <p className="whitespace-pre-wrap text-sm text-slate-300">
+                        <HighlightedText text={record.content} query={globalSearchQuery} />
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                        {record.source_file && (
+                          <span className="flex items-center gap-1">
+                            <FiDatabase size={12} />
+                            {record.source_file}
+                          </span>
+                        )}
+                        {record.tags && (
+                          <span className="flex items-center gap-1">
+                            <FiTag size={12} />
+                            {record.tags}
+                          </span>
+                        )}
+                        <span>ID: {record.id}</span>
+                        <span>Updated: {new Date(record.updated_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Domain list view */}
+      {!selectedDomain && !isGlobalSearchActive && (
         <div>
           {domains.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-12 text-center">
@@ -407,7 +651,9 @@ export function ExpertisePage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-slate-100 truncate">{record.title}</span>
+                        <span className="font-medium text-slate-100 truncate">
+                          <HighlightedText text={record.title} query={searchQuery} />
+                        </span>
                         <TypeBadge type={record.type} />
                         <ClassificationBadge classification={record.classification} />
                       </div>
@@ -432,7 +678,9 @@ export function ExpertisePage() {
                   {/* Expanded content */}
                   {expandedRecordId === record.id && (
                     <div className="border-t border-slate-700 p-4">
-                      <p className="whitespace-pre-wrap text-sm text-slate-300">{record.content}</p>
+                      <p className="whitespace-pre-wrap text-sm text-slate-300">
+                        <HighlightedText text={record.content} query={searchQuery} />
+                      </p>
                       <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
                         {record.source_file && (
                           <span className="flex items-center gap-1">
