@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Doctor Config Validation & DB Integrity)
+
+#### Feature #206: Doctor config validation - PASSING
+- Added Config check to doctor:run IPC handler
+- Validates active project exists, .overstory/config.json is present and parseable
+- Checks required fields: version (number), project.name (string), project.path (string + exists), settings section
+- Validates settings values: maxConcurrentAgents (positive number), defaultModel (string)
+- Reports all issues found in detail string
+- Added auto-fix handler that creates/reinitializes config file with defaults
+- Added FiFileText icon in DoctorPage UI
+
+#### Feature #207: Doctor database integrity checks - PASSING
+- Added DB Integrity check to doctor:run IPC handler
+- Runs PRAGMA integrity_check on fleet-command.db SQLite database
+- Verifies WAL journal mode is enabled
+- Checks all 26 expected tables exist (sessions, runs, messages, events, metrics, etc.)
+- Reports missing tables, integrity failures, and WAL mode status
+- Added auto-fix handler for WAL mode re-enable and integrity verification
+- Added FiHardDrive icon in DoctorPage UI
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added checks #5 (Config) and #6 (DB Integrity) to doctor:run, plus fix handlers
+- MODIFIED: src/renderer/pages/DoctorPage.tsx - Added FiFileText, FiHardDrive icons for new checks
+
+#### Current Status
+- 213/366 features passing (added #206 and #207 this session)
+- All code passes Biome lint (only pre-existing noUnusedVariables warning on line 8292)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Per-Capability Aggregation & Metrics Export)
 
 #### Feature #185: Per-capability token aggregation - PASSING
