@@ -120,6 +120,21 @@
 - 7/366 features passing (added #6 and #104 this session)
 - Infrastructure features all complete, now working on UI features
 
+### Session: 2026-03-15 (Sidebar Features)
+
+#### Feature #7: Sidebar navigation displays all menu items - PASSING
+- Already implemented in Sidebar.tsx with all 6 nav items: Agents, Mail, Merge, Tasks, Debug, Settings
+- Each item has an icon (FiUsers, FiMail, FiGitMerge, FiCheckSquare, FiTerminal, FiSettings)
+- Active state highlighted with blue color scheme
+
+#### Feature #17: Sidebar collapse toggle - PASSING
+- Already implemented: toggle button with chevron icons
+- Collapsed (w-16) shows icons only, expanded (w-56) shows icons + labels
+- Smooth CSS transition, tooltip on collapsed items
+
+#### Current Status
+- 13/366 features passing (added #7 and #17 this session)
+
 #### What's Next
 - Continue with next assigned features
 - Note: npm install requires --ignore-scripts flag (electron-builder postinstall has module issues)
