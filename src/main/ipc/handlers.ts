@@ -1,5 +1,5 @@
 import { exec, execSync } from 'node:child_process';
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
 import {
@@ -491,6 +491,103 @@ export function registerIpcHandlers(): void {
       return { data: null, error: String(error) };
     }
   });
+
+  ipcMain.handle(
+    'agent:resume',
+    (
+      _event,
+      options: {
+        id: string;
+        agent_name: string;
+        capability: string;
+        model?: string;
+        run_id?: string;
+        task_id?: string;
+        parent_agent?: string;
+        worktree_path?: string;
+        branch_name?: string;
+        depth?: number;
+        resume_session_id: string;
+        file_scope?: string;
+      },
+    ) => {
+      try {
+        const capability = options.capability as AgentCapability;
+        const model = options.model || getDefaultModel(capability);
+
+        // Resume agent via AgentProcessManager with --resume flag
+        const agentProcess = agentProcessManager.resume({
+          id: options.id,
+          agentName: options.agent_name,
+          capability,
+          model,
+          worktreePath: options.worktree_path,
+          branchName: options.branch_name,
+          taskId: options.task_id,
+          parentAgent: options.parent_agent,
+          runId: options.run_id,
+          depth: options.depth,
+          resumeSessionId: options.resume_session_id,
+        });
+
+        // Insert new session record (resumed sessions get a new session ID)
+        loggedPrepare(
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid, file_scope)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?, ?)`,
+        ).run(
+          options.id,
+          options.agent_name,
+          options.capability,
+          model,
+          options.run_id ?? null,
+          options.task_id ?? null,
+          options.parent_agent ?? null,
+          options.worktree_path ?? null,
+          options.branch_name ?? null,
+          options.depth ?? 0,
+          agentProcess.pid,
+          options.file_scope ?? null,
+        );
+
+        // Transition to 'working' state
+        loggedPrepare(
+          `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
+        ).run(options.id);
+
+        const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(options.id);
+        log.info(
+          `[IPC] agent:resume - resumed session ${options.resume_session_id} as ${options.id}, agent: ${options.agent_name}, PID=${agentProcess.pid}`,
+        );
+
+        // Record session_start event with resume info
+        recordEvent({
+          eventType: 'session_start',
+          agentName: options.agent_name,
+          sessionId: options.id,
+          runId: options.run_id,
+          data: JSON.stringify({
+            capability: options.capability,
+            model,
+            pid: agentProcess.pid,
+            resumed_from: options.resume_session_id,
+          }),
+        });
+
+        return {
+          data: {
+            ...(session as Record<string, unknown>),
+            model,
+            pid: agentProcess.pid,
+            resumed_from: options.resume_session_id,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('agent:resume failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   // Scope overlap detection - check if file paths conflict with active builder scopes
   ipcMain.handle('scope:checkOverlap', (_event, filePaths: string[], excludeSessionId?: string) => {
@@ -4698,6 +4795,25 @@ export function registerIpcHandlers(): void {
       return { data: results, error: null };
     } catch (error) {
       log.error('hook:deploy failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Dialog - folder picker
+  ipcMain.handle('dialog:selectFolder', async () => {
+    try {
+      const windows = BrowserWindow.getAllWindows();
+      const parentWindow = windows.find((w) => !w.isDestroyed()) || null;
+      const result = await dialog.showOpenDialog(parentWindow as BrowserWindow, {
+        properties: ['openDirectory'],
+        title: 'Select Project Folder',
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { data: null, error: null };
+      }
+      return { data: result.filePaths[0], error: null };
+    } catch (error) {
+      log.error('dialog:selectFolder failed:', error);
       return { data: null, error: String(error) };
     }
   });

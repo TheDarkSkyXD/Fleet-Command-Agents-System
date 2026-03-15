@@ -14,8 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agentStop: (name: string) => ipcRenderer.invoke('agent:stop', name),
   agentStopAll: () => ipcRenderer.invoke('agent:stop-all'),
   agentNudge: (name: string) => ipcRenderer.invoke('agent:nudge', name),
-  agentResume: (options: Record<string, unknown>) =>
-    ipcRenderer.invoke('agent:resume', options),
+  agentResume: (options: Record<string, unknown>) => ipcRenderer.invoke('agent:resume', options),
 
   // Scope overlap detection
   scopeCheckOverlap: (filePaths: string[], excludeSessionId?: string) =>

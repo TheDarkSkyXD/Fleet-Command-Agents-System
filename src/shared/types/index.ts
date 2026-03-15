@@ -581,6 +581,21 @@ export interface AgentSpawnRequest {
   file_scope?: string;
 }
 
+export interface AgentResumeRequest {
+  id: string;
+  agent_name: string;
+  capability: AgentCapability;
+  model?: string;
+  run_id?: string;
+  task_id?: string;
+  parent_agent?: string;
+  worktree_path?: string;
+  branch_name?: string;
+  depth?: number;
+  resume_session_id: string;
+  file_scope?: string;
+}
+
 // Running agent process info from main process
 export interface AgentProcessInfo {
   id: string;
@@ -604,6 +619,10 @@ export interface ElectronAPI {
   agentStop: (name: string) => Promise<{ data: unknown; error: string | null }>;
   agentStopAll: () => Promise<{ data: unknown; error: string | null }>;
   agentNudge: (name: string) => Promise<{ data: unknown; error: string | null }>;
+  agentResume: (options: AgentResumeRequest) => Promise<{
+    data: (Session & { model: string; pid: number; resumed_from: string }) | null;
+    error: string | null;
+  }>;
   // Scope overlap detection
   scopeCheckOverlap: (
     filePaths: string[],
