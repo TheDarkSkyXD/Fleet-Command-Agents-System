@@ -1,5 +1,45 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Expertise Management & Global Search)
+
+#### Feature #162: View expertise records by domain - PASSING
+- Created expertise_records SQLite table with domain, title, content, type (6 types), classification (3 levels), agent_name, source_file, tags
+- Added indexes on domain, type, classification, agent_name for query performance
+- 6 IPC handlers: expertise:list (with filters), expertise:domains (with type breakdown), expertise:create, expertise:get, expertise:delete, expertise:update
+- Preload bridge methods and shared types (ExpertiseRecord, ExpertiseDomainSummary)
+- ExpertisePage with domain cards grid showing record count and type breakdown
+- Click domain to browse records with search and type filter
+- Expandable record details showing content, source file, tags, timestamps
+- Create form modal with all fields (domain, title, content, type, classification, agent name, source file, tags)
+- Delete records with immediate refresh
+- Added to Sidebar (FiBook icon), AppLayout routing, CommandPalette
+
+#### Feature #164: Search expertise across all domains - PASSING
+- Global search bar on domain list view with placeholder "Search expertise across all domains..."
+- Debounced search (300ms) via expertiseList IPC with search filter
+- Results ranked by relevance: title matches first, domain matches second, then recency
+- HighlightedText component wraps matching text in yellow <mark> tags
+- Highlighting applied in both global and domain-scoped search results
+- DomainBadge shows which domain each result belongs to
+- Result count shows "X results across Y domains"
+- Clear button (X) to dismiss search and return to domain view
+- Loading skeletons during search
+
+#### Files Created/Modified
+- MODIFIED: src/main/db/database.ts - Added expertise_records table with 4 indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added 6 expertise IPC handlers
+- MODIFIED: src/preload/index.ts - Added expertise bridge methods
+- MODIFIED: src/shared/types/index.ts - Added ExpertiseRecord, ExpertiseDomainSummary types + ElectronAPI methods
+- NEW: src/renderer/pages/ExpertisePage.tsx - Full expertise page with domain view, records, global search, highlighting
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Expertise nav item
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added ExpertisePage routing
+- MODIFIED: src/renderer/components/CommandPalette.tsx - Added Expertise to command palette
+
+#### Current Status
+- 59/366 features passing (added #162 and #164 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Checkpoint Save & Restore)
 
 #### Feature #151: Checkpoint save on app close - PASSING
