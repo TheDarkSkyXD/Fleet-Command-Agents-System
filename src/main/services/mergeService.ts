@@ -333,7 +333,7 @@ function resolveFileConflicts(content: string): { resolved: string; allResolved:
         resultLines.push(lines[markerStart]); // <<<<<<<
         resultLines.push(...oursLines);
         if (hasBase) {
-          resultLines.push(`||||||| base`);
+          resultLines.push('||||||| base');
           resultLines.push(...baseLines);
         }
         resultLines.push('=======');
