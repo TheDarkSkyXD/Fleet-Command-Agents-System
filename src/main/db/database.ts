@@ -34,6 +34,7 @@ export async function initDatabase(): Promise<void> {
       run_id TEXT,
       agent_name TEXT NOT NULL,
       capability TEXT NOT NULL,
+      model TEXT,
       state TEXT NOT NULL DEFAULT 'booting' CHECK(state IN ('booting', 'working', 'completed', 'stalled', 'zombie')),
       pid INTEGER,
       worktree_path TEXT,
@@ -348,6 +349,13 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);
     CREATE INDEX IF NOT EXISTS idx_expertise_agent ON expertise_records(agent_name);
   `);
+
+  // Migrations: add model column to sessions if not present
+  try {
+    db.prepare("SELECT model FROM sessions LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE sessions ADD COLUMN model TEXT");
+  }
 
   // Seed default agent definitions if table is empty
   const defCount = db.prepare('SELECT COUNT(*) as cnt FROM agent_definitions').get() as {

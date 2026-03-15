@@ -127,6 +127,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   projectDelete: (id: string) => ipcRenderer.invoke('project:delete', id),
   projectSwitch: (id: string) => ipcRenderer.invoke('project:switch', id),
   projectGetActive: () => ipcRenderer.invoke('project:get-active'),
+  projectFileTree: (rootPath: string, maxDepth?: number) =>
+    ipcRenderer.invoke('project:file-tree', rootPath, maxDepth),
 
   // Worktrees
   worktreeList: (repoPath: string) => ipcRenderer.invoke('worktree:list', repoPath),

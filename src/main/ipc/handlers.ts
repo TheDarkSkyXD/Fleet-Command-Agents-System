@@ -202,14 +202,15 @@ export function registerIpcHandlers(): void {
           prompt: options.prompt,
         });
 
-        // Insert session record into database with PID
+        // Insert session record into database with PID and model
         loggedPrepare(
-          `INSERT INTO sessions (id, agent_name, capability, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?)`,
+          `INSERT INTO sessions (id, agent_name, capability, model, run_id, task_id, parent_agent, worktree_path, branch_name, depth, state, pid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booting', ?)`,
         ).run(
           options.id,
           options.agent_name,
           options.capability,
+          model,
           options.run_id ?? null,
           options.task_id ?? null,
           options.parent_agent ?? null,
@@ -1459,6 +1460,80 @@ export function registerIpcHandlers(): void {
       return { data: project || null, error: null };
     } catch (error) {
       log.error('project:get-active failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // File tree listing for file scope picker
+  ipcMain.handle('project:file-tree', async (_event, rootPath: string, maxDepth = 4) => {
+    try {
+      const fs = await import('node:fs/promises');
+      const path = await import('node:path');
+
+      interface FileTreeNode {
+        name: string;
+        path: string;
+        relativePath: string;
+        isDirectory: boolean;
+        children?: FileTreeNode[];
+      }
+
+      const IGNORED_DIRS = new Set([
+        'node_modules', '.git', '.next', '.nuxt', 'dist', 'build', 'out',
+        '.cache', '.turbo', '__pycache__', '.venv', 'venv', 'coverage',
+        '.overstory', '.autoforge', '.claude', '.playwright',
+      ]);
+
+      async function readDir(dirPath: string, depth: number): Promise<FileTreeNode[]> {
+        if (depth > maxDepth) return [];
+        try {
+          const entries = await fs.readdir(dirPath, { withFileTypes: true });
+          const nodes: FileTreeNode[] = [];
+
+          // Sort: directories first, then files, alphabetical
+          const sorted = entries
+            .filter((e) => !e.name.startsWith('.') || e.isDirectory())
+            .sort((a, b) => {
+              if (a.isDirectory() && !b.isDirectory()) return -1;
+              if (!a.isDirectory() && b.isDirectory()) return 1;
+              return a.name.localeCompare(b.name);
+            });
+
+          for (const entry of sorted) {
+            if (IGNORED_DIRS.has(entry.name)) continue;
+
+            const fullPath = path.join(dirPath, entry.name);
+            const relativePath = path.relative(rootPath, fullPath).replace(/\\/g, '/');
+
+            if (entry.isDirectory()) {
+              const children = await readDir(fullPath, depth + 1);
+              nodes.push({
+                name: entry.name,
+                path: fullPath,
+                relativePath,
+                isDirectory: true,
+                children,
+              });
+            } else {
+              nodes.push({
+                name: entry.name,
+                path: fullPath,
+                relativePath,
+                isDirectory: false,
+              });
+            }
+          }
+          return nodes;
+        } catch {
+          return [];
+        }
+      }
+
+      const tree = await readDir(rootPath, 0);
+      log.info(`[IPC] project:file-tree - scanned directory: ${rootPath}`);
+      return { data: tree, error: null };
+    } catch (error) {
+      log.error('project:file-tree failed:', error);
       return { data: null, error: String(error) };
     }
   });

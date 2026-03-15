@@ -6,6 +6,7 @@ import { DebugPage } from '../pages/DebugPage';
 import { DiscoveryPage } from '../pages/DiscoveryPage';
 import { ExpertisePage } from '../pages/ExpertisePage';
 import { GuardRulesPage } from '../pages/GuardRulesPage';
+import { HooksPage } from '../pages/HooksPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { MetricsPage } from '../pages/MetricsPage';
@@ -146,6 +147,12 @@ function PageContent({
       return (
         <ErrorBoundary sectionName="Guard Rules">
           <GuardRulesPage />
+        </ErrorBoundary>
+      );
+    case 'hooks':
+      return (
+        <ErrorBoundary sectionName="Hooks">
+          <HooksPage />
         </ErrorBoundary>
       );
     case 'tasks':

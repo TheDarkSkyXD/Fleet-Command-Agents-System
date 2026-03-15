@@ -1,4 +1,5 @@
 import {
+  FiAnchor,
   FiBarChart2,
   FiBook,
   FiBookOpen,
@@ -31,6 +32,7 @@ const navItems = [
   { id: 'worktrees', label: 'Worktrees', icon: FiGitBranch },
   { id: 'definitions', label: 'Definitions', icon: FiBookOpen },
   { id: 'guard-rules', label: 'Guard Rules', icon: FiShield },
+  { id: 'hooks', label: 'Hooks', icon: FiAnchor },
   { id: 'tasks', label: 'Tasks', icon: FiCheckSquare },
   { id: 'discovery', label: 'Discovery', icon: FiSearch },
   { id: 'prompts', label: 'Prompts', icon: FiFileText },

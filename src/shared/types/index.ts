@@ -55,6 +55,7 @@ export interface Session {
   run_id: string | null;
   agent_name: string;
   capability: AgentCapability;
+  model: string | null;
   state: AgentState;
   pid: number | null;
   worktree_path: string | null;
@@ -255,6 +256,15 @@ export interface Worktree {
   isBare: boolean;
   agentName: string | null;
   status: 'clean' | 'dirty' | 'unknown';
+}
+
+// File tree node for file scope picker
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  relativePath: string;
+  isDirectory: boolean;
+  children?: FileTreeNode[];
 }
 
 // Agent Definition types
@@ -637,6 +647,10 @@ export interface ElectronAPI {
   projectDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
   projectSwitch: (id: string) => Promise<{ data: Project | null; error: string | null }>;
   projectGetActive: () => Promise<{ data: Project | null; error: string | null }>;
+  projectFileTree: (
+    rootPath: string,
+    maxDepth?: number,
+  ) => Promise<{ data: FileTreeNode[] | null; error: string | null }>;
 
   // Worktrees
   worktreeList: (repoPath: string) => Promise<{ data: Worktree[] | null; error: string | null }>;
