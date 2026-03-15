@@ -305,12 +305,57 @@ export function MailPage() {
     }
   };
 
-  const handlePurge = async () => {
-    if (!confirm('Delete all messages? This cannot be undone.')) return;
-    await window.electronAPI.mailPurge();
+  // Purge state
+  const [showPurgeMenu, setShowPurgeMenu] = useState(false);
+  const [purgeAgentName, setPurgeAgentName] = useState('');
+  const purgeMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close purge menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (purgeMenuRef.current && !purgeMenuRef.current.contains(e.target as Node)) {
+        setShowPurgeMenu(false);
+      }
+    };
+    if (showPurgeMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showPurgeMenu]);
+
+  const handlePurgeAll = async () => {
+    if (!confirm('Delete ALL messages? This cannot be undone.')) return;
+    const result = await window.electronAPI.mailPurge();
     setMessages([]);
     setUnreadCount(0);
     setSelectedMessage(null);
+    setShowPurgeMenu(false);
+    const deleted = result?.data?.deleted ?? 0;
+    setStatusMsg({ type: 'success', text: `Purged all messages (${deleted} removed)` });
+  };
+
+  const handlePurgeByAge = async (hours: number) => {
+    const label = hours >= 24 ? `${hours / 24} day(s)` : `${hours} hour(s)`;
+    if (!confirm(`Delete messages older than ${label}? This cannot be undone.`)) return;
+    if (hours >= 24) {
+      await window.electronAPI.mailPurge({ olderThanDays: hours / 24 });
+    } else {
+      await window.electronAPI.mailPurge({ olderThanHours: hours });
+    }
+    setShowPurgeMenu(false);
+    loadMessages();
+    setStatusMsg({ type: 'success', text: `Purged messages older than ${label}` });
+  };
+
+  const handlePurgeByAgent = async () => {
+    const name = purgeAgentName.trim();
+    if (!name) return;
+    if (!confirm(`Delete all messages for agent "${name}"? This cannot be undone.`)) return;
+    await window.electronAPI.mailPurge({ agentName: name });
+    setPurgeAgentName('');
+    setShowPurgeMenu(false);
+    loadMessages();
+    setStatusMsg({ type: 'success', text: `Purged messages for agent "${name}"` });
   };
 
   const loadThread = async (threadId: string) => {

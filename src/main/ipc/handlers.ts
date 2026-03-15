@@ -2025,25 +2025,40 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'mail:purge',
-    (_event, options?: { agentName?: string; olderThanDays?: number }) => {
+    (
+      _event,
+      options?: {
+        agentName?: string;
+        olderThanDays?: number;
+        olderThanHours?: number;
+      },
+    ) => {
       try {
+        let info: { changes: number };
         if (options?.agentName) {
-          loggedPrepare('DELETE FROM messages WHERE from_agent = ? OR to_agent = ?').run(
-            options.agentName,
-            options.agentName,
-          );
+          info = loggedPrepare(
+            'DELETE FROM messages WHERE from_agent = ? OR to_agent = ?',
+          ).run(options.agentName, options.agentName) as { changes: number };
+        } else if (options?.olderThanHours) {
+          info = loggedPrepare(
+            `DELETE FROM messages WHERE created_at < datetime('now', '-' || ? || ' hours')`,
+          ).run(options.olderThanHours) as { changes: number };
         } else if (options?.olderThanDays) {
-          loggedPrepare(
+          info = loggedPrepare(
             `DELETE FROM messages WHERE created_at < datetime('now', '-' || ? || ' days')`,
-          ).run(options.olderThanDays);
+          ).run(options.olderThanDays) as { changes: number };
         } else {
-          loggedPrepare('DELETE FROM messages').run();
+          info = loggedPrepare('DELETE FROM messages').run() as {
+            changes: number;
+          };
         }
-        log.info('[IPC] mail:purge - DELETE executed on real database');
-        return { data: true, error: null };
+        log.info(
+          `[IPC] mail:purge - DELETE removed ${info.changes} messages from real database`,
+        );
+        return { data: { deleted: info.changes }, error: null };
       } catch (error) {
         log.error('mail:purge failed:', error);
-        return { data: false, error: String(error) };
+        return { data: null, error: String(error) };
       }
     },
   );
