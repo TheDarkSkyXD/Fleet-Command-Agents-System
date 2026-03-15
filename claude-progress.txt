@@ -4665,3 +4665,27 @@
 - 316/366 features passing (added #315 and #316 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Search Input Sanitization)
+
+#### Feature #317: Search with whitespace only returns all or empty - PASSING
+- Added .trim() checks to all search filter logic (AgentsPage globalFilter, ExpertisePage, DebugPage)
+- Whitespace-only search queries now treated as empty, returning all results
+- DebugPage hasFilters and highlightMessage also use trimmed check
+- ExpertisePage HighlightedText already had trim guard
+
+#### Feature #318: Long search strings handled gracefully - PASSING
+- Added maxLength=200 to all search inputs (AgentsPage, ExpertisePage x2, DebugPage)
+- Backend IPC handlers (mail, debug logs, expertise) trim and truncate search terms to 200 chars
+- .trim().slice(0, 200) applied before SQL LIKE queries prevents performance issues
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - globalFilter trim, maxLength
+- MODIFIED: src/renderer/pages/ExpertisePage.tsx - searchQuery trim, maxLength on both inputs
+- MODIFIED: src/renderer/pages/DebugPage.tsx - searchQuery trim, hasFilters trim, highlight trim, maxLength
+- MODIFIED: src/main/ipc/handlers.ts - trim+slice on 3 search handlers (mail, debug, expertise)
+
+#### Current Status
+- 317/366 features passing (added #317 and #318 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
