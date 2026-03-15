@@ -1,5 +1,31 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Styled Modals for Stop All and Cleanup)
+
+#### Feature #262: Styled modal for stop all agents - PASSING
+- StopConfirmDialog already had comprehensive dark theme styling
+- Enhanced with backdrop-blur-sm on overlay, ring-1 ring-black/20 for depth
+- Added optional testId prop, specific data-testid for stop-all variant
+- Improved warning message clarity with destructive action suffix
+
+#### Feature #263: Styled modal for nuclear cleanup - PASSING
+- Replaced plain div dialog with AnimatePresence + motion.div for animated entrance/exit
+- Spring animation (stiffness 400, damping 30, mass 0.8)
+- Red-tinted border and ring glow for danger emphasis
+- Danger-styled header with red accent background and Destructive Operation badge
+- Prominent danger warning callout box with FiZap icon and backup reminder
+- Red Confirm Destruction button with FiTrash2 icon and shadow-red glow
+- data-testid attributes for nuclear-confirm-dialog and nuclear-confirm-modal
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - StopConfirmDialog testId prop, backdrop-blur
+- MODIFIED: src/renderer/pages/NuclearCleanupPage.tsx - Animated cleanup modal with danger styling
+
+#### Current Status
+- 262/366 features passing (added #262 and #263 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Zombie Error Icon & Scope Visualization)
 
 #### Feature #247: Error icon on zombie agents - PASSING
