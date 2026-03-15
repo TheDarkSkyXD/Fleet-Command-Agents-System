@@ -1507,6 +1507,150 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Coordinator activity log - aggregates coordinator events, dispatches, and mail activity
+  ipcMain.handle('coordinator:activity-log', (_event, limit?: number) => {
+    try {
+      const maxEntries = limit ?? 100;
+
+      // Find active or most recent coordinator session
+      const coordinator = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (!coordinator) {
+        return { data: [], error: null };
+      }
+
+      const coordinatorName = coordinator.agent_name as string;
+      const coordinatorId = coordinator.id as string;
+
+      // Gather activity entries from multiple sources:
+
+      // 1. Events related to coordinator session (spawns, session events, errors, custom, decomposition)
+      const events = loggedPrepare(
+        `SELECT id, event_type, agent_name, data, level, created_at as timestamp
+        FROM events
+        WHERE session_id = ? OR agent_name = ?
+        ORDER BY created_at DESC
+        LIMIT ?`,
+      ).all(coordinatorId, coordinatorName, maxEntries) as Array<{
+        id: string;
+        event_type: string;
+        agent_name: string | null;
+        data: string | null;
+        level: string;
+        timestamp: string;
+      }>;
+
+      // 2. Mail messages sent to or from coordinator
+      const mail = loggedPrepare(
+        `SELECT id, from_agent, to_agent, subject, type, priority, created_at as timestamp
+        FROM mail
+        WHERE from_agent = ? OR to_agent = ?
+        ORDER BY created_at DESC
+        LIMIT ?`,
+      ).all(coordinatorName, coordinatorName, maxEntries) as Array<{
+        id: string;
+        from_agent: string;
+        to_agent: string;
+        subject: string;
+        type: string;
+        priority: string;
+        timestamp: string;
+      }>;
+
+      // 3. Agent sessions dispatched by coordinator (lead spawns)
+      const dispatches = loggedPrepare(
+        `SELECT id, agent_name, capability, state, model, created_at as timestamp
+        FROM sessions
+        WHERE parent_agent = ? AND id != ?
+        ORDER BY created_at DESC
+        LIMIT ?`,
+      ).all(coordinatorName, coordinatorId, maxEntries) as Array<{
+        id: string;
+        agent_name: string;
+        capability: string;
+        state: string;
+        model: string;
+        timestamp: string;
+      }>;
+
+      // Merge all sources into a unified activity log
+      const activities: Array<{
+        id: string;
+        source: string;
+        type: string;
+        summary: string;
+        detail: string | null;
+        level: string;
+        timestamp: string;
+      }> = [];
+
+      for (const ev of events) {
+        let summary = ev.event_type.replace(/_/g, ' ');
+        let detail: string | null = null;
+        if (ev.data) {
+          try {
+            const parsed = JSON.parse(ev.data);
+            if (parsed.scope) summary = `Decomposition: ${parsed.scope}`;
+            if (parsed.streamCount)
+              detail = `${parsed.streamCount} streams, ${parsed.totalTasks} tasks`;
+            else detail = ev.data.substring(0, 200);
+          } catch {
+            detail = ev.data.substring(0, 200);
+          }
+        }
+        activities.push({
+          id: ev.id ?? `ev-${ev.timestamp}`,
+          source: 'event',
+          type: ev.event_type,
+          summary,
+          detail,
+          level: ev.level,
+          timestamp: ev.timestamp,
+        });
+      }
+
+      for (const m of mail) {
+        const direction = m.from_agent === coordinatorName ? 'sent' : 'received';
+        const peer = direction === 'sent' ? m.to_agent : m.from_agent;
+        activities.push({
+          id: m.id,
+          source: 'mail',
+          type: m.type,
+          summary: `Mail ${direction}: ${m.subject}`,
+          detail: `${direction === 'sent' ? 'To' : 'From'}: ${peer} | Priority: ${m.priority}`,
+          level: m.type === 'error' ? 'error' : m.type === 'escalation' ? 'warn' : 'info',
+          timestamp: m.timestamp,
+        });
+      }
+
+      for (const d of dispatches) {
+        activities.push({
+          id: d.id,
+          source: 'dispatch',
+          type: 'dispatch',
+          summary: `Dispatched ${d.capability}: ${d.agent_name}`,
+          detail: `Model: ${d.model} | State: ${d.state}`,
+          level: 'info',
+          timestamp: d.timestamp,
+        });
+      }
+
+      // Sort by timestamp descending
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      // Limit to requested count
+      const result = activities.slice(0, maxEntries);
+
+      log.info(`[IPC] coordinator:activity-log - returned ${result.length} activity entries`);
+      return { data: result, error: null };
+    } catch (error) {
+      log.error('coordinator:activity-log failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // Mail channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle(
     'mail:list',

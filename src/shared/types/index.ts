@@ -695,6 +695,18 @@ export interface ElectronAPI {
     } | null;
     error: string | null;
   }>;
+  coordinatorActivityLog: (limit?: number) => Promise<{
+    data: Array<{
+      id: string;
+      source: string;
+      type: string;
+      summary: string;
+      detail: string | null;
+      level: string;
+      timestamp: string;
+    }> | null;
+    error: string | null;
+  }>;
   coordinatorWorkStreams: () => Promise<{
     data: Array<{
       id: string;

@@ -4,6 +4,7 @@ import {
   FiAlertTriangle,
   FiCheckCircle,
   FiClock,
+  FiFileText,
   FiLayers,
   FiMail,
   FiPlay,
@@ -73,6 +74,20 @@ export function CoordinatorPanel() {
   // Work streams state
   const [workStreams, setWorkStreams] = useState<WorkStream[]>([]);
 
+  // Activity log state
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [activityLog, setActivityLog] = useState<
+    Array<{
+      id: string;
+      source: string;
+      type: string;
+      summary: string;
+      detail: string | null;
+      level: string;
+      timestamp: string;
+    }>
+  >([]);
+
   const loadStatus = useCallback(async () => {
     try {
       const result = await window.electronAPI.coordinatorStatus();
@@ -106,18 +121,31 @@ export function CoordinatorPanel() {
     }
   }, []);
 
-  // Poll coordinator status, dispatched leads, and work streams
+  const loadActivityLog = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.coordinatorActivityLog(50);
+      if (result.data) {
+        setActivityLog(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to load activity log:', err);
+    }
+  }, []);
+
+  // Poll coordinator status, dispatched leads, work streams, and activity log
   useEffect(() => {
     loadStatus();
     loadDispatchedLeads();
     loadWorkStreams();
+    loadActivityLog();
     const interval = setInterval(() => {
       loadStatus();
       loadDispatchedLeads();
       loadWorkStreams();
+      loadActivityLog();
     }, 3000);
     return () => clearInterval(interval);
-  }, [loadStatus, loadDispatchedLeads, loadWorkStreams]);
+  }, [loadStatus, loadDispatchedLeads, loadWorkStreams, loadActivityLog]);
 
   // Auto-poll mail when coordinator is active
   useEffect(() => {
@@ -460,6 +488,94 @@ export function CoordinatorPanel() {
                 </div>
               </div>
             )}
+
+            {/* Coordinator Activity Log */}
+            <div className="rounded-lg bg-slate-900/40 border border-slate-700/50 p-2.5">
+              <button
+                type="button"
+                onClick={() => setShowActivityLog(!showActivityLog)}
+                className="w-full flex items-center justify-between text-xs font-medium text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <FiFileText className="h-3 w-3" />
+                  Activity Log ({activityLog.length} entries)
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {showActivityLog ? 'Hide' : 'Show'}
+                </span>
+              </button>
+              {showActivityLog && (
+                <div className="mt-2 space-y-1 max-h-64 overflow-y-auto" data-testid="coordinator-activity-log">
+                  {activityLog.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-2">No activity recorded yet</p>
+                  ) : (
+                    activityLog.map((entry) => {
+                      const timeStr = entry.timestamp
+                        ? new Date(entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })
+                        : '';
+                      const dateStr = entry.timestamp
+                        ? new Date(entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`).toLocaleDateString([], {
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : '';
+
+                      const levelColor =
+                        entry.level === 'error'
+                          ? 'border-l-red-500 bg-red-900/10'
+                          : entry.level === 'warn'
+                            ? 'border-l-amber-500 bg-amber-900/10'
+                            : entry.source === 'dispatch'
+                              ? 'border-l-purple-500 bg-purple-900/10'
+                              : entry.source === 'mail'
+                                ? 'border-l-blue-500 bg-blue-900/10'
+                                : 'border-l-slate-600 bg-slate-800/50';
+
+                      const sourceIcon =
+                        entry.source === 'mail' ? (
+                          <FiMail className="h-3 w-3 text-blue-400 shrink-0" />
+                        ) : entry.source === 'dispatch' ? (
+                          <FiSend className="h-3 w-3 text-purple-400 shrink-0" />
+                        ) : entry.type === 'error' ? (
+                          <FiAlertTriangle className="h-3 w-3 text-red-400 shrink-0" />
+                        ) : (
+                          <FiActivity className="h-3 w-3 text-slate-400 shrink-0" />
+                        );
+
+                      return (
+                        <div
+                          key={entry.id}
+                          className={`border-l-2 rounded-r px-2 py-1.5 ${levelColor}`}
+                        >
+                          <div className="flex items-start gap-1.5">
+                            <div className="mt-0.5">{sourceIcon}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-xs text-slate-200 truncate">
+                                  {entry.summary}
+                                </span>
+                                <span className="text-[10px] text-slate-500 whitespace-nowrap shrink-0" title={`${dateStr} ${timeStr}`}>
+                                  {dateStr} {timeStr}
+                                </span>
+                              </div>
+                              {entry.detail && (
+                                <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                  {entry.detail}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Agent name & details */}
             <div className="flex items-center justify-between text-xs">

@@ -146,6 +146,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   coordinatorDecompose: (options?: { scope?: string; coordinatorSessionId?: string }) =>
     ipcRenderer.invoke('coordinator:decompose', options),
   coordinatorWorkStreams: () => ipcRenderer.invoke('coordinator:workStreams'),
+  coordinatorActivityLog: (limit?: number) => ipcRenderer.invoke('coordinator:activity-log', limit),
 
   // Agent process management (node-pty)
   agentOutput: (id: string) => ipcRenderer.invoke('agent:output', id),
