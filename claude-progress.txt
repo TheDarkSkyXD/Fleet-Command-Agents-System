@@ -3171,3 +3171,31 @@
 - 211/366 features passing (added #194 and #195 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Prompt Preview & Version Diff)
+
+#### Feature #189: Render and preview prompts - PASSING
+- Added Preview button to PromptDetail header with cyan toggle styling
+- PromptPreviewPanel resolves full inheritance chain by walking parent_id links
+- Merged content displays all ancestor content joined with separators (root to child)
+- Template variables ({{var}}, ${var}, {var}) highlighted with amber background and border
+- Template variables summary shows unique variable count with mono-styled chips
+- Inheritance chain visualization with type badges and arrow connectors
+- Per-level content breakdown for multi-level chains
+
+#### Feature #191: Prompt diff viewer - PASSING
+- Built LCS-based line diff engine (computeLineDiff) for text comparison
+- VersionDiffViewer full-screen overlay with version selectors (old/new dropdowns)
+- Diff table with dual line numbers, +/- change indicators
+- Green highlighting for additions, red for deletions
+- Added/removed line counts in header
+- Compare Versions button in VersionHistoryPanel (shown when 2+ versions exist)
+- Auto-selects penultimate and latest versions for initial comparison
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/PromptsPage.tsx - Preview panel, diff engine, diff viewer, compare button
+
+#### Current Status
+- 211/366 features passing (added #189 and #191 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
