@@ -94,11 +94,17 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Track scroll position for auto-scroll toggle
+    // Track scroll position for auto-scroll toggle (scroll-lock)
+    // When user scrolls up, auto-scroll is disabled (scroll-lock engaged)
+    // When user clicks scroll-to-bottom, auto-scroll resumes
     term.onScroll(() => {
       const buffer = term.buffer.active;
       const atBottom = buffer.viewportY >= buffer.baseY;
       setIsAtBottom(atBottom);
+      // If user scrolled away from bottom, engage scroll-lock
+      if (!atBottom) {
+        setAutoScroll(false);
+      }
     });
 
     // Handle user input - send to agent's pty via ref to avoid stale closure
@@ -265,6 +271,7 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
             title={
               autoScroll ? 'Auto-scroll ON (click to disable)' : 'Auto-scroll OFF (click to enable)'
             }
+            data-testid="auto-scroll-toggle"
           >
             {autoScroll ? <FiUnlock className="h-3.5 w-3.5" /> : <FiLock className="h-3.5 w-3.5" />}
           </button>

@@ -2,6 +2,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FiActivity,
@@ -713,18 +714,75 @@ function AppLogPanel() {
           )}
         </div>
       ) : (
-        <div className="space-y-1 max-h-[600px] overflow-y-auto">
-          {logs.map((entry) => (
-            <LogEntryRow
-              key={entry.id}
-              entry={entry}
-              expanded={expandedIds.has(entry.id)}
-              onToggle={() => toggleExpand(entry.id)}
-              searchQuery={searchQuery}
-            />
-          ))}
-        </div>
+        <VirtualizedLogList
+          logs={logs}
+          expandedIds={expandedIds}
+          toggleExpand={toggleExpand}
+          searchQuery={searchQuery}
+        />
       )}
+    </div>
+  );
+}
+
+function VirtualizedLogList({
+  logs,
+  expandedIds,
+  toggleExpand,
+  searchQuery,
+}: {
+  logs: AppLogEntry[];
+  expandedIds: Set<string>;
+  toggleExpand: (id: string) => void;
+  searchQuery: string;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: logs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 36,
+    overscan: 15,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      className="max-h-[600px] overflow-y-auto"
+      data-testid="virtualized-log-list"
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const entry = logs[virtualItem.index];
+          return (
+            <div
+              key={entry.id}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <LogEntryRow
+                entry={entry}
+                expanded={expandedIds.has(entry.id)}
+                onToggle={() => toggleExpand(entry.id)}
+                searchQuery={searchQuery}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

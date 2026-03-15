@@ -1384,10 +1384,11 @@ function AgentCard({
 }) {
   const agentModel = session.model || processInfo?.model || null;
   const borderAccent = CAPABILITY_BORDER_ACCENT[session.capability] || 'border-l-slate-500';
+  const isRunning = session.state === 'working' || session.state === 'booting';
 
   return (
     <div
-      className={`rounded-lg border border-l-[3px] ${borderAccent} bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors ${isSelected ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-700'}`}
+      className={`rounded-lg border border-l-[3px] ${borderAccent} bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors ${isSelected ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-700'} ${isRunning ? 'animate-card-activity-pulse' : ''}`}
       onClick={onSelect}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => {
