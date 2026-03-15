@@ -1,5 +1,39 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Run Management & Status Bar)
+
+#### Feature #176: Start new run - PASSING
+- Added run:start IPC handler that creates run record in SQLite runs table
+- Auto-generated run ID (run-{timestamp}-{random})
+- Run status defaults to 'active' with agent_count=0
+- Added run:get-active, run:list, run:stop, run:get IPC handlers
+- All handlers use real SQLite queries via loggedPrepare()
+- Added preload bridge methods (runStart, runGetActive, runList, runStop, runGet)
+- Added ElectronAPI types for all run operations
+- Created Zustand runStore (src/renderer/stores/runStore.ts)
+- StatusBar shows "Start Run" button that creates a new run record
+
+#### Feature #177: View active run status - PASSING
+- Active run displayed in StatusBar with green pulse indicator
+- Shows agent count (computed from sessions table linked by run_id)
+- Ticking duration timer updates every second
+- Run ID displayed (truncated to 12 chars)
+- Stop button to end the run (sets status='completed')
+- Polls for active run every 5 seconds
+- run:get-active handler auto-computes agent_count from sessions table
+
+#### Files Created/Modified
+- NEW: src/renderer/stores/runStore.ts - Zustand store for run management
+- MODIFIED: src/main/ipc/handlers.ts - Added 5 run IPC handlers
+- MODIFIED: src/preload/index.ts - Added run bridge methods
+- MODIFIED: src/shared/types/index.ts - Added run methods to ElectronAPI
+- MODIFIED: src/renderer/components/StatusBar.tsx - Run controls with duration timer
+
+#### Current Status
+- 45/366 features passing (added #176 and #177 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Configuration Profiles & Zod Validation)
 
 #### Feature #141: Named configuration profiles - PASSING
