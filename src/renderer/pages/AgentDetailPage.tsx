@@ -13,6 +13,7 @@ import {
   FiHash,
   FiInbox,
   FiLayers,
+  FiLink,
   FiLoader,
   FiMail,
   FiSend,
@@ -22,7 +23,14 @@ import {
   FiUser,
   FiZap,
 } from 'react-icons/fi';
-import type { AgentIdentity, AgentProcessInfo, Event, Message, Session } from '../../shared/types';
+import type {
+  AgentIdentity,
+  AgentProcessInfo,
+  Event,
+  Issue,
+  Message,
+  Session,
+} from '../../shared/types';
 import { AgentTerminal } from '../components/AgentTerminal';
 
 const CAPABILITY_COLORS: Record<string, string> = {
@@ -679,6 +687,7 @@ interface AgentDetailPageProps {
 export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [processInfo, setProcessInfo] = useState<AgentProcessInfo | null>(null);
+  const [associatedIssues, setAssociatedIssues] = useState<Issue[]>([]);
   const [activeTab, setActiveTab] = useState<DetailTab>('terminal');
   const [error, setError] = useState<string | null>(null);
 
@@ -706,6 +715,18 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     }
   }, [agentId]);
 
+  const loadAssociatedIssues = useCallback(async () => {
+    if (!session?.agent_name) return;
+    try {
+      const result = await window.electronAPI.issueByAgent(session.agent_name);
+      if (result.data) {
+        setAssociatedIssues(result.data);
+      }
+    } catch {
+      // Issues may not exist
+    }
+  }, [session?.agent_name]);
+
   // Load data and poll
   useEffect(() => {
     loadSession();
@@ -718,6 +739,13 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
 
     return () => clearInterval(interval);
   }, [loadSession, loadProcessInfo]);
+
+  // Load associated issues when session is available
+  useEffect(() => {
+    loadAssociatedIssues();
+    const interval = setInterval(loadAssociatedIssues, 5000);
+    return () => clearInterval(interval);
+  }, [loadAssociatedIssues]);
 
   const handleStop = async () => {
     try {
@@ -910,7 +938,40 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
           {session.branch_name && (
             <span className="flex items-center gap-1">Branch: {session.branch_name}</span>
           )}
+          {associatedIssues.length > 0 && (
+            <span className="flex items-center gap-1" data-testid="agent-associated-issues">
+              <FiLink className="h-3 w-3" />
+              {associatedIssues.length} issue{associatedIssues.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
+
+        {/* Associated Issues */}
+        {associatedIssues.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap" data-testid="agent-issue-list">
+            {associatedIssues.map((issue) => {
+              const statusColor =
+                issue.status === 'in_progress'
+                  ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                  : issue.status === 'closed'
+                    ? 'bg-green-500/15 text-green-400 border-green-500/30'
+                    : issue.status === 'blocked'
+                      ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                      : 'bg-slate-500/15 text-slate-400 border-slate-500/30';
+              return (
+                <span
+                  key={issue.id}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium ${statusColor}`}
+                  title={`${issue.title} (${issue.status})`}
+                >
+                  <FiLink className="h-3 w-3" />
+                  {issue.title.length > 40 ? `${issue.title.slice(0, 40)}...` : issue.title}
+                  <span className="opacity-60">({issue.status.replace('_', ' ')})</span>
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

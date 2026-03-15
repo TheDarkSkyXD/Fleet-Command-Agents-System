@@ -78,6 +78,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('issue:update', id, updates),
   issueDelete: (id: string) => ipcRenderer.invoke('issue:delete', id),
   issueClaim: (id: string, agentName: string) => ipcRenderer.invoke('issue:claim', id, agentName),
+  issueSetDependencies: (id: string, dependencyIds: string[]) =>
+    ipcRenderer.invoke('issue:set-dependencies', id, dependencyIds),
+  issueReadyQueue: () => ipcRenderer.invoke('issue:ready-queue'),
+  issueByAgent: (agentName: string) => ipcRenderer.invoke('issue:by-agent', agentName),
 
   // Task Groups
   taskGroupList: () => ipcRenderer.invoke('taskGroup:list'),

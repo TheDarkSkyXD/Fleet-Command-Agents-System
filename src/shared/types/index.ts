@@ -942,6 +942,12 @@ export interface ElectronAPI {
     id: string,
     agentName: string,
   ) => Promise<{ data: Issue | null; error: string | null }>;
+  issueSetDependencies: (
+    id: string,
+    dependencyIds: string[],
+  ) => Promise<{ data: Issue | null; error: string | null }>;
+  issueReadyQueue: () => Promise<{ data: Issue[] | null; error: string | null }>;
+  issueByAgent: (agentName: string) => Promise<{ data: Issue[] | null; error: string | null }>;
 
   // Task Groups
   taskGroupList: () => Promise<{ data: TaskGroup[] | null; error: string | null }>;

@@ -2850,6 +2850,7 @@ export function registerIpcHandlers(): void {
         'assigned_agent',
         'group_id',
         'close_summary',
+        'dependencies',
       ];
       const setClauses: string[] = [];
       const params: unknown[] = [];
@@ -2932,6 +2933,82 @@ export function registerIpcHandlers(): void {
       return { data: issue, error: null };
     } catch (error) {
       log.error('issue:claim failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Issues by agent name
+  ipcMain.handle('issue:by-agent', (_event, agentName: string) => {
+    try {
+      const issues = loggedPrepare(
+        'SELECT * FROM issues WHERE assigned_agent = ? ORDER BY updated_at DESC',
+      ).all(agentName);
+      log.info(
+        `[IPC] issue:by-agent - SELECT returned ${issues.length} issues for agent ${agentName}`,
+      );
+      return { data: issues, error: null };
+    } catch (error) {
+      log.error('issue:by-agent failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Issue dependency management
+  ipcMain.handle('issue:set-dependencies', (_event, id: string, dependencyIds: string[]) => {
+    try {
+      const depsJson = JSON.stringify(dependencyIds);
+      loggedPrepare(
+        "UPDATE issues SET dependencies = ?, updated_at = datetime('now') WHERE id = ?",
+      ).run(depsJson, id);
+      const updated = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(id);
+      log.info(
+        `[IPC] issue:set-dependencies - SET ${dependencyIds.length} dependencies for issue ${id}`,
+      );
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('issue:set-dependencies failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Ready queue: issues that are open/in_progress with no unresolved blocking dependencies
+  ipcMain.handle('issue:ready-queue', (_event) => {
+    try {
+      // Get all non-closed issues
+      const allIssues = loggedPrepare(
+        "SELECT * FROM issues WHERE status IN ('open', 'in_progress') ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, created_at ASC",
+      ).all() as Array<Record<string, unknown>>;
+
+      // Get statuses of all issues for dependency resolution
+      const allIssueStatuses = loggedPrepare('SELECT id, status FROM issues').all() as Array<{
+        id: string;
+        status: string;
+      }>;
+      const statusMap = new Map<string, string>();
+      for (const issue of allIssueStatuses) {
+        statusMap.set(issue.id, issue.status);
+      }
+
+      // Filter to only unblocked issues
+      const readyIssues = allIssues.filter((issue) => {
+        const depsJson = issue.dependencies as string | null;
+        if (!depsJson) return true; // No dependencies = ready
+        try {
+          const depIds = JSON.parse(depsJson) as string[];
+          if (depIds.length === 0) return true;
+          // Ready if ALL dependencies are closed
+          return depIds.every((depId) => statusMap.get(depId) === 'closed');
+        } catch {
+          return true; // Invalid JSON = treat as no dependencies
+        }
+      });
+
+      log.info(
+        `[IPC] issue:ready-queue - Found ${readyIssues.length} ready issues out of ${allIssues.length} active`,
+      );
+      return { data: readyIssues, error: null };
+    } catch (error) {
+      log.error('issue:ready-queue failed:', error);
       return { data: null, error: String(error) };
     }
   });
