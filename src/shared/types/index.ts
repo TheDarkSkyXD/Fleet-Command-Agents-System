@@ -428,6 +428,21 @@ export interface DiscoveryFinding {
   created_at: string;
 }
 
+// Quality Gate types
+export type QualityGateType = 'test' | 'lint' | 'typecheck' | 'custom';
+
+export interface QualityGate {
+  id: string;
+  project_id: string;
+  gate_type: QualityGateType;
+  name: string;
+  command: string;
+  enabled: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Hook types
 export type HookType = 'SessionStart' | 'UserPromptSubmit' | 'PreToolUse';
 
@@ -477,6 +492,27 @@ export interface UpdateStatus {
   isDownloading: boolean;
   isDownloaded: boolean;
   error: string | null;
+}
+
+// Doctor check result
+export interface DoctorCheck {
+  name: string;
+  status: 'pass' | 'fail';
+  version: string | null;
+  detail: string | null;
+  fixable: boolean;
+  fixAction?: string;
+}
+
+export interface DoctorResult {
+  checks: DoctorCheck[];
+  allPassing: boolean;
+}
+
+export interface DoctorFixResult {
+  name: string;
+  success: boolean;
+  message: string;
 }
 
 // Electron API type for renderer process
@@ -820,7 +856,8 @@ export interface ElectronAPI {
   updateStatus: () => Promise<{ data: UpdateStatus; error: string | null }>;
   updateDownload: () => Promise<{ data: UpdateStatus; error: string | null }>;
   updateInstall: () => Promise<{ data: boolean; error: string | null }>;
-  doctorRun: () => Promise<{ data: unknown; error: string | null }>;
+  doctorRun: () => Promise<{ data: DoctorResult | null; error: string | null }>;
+  doctorFix: (checkName: string) => Promise<{ data: DoctorFixResult | null; error: string | null }>;
   // Watchdog
   watchdogStart: () => Promise<{ data: WatchdogStatus | null; error: string | null }>;
   watchdogStop: () => Promise<{ data: WatchdogStatus | null; error: string | null }>;
@@ -963,6 +1000,28 @@ export interface ElectronAPI {
     } | null;
     error: string | null;
   }>;
+
+  // Quality Gates
+  qualityGateList: (
+    projectId: string,
+  ) => Promise<{ data: QualityGate[] | null; error: string | null }>;
+  qualityGateCreate: (gate: {
+    id: string;
+    project_id: string;
+    gate_type: string;
+    name: string;
+    command: string;
+    enabled?: boolean;
+    sort_order?: number;
+  }) => Promise<{ data: QualityGate | null; error: string | null }>;
+  qualityGateUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: QualityGate | null; error: string | null }>;
+  qualityGateDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+  qualityGateReorder: (
+    gates: Array<{ id: string; sort_order: number }>,
+  ) => Promise<{ data: boolean; error: string | null }>;
 
   // Hooks
   hookList: (filters?: { project_id?: string; hook_type?: string }) => Promise<{

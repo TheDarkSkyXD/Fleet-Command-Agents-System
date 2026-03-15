@@ -2,17 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   FiAlertTriangle,
   FiCheck,
+  FiChevronDown,
+  FiChevronUp,
   FiEdit2,
   FiEye,
   FiPlus,
   FiRefreshCw,
   FiSave,
+  FiShield,
   FiStar,
   FiTrash2,
   FiX,
 } from 'react-icons/fi';
 import { z } from 'zod';
-import type { ConfigProfile } from '../../shared/types';
+import type { ConfigProfile, QualityGate } from '../../shared/types';
+import { useProjectStore } from '../stores/projectStore';
 import {
   ACCENT_COLORS,
   type AccentColorKey,
@@ -79,7 +83,7 @@ const DEFAULT_PROFILE_FORM: ProfileFormData = {
 export function SettingsPage() {
   const { loaded, saving, loadSettings } = useSettingsStore();
   const [activeTab, setActiveTab] = useState<
-    'agents' | 'watchdog' | 'terminal' | 'theme' | 'profiles'
+    'agents' | 'watchdog' | 'terminal' | 'theme' | 'profiles' | 'quality-gates'
   >('agents');
 
   useEffect(() => {
@@ -103,6 +107,7 @@ export function SettingsPage() {
     { id: 'terminal' as const, label: 'Terminal' },
     { id: 'theme' as const, label: 'Theme' },
     { id: 'profiles' as const, label: 'Profiles' },
+    { id: 'quality-gates' as const, label: 'Quality Gates' },
   ];
 
   return (
@@ -149,6 +154,7 @@ export function SettingsPage() {
       {activeTab === 'terminal' && <TerminalSettings />}
       {activeTab === 'theme' && <ThemeSettings />}
       {activeTab === 'profiles' && <ProfilesSettings />}
+      {activeTab === 'quality-gates' && <QualityGatesSettings />}
     </div>
   );
 }
@@ -1506,6 +1512,517 @@ function ValidatedNumberInput({
       >
         +
       </button>
+    </div>
+  );
+}
+
+// ── Quality Gates Tab ─────────────────────────────────────────────────
+
+const GATE_TYPE_OPTIONS = [
+  { label: 'Test', value: 'test' },
+  { label: 'Lint', value: 'lint' },
+  { label: 'Typecheck', value: 'typecheck' },
+  { label: 'Custom', value: 'custom' },
+];
+
+const GATE_TYPE_COLORS: Record<string, string> = {
+  test: 'bg-green-500/20 text-green-400 border-green-500/30',
+  lint: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  typecheck: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  custom: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+};
+
+const DEFAULT_COMMANDS: Record<string, string> = {
+  test: 'npm test',
+  lint: 'npm run lint',
+  typecheck: 'npx tsc --noEmit',
+  custom: '',
+};
+
+function QualityGatesSettings() {
+  const { activeProject } = useProjectStore();
+  const [gates, setGates] = useState<QualityGate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  // Create form state
+  const [newGateType, setNewGateType] = useState('test');
+  const [newGateName, setNewGateName] = useState('');
+  const [newGateCommand, setNewGateCommand] = useState('npm test');
+
+  // Edit form state
+  const [editName, setEditName] = useState('');
+  const [editCommand, setEditCommand] = useState('');
+  const [editGateType, setEditGateType] = useState('test');
+
+  const loadGates = useCallback(async () => {
+    if (!activeProject) {
+      setGates([]);
+      setLoading(false);
+      return;
+    }
+    try {
+      const result = await window.electronAPI.qualityGateList(activeProject.id);
+      if (result.data) {
+        setGates(result.data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [activeProject]);
+
+  useEffect(() => {
+    loadGates();
+  }, [loadGates]);
+
+  const showStatus = (type: 'success' | 'error', text: string) => {
+    setStatusMessage({ type, text });
+    setTimeout(() => setStatusMessage(null), 3000);
+  };
+
+  const handleCreate = async () => {
+    if (!activeProject) return;
+    const name =
+      newGateName.trim() ||
+      GATE_TYPE_OPTIONS.find((o) => o.value === newGateType)?.label ||
+      newGateType;
+    const command = newGateCommand.trim();
+    if (!command) {
+      showStatus('error', 'Command is required');
+      return;
+    }
+    try {
+      const id = `qg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const result = await window.electronAPI.qualityGateCreate({
+        id,
+        project_id: activeProject.id,
+        gate_type: newGateType,
+        name,
+        command,
+        sort_order: gates.length,
+      });
+      if (result.error) {
+        showStatus('error', result.error);
+      } else {
+        showStatus('success', `Quality gate "${name}" created`);
+        setShowCreateForm(false);
+        setNewGateType('test');
+        setNewGateName('');
+        setNewGateCommand('npm test');
+        loadGates();
+      }
+    } catch (err) {
+      showStatus('error', String(err));
+    }
+  };
+
+  const handleToggle = async (gate: QualityGate) => {
+    try {
+      await window.electronAPI.qualityGateUpdate(gate.id, {
+        enabled: !gate.enabled,
+      });
+      loadGates();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDelete = async (gate: QualityGate) => {
+    try {
+      await window.electronAPI.qualityGateDelete(gate.id);
+      showStatus('success', `Quality gate "${gate.name}" deleted`);
+      loadGates();
+    } catch (err) {
+      showStatus('error', String(err));
+    }
+  };
+
+  const handleSaveEdit = async (gateId: string) => {
+    const name = editName.trim();
+    const command = editCommand.trim();
+    if (!command) {
+      showStatus('error', 'Command is required');
+      return;
+    }
+    try {
+      const result = await window.electronAPI.qualityGateUpdate(gateId, {
+        name: name || editGateType,
+        command,
+        gate_type: editGateType,
+      });
+      if (result.error) {
+        showStatus('error', result.error);
+      } else {
+        showStatus('success', 'Quality gate updated');
+        setEditingId(null);
+        loadGates();
+      }
+    } catch (err) {
+      showStatus('error', String(err));
+    }
+  };
+
+  const startEdit = (gate: QualityGate) => {
+    setEditingId(gate.id);
+    setEditName(gate.name);
+    setEditCommand(gate.command);
+    setEditGateType(gate.gate_type);
+  };
+
+  const handleMoveUp = async (index: number) => {
+    if (index === 0) return;
+    const newGates = [...gates];
+    const temp = newGates[index];
+    newGates[index] = newGates[index - 1];
+    newGates[index - 1] = temp;
+    const reorderData = newGates.map((g, i) => ({ id: g.id, sort_order: i }));
+    try {
+      await window.electronAPI.qualityGateReorder(reorderData);
+      loadGates();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleMoveDown = async (index: number) => {
+    if (index >= gates.length - 1) return;
+    const newGates = [...gates];
+    const temp = newGates[index];
+    newGates[index] = newGates[index + 1];
+    newGates[index + 1] = temp;
+    const reorderData = newGates.map((g, i) => ({ id: g.id, sort_order: i }));
+    try {
+      await window.electronAPI.qualityGateReorder(reorderData);
+      loadGates();
+    } catch {
+      // ignore
+    }
+  };
+
+  if (!activeProject) {
+    return (
+      <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-8 text-center">
+        <FiShield className="mx-auto mb-3 text-slate-500" size={32} />
+        <p className="text-slate-400 text-sm">Select a project to configure quality gates.</p>
+        <p className="text-slate-500 text-xs mt-1">Quality gates are stored per project.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <FiRefreshCw className="animate-spin text-slate-400 mr-2" size={20} />
+        <span className="text-slate-400">Loading quality gates...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="quality-gates-settings">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+            <FiShield size={18} />
+            Quality Gates
+          </h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Configure test, lint, and typecheck commands as quality gates for{' '}
+            <span className="text-slate-200 font-medium">{activeProject.name}</span>.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setShowCreateForm(true);
+            setNewGateType('test');
+            setNewGateName('');
+            setNewGateCommand(DEFAULT_COMMANDS.test);
+          }}
+          className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+          data-testid="add-quality-gate-btn"
+        >
+          <FiPlus size={14} />
+          Add Gate
+        </button>
+      </div>
+
+      {/* Status message */}
+      {statusMessage && (
+        <div
+          className={`rounded-md px-4 py-2 text-sm ${
+            statusMessage.type === 'success'
+              ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+          }`}
+        >
+          {statusMessage.type === 'success' ? (
+            <FiCheck className="inline mr-1.5" size={14} />
+          ) : (
+            <FiAlertTriangle className="inline mr-1.5" size={14} />
+          )}
+          {statusMessage.text}
+        </div>
+      )}
+
+      {/* Create form */}
+      {showCreateForm && (
+        <div
+          className="rounded-lg border border-slate-600 bg-slate-800 p-4 space-y-4"
+          data-testid="create-quality-gate-form"
+        >
+          <h3 className="text-sm font-medium text-slate-200">Add Quality Gate</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="qg-gate-type" className="block text-xs text-slate-400 mb-1">
+                Gate Type
+              </label>
+              <select
+                id="qg-gate-type"
+                value={newGateType}
+                onChange={(e) => {
+                  setNewGateType(e.target.value);
+                  setNewGateCommand(DEFAULT_COMMANDS[e.target.value] || '');
+                }}
+                className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                data-testid="gate-type-select"
+              >
+                {GATE_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="qg-gate-name" className="block text-xs text-slate-400 mb-1">
+                Name (optional)
+              </label>
+              <input
+                id="qg-gate-name"
+                type="text"
+                value={newGateName}
+                onChange={(e) => setNewGateName(e.target.value)}
+                placeholder={
+                  GATE_TYPE_OPTIONS.find((o) => o.value === newGateType)?.label || 'Gate name'
+                }
+                className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                data-testid="gate-name-input"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="qg-gate-command" className="block text-xs text-slate-400 mb-1">
+              Command
+            </label>
+            <input
+              id="qg-gate-command"
+              type="text"
+              value={newGateCommand}
+              onChange={(e) => setNewGateCommand(e.target.value)}
+              placeholder="e.g., npm test"
+              className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 font-mono placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              data-testid="gate-command-input"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+              className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleCreate}
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+              data-testid="save-quality-gate-btn"
+            >
+              <FiSave className="inline mr-1" size={14} />
+              Save Gate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Gates list */}
+      {gates.length === 0 && !showCreateForm ? (
+        <div className="rounded-lg border border-dashed border-slate-700 bg-slate-800/30 p-8 text-center">
+          <FiShield className="mx-auto mb-3 text-slate-500" size={28} />
+          <p className="text-slate-400 text-sm mb-1">No quality gates configured</p>
+          <p className="text-slate-500 text-xs">
+            Add test, lint, or typecheck commands to enforce code quality.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2" data-testid="quality-gates-list">
+          {gates.map((gate, index) => (
+            <div
+              key={gate.id}
+              className={`rounded-lg border bg-slate-800/50 p-4 transition-colors ${
+                gate.enabled ? 'border-slate-700' : 'border-slate-700/50 opacity-60'
+              }`}
+              data-testid={`quality-gate-${gate.id}`}
+            >
+              {editingId === gate.id ? (
+                // Edit mode
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="qg-edit-type" className="block text-xs text-slate-400 mb-1">
+                        Type
+                      </label>
+                      <select
+                        id="qg-edit-type"
+                        value={editGateType}
+                        onChange={(e) => setEditGateType(e.target.value)}
+                        className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {GATE_TYPE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="qg-edit-name" className="block text-xs text-slate-400 mb-1">
+                        Name
+                      </label>
+                      <input
+                        id="qg-edit-name"
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="qg-edit-command" className="block text-xs text-slate-400 mb-1">
+                      Command
+                    </label>
+                    <input
+                      id="qg-edit-command"
+                      type="text"
+                      value={editCommand}
+                      onChange={(e) => setEditCommand(e.target.value)}
+                      className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(null)}
+                      className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEdit(gate.id)}
+                      className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+                    >
+                      <FiCheck className="inline mr-1" size={14} />
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Display mode
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {/* Reorder buttons */}
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                        className="text-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Move up"
+                      >
+                        <FiChevronUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveDown(index)}
+                        disabled={index >= gates.length - 1}
+                        className="text-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Move down"
+                      >
+                        <FiChevronDown size={14} />
+                      </button>
+                    </div>
+
+                    {/* Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggle(gate)}
+                      className={`w-10 h-5 rounded-full relative transition-colors ${
+                        gate.enabled ? 'bg-green-600' : 'bg-slate-600'
+                      }`}
+                      title={gate.enabled ? 'Disable gate' : 'Enable gate'}
+                      data-testid={`toggle-gate-${gate.id}`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                          gate.enabled ? 'left-5' : 'left-0.5'
+                        }`}
+                      />
+                    </button>
+
+                    {/* Gate info */}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-100">{gate.name}</span>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
+                            GATE_TYPE_COLORS[gate.gate_type] || GATE_TYPE_COLORS.custom
+                          }`}
+                        >
+                          {gate.gate_type}
+                        </span>
+                      </div>
+                      <code className="text-xs text-slate-400 font-mono">{gate.command}</code>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(gate)}
+                      className="rounded p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                      title="Edit gate"
+                      data-testid={`edit-gate-${gate.id}`}
+                    >
+                      <FiEdit2 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(gate)}
+                      className="rounded p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                      title="Delete gate"
+                      data-testid={`delete-gate-${gate.id}`}
+                    >
+                      <FiTrash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

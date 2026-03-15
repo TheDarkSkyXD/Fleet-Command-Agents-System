@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { ipcMain } from 'electron';
 import log from 'electron-log';
 import { getDatabase } from '../db/database';
@@ -1653,27 +1654,210 @@ export function registerIpcHandlers(): void {
     return { data: true, error: null };
   });
 
-  ipcMain.handle('doctor:run', () => {
+  ipcMain.handle('doctor:run', async () => {
     try {
-      const result = loggedPrepare('SELECT 1 as ok').get() as { ok: number };
-      const sessionCount = loggedPrepare('SELECT COUNT(*) as count FROM sessions').get() as {
-        count: number;
-      };
-      log.info(
-        `[IPC] doctor:run - real SQLite diagnostics: db=${result.ok === 1 ? 'ok' : 'error'}, sessions=${sessionCount.count}`,
-      );
+      const checks: Array<{
+        name: string;
+        status: 'pass' | 'fail';
+        version: string | null;
+        detail: string | null;
+        fixable: boolean;
+        fixAction?: string;
+      }> = [];
+
+      // 1. Database check
+      try {
+        const result = loggedPrepare('SELECT 1 as ok').get() as { ok: number };
+        const sessionCount = loggedPrepare('SELECT COUNT(*) as count FROM sessions').get() as {
+          count: number;
+        };
+        const dbOk = result.ok === 1;
+        checks.push({
+          name: 'Database',
+          status: dbOk ? 'pass' : 'fail',
+          version: 'SQLite (better-sqlite3)',
+          detail: `${sessionCount.count} sessions stored`,
+          fixable: !dbOk,
+          fixAction: !dbOk ? 'Reinitialize database connection' : undefined,
+        });
+      } catch (err) {
+        checks.push({
+          name: 'Database',
+          status: 'fail',
+          version: null,
+          detail: String(err),
+          fixable: true,
+          fixAction: 'Reinitialize database connection',
+        });
+      }
+
+      // 2. Node.js check
+      try {
+        const nodeVersion = process.version;
+        const major = Number.parseInt(nodeVersion.slice(1).split('.')[0], 10);
+        checks.push({
+          name: 'Node.js',
+          status: major >= 18 ? 'pass' : 'fail',
+          version: nodeVersion,
+          detail:
+            major >= 18
+              ? 'Meets minimum requirement (v18+)'
+              : `Version ${nodeVersion} is below minimum v18`,
+          fixable: false,
+        });
+      } catch (err) {
+        checks.push({
+          name: 'Node.js',
+          status: 'fail',
+          version: null,
+          detail: String(err),
+          fixable: false,
+        });
+      }
+
+      // 3. Claude CLI check
+      try {
+        const cliResult = await detectClaudeCli();
+        if (cliResult.found && cliResult.authenticated) {
+          checks.push({
+            name: 'Claude CLI',
+            status: 'pass',
+            version: cliResult.version,
+            detail: 'Authenticated',
+            fixable: false,
+          });
+        } else if (cliResult.found) {
+          checks.push({
+            name: 'Claude CLI',
+            status: 'fail',
+            version: cliResult.version,
+            detail: 'Found but not authenticated',
+            fixable: true,
+            fixAction: 'Refresh CLI detection cache',
+          });
+        } else {
+          checks.push({
+            name: 'Claude CLI',
+            status: 'fail',
+            version: null,
+            detail: cliResult.error || 'Not found in PATH or fallback locations',
+            fixable: true,
+            fixAction: 'Re-scan PATH for Claude CLI',
+          });
+        }
+      } catch (err) {
+        checks.push({
+          name: 'Claude CLI',
+          status: 'fail',
+          version: null,
+          detail: String(err),
+          fixable: true,
+          fixAction: 'Re-scan PATH for Claude CLI',
+        });
+      }
+
+      // 4. Git check
+      try {
+        const gitVersionOutput = execSync('git --version', {
+          encoding: 'utf-8',
+          timeout: 5000,
+        }).trim();
+        const gitVersion = gitVersionOutput.replace('git version ', '');
+        checks.push({
+          name: 'Git',
+          status: 'pass',
+          version: gitVersion,
+          detail: 'Available in PATH',
+          fixable: false,
+        });
+      } catch (_err) {
+        checks.push({
+          name: 'Git',
+          status: 'fail',
+          version: null,
+          detail: 'Git not found in PATH',
+          fixable: false,
+        });
+      }
+
+      const allPassing = checks.every((c) => c.status === 'pass');
+      log.info(`[IPC] doctor:run - ${checks.length} checks, all passing: ${allPassing}`);
+
+      return { data: { checks, allPassing }, error: null };
+    } catch (error) {
+      log.error('doctor:run failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('doctor:fix', async (_event, checkName: string) => {
+    try {
+      log.info(`[IPC] doctor:fix - attempting fix for: ${checkName}`);
+
+      if (checkName === 'Database') {
+        try {
+          const db = getDatabase();
+          db.pragma('wal_checkpoint(TRUNCATE)');
+          const result = loggedPrepare('SELECT 1 as ok').get() as { ok: number };
+          return {
+            data: {
+              name: checkName,
+              success: result.ok === 1,
+              message:
+                result.ok === 1
+                  ? 'Database connection reinitialized successfully'
+                  : 'Database reconnection failed',
+            },
+            error: null,
+          };
+        } catch (dbErr) {
+          return {
+            data: {
+              name: checkName,
+              success: false,
+              message: `Database fix failed: ${String(dbErr)}`,
+            },
+            error: null,
+          };
+        }
+      }
+
+      if (checkName === 'Claude CLI') {
+        clearClaudeCliCache();
+        const freshResult = await detectClaudeCli({ forceRefresh: true });
+        if (freshResult.found) {
+          return {
+            data: {
+              name: checkName,
+              success: true,
+              message: freshResult.authenticated
+                ? `Claude CLI found at ${freshResult.path} (authenticated)`
+                : `Claude CLI found at ${freshResult.path} (not authenticated - run "claude auth login")`,
+            },
+            error: null,
+          };
+        }
+        return {
+          data: {
+            name: checkName,
+            success: false,
+            message:
+              'Claude CLI still not found. Install with: npm install -g @anthropic-ai/claude-code',
+          },
+          error: null,
+        };
+      }
+
       return {
         data: {
-          checks: [
-            { name: 'Database', status: result.ok === 1 ? 'pass' : 'fail' },
-            { name: 'Schema', status: 'pass' },
-            { name: 'Sessions', count: sessionCount.count },
-          ],
+          name: checkName,
+          success: false,
+          message: `No auto-fix available for ${checkName}`,
         },
         error: null,
       };
     } catch (error) {
-      log.error('doctor:run failed:', error);
+      log.error(`doctor:fix failed for ${checkName}:`, error);
       return { data: null, error: String(error) };
     }
   });
@@ -3916,6 +4100,113 @@ export function registerIpcHandlers(): void {
       return { data: null, error: String(error) };
     }
   });
+
+  // ─── Quality Gates ──────────────────────────────────────
+
+  ipcMain.handle('qualityGate:list', (_event, projectId: string) => {
+    try {
+      const db = getDatabase();
+      const rows = db
+        .prepare(
+          'SELECT * FROM quality_gates WHERE project_id = ? ORDER BY sort_order ASC, created_at ASC',
+        )
+        .all(projectId);
+      return { data: rows, error: null };
+    } catch (err) {
+      return { data: null, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(
+    'qualityGate:create',
+    (
+      _event,
+      gate: {
+        id: string;
+        project_id: string;
+        gate_type: string;
+        name: string;
+        command: string;
+        enabled?: boolean;
+        sort_order?: number;
+      },
+    ) => {
+      try {
+        const db = getDatabase();
+        db.prepare(
+          'INSERT INTO quality_gates (id, project_id, gate_type, name, command, enabled, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ).run(
+          gate.id,
+          gate.project_id,
+          gate.gate_type,
+          gate.name,
+          gate.command,
+          gate.enabled !== false ? 1 : 0,
+          gate.sort_order ?? 0,
+        );
+        const row = db.prepare('SELECT * FROM quality_gates WHERE id = ?').get(gate.id);
+        return { data: row, error: null };
+      } catch (err) {
+        return { data: null, error: String(err) };
+      }
+    },
+  );
+
+  ipcMain.handle('qualityGate:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      const db = getDatabase();
+      const allowed = ['gate_type', 'name', 'command', 'enabled', 'sort_order'];
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+      for (const [key, val] of Object.entries(updates)) {
+        if (allowed.includes(key)) {
+          setClauses.push(`${key} = ?`);
+          values.push(key === 'enabled' ? (val ? 1 : 0) : val);
+        }
+      }
+      if (setClauses.length === 0) {
+        return { data: null, error: 'No valid fields to update' };
+      }
+      setClauses.push("updated_at = datetime('now')");
+      values.push(id);
+      db.prepare(`UPDATE quality_gates SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+      const row = db.prepare('SELECT * FROM quality_gates WHERE id = ?').get(id);
+      return { data: row, error: null };
+    } catch (err) {
+      return { data: null, error: String(err) };
+    }
+  });
+
+  ipcMain.handle('qualityGate:delete', (_event, id: string) => {
+    try {
+      const db = getDatabase();
+      db.prepare('DELETE FROM quality_gates WHERE id = ?').run(id);
+      return { data: true, error: null };
+    } catch (err) {
+      return { data: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(
+    'qualityGate:reorder',
+    (_event, gates: Array<{ id: string; sort_order: number }>) => {
+      try {
+        const db = getDatabase();
+        const stmt = db.prepare(
+          "UPDATE quality_gates SET sort_order = ?, updated_at = datetime('now') WHERE id = ?",
+        );
+        const reorderAll = db.transaction((items: Array<{ id: string; sort_order: number }>) => {
+          for (const item of items) {
+            stmt.run(item.sort_order, item.id);
+          }
+        });
+        reorderAll(gates);
+        return { data: true, error: null };
+      } catch (err) {
+        return { data: false, error: String(err) };
+      }
+    },
+  );
 
   // ─── Hooks ───────────────────────────────────────────────
 

@@ -292,6 +292,18 @@ export async function initDatabase(): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS quality_gates (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      gate_type TEXT NOT NULL CHECK(gate_type IN ('test', 'lint', 'typecheck', 'custom')),
+      name TEXT NOT NULL,
+      command TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS expertise_records (
       id TEXT PRIMARY KEY,
       domain TEXT NOT NULL,
@@ -348,6 +360,9 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_hooks_project ON hooks(project_id);
     CREATE INDEX IF NOT EXISTS idx_hooks_type ON hooks(hook_type);
     CREATE INDEX IF NOT EXISTS idx_hooks_installed ON hooks(is_installed);
+    CREATE INDEX IF NOT EXISTS idx_quality_gates_project ON quality_gates(project_id);
+    CREATE INDEX IF NOT EXISTS idx_quality_gates_type ON quality_gates(gate_type);
+    CREATE INDEX IF NOT EXISTS idx_quality_gates_enabled ON quality_gates(enabled);
     CREATE INDEX IF NOT EXISTS idx_expertise_domain ON expertise_records(domain);
     CREATE INDEX IF NOT EXISTS idx_expertise_type ON expertise_records(type);
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);

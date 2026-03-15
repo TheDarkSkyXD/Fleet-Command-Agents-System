@@ -198,6 +198,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateDownload: () => ipcRenderer.invoke('update:download'),
   updateInstall: () => ipcRenderer.invoke('update:install'),
   doctorRun: () => ipcRenderer.invoke('doctor:run'),
+  doctorFix: (checkName: string) => ipcRenderer.invoke('doctor:fix', checkName),
 
   // Watchdog
   watchdogStart: () => ipcRenderer.invoke('watchdog:start'),
@@ -404,6 +405,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   identitySessions: (agentName: string) => ipcRenderer.invoke('identity:sessions', agentName),
   identityUpdateExpertise: (name: string, domains: string) =>
     ipcRenderer.invoke('identity:update-expertise', name, domains),
+
+  // Quality Gates
+  qualityGateList: (projectId: string) => ipcRenderer.invoke('qualityGate:list', projectId),
+  qualityGateCreate: (gate: {
+    id: string;
+    project_id: string;
+    gate_type: string;
+    name: string;
+    command: string;
+    enabled?: boolean;
+    sort_order?: number;
+  }) => ipcRenderer.invoke('qualityGate:create', gate),
+  qualityGateUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('qualityGate:update', id, updates),
+  qualityGateDelete: (id: string) => ipcRenderer.invoke('qualityGate:delete', id),
+  qualityGateReorder: (gates: Array<{ id: string; sort_order: number }>) =>
+    ipcRenderer.invoke('qualityGate:reorder', gates),
 
   // Hooks
   hookList: (filters?: { project_id?: string; hook_type?: string }) =>
