@@ -195,6 +195,32 @@ export function registerIpcHandlers(): void {
         const capability = options.capability as AgentCapability;
         const model = options.model || getDefaultModel(capability);
 
+        // Enforce hierarchy depth limit
+        const requestedDepth = options.depth ?? 0;
+        let maxDepth = 2; // default
+        try {
+          const setting = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
+            'maxHierarchyDepth',
+          ) as { value: string } | undefined;
+          if (setting) {
+            const parsed = JSON.parse(setting.value);
+            if (typeof parsed === 'number' && parsed >= 0) {
+              maxDepth = parsed;
+            }
+          }
+        } catch (depthErr) {
+          log.warn(
+            '[IPC] agent:spawn - failed to read maxHierarchyDepth setting, using default 2:',
+            depthErr,
+          );
+        }
+
+        if (requestedDepth > maxDepth) {
+          const msg = `Hierarchy depth limit exceeded: requested depth ${requestedDepth} exceeds max ${maxDepth}`;
+          log.warn(`[IPC] agent:spawn - ${msg}`);
+          return { data: null, error: msg };
+        }
+
         // Spawn the actual node-pty process via AgentProcessManager
         const agentProcess = agentProcessManager.spawn({
           id: options.id,
@@ -2181,6 +2207,88 @@ export function registerIpcHandlers(): void {
       return { data: agents, error: null };
     } catch (error) {
       log.error('agent:running-list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Agent hierarchy relationship queries
+  ipcMain.handle('agent:children', (_event, agentName: string) => {
+    try {
+      const children = loggedPrepare(
+        'SELECT * FROM sessions WHERE parent_agent = ? ORDER BY created_at DESC',
+      ).all(agentName);
+      log.info(`[IPC] agent:children - found ${children.length} children for ${agentName}`);
+      return { data: children, error: null };
+    } catch (error) {
+      log.error('agent:children failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('agent:hierarchy', (_event, agentName?: string) => {
+    try {
+      // If agentName provided, get its subtree; otherwise get full hierarchy
+      if (agentName) {
+        // Get the agent itself
+        const agent = loggedPrepare(
+          'SELECT * FROM sessions WHERE agent_name = ? ORDER BY created_at DESC LIMIT 1',
+        ).get(agentName) as Record<string, unknown> | undefined;
+        if (!agent) {
+          return { data: null, error: `Agent ${agentName} not found` };
+        }
+        // Get all descendants recursively using CTE
+        const descendants = loggedPrepare(
+          `WITH RECURSIVE subtree AS (
+            SELECT * FROM sessions WHERE parent_agent = ?
+            UNION ALL
+            SELECT s.* FROM sessions s
+            INNER JOIN subtree st ON s.parent_agent = st.agent_name
+          )
+          SELECT * FROM subtree ORDER BY depth ASC, created_at ASC`,
+        ).all(agentName);
+        log.info(
+          `[IPC] agent:hierarchy - found ${descendants.length} descendants for ${agentName}`,
+        );
+        return {
+          data: {
+            agent,
+            children: descendants,
+            childCount: descendants.length,
+          },
+          error: null,
+        };
+      }
+      // Full hierarchy: get all root agents (no parent) and their trees
+      const roots = loggedPrepare(
+        `SELECT * FROM sessions WHERE (parent_agent IS NULL OR parent_agent = '') AND state IN ('working', 'booting') ORDER BY created_at DESC`,
+      ).all();
+      const allSessions = loggedPrepare(
+        `SELECT * FROM sessions WHERE state IN ('working', 'booting') ORDER BY depth ASC, created_at ASC`,
+      ).all() as Array<Record<string, unknown>>;
+
+      // Build parent->children map
+      const childMap: Record<string, Array<Record<string, unknown>>> = {};
+      for (const s of allSessions) {
+        const parent = s.parent_agent as string;
+        if (parent) {
+          if (!childMap[parent]) childMap[parent] = [];
+          childMap[parent].push(s);
+        }
+      }
+
+      log.info(
+        `[IPC] agent:hierarchy - full tree: ${roots.length} roots, ${allSessions.length} total active`,
+      );
+      return {
+        data: {
+          roots,
+          allSessions,
+          childMap,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('agent:hierarchy failed:', error);
       return { data: null, error: String(error) };
     }
   });

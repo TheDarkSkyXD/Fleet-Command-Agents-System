@@ -140,6 +140,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('agent:resize', id, cols, rows),
   agentProcessInfo: (id: string) => ipcRenderer.invoke('agent:process-info', id),
   agentRunningList: () => ipcRenderer.invoke('agent:running-list'),
+  agentChildren: (agentName: string) => ipcRenderer.invoke('agent:children', agentName),
+  agentHierarchy: (agentName?: string) => ipcRenderer.invoke('agent:hierarchy', agentName),
 
   // Projects
   projectList: () => ipcRenderer.invoke('project:list'),

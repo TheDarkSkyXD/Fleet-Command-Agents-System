@@ -655,6 +655,18 @@ export interface ElectronAPI {
     id: string,
   ) => Promise<{ data: AgentProcessInfo | null; error: string | null }>;
   agentRunningList: () => Promise<{ data: AgentProcessInfo[] | null; error: string | null }>;
+  agentChildren: (agentName: string) => Promise<{ data: Session[] | null; error: string | null }>;
+  agentHierarchy: (agentName?: string) => Promise<{
+    data: {
+      agent?: Record<string, unknown>;
+      roots?: Record<string, unknown>[];
+      children?: Record<string, unknown>[];
+      childCount?: number;
+      allSessions?: Record<string, unknown>[];
+      childMap?: Record<string, Record<string, unknown>[]>;
+    } | null;
+    error: string | null;
+  }>;
   mailList: (
     filters?: Record<string, unknown>,
   ) => Promise<{ data: Message[] | null; error: string | null }>;
