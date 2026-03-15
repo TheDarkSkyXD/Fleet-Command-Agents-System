@@ -1,5 +1,11 @@
 import React from 'react';
-import { FiChevronDown, FiChevronRight, FiCircle, FiCpu, FiUser } from 'react-icons/fi';
+import {
+  FiChevronDown,
+  FiChevronRight,
+  FiCpu,
+  FiUser,
+  FiUsers,
+} from 'react-icons/fi';
 import type { AgentState, Session } from '../../shared/types';
 
 interface AgentHierarchyTreeProps {
@@ -12,12 +18,30 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-const stateColors: Record<AgentState, string> = {
-  booting: 'text-yellow-400',
-  working: 'text-green-400',
-  completed: 'text-slate-400',
+/** Status dot colors matching spec: green=working, amber=stalled, red=zombie, sky=booting, gray=completed */
+const stateDotBg: Record<AgentState, string> = {
+  booting: 'bg-sky-400',
+  working: 'bg-emerald-400',
+  completed: 'bg-slate-400',
+  stalled: 'bg-amber-400',
+  zombie: 'bg-red-400',
+};
+
+const stateTextColor: Record<AgentState, string> = {
+  booting: 'text-sky-400',
+  working: 'text-emerald-400',
+  completed: 'text-slate-500',
   stalled: 'text-amber-400',
   zombie: 'text-red-400',
+};
+
+/** Glow/pulse animation for active states */
+const statePulse: Record<AgentState, string> = {
+  booting: 'animate-pulse',
+  working: 'animate-pulse',
+  completed: '',
+  stalled: 'animate-pulse',
+  zombie: '',
 };
 
 const capabilityColors: Record<string, string> = {
@@ -28,6 +52,16 @@ const capabilityColors: Record<string, string> = {
   merger: 'bg-emerald-600/20 text-emerald-300 border-emerald-600/40',
   coordinator: 'bg-rose-600/20 text-rose-300 border-rose-600/40',
   monitor: 'bg-teal-600/20 text-teal-300 border-teal-600/40',
+};
+
+const capabilityIcon: Record<string, React.ReactNode> = {
+  coordinator: <FiUsers className="h-4 w-4" />,
+  lead: <FiUser className="h-4 w-4" />,
+  scout: <FiCpu className="h-4 w-4" />,
+  builder: <FiCpu className="h-4 w-4" />,
+  reviewer: <FiCpu className="h-4 w-4" />,
+  merger: <FiCpu className="h-4 w-4" />,
+  monitor: <FiCpu className="h-4 w-4" />,
 };
 
 function buildTree(sessions: Session[]): TreeNode[] {
@@ -59,16 +93,42 @@ function buildTree(sessions: Session[]): TreeNode[] {
     }
   }
 
+  // Sort: coordinators first, then leads, then others
+  const capOrder: Record<string, number> = {
+    coordinator: 0,
+    lead: 1,
+    builder: 2,
+    reviewer: 3,
+    scout: 4,
+    merger: 5,
+    monitor: 6,
+  };
+  const sortNodes = (nodes: TreeNode[]) => {
+    nodes.sort(
+      (a, b) =>
+        (capOrder[a.session.capability] ?? 9) - (capOrder[b.session.capability] ?? 9),
+    );
+    for (const n of nodes) sortNodes(n.children);
+  };
+  sortNodes(roots);
+
   return roots;
 }
 
+/**
+ * A single node in the tree with visual connection lines.
+ */
 function TreeNodeComponent({
   node,
   depth,
+  isLast,
+  parentLines,
   onSelectAgent,
 }: {
   node: TreeNode;
   depth: number;
+  isLast: boolean;
+  parentLines: boolean[];
   onSelectAgent: (agentId: string) => void;
 }) {
   const [expanded, setExpanded] = React.useState(true);
@@ -76,82 +136,126 @@ function TreeNodeComponent({
   const hasChildren = node.children.length > 0;
   const capColor =
     capabilityColors[session.capability] || 'bg-slate-600/20 text-slate-300 border-slate-600/40';
+  const dotBg = stateDotBg[session.state] || 'bg-slate-400';
+  const textColor = stateTextColor[session.state] || 'text-slate-500';
+  const pulse = statePulse[session.state] || '';
+  const icon = capabilityIcon[session.capability] || <FiCpu className="h-4 w-4" />;
 
   return (
-    <div>
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 hover:bg-slate-700/50 rounded-md cursor-pointer transition-colors group text-left"
-        style={{ paddingLeft: `${depth * 24 + 12}px` }}
-        onClick={() => onSelectAgent(session.id)}
-      >
-        {/* Expand/collapse toggle */}
-        {hasChildren ? (
-          <span
-            className="p-0.5 text-slate-400 hover:text-slate-200 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpanded(!expanded);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
+    <div data-testid={`tree-node-${session.id}`}>
+      <div className="flex items-stretch">
+        {/* Connection lines for parent levels */}
+        {parentLines.map((showLine, i) => (
+          <div
+            key={`line-${session.id}-${i}`}
+            className="w-6 flex-shrink-0 relative"
+          >
+            {showLine && (
+              <div className="absolute left-3 top-0 bottom-0 w-px bg-slate-600/50" />
+            )}
+          </div>
+        ))}
+
+        {/* Current level connector */}
+        {depth > 0 && (
+          <div className="w-6 flex-shrink-0 relative">
+            {/* Vertical line from top to middle */}
+            <div
+              className={`absolute left-3 top-0 w-px bg-slate-600/50 ${isLast ? 'h-1/2' : 'h-full'}`}
+            />
+            {/* Horizontal line from middle to right */}
+            <div className="absolute left-3 top-1/2 w-3 h-px bg-slate-600/50" />
+          </div>
+        )}
+
+        {/* Node content */}
+        <button
+          type="button"
+          className="flex flex-1 items-center gap-2 px-2 py-1.5 hover:bg-slate-700/40 rounded-md cursor-pointer transition-colors group text-left min-w-0"
+          onClick={() => onSelectAgent(session.id)}
+          data-testid={`tree-node-button-${session.id}`}
+        >
+          {/* Expand/collapse toggle */}
+          {hasChildren ? (
+            <span
+              className="p-0.5 text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0"
+              onClick={(e) => {
                 e.stopPropagation();
                 setExpanded(!expanded);
-              }
-            }}
-          >
-            {expanded ? (
-              <FiChevronDown className="h-4 w-4" />
-            ) : (
-              <FiChevronRight className="h-4 w-4" />
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                  setExpanded(!expanded);
+                }
+              }}
+            >
+              {expanded ? (
+                <FiChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <FiChevronRight className="h-3.5 w-3.5" />
+              )}
+            </span>
+          ) : (
+            <span className="w-[18px] flex-shrink-0" />
+          )}
+
+          {/* Status dot with pulse animation */}
+          <span className="relative flex-shrink-0">
+            <span className={`block h-2.5 w-2.5 rounded-full ${dotBg}`} />
+            {pulse && (
+              <span
+                className={`absolute inset-0 rounded-full ${dotBg} opacity-40 ${pulse}`}
+              />
             )}
           </span>
-        ) : (
-          <span className="w-5" />
-        )}
 
-        {/* State indicator */}
-        <FiCircle
-          className={`h-2.5 w-2.5 fill-current ${stateColors[session.state] || 'text-slate-500'}`}
-        />
+          {/* Agent icon colored by capability */}
+          <span className={`flex-shrink-0 ${textColor}`}>{icon}</span>
 
-        {/* Agent icon */}
-        {session.capability === 'coordinator' || session.capability === 'lead' ? (
-          <FiUser className="h-4 w-4 text-slate-400" />
-        ) : (
-          <FiCpu className="h-4 w-4 text-slate-400" />
-        )}
+          {/* Agent name */}
+          <span className="text-sm font-medium text-slate-200 group-hover:text-white truncate">
+            {session.agent_name}
+          </span>
 
-        {/* Agent name */}
-        <span className="text-sm font-medium text-slate-200 group-hover:text-white">
-          {session.agent_name}
-        </span>
+          {/* Capability badge */}
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${capColor}`}
+          >
+            {session.capability}
+          </span>
 
-        {/* Capability badge */}
-        <span className={`text-xs px-1.5 py-0.5 rounded border ${capColor}`}>
-          {session.capability}
-        </span>
+          {/* State label */}
+          <span className={`text-xs flex-shrink-0 ${textColor}`}>{session.state}</span>
 
-        {/* State */}
-        <span className={`text-xs ${stateColors[session.state] || 'text-slate-500'}`}>
-          {session.state}
-        </span>
+          {/* Child count for leads/coordinators */}
+          {hasChildren && (
+            <span className="text-xs text-slate-500 ml-auto flex-shrink-0">
+              {node.children.length} child{node.children.length !== 1 ? 'ren' : ''}
+            </span>
+          )}
+        </button>
+      </div>
 
-        {/* Depth indicator */}
-        <span className="text-xs text-slate-500 ml-auto">depth {session.depth}</span>
-      </button>
-
-      {/* Children */}
+      {/* Children with connection lines */}
       {expanded && hasChildren && (
         <div>
-          {node.children.map((child) => (
-            <TreeNodeComponent
-              key={child.session.id}
-              node={child}
-              depth={depth + 1}
-              onSelectAgent={onSelectAgent}
-            />
-          ))}
+          {node.children.map((child, i) => {
+            const childIsLast = i === node.children.length - 1;
+            // Pass down which parent levels should show a continuing vertical line
+            const nextParentLines =
+              depth > 0 ? [...parentLines, !isLast] : !isLast ? [!isLast] : [false];
+            return (
+              <TreeNodeComponent
+                key={child.session.id}
+                node={child}
+                depth={depth + 1}
+                isLast={childIsLast}
+                parentLines={depth === 0 ? [] : nextParentLines}
+                onSelectAgent={onSelectAgent}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -164,26 +268,68 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
   if (tree.length === 0) {
     return (
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
-        <FiCpu className="h-12 w-12 mx-auto mb-3 text-slate-600" />
+        <FiUsers className="h-12 w-12 mx-auto mb-3 text-slate-600" />
         <p className="text-lg mb-2">No agents to display</p>
-        <p className="text-sm">Spawn agents to see the hierarchy tree</p>
+        <p className="text-sm text-slate-500">
+          Spawn agents to see the hierarchy tree.
+          <br />
+          Coordinator → Leads → Workers
+        </p>
       </div>
     );
   }
 
+  // Legend
+  const legendItems = [
+    { color: 'bg-emerald-400', label: 'Working' },
+    { color: 'bg-sky-400', label: 'Booting' },
+    { color: 'bg-amber-400', label: 'Stalled' },
+    { color: 'bg-red-400', label: 'Zombie' },
+    { color: 'bg-slate-400', label: 'Completed' },
+  ];
+
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800 p-2">
-      <div className="text-xs text-slate-500 px-3 py-1.5 border-b border-slate-700 mb-1">
-        Agent Hierarchy
+    <div className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden">
+      {/* Header with legend */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+          Agent Hierarchy
+        </span>
+        <div className="flex items-center gap-3">
+          {legendItems.map((item) => (
+            <div key={item.label} className="flex items-center gap-1">
+              <span className={`h-2 w-2 rounded-full ${item.color}`} />
+              <span className="text-xs text-slate-500">{item.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
-      {tree.map((node) => (
-        <TreeNodeComponent
-          key={node.session.id}
-          node={node}
-          depth={0}
-          onSelectAgent={onSelectAgent}
-        />
-      ))}
+
+      {/* Tree content */}
+      <div className="p-2">
+        {tree.map((node, i) => (
+          <TreeNodeComponent
+            key={node.session.id}
+            node={node}
+            depth={0}
+            isLast={i === tree.length - 1}
+            parentLines={[]}
+            onSelectAgent={onSelectAgent}
+          />
+        ))}
+      </div>
+
+      {/* Footer stats */}
+      <div className="border-t border-slate-700 px-4 py-2 flex items-center gap-4 text-xs text-slate-500">
+        <span>Total: {sessions.length} agents</span>
+        <span>
+          Roots: {tree.length}
+        </span>
+        <span>
+          Max depth:{' '}
+          {sessions.reduce((max, s) => Math.max(max, s.depth || 0), 0)}
+        </span>
+      </div>
     </div>
   );
 }
