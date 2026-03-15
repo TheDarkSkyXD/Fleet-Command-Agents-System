@@ -10,10 +10,12 @@ import {
   FiChevronRight,
   FiCircle,
   FiClock,
+  FiColumns,
   FiEdit3,
   FiFolder,
   FiHash,
   FiLink,
+  FiList,
   FiLoader,
   FiMinus,
   FiPlus,
@@ -1352,6 +1354,30 @@ function IssueCard({
                 Grouped
               </span>
             )}
+
+            {/* Dependency badge */}
+            {issue.dependencies &&
+              (() => {
+                try {
+                  const depCount = JSON.parse(issue.dependencies).length;
+                  if (depCount > 0) {
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs ${
+                          issue.status === 'blocked' ? 'text-red-400' : 'text-slate-400'
+                        }`}
+                        data-testid={`dep-count-${issue.id}`}
+                      >
+                        <FiLink size={10} />
+                        {depCount} dep{depCount > 1 ? 's' : ''}
+                      </span>
+                    );
+                  }
+                  return null;
+                } catch {
+                  return null;
+                }
+              })()}
           </div>
 
           <h3 className="text-sm font-medium text-slate-50 truncate">{issue.title}</h3>
@@ -1491,6 +1517,23 @@ function DependencyManager({
   onDependenciesChange: (id: string, depIds: string[]) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [blockingIssues, setBlockingIssues] = useState<
+    Array<{ id: string; title: string; status: string }>
+  >([]);
+
+  // Load reverse dependencies (issues this one blocks)
+  useEffect(() => {
+    let cancelled = false;
+    window.electronAPI.issueBlocking(issue.id).then((result) => {
+      if (!cancelled && result.data) {
+        setBlockingIssues(result.data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [issue.id]);
+
   const deps: string[] = (() => {
     try {
       return JSON.parse(issue.dependencies || '[]');
@@ -1506,76 +1549,110 @@ function DependencyManager({
   const availableIssues = allIssues.filter((i) => i.id !== issue.id && !deps.includes(i.id));
 
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-          Dependencies ({deps.length})
-        </span>
-        <button
-          type="button"
-          onClick={() => setAdding(!adding)}
-          className="rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
-          title="Add dependency"
-        >
-          {adding ? <FiX size={14} /> : <FiPlus size={14} />}
-        </button>
+    <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 space-y-4">
+      {/* Blocked By (dependencies) */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+            <FiLink className="inline mr-1 -mt-0.5" size={11} />
+            Blocked By ({deps.length})
+          </span>
+          <button
+            type="button"
+            onClick={() => setAdding(!adding)}
+            className="rounded p-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+            title="Add dependency"
+          >
+            {adding ? <FiX size={14} /> : <FiPlus size={14} />}
+          </button>
+        </div>
+
+        {adding && availableIssues.length > 0 && (
+          <div className="mb-3 max-h-32 overflow-y-auto rounded border border-slate-600 bg-slate-800">
+            {availableIssues.map((i) => {
+              const st = statuses[i.status];
+              return (
+                <button
+                  key={i.id}
+                  type="button"
+                  onClick={() => {
+                    onDependenciesChange(issue.id, [...deps, i.id]);
+                    setAdding(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <st.icon size={12} className={st.color} />
+                  <span className="text-slate-300 truncate">{i.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {depIssues.length === 0 ? (
+          <p className="text-sm text-slate-500 italic">No dependencies</p>
+        ) : (
+          <div className="space-y-1">
+            {depIssues.map((dep) => {
+              const st = statuses[dep.status];
+              const StIcon = st.icon;
+              return (
+                <div
+                  key={dep.id}
+                  className="flex items-center justify-between rounded px-2 py-1 bg-slate-800/50"
+                  data-testid={`dep-blocked-by-${dep.id}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <StIcon size={12} className={st.color} />
+                    <span className="text-sm text-slate-300 truncate">{dep.title}</span>
+                    <span className={`text-[10px] ${st.color}`}>{st.label}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onDependenciesChange(
+                        issue.id,
+                        deps.filter((d) => d !== dep.id),
+                      )
+                    }
+                    className="rounded p-0.5 text-slate-500 hover:text-red-400 transition-colors"
+                    title="Remove dependency"
+                  >
+                    <FiX size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {adding && availableIssues.length > 0 && (
-        <div className="mb-3 max-h-32 overflow-y-auto rounded border border-slate-600 bg-slate-800">
-          {availableIssues.map((i) => {
-            const st = statuses[i.status];
-            return (
-              <button
-                key={i.id}
-                type="button"
-                onClick={() => {
-                  onDependenciesChange(issue.id, [...deps, i.id]);
-                  setAdding(false);
-                }}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
-              >
-                <st.icon size={12} className={st.color} />
-                <span className="text-slate-300 truncate">{i.title}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {depIssues.length === 0 ? (
-        <p className="text-sm text-slate-500 italic">No dependencies</p>
-      ) : (
-        <div className="space-y-1">
-          {depIssues.map((dep) => {
-            const st = statuses[dep.status];
-            const StIcon = st.icon;
-            return (
-              <div
-                key={dep.id}
-                className="flex items-center justify-between rounded px-2 py-1 bg-slate-800/50"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <StIcon size={12} className={st.color} />
-                  <span className="text-sm text-slate-300 truncate">{dep.title}</span>
-                  <span className={`text-[10px] ${st.color}`}>{st.label}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onDependenciesChange(
-                      issue.id,
-                      deps.filter((d) => d !== dep.id),
-                    )
-                  }
-                  className="rounded p-0.5 text-slate-500 hover:text-red-400 transition-colors"
-                  title="Remove dependency"
+      {/* Blocking (reverse dependencies) */}
+      {blockingIssues.length > 0 && (
+        <div>
+          <span className="text-xs font-medium text-orange-400 uppercase tracking-wider block mb-2">
+            <FiAlertTriangle className="inline mr-1 -mt-0.5" size={11} />
+            Blocking ({blockingIssues.length})
+          </span>
+          <div className="space-y-1">
+            {blockingIssues.map((blocked) => {
+              const st = statuses[blocked.status as IssueStatus] || statuses.open;
+              const StIcon = st.icon;
+              return (
+                <div
+                  key={blocked.id}
+                  className="flex items-center rounded px-2 py-1 bg-orange-500/5 border border-orange-500/10"
+                  data-testid={`dep-blocking-${blocked.id}`}
                 >
-                  <FiX size={12} />
-                </button>
-              </div>
-            );
-          })}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <StIcon size={12} className={st.color} />
+                    <span className="text-sm text-slate-300 truncate">{blocked.title}</span>
+                    <span className={`text-[10px] ${st.color}`}>{st.label}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
