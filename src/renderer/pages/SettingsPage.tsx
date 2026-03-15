@@ -3,11 +3,14 @@ import {
   FiAlertTriangle,
   FiBell,
   FiCheck,
+  FiCheckCircle,
   FiChevronDown,
   FiChevronUp,
   FiCopy,
+  FiDownload,
   FiEdit2,
   FiEye,
+  FiFileText,
   FiPlay,
   FiPlus,
   FiRefreshCw,
@@ -18,7 +21,12 @@ import {
   FiX,
 } from 'react-icons/fi';
 import { z } from 'zod';
-import type { ConfigProfile, QualityGate, QualityGateResult } from '../../shared/types';
+import type {
+  ConfigProfile,
+  QualityGate,
+  QualityGateResult,
+  UpdateStatus,
+} from '../../shared/types';
 import { AuthDecisionTree } from '../components/AuthDecisionTree';
 import { ProjectConfigEditor } from '../components/ProjectConfigEditor';
 import { useProjectStore } from '../stores/projectStore';
@@ -101,6 +109,7 @@ export function SettingsPage() {
     | 'quality-gates'
     | 'project-config'
     | 'notifications'
+    | 'updates'
   >('agents');
 
   useEffect(() => {
@@ -128,6 +137,7 @@ export function SettingsPage() {
     { id: 'quality-gates' as const, label: 'Quality Gates' },
     { id: 'notifications' as const, label: 'Notifications' },
     { id: 'project-config' as const, label: 'Project Config' },
+    { id: 'updates' as const, label: 'Updates' },
   ];
 
   return (
@@ -178,6 +188,7 @@ export function SettingsPage() {
       {activeTab === 'quality-gates' && <QualityGatesSettings />}
       {activeTab === 'notifications' && <NotificationPreferencesSettings />}
       {activeTab === 'project-config' && <ProjectConfigEditor />}
+      {activeTab === 'updates' && <UpdateSettings />}
     </div>
   );
 }
@@ -2513,6 +2524,319 @@ function NotificationPreferencesSettings() {
         >
           Reset to Defaults
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Updates Tab ──────────────────────────────────────────────────────
+
+function UpdateSettings() {
+  const [status, setStatus] = useState<UpdateStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [installing, setInstalling] = useState(false);
+
+  // Load initial status on mount
+  useEffect(() => {
+    window.electronAPI.updateStatus().then((result) => {
+      if (result.data) {
+        setStatus(result.data);
+      }
+    });
+
+    // Listen for live update events
+    const handleStatus = (data: unknown) => {
+      const s = data as UpdateStatus;
+      setStatus(s);
+      setChecking(false);
+    };
+
+    const handleDownloadProgress = (data: {
+      percent: number;
+      transferred: number;
+      total: number;
+      bytesPerSecond: number;
+    }) => {
+      setStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              downloadProgress: data.percent,
+              downloadedBytes: data.transferred,
+              totalBytes: data.total,
+              downloadSpeed: data.bytesPerSecond,
+              isDownloading: true,
+            }
+          : null,
+      );
+    };
+
+    const handleDownloaded = (data: { version: string; releaseNotes?: string | null }) => {
+      setStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              isDownloaded: true,
+              isDownloading: false,
+              downloadProgress: 100,
+              latestVersion: data.version,
+              releaseNotes: data.releaseNotes ?? prev.releaseNotes,
+            }
+          : null,
+      );
+    };
+
+    const handleError = (data: { message: string }) => {
+      setChecking(false);
+      setInstalling(false);
+      setStatus((prev) => (prev ? { ...prev, error: data.message, isDownloading: false } : null));
+    };
+
+    window.electronAPI.onUpdateStatus(handleStatus);
+    window.electronAPI.onUpdateDownloadProgress(handleDownloadProgress);
+    window.electronAPI.onUpdateDownloaded(handleDownloaded);
+    window.electronAPI.onUpdateError(handleError);
+
+    return () => {
+      window.electronAPI.removeAllListeners('update:status');
+      window.electronAPI.removeAllListeners('update:download-progress');
+      window.electronAPI.removeAllListeners('update:downloaded');
+      window.electronAPI.removeAllListeners('update:error');
+    };
+  }, []);
+
+  const handleCheckForUpdates = useCallback(async () => {
+    setChecking(true);
+    setStatus((prev) => (prev ? { ...prev, error: null } : null));
+    try {
+      const result = await window.electronAPI.updateCheck();
+      if (result.data) {
+        setStatus(result.data);
+      }
+      if (result.error) {
+        setStatus((prev) => (prev ? { ...prev, error: result.error } : null));
+      }
+      setLastChecked(new Date());
+    } catch {
+      setStatus((prev) => (prev ? { ...prev, error: 'Failed to check for updates' } : null));
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  const handleDownload = useCallback(() => {
+    setStatus((prev) => (prev ? { ...prev, isDownloading: true, error: null } : null));
+    window.electronAPI.updateDownload();
+  }, []);
+
+  const handleInstall = useCallback(() => {
+    setInstalling(true);
+    window.electronAPI.updateInstall();
+  }, []);
+
+  const formatBytes = (bytes: number | null): string => {
+    if (!bytes) return '0 B';
+    if (bytes > 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes > 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${bytes} B`;
+  };
+
+  const formatSpeed = (bps: number | null): string => {
+    if (!bps) return '';
+    if (bps > 1024 * 1024) return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+    if (bps > 1024) return `${(bps / 1024).toFixed(0)} KB/s`;
+    return `${bps} B/s`;
+  };
+
+  const progressPercent =
+    status?.downloadProgress != null ? Math.round(status.downloadProgress) : 0;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-100">Software Updates</h2>
+        <p className="text-sm text-slate-400 mt-1">
+          Check for and install updates to Fleet Command.
+        </p>
+      </div>
+
+      {/* Current Version Card */}
+      <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-400">Current Version</p>
+            <p className="text-xl font-bold text-slate-100 mt-1">
+              v{status?.currentVersion ?? '...'}
+            </p>
+            {lastChecked && (
+              <p className="text-xs text-slate-500 mt-1">
+                Last checked: {lastChecked.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleCheckForUpdates}
+            disabled={checking || status?.isDownloading}
+            className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: checking ? 'rgb(51 65 85)' : 'var(--accent-primary)',
+            }}
+            data-testid="check-updates-btn"
+          >
+            <FiRefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+            {checking ? 'Checking...' : 'Check for Updates'}
+          </button>
+        </div>
+      </div>
+
+      {/* Result Display */}
+      {status && !checking && (
+        <>
+          {/* Update Available */}
+          {status.updateAvailable && !status.isDownloaded && !status.isDownloading && (
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-5">
+              <div className="flex items-start gap-3">
+                <FiDownload className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-300">Update Available</h3>
+                  <p className="text-sm text-slate-300 mt-1">
+                    Version <strong className="text-white">v{status.latestVersion}</strong> is
+                    available for download.
+                  </p>
+                  {status.releaseDate && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Released{' '}
+                      {new Date(status.releaseDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+                  >
+                    <FiDownload className="w-4 h-4" />
+                    Download Update
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Downloading */}
+          {status.isDownloading && (
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-5">
+              <div className="flex items-start gap-3">
+                <FiDownload className="w-5 h-5 text-blue-400 mt-0.5 shrink-0 animate-bounce" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-300">Downloading Update</h3>
+                  <p className="text-sm text-slate-300 mt-1">
+                    Downloading v{status.latestVersion}...
+                  </p>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                      <span>
+                        {formatBytes(status.downloadedBytes)} / {formatBytes(status.totalBytes)}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        {status.downloadSpeed ? formatSpeed(status.downloadSpeed) : null}
+                        <span className="font-mono font-bold text-slate-200">
+                          {progressPercent}%
+                        </span>
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Downloaded - Ready to Install */}
+          {status.isDownloaded && (
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-5">
+              <div className="flex items-start gap-3">
+                <FiCheckCircle className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-green-300">Ready to Install</h3>
+                  <p className="text-sm text-slate-300 mt-1">
+                    Version <strong className="text-white">v{status.latestVersion}</strong> has been
+                    downloaded and is ready to install. The app will restart to apply the update.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleInstall}
+                    disabled={installing}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FiRefreshCw className={`w-4 h-4 ${installing ? 'animate-spin' : ''}`} />
+                    {installing ? 'Installing...' : 'Restart & Install'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Up to Date */}
+          {!status.updateAvailable && !status.isDownloaded && lastChecked && (
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-5">
+              <div className="flex items-center gap-3">
+                <FiCheckCircle className="w-5 h-5 text-green-400 shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold text-green-300">You're up to date!</h3>
+                  <p className="text-sm text-slate-300 mt-0.5">
+                    Fleet Command v{status.currentVersion} is the latest version.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Release Notes */}
+          {status.releaseNotes && status.updateAvailable && (
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <FiFileText className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-200">Release Notes</h3>
+              </div>
+              <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                {status.releaseNotes}
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {status.error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-5">
+              <div className="flex items-center gap-3">
+                <FiAlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold text-red-300">Update Error</h3>
+                  <p className="text-sm text-slate-300 mt-0.5">{status.error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Auto-update info */}
+      <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
+        <p className="text-xs text-slate-500">
+          Fleet Command automatically checks for updates on startup. Downloaded updates are
+          installed when you quit the application.
+        </p>
       </div>
     </div>
   );
