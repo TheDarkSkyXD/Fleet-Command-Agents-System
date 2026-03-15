@@ -9,7 +9,6 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import {
   FiActivity,
   FiAlertTriangle,
@@ -31,6 +30,7 @@ import {
   FiX,
   FiZap,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type {
   AgentCapability,
   AgentProcessInfo,

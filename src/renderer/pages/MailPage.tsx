@@ -397,6 +397,7 @@ export function MailPage() {
   // Context menu for right-click on messages
   const msgContextMenu = useContextMenu();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: handleReply/handleMarkRead are inline functions
   const handleMessageContextMenu = useCallback(
     (e: React.MouseEvent, msg: Message) => {
       const items: ContextMenuItem[] = [
@@ -427,7 +428,6 @@ export function MailPage() {
       ];
       msgContextMenu.show(e, items);
     },
-    // biome-ignore lint/correctness/useExhaustiveDependencies: handleReply/handleMarkRead are inline functions, context menu captures latest values
     [msgContextMenu],
   );
 
