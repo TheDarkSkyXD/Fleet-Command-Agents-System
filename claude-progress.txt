@@ -1,5 +1,37 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Session Handoff Tracking & Instruction Editor)
+
+#### Feature #154: Session handoff tracking - PASSING
+- Created session_handoffs table (id, from_session, to_session, reason, created_at)
+- Added indexes on from_session, to_session, and created_at columns
+- IPC handlers: session:handoff-create, session:handoff-list, session:handoff-get, session:handoff-by-session
+- Preload bridges: sessionHandoffCreate, sessionHandoffList, sessionHandoffGet, sessionHandoffBySession
+- Added SessionHandoff type to shared types and ElectronAPI interface
+
+#### Feature #156: Edit agent instruction files with syntax highlighting - PASSING
+- IPC handlers: agentDef:instruction-read, agentDef:instruction-write
+- Per-role .md files stored in userData/agent-instructions/ directory
+- Default template generated if no instruction file exists for a role
+- InstructionEditor component with split-pane layout (edit textarea + syntax-highlighted preview)
+- Markdown syntax highlighting: headers (blue), blockquotes (green), lists (amber), code blocks (purple), rules (gray)
+- Line numbers in preview pane for easy reference
+- Save/Close buttons with unsaved changes indicator and saved confirmation
+- "Edit Instructions" button added to RoleDetail component header
+- editingRole state in AgentDefinitionsPage toggles between detail view and editor
+
+#### Files Created/Modified
+- MODIFIED: src/main/db/database.ts - session_handoffs table and indexes
+- MODIFIED: src/main/ipc/handlers.ts - handoff CRUD and instruction read/write handlers
+- MODIFIED: src/preload/index.ts - handoff and instruction bridge methods
+- MODIFIED: src/shared/types/index.ts - SessionHandoff type, ElectronAPI additions
+- MODIFIED: src/renderer/pages/AgentDefinitionsPage.tsx - InstructionEditor component, Edit button
+
+#### Current Status
+- 191/366 features passing (added #154 and #156 this session)
+- All code passes Biome lint and TypeScript check (no new errors)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Profile CRUD & Quick-Switch)
 
 #### Feature #142: Profile CRUD operations - PASSING
