@@ -3591,3 +3591,27 @@
 - 238/366 features passing (added #230 and #231 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Error Copy & Agent ID Copy)
+
+#### Feature #234: Error reporting with copy-to-clipboard - PASSING
+- Added Copy Error Details button to ErrorBoundary fallback UI
+- Copies section name, error name, message, stack trace, component stack, timestamp, user agent
+- Toast notifications for success/failure feedback
+- Styled with FiClipboard icon alongside existing Try Again button
+- data-testid='error-boundary-copy-details' for testing
+
+#### Feature #235: One-click copy agent IDs - PASSING
+- Added ID column to agents table with truncated ID and hover-reveal copy icon
+- Added ID display in agent card details row with hover-reveal copy icon
+- Both use navigator.clipboard.writeText with toast confirmation
+- data-testid attributes for all copy buttons
+
+#### Files Modified
+- MODIFIED: src/renderer/components/ErrorBoundary.tsx - Copy Error Details button, componentStack tracking
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - ID column with copy, card ID with copy
+
+#### Current Status
+- 241/366 features passing (added #234 and #235 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
