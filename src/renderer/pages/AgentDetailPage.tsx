@@ -38,6 +38,7 @@ import type {
   Session,
 } from '../../shared/types';
 import { AgentTerminal } from '../components/AgentTerminal';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 
 const CAPABILITY_COLORS: Record<string, string> = {
   scout: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -823,10 +824,17 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
   if (error && !session) {
     return (
       <div className="space-y-4">
+        <Breadcrumbs
+          items={[
+            { label: 'Agents', page: 'agents', onClick: onBack },
+            { label: 'Error' },
+          ]}
+        />
         <button
           type="button"
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          data-testid="back-to-agents"
         >
           <FiArrowLeft className="h-4 w-4" />
           Back to Agents
@@ -853,10 +861,17 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
   if (!session) {
     return (
       <div className="space-y-4">
+        <Breadcrumbs
+          items={[
+            { label: 'Agents', page: 'agents', onClick: onBack },
+            { label: 'Loading...' },
+          ]}
+        />
         <button
           type="button"
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          data-testid="back-to-agents"
         >
           <FiArrowLeft className="h-4 w-4" />
           Back to Agents
@@ -874,10 +889,17 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 96px)' }}>
       {/* Header */}
       <div className="flex-shrink-0 space-y-3 pb-4">
+        <Breadcrumbs
+          items={[
+            { label: 'Agents', page: 'agents', onClick: onBack },
+            { label: session.agent_name || 'Agent Detail' },
+          ]}
+        />
         <button
           type="button"
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          data-testid="back-to-agents"
         >
           <FiArrowLeft className="h-4 w-4" />
           Back to Agents

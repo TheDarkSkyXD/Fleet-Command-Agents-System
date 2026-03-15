@@ -5,6 +5,7 @@ import {
   FiAlertTriangle,
   FiAnchor,
   FiBarChart2,
+  FiBell,
   FiBook,
   FiBookOpen,
   FiCheckSquare,
@@ -106,22 +107,132 @@ function clearRecentActions(): void {
 }
 
 const navigationItems: CommandItem[] = [
-  { id: 'agents', label: 'Go to Agents', keywords: ['agents', 'agent', 'workers', 'swarm'], icon: FiUsers, group: 'Navigation' },
-  { id: 'mail', label: 'Go to Mail', keywords: ['mail', 'messages', 'inbox', 'outbox'], icon: FiMail, group: 'Navigation' },
-  { id: 'merge', label: 'Go to Merge Queue', keywords: ['merge', 'queue', 'git', 'branch'], icon: FiGitMerge, group: 'Navigation' },
-  { id: 'worktrees', label: 'Go to Worktrees', keywords: ['worktrees', 'worktree', 'branches', 'git'], icon: FiGitBranch, group: 'Navigation' },
-  { id: 'definitions', label: 'Go to Definitions', keywords: ['definitions', 'definition', 'agent types', 'roles'], icon: FiBookOpen, group: 'Navigation' },
-  { id: 'guard-rules', label: 'Go to Guard Rules', keywords: ['guard', 'rules', 'security', 'permissions'], icon: FiShield, group: 'Navigation' },
-  { id: 'hooks', label: 'Go to Hooks', keywords: ['hooks', 'hook', 'lifecycle', 'events'], icon: FiAnchor, group: 'Navigation' },
-  { id: 'tasks', label: 'Go to Tasks', keywords: ['tasks', 'task', 'todo', 'tracker'], icon: FiCheckSquare, group: 'Navigation' },
-  { id: 'discovery', label: 'Go to Discovery', keywords: ['discovery', 'discover', 'scan', 'find'], icon: FiSearch, group: 'Navigation' },
-  { id: 'prompts', label: 'Go to Prompts', keywords: ['prompts', 'prompt', 'templates'], icon: FiFileText, group: 'Navigation' },
-  { id: 'expertise', label: 'Go to Expertise', keywords: ['expertise', 'knowledge', 'domains'], icon: FiBook, group: 'Navigation' },
-  { id: 'events', label: 'Go to Event Feed', keywords: ['events', 'event', 'feed', 'activity', 'log'], icon: FiActivity, group: 'Navigation' },
-  { id: 'metrics', label: 'Go to Metrics', keywords: ['metrics', 'stats', 'statistics', 'dashboard', 'analytics'], icon: FiBarChart2, group: 'Navigation' },
-  { id: 'doctor', label: 'Go to Doctor', keywords: ['doctor', 'health', 'diagnostics', 'check'], icon: FiHeart, group: 'Navigation' },
-  { id: 'debug', label: 'Go to Debug', keywords: ['debug', 'debugger', 'console', 'terminal', 'logs'], icon: FiTerminal, group: 'Navigation' },
-  { id: 'settings', label: 'Go to Settings', keywords: ['settings', 'preferences', 'config', 'configuration'], icon: FiSettings, group: 'Navigation' },
+  {
+    id: 'agents',
+    label: 'Go to Agents',
+    keywords: ['agents', 'agent', 'workers', 'swarm'],
+    icon: FiUsers,
+    group: 'Navigation',
+  },
+  {
+    id: 'mail',
+    label: 'Go to Mail',
+    keywords: ['mail', 'messages', 'inbox', 'outbox'],
+    icon: FiMail,
+    group: 'Navigation',
+  },
+  {
+    id: 'merge',
+    label: 'Go to Merge Queue',
+    keywords: ['merge', 'queue', 'git', 'branch'],
+    icon: FiGitMerge,
+    group: 'Navigation',
+  },
+  {
+    id: 'worktrees',
+    label: 'Go to Worktrees',
+    keywords: ['worktrees', 'worktree', 'branches', 'git'],
+    icon: FiGitBranch,
+    group: 'Navigation',
+  },
+  {
+    id: 'definitions',
+    label: 'Go to Definitions',
+    keywords: ['definitions', 'definition', 'agent types', 'roles'],
+    icon: FiBookOpen,
+    group: 'Navigation',
+  },
+  {
+    id: 'guard-rules',
+    label: 'Go to Guard Rules',
+    keywords: ['guard', 'rules', 'security', 'permissions'],
+    icon: FiShield,
+    group: 'Navigation',
+  },
+  {
+    id: 'hooks',
+    label: 'Go to Hooks',
+    keywords: ['hooks', 'hook', 'lifecycle', 'events'],
+    icon: FiAnchor,
+    group: 'Navigation',
+  },
+  {
+    id: 'tasks',
+    label: 'Go to Tasks',
+    keywords: ['tasks', 'task', 'todo', 'tracker'],
+    icon: FiCheckSquare,
+    group: 'Navigation',
+  },
+  {
+    id: 'discovery',
+    label: 'Go to Discovery',
+    keywords: ['discovery', 'discover', 'scan', 'find'],
+    icon: FiSearch,
+    group: 'Navigation',
+  },
+  {
+    id: 'prompts',
+    label: 'Go to Prompts',
+    keywords: ['prompts', 'prompt', 'templates'],
+    icon: FiFileText,
+    group: 'Navigation',
+  },
+  {
+    id: 'expertise',
+    label: 'Go to Expertise',
+    keywords: ['expertise', 'knowledge', 'domains'],
+    icon: FiBook,
+    group: 'Navigation',
+  },
+  {
+    id: 'notifications',
+    label: 'Go to Notifications',
+    keywords: ['notifications', 'alerts', 'bell', 'notify'],
+    icon: FiBell,
+    group: 'Navigation',
+  },
+  {
+    id: 'events',
+    label: 'Go to Event Feed',
+    keywords: ['events', 'event', 'feed', 'activity', 'log'],
+    icon: FiActivity,
+    group: 'Navigation',
+  },
+  {
+    id: 'metrics',
+    label: 'Go to Metrics',
+    keywords: ['metrics', 'stats', 'statistics', 'dashboard', 'analytics'],
+    icon: FiBarChart2,
+    group: 'Navigation',
+  },
+  {
+    id: 'doctor',
+    label: 'Go to Doctor',
+    keywords: ['doctor', 'health', 'diagnostics', 'check'],
+    icon: FiHeart,
+    group: 'Navigation',
+  },
+  {
+    id: 'cleanup',
+    label: 'Go to Cleanup',
+    keywords: ['cleanup', 'nuclear', 'clean', 'reset', 'wipe'],
+    icon: FiZap,
+    group: 'Navigation',
+  },
+  {
+    id: 'debug',
+    label: 'Go to Debug',
+    keywords: ['debug', 'debugger', 'console', 'terminal', 'logs'],
+    icon: FiTerminal,
+    group: 'Navigation',
+  },
+  {
+    id: 'settings',
+    label: 'Go to Settings',
+    keywords: ['settings', 'preferences', 'config', 'configuration'],
+    icon: FiSettings,
+    group: 'Navigation',
+  },
 ];
 
 function fuzzyScore(query: string, text: string): number {
@@ -195,7 +306,9 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
   }, [activeProject]);
 
   useEffect(() => {
-    if (!open) { setPendingAction(null); }
+    if (!open) {
+      setPendingAction(null);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -204,62 +317,93 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       refreshLiveState();
       refreshTimerRef.current = setInterval(refreshLiveState, 3000);
     } else {
-      if (refreshTimerRef.current) { clearInterval(refreshTimerRef.current); refreshTimerRef.current = null; }
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
     }
     return () => {
-      if (refreshTimerRef.current) { clearInterval(refreshTimerRef.current); refreshTimerRef.current = null; }
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
     };
   }, [open, refreshLiveState]);
 
   const agentActionItems: CommandItem[] = useMemo(
     () => [
       {
-        id: 'action-spawn-agent', label: 'Spawn Agent',
+        id: 'action-spawn-agent',
+        label: 'Spawn Agent',
         keywords: ['spawn', 'start', 'launch', 'create', 'new agent', 'run'],
-        icon: FiPlay, group: 'Agent Actions',
+        icon: FiPlay,
+        group: 'Agent Actions',
         contextCheck: (ctx) => ctx.hasActiveProject,
-        action: () => { onNavigate('agents'); },
+        action: () => {
+          onNavigate('agents');
+        },
       },
       {
-        id: 'action-stop-all-agents', label: 'Stop All Agents',
+        id: 'action-stop-all-agents',
+        label: 'Stop All Agents',
         keywords: ['stop', 'kill', 'terminate', 'halt', 'shutdown', 'stop all'],
-        icon: FiSquare, group: 'Agent Actions',
+        icon: FiSquare,
+        group: 'Agent Actions',
         contextCheck: (ctx) => ctx.hasRunningAgents,
         destructive: true,
         confirmMessage: 'This will stop all running agents. Are you sure?',
-        action: async () => { try { await window.electronAPI.agentStopAll(); } catch { /* silently fail */ } },
+        action: async () => {
+          try {
+            await window.electronAPI.agentStopAll();
+          } catch {
+            /* silently fail */
+          }
+        },
       },
       {
-        id: 'action-nudge-agent', label: 'Nudge Agent',
+        id: 'action-nudge-agent',
+        label: 'Nudge Agent',
         keywords: ['nudge', 'poke', 'wake', 'prompt', 'remind'],
-        icon: FiZap, group: 'Agent Actions',
+        icon: FiZap,
+        group: 'Agent Actions',
         contextCheck: (ctx) => ctx.hasRunningAgents,
-        action: () => { onNavigate('agents'); },
+        action: () => {
+          onNavigate('agents');
+        },
       },
       {
-        id: 'action-inspect-agent', label: 'Inspect Agent',
+        id: 'action-inspect-agent',
+        label: 'Inspect Agent',
         keywords: ['inspect', 'view', 'detail', 'info', 'status', 'examine'],
-        icon: FiEye, group: 'Agent Actions',
+        icon: FiEye,
+        group: 'Agent Actions',
         contextCheck: (ctx) => ctx.hasRunningAgents,
-        action: () => { onNavigate('agents'); },
+        action: () => {
+          onNavigate('agents');
+        },
       },
     ],
     [onNavigate],
   );
 
   const contextualAgentActions = useMemo(
-    () => agentActionItems.filter((item) => !item.contextCheck || item.contextCheck(commandContext)),
+    () =>
+      agentActionItems.filter((item) => !item.contextCheck || item.contextCheck(commandContext)),
     [agentActionItems, commandContext],
   );
 
   const runningAgentItems: CommandItem[] = useMemo(
-    () => runningAgents.map((agent) => ({
-      id: `live-agent-${agent.id}`,
-      label: `${agent.agentName} (${agent.capability})`,
-      keywords: [agent.agentName, agent.capability, agent.model, 'running', 'active', 'live'],
-      icon: FiCpu, group: 'Running Agents',
-      action: () => { onNavigate('agents'); },
-    })),
+    () =>
+      runningAgents.map((agent) => ({
+        id: `live-agent-${agent.id}`,
+        label: `${agent.agentName} (${agent.capability})`,
+        keywords: [agent.agentName, agent.capability, agent.model, 'running', 'active', 'live'],
+        icon: FiCpu,
+        group: 'Running Agents',
+        action: () => {
+          onNavigate('agents');
+        },
+      })),
     [runningAgents, onNavigate],
   );
 
@@ -301,10 +445,19 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 
   const executeAction = useCallback(
     (item: CommandItem) => {
-      const recentAction: RecentAction = { id: item.id, label: item.label, group: item.group, timestamp: Date.now() };
+      const recentAction: RecentAction = {
+        id: item.id,
+        label: item.label,
+        group: item.group,
+        timestamp: Date.now(),
+      };
       const updated = addRecentAction(recentAction);
       setRecentActions(updated);
-      if (item.action) { item.action(); } else { onNavigate(item.id); }
+      if (item.action) {
+        item.action();
+      } else {
+        onNavigate(item.id);
+      }
       setOpen(false);
     },
     [onNavigate],
@@ -328,8 +481,13 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
     }
   }, [pendingAction, executeAction]);
 
-  const handleCancelAction = useCallback(() => { setPendingAction(null); }, []);
-  const handleClearRecent = useCallback(() => { clearRecentActions(); setRecentActions([]); }, []);
+  const handleCancelAction = useCallback(() => {
+    setPendingAction(null);
+  }, []);
+  const handleClearRecent = useCallback(() => {
+    clearRecentActions();
+    setRecentActions([]);
+  }, []);
 
   if (!open) return null;
 
@@ -338,7 +496,9 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => setOpen(false)}
-        onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+        }}
       />
       <Command
         className="relative z-50 w-full max-w-lg overflow-hidden rounded-xl border border-slate-600 bg-slate-800 shadow-2xl shadow-black/50"
@@ -346,7 +506,11 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
         onKeyDown={(e: React.KeyboardEvent) => {
           if (e.key === 'Escape') {
             e.preventDefault();
-            if (pendingAction) { setPendingAction(null); } else { setOpen(false); }
+            if (pendingAction) {
+              setPendingAction(null);
+            } else {
+              setOpen(false);
+            }
           }
         }}
       >
@@ -357,14 +521,22 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
         />
 
         {/* Project context indicator */}
-        <div className="flex items-center gap-2 border-b border-slate-700/60 bg-slate-800/40 px-4 py-1.5" data-testid="command-palette-project-context">
+        <div
+          className="flex items-center gap-2 border-b border-slate-700/60 bg-slate-800/40 px-4 py-1.5"
+          data-testid="command-palette-project-context"
+        >
           <FiFolder size={12} className="text-blue-400 shrink-0" />
           <span className="text-[11px] text-slate-400">
             Project:{' '}
-            <span className="font-medium text-slate-300">{activeProject ? activeProject.name : 'None selected'}</span>
+            <span className="font-medium text-slate-300">
+              {activeProject ? activeProject.name : 'None selected'}
+            </span>
           </span>
           {activeProject && (
-            <span className="ml-auto text-[10px] text-slate-600 truncate max-w-[200px]" title={activeProject.path}>
+            <span
+              className="ml-auto text-[10px] text-slate-600 truncate max-w-[200px]"
+              title={activeProject.path}
+            >
               {activeProject.path}
             </span>
           )}
@@ -403,16 +575,23 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
           </div>
         ) : (
           <Command.List className="max-h-72 overflow-y-auto p-2">
-            <Command.Empty className="px-4 py-8 text-center text-sm text-slate-500">No results found.</Command.Empty>
+            <Command.Empty className="px-4 py-8 text-center text-sm text-slate-500">
+              No results found.
+            </Command.Empty>
 
             {/* Recent Actions */}
             {recentActions.length > 0 && (
               <Command.Group heading="Recent" className="mb-2">
                 <div className="flex items-center justify-between px-2 pb-1 pt-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Recent</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Recent
+                  </span>
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); handleClearRecent(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearRecent();
+                    }}
                     className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-700 hover:text-slate-300 transition-colors"
                   >
                     <FiTrash2 size={10} />
@@ -477,7 +656,11 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                 <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Running Agents
                   <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-normal text-emerald-400">
-                    <FiRefreshCw size={9} className="animate-spin" style={{ animationDuration: '3s' }} />
+                    <FiRefreshCw
+                      size={9}
+                      className="animate-spin"
+                      style={{ animationDuration: '3s' }}
+                    />
                     Live
                   </span>
                 </div>
@@ -493,7 +676,9 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                       <FiCpu size={16} className="shrink-0 text-emerald-400" />
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="truncate">{agent?.agentName ?? 'Agent'}</span>
-                        <span className="text-[10px] text-slate-500">{agent?.capability} · {agent?.model}</span>
+                        <span className="text-[10px] text-slate-500">
+                          {agent?.capability} · {agent?.model}
+                        </span>
                       </div>
                       <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-400">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -507,14 +692,25 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 
             {/* System Status */}
             <Command.Group heading="System Status" className="mb-2">
-              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">System Status</div>
+              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                System Status
+              </div>
               <div className="px-3 py-1.5 flex items-center gap-4 text-[11px] text-slate-400">
                 <span className="inline-flex items-center gap-1.5">
-                  <FiUsers size={12} className={commandContext.hasRunningAgents ? 'text-emerald-400' : 'text-slate-600'} />
-                  {commandContext.runningAgentCount} agent{commandContext.runningAgentCount !== 1 ? 's' : ''} running
+                  <FiUsers
+                    size={12}
+                    className={
+                      commandContext.hasRunningAgents ? 'text-emerald-400' : 'text-slate-600'
+                    }
+                  />
+                  {commandContext.runningAgentCount} agent
+                  {commandContext.runningAgentCount !== 1 ? 's' : ''} running
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <FiMail size={12} className={unreadMailCount > 0 ? 'text-blue-400' : 'text-slate-600'} />
+                  <FiMail
+                    size={12}
+                    className={unreadMailCount > 0 ? 'text-blue-400' : 'text-slate-600'}
+                  />
                   {unreadMailCount} unread
                 </span>
               </div>
@@ -522,7 +718,9 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 
             {/* Navigation */}
             <Command.Group heading="Navigation" className="mb-2">
-              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Navigation</div>
+              <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Navigation
+              </div>
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -548,7 +746,9 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
             ) : (
               <>
                 Commands apply to{' '}
-                <span className="font-medium text-slate-400">{activeProject ? activeProject.name : 'no project'}</span>
+                <span className="font-medium text-slate-400">
+                  {activeProject ? activeProject.name : 'no project'}
+                </span>
               </>
             )}
           </span>
@@ -559,7 +759,9 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
             <span>{pendingAction ? 'to cancel' : 'to select'}</span>
             {!pendingAction && (
               <>
-                <kbd className="rounded border border-slate-600 bg-slate-700 px-1.5 py-0.5 text-xs text-slate-400">Esc</kbd>
+                <kbd className="rounded border border-slate-600 bg-slate-700 px-1.5 py-0.5 text-xs text-slate-400">
+                  Esc
+                </kbd>
                 <span>to close</span>
               </>
             )}

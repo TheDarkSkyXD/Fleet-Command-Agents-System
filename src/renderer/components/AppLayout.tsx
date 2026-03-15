@@ -32,11 +32,49 @@ import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
 import { UpdateBanner } from './UpdateBanner';
 
+// Parse hash to extract page and optional agent ID
+function parseHash(hash: string): { page: string; agentId?: string } {
+  const cleaned = hash.replace(/^#\/?/, '');
+  if (!cleaned) return { page: 'welcome' };
+
+  // Handle agent-detail deep links: #/agent-detail/{agentId}
+  const agentDetailMatch = cleaned.match(/^agent-detail\/(.+)$/);
+  if (agentDetailMatch) {
+    return { page: 'agent-detail', agentId: agentDetailMatch[1] };
+  }
+
+  return { page: cleaned };
+}
+
+// Build hash from page and optional agent ID
+function buildHash(page: string, agentId?: string | null): string {
+  if (page === 'agent-detail' && agentId) {
+    return `#/agent-detail/${agentId}`;
+  }
+  if (page === 'welcome') return '';
+  return `#/${page}`;
+}
+
+// Parse initial URL hash once at module load (before component mounts)
+const appInitialState = parseHash(window.location.hash);
+
 export function AppLayout() {
-  const [currentPage, setCurrentPage] = useState('welcome');
+  const [currentPage, setCurrentPage] = useState(appInitialState.page);
   const { settings, loaded, updateSetting } = useSettingsStore();
   const sidebarCollapsed = settings.sidebarCollapsed;
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(
+    appInitialState.agentId || null,
+  );
+
+  // Replace initial history entry with current page state (so popstate has correct state)
+  useEffect(() => {
+    const hash = buildHash(appInitialState.page, appInitialState.agentId);
+    window.history.replaceState(
+      { page: appInitialState.page, agentId: appInitialState.agentId },
+      '',
+      hash || window.location.pathname,
+    );
+  }, []);
 
   // Load settings on mount (includes sidebar collapsed state)
   useEffect(() => {
@@ -85,7 +123,14 @@ export function AppLayout() {
   }, [activeProject, activeAgentCount]);
 
   const handleNavigate = useCallback((page: string) => {
-    setCurrentPage(page);
+    setCurrentPage((prev) => {
+      // Push current state to browser history before navigating (enables back button)
+      if (prev !== page) {
+        const newHash = buildHash(page);
+        window.history.pushState({ page }, '', newHash || window.location.pathname);
+      }
+      return page;
+    });
     // Clear agent detail when navigating away
     if (page !== 'agent-detail') {
       setSelectedAgentId(null);
@@ -94,18 +139,38 @@ export function AppLayout() {
 
   const handleSelectAgent = useCallback((agentId: string) => {
     setSelectedAgentId(agentId);
+    // Push current page to history before navigating to agent detail
+    const newHash = buildHash('agent-detail', agentId);
+    window.history.pushState({ page: 'agent-detail', agentId }, '', newHash);
     setCurrentPage('agent-detail');
   }, []);
 
   const handleBackFromDetail = useCallback(() => {
-    setSelectedAgentId(null);
-    setCurrentPage('agents');
+    // Use browser history back for proper back navigation
+    window.history.back();
   }, []);
 
   const handleProjectOpened = useCallback(() => {
+    const newHash = buildHash('agents');
+    window.history.pushState({ page: 'agents' }, '', newHash);
     setCurrentPage('agents');
     loadActiveProject();
   }, [loadActiveProject]);
+
+  // Listen for popstate events (browser back/forward navigation)
+  useEffect(() => {
+    const handlePopState = () => {
+      const { page, agentId } = parseHash(window.location.hash);
+      setCurrentPage(page);
+      if (agentId) {
+        setSelectedAgentId(agentId);
+      } else if (page !== 'agent-detail') {
+        setSelectedAgentId(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Listen for notification events from main process -> show in-app toasts
   useEffect(() => {
@@ -155,6 +220,8 @@ export function AppLayout() {
             (a: { agent_name: string }) => a.agent_name === data.agentName,
           );
           if (agent) {
+            const newHash = buildHash('agent-detail', agent.id);
+            window.history.pushState({ page: 'agent-detail', agentId: agent.id }, '', newHash);
             setSelectedAgentId(agent.id);
             setCurrentPage('agent-detail');
           }
@@ -226,6 +293,7 @@ export function AppLayout() {
                   selectedAgentId={selectedAgentId}
                   onSelectAgent={handleSelectAgent}
                   onBackFromDetail={handleBackFromDetail}
+                  onNavigateHome={() => handleNavigate('agents')}
                 />
               </ErrorBoundary>
             </motion.div>
@@ -252,11 +320,13 @@ function PageContent({
   selectedAgentId,
   onSelectAgent,
   onBackFromDetail,
+  onNavigateHome,
 }: {
   page: string;
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
   onBackFromDetail: () => void;
+  onNavigateHome: () => void;
 }) {
   switch (page) {
     case 'agents':
@@ -382,8 +452,28 @@ function PageContent({
       );
     default:
       return (
-        <div className="text-slate-400">
-          <p>Page not found</p>
+        <div
+          className="flex h-full flex-col items-center justify-center text-center"
+          data-testid="not-found-page"
+        >
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-slate-800">
+            <span className="text-4xl font-bold text-slate-500">404</span>
+          </div>
+          <h1 className="mb-2 text-2xl font-bold text-slate-200">Page Not Found</h1>
+          <p className="mb-1 text-slate-400">
+            The page <span className="font-mono text-slate-300">"{page}"</span> does not exist.
+          </p>
+          <p className="mb-6 text-sm text-slate-500">
+            It may have been moved or the URL is incorrect.
+          </p>
+          <button
+            type="button"
+            onClick={onNavigateHome}
+            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500"
+            data-testid="not-found-home-button"
+          >
+            Go to Agents
+          </button>
         </div>
       );
   }
