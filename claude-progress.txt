@@ -1152,3 +1152,28 @@
 - 71/366 features passing (added #232 and #233 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Status Bar & CLI Indicator)
+
+#### Feature #9: Status bar displays at bottom - PASSING
+- Updated StatusBar to show active project name from projectStore with FiFolder icon
+- Shows 'No Project' fallback when no project is selected
+- Active agent count with pulse indicator when run is active
+- CLI status indicator with color-coded dots
+- Run ID display with duration timer
+- Added data-testid attributes for all sections
+
+#### Feature #27: CLI status indicator in status bar - PASSING
+- CLI indicator changed from span to button for accessibility and click handling
+- Clicking CLI indicator navigates to settings page via onNavigate prop
+- Color states: green (ready), amber (not authenticated), red (not installed), gray pulse (checking)
+- Tooltip includes click hint
+
+#### Files Modified
+- MODIFIED: src/renderer/components/StatusBar.tsx - Added project name, clickable CLI indicator, data-testid attrs
+- MODIFIED: src/renderer/components/AppLayout.tsx - Pass onNavigate prop to StatusBar
+
+#### Current Status
+- 76/366 features passing (added #9 and #27 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
