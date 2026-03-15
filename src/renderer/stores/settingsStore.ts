@@ -182,6 +182,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   accentColor: 'blue',
   sidebarCollapsed: false,
   setupCompleted: false,
+  notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
 };
 
 /** Apply accent color CSS custom properties to :root */

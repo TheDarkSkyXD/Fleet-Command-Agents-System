@@ -2,9 +2,9 @@ import { exec, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import * as nodePty from 'node-pty';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import log from 'electron-log';
+import * as nodePty from 'node-pty';
 import { getDatabase } from '../db/database';
 import {
   type AgentCapability,
@@ -223,6 +223,37 @@ export function registerIpcHandlers(): void {
 
         if (requestedDepth > maxDepth) {
           const msg = `Hierarchy depth limit exceeded: requested depth ${requestedDepth} exceeds max ${maxDepth}`;
+          log.warn(`[IPC] agent:spawn - ${msg}`);
+          return { data: null, error: msg };
+        }
+
+        // Enforce max concurrent agents limit
+        let maxConcurrent = 10; // default
+        try {
+          const concurrentSetting = loggedPrepare(
+            'SELECT value FROM app_settings WHERE key = ?',
+          ).get('app_settings') as { value: string } | undefined;
+          if (concurrentSetting) {
+            const parsed = JSON.parse(concurrentSetting.value);
+            if (
+              parsed &&
+              typeof parsed === 'object' &&
+              typeof parsed.maxConcurrentAgents === 'number' &&
+              parsed.maxConcurrentAgents >= 1
+            ) {
+              maxConcurrent = parsed.maxConcurrentAgents;
+            }
+          }
+        } catch (concurrentErr) {
+          log.warn(
+            '[IPC] agent:spawn - failed to read maxConcurrentAgents setting, using default 10:',
+            concurrentErr,
+          );
+        }
+
+        const runningAgents = agentProcessManager.getAll().filter((a) => a.isRunning);
+        if (runningAgents.length >= maxConcurrent) {
+          const msg = `Max concurrent agents limit reached: ${runningAgents.length}/${maxConcurrent} agents running. Increase the limit in Settings > Agents.`;
           log.warn(`[IPC] agent:spawn - ${msg}`);
           return { data: null, error: msg };
         }
@@ -2907,7 +2938,9 @@ export function registerIpcHandlers(): void {
 
       // Auto-unblock dependent issues when this issue is closed
       if (updates.status === 'closed') {
-        const allRows = loggedPrepare('SELECT id, dependencies, status FROM issues').all() as Array<{
+        const allRows = loggedPrepare(
+          'SELECT id, dependencies, status FROM issues',
+        ).all() as Array<{
           id: string;
           dependencies: string | null;
           status: string;
@@ -3007,11 +3040,7 @@ export function registerIpcHandlers(): void {
         loggedPrepare(
           "UPDATE issues SET dependencies = ?, status = 'blocked', updated_at = datetime('now') WHERE id = ?",
         ).run(depsJson, id);
-      } else if (
-        !shouldBlock &&
-        currentIssue &&
-        currentIssue.status === 'blocked'
-      ) {
+      } else if (!shouldBlock && currentIssue && currentIssue.status === 'blocked') {
         loggedPrepare(
           "UPDATE issues SET dependencies = ?, status = 'open', updated_at = datetime('now') WHERE id = ?",
         ).run(depsJson, id);
@@ -3034,7 +3063,9 @@ export function registerIpcHandlers(): void {
   // Get issues that this issue is blocking (reverse dependency lookup)
   ipcMain.handle('issue:blocking', (_event, id: string) => {
     try {
-      const allIssues = loggedPrepare('SELECT id, title, status, dependencies FROM issues').all() as Array<{
+      const allIssues = loggedPrepare(
+        'SELECT id, title, status, dependencies FROM issues',
+      ).all() as Array<{
         id: string;
         title: string;
         status: string;
@@ -5191,6 +5222,22 @@ export function registerIpcHandlers(): void {
 
   // ─── Notification Handlers ───────────────────────────────────────────
 
+  // Load notification preferences from settings on startup
+  try {
+    const notifSetting = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
+      'app_settings',
+    ) as { value: string } | undefined;
+    if (notifSetting) {
+      const parsed = JSON.parse(notifSetting.value);
+      if (parsed?.notificationPreferences && typeof parsed.notificationPreferences === 'object') {
+        notificationService.setPreferences(parsed.notificationPreferences);
+        log.info('[IPC] Loaded notification preferences from settings');
+      }
+    }
+  } catch (prefsErr) {
+    log.warn('[IPC] Failed to load notification preferences from settings:', prefsErr);
+  }
+
   ipcMain.handle(
     'notification:send',
     (_event, options: { title: string; body: string; eventType: string; agentName?: string }) => {
@@ -5225,6 +5272,25 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('notification:is-supported failed:', error);
       return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('notification:set-preferences', (_event, prefs: Record<string, boolean>) => {
+    try {
+      notificationService.setPreferences(prefs);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('notification:set-preferences failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('notification:get-preferences', () => {
+    try {
+      return { data: notificationService.getPreferences(), error: null };
+    } catch (error) {
+      log.error('notification:get-preferences failed:', error);
+      return { data: null, error: String(error) };
     }
   });
 

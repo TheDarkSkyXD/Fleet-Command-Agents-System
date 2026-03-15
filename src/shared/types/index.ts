@@ -947,9 +947,7 @@ export interface ElectronAPI {
     dependencyIds: string[],
   ) => Promise<{ data: Issue | null; error: string | null }>;
   issueReadyQueue: () => Promise<{ data: Issue[] | null; error: string | null }>;
-  issueBlocking: (
-    id: string,
-  ) => Promise<{
+  issueBlocking: (id: string) => Promise<{
     data: Array<{ id: string; title: string; status: string; dependencies: string | null }> | null;
     error: string | null;
   }>;
@@ -1393,6 +1391,13 @@ export interface ElectronAPI {
   }) => Promise<{ data: boolean; error: string | null }>;
   notificationSetEnabled: (enabled: boolean) => Promise<{ data: boolean; error: string | null }>;
   notificationIsSupported: () => Promise<{ data: boolean; error: string | null }>;
+  notificationSetPreferences: (
+    prefs: Record<string, boolean>,
+  ) => Promise<{ data: boolean; error: string | null }>;
+  notificationGetPreferences: () => Promise<{
+    data: Record<string, boolean> | null;
+    error: string | null;
+  }>;
 
   // Agent Identity
   identityGet: (name: string) => Promise<{ data: AgentIdentity | null; error: string | null }>;

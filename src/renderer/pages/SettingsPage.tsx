@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   FiAlertTriangle,
+  FiBell,
   FiCheck,
   FiChevronDown,
   FiChevronUp,
@@ -25,8 +26,10 @@ import {
   ACCENT_COLORS,
   type AccentColorKey,
   DEFAULT_MODEL_DEFAULTS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
   DEFAULT_SETTINGS,
   type ModelDefaultsPerCapability,
+  type NotificationPreferences,
   useSettingsStore,
 } from '../stores/settingsStore';
 
@@ -1215,7 +1218,8 @@ function AgentSettings() {
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
         <h2 className="text-lg font-semibold text-slate-100 mb-2">Model Defaults Per Capability</h2>
         <p className="text-sm text-slate-400 mb-4">
-          Set the default Claude model for each agent capability type. When spawning a new agent, the model picker will pre-select the configured default.
+          Set the default Claude model for each agent capability type. When spawning a new agent,
+          the model picker will pre-select the configured default.
         </p>
 
         {(
@@ -1237,7 +1241,9 @@ function AgentSettings() {
             <select
               value={settings.modelDefaultsPerCapability?.[cap] ?? DEFAULT_MODEL_DEFAULTS[cap]}
               onChange={(e) => {
-                const current = settings.modelDefaultsPerCapability ?? { ...DEFAULT_MODEL_DEFAULTS };
+                const current = settings.modelDefaultsPerCapability ?? {
+                  ...DEFAULT_MODEL_DEFAULTS,
+                };
                 updateSetting('modelDefaultsPerCapability', {
                   ...current,
                   [cap]: e.target.value,
@@ -2273,6 +2279,241 @@ function CliStatusSettings() {
         tree below shows the current state.
       </p>
       <AuthDecisionTree />
+    </div>
+  );
+}
+
+// ── Notification Preferences Tab ─────────────────────────────────────
+
+const NOTIFICATION_EVENT_LABELS: Record<
+  keyof NotificationPreferences,
+  { label: string; description: string }
+> = {
+  agent_completed: {
+    label: 'Agent Completed',
+    description: 'When an agent finishes its work successfully.',
+  },
+  agent_stalled: {
+    label: 'Agent Stalled',
+    description: 'When an agent appears idle beyond the stale threshold.',
+  },
+  agent_zombie: {
+    label: 'Zombie Agent',
+    description: 'When an agent is unresponsive and may need termination.',
+  },
+  agent_error: {
+    label: 'Agent Error',
+    description: 'When an agent encounters an error during execution.',
+  },
+  merge_ready: {
+    label: 'Merge Ready',
+    description: 'When a branch is ready for merge review.',
+  },
+  merge_failed: {
+    label: 'Merge Failed',
+    description: 'When a merge operation has failed.',
+  },
+  health_alert: {
+    label: 'Health Alert',
+    description: 'Fleet-wide health issues (e.g., multiple agents stalled).',
+  },
+};
+
+function NotificationPreferencesSettings() {
+  const { settings, updateSetting } = useSettingsStore();
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  const prefs = settings.notificationPreferences ?? { ...DEFAULT_NOTIFICATION_PREFERENCES };
+
+  // Check if notifications are supported on mount
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const result = await window.electronAPI.notificationIsSupported();
+        setSupported(result.data);
+      } catch {
+        setSupported(false);
+      }
+    };
+    check();
+  }, []);
+
+  // Sync preferences to notification service on mount & changes
+  useEffect(() => {
+    const sync = async () => {
+      try {
+        await window.electronAPI.notificationSetPreferences(
+          prefs as unknown as Record<string, boolean>,
+        );
+      } catch {
+        // Ignore sync errors
+      }
+    };
+    sync();
+  }, [prefs]);
+
+  const handleToggle = async (key: keyof NotificationPreferences) => {
+    const updated = { ...prefs, [key]: !prefs[key] };
+    await updateSetting('notificationPreferences', updated);
+    try {
+      await window.electronAPI.notificationSetPreferences(
+        updated as unknown as Record<string, boolean>,
+      );
+      setStatusMessage({
+        type: 'success',
+        text: `${NOTIFICATION_EVENT_LABELS[key].label} notifications ${updated[key] ? 'enabled' : 'disabled'}`,
+      });
+      setTimeout(() => setStatusMessage(null), 2000);
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Failed to update notification preferences' });
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
+  };
+
+  const handleEnableAll = async () => {
+    const allEnabled = { ...DEFAULT_NOTIFICATION_PREFERENCES };
+    await updateSetting('notificationPreferences', allEnabled);
+    await window.electronAPI.notificationSetPreferences(
+      allEnabled as unknown as Record<string, boolean>,
+    );
+    setStatusMessage({ type: 'success', text: 'All notifications enabled' });
+    setTimeout(() => setStatusMessage(null), 2000);
+  };
+
+  const handleDisableAll = async () => {
+    const allDisabled: NotificationPreferences = {
+      agent_completed: false,
+      agent_stalled: false,
+      agent_zombie: false,
+      agent_error: false,
+      merge_ready: false,
+      merge_failed: false,
+      health_alert: false,
+    };
+    await updateSetting('notificationPreferences', allDisabled);
+    await window.electronAPI.notificationSetPreferences(
+      allDisabled as unknown as Record<string, boolean>,
+    );
+    setStatusMessage({ type: 'success', text: 'All notifications disabled' });
+    setTimeout(() => setStatusMessage(null), 2000);
+  };
+
+  const enabledCount = Object.values(prefs).filter(Boolean).length;
+  const totalCount = Object.keys(prefs).length;
+
+  return (
+    <div data-testid="notification-preferences-settings">
+      <div className="flex items-center gap-3 mb-2">
+        <FiBell className="text-blue-400" size={20} />
+        <h2 className="text-lg font-semibold text-slate-100">Notification Preferences</h2>
+      </div>
+      <p className="text-sm text-slate-400 mb-6">
+        Toggle which events trigger desktop notifications. Disable notifications for events you
+        don't want to be alerted about.
+      </p>
+
+      {supported === false && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-900/30 border border-amber-700/50 px-4 py-3">
+          <FiAlertTriangle className="text-amber-400 shrink-0" size={16} />
+          <span className="text-sm text-amber-300">
+            Desktop notifications are not supported on this platform.
+          </span>
+        </div>
+      )}
+
+      {statusMessage && (
+        <div
+          className={`mb-4 flex items-center gap-2 rounded-lg px-4 py-3 ${
+            statusMessage.type === 'success'
+              ? 'bg-emerald-900/30 border border-emerald-700/50'
+              : 'bg-red-900/30 border border-red-700/50'
+          }`}
+        >
+          {statusMessage.type === 'success' ? (
+            <FiCheck className="text-emerald-400 shrink-0" size={16} />
+          ) : (
+            <FiAlertTriangle className="text-red-400 shrink-0" size={16} />
+          )}
+          <span
+            className={`text-sm ${statusMessage.type === 'success' ? 'text-emerald-300' : 'text-red-300'}`}
+          >
+            {statusMessage.text}
+          </span>
+        </div>
+      )}
+
+      {/* Summary & bulk actions */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-slate-400">
+          {enabledCount}/{totalCount} event types enabled
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleEnableAll}
+            className="rounded-md border border-slate-600 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            Enable All
+          </button>
+          <button
+            type="button"
+            onClick={handleDisableAll}
+            className="rounded-md border border-slate-600 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            Disable All
+          </button>
+        </div>
+      </div>
+
+      {/* Event type toggles */}
+      <div className="space-y-1">
+        {(Object.keys(NOTIFICATION_EVENT_LABELS) as Array<keyof NotificationPreferences>).map(
+          (key) => {
+            const { label, description } = NOTIFICATION_EVENT_LABELS[key];
+            const enabled = prefs[key];
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded-lg bg-slate-800/50 border border-slate-700/50 px-4 py-3 hover:bg-slate-800 transition-colors"
+              >
+                <div className="flex-1 min-w-0 mr-4">
+                  <div className="text-sm font-medium text-slate-200">{label}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{description}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggle(key)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                    enabled ? 'bg-blue-600' : 'bg-slate-600'
+                  }`}
+                  data-testid={`notification-toggle-${key}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          },
+        )}
+      </div>
+
+      {/* Reset to defaults */}
+      <div className="mt-6 flex justify-end">
+        <button
+          type="button"
+          onClick={handleEnableAll}
+          className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+        >
+          Reset to Defaults
+        </button>
+      </div>
     </div>
   );
 }

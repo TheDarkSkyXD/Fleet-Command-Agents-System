@@ -25,8 +25,30 @@ interface NotificationOptions {
  * Notifications are shown when agent events occur (completion, stalls, errors, merges).
  * Clicking a notification brings the app window to the foreground.
  */
+/**
+ * Per-event-type notification preferences.
+ */
+export interface NotificationPreferencesMap {
+  agent_completed: boolean;
+  agent_stalled: boolean;
+  agent_zombie: boolean;
+  agent_error: boolean;
+  merge_ready: boolean;
+  merge_failed: boolean;
+  health_alert: boolean;
+}
+
 class NotificationService {
   private enabled = true;
+  private preferences: NotificationPreferencesMap = {
+    agent_completed: true,
+    agent_stalled: true,
+    agent_zombie: true,
+    agent_error: true,
+    merge_ready: true,
+    merge_failed: true,
+    health_alert: true,
+  };
 
   /**
    * Check if notifications are supported on this platform.
@@ -44,11 +66,35 @@ class NotificationService {
   }
 
   /**
+   * Update per-event-type notification preferences.
+   */
+  setPreferences(prefs: Partial<NotificationPreferencesMap>): void {
+    this.preferences = { ...this.preferences, ...prefs };
+    log.info('[NotificationService] Updated notification preferences:', this.preferences);
+  }
+
+  /**
+   * Get current notification preferences.
+   */
+  getPreferences(): NotificationPreferencesMap {
+    return { ...this.preferences };
+  }
+
+  /**
    * Show a desktop notification for an agent event.
    */
   notify(options: NotificationOptions): void {
     if (!this.enabled) {
       log.debug('[NotificationService] Notifications disabled, skipping');
+      return;
+    }
+
+    // Check per-event-type preference
+    const eventType = options.eventType as keyof NotificationPreferencesMap;
+    if (eventType in this.preferences && !this.preferences[eventType]) {
+      log.debug(
+        `[NotificationService] Notification for ${eventType} disabled by preferences, skipping`,
+      );
       return;
     }
 

@@ -453,6 +453,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   notificationSetEnabled: (enabled: boolean) =>
     ipcRenderer.invoke('notification:set-enabled', enabled),
   notificationIsSupported: () => ipcRenderer.invoke('notification:is-supported'),
+  notificationSetPreferences: (prefs: Record<string, boolean>) =>
+    ipcRenderer.invoke('notification:set-preferences', prefs),
+  notificationGetPreferences: () => ipcRenderer.invoke('notification:get-preferences'),
 
   // Agent Identity
   identityGet: (name: string) => ipcRenderer.invoke('identity:get', name),
