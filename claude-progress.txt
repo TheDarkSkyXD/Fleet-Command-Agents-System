@@ -1,5 +1,46 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Live Terminal & Scroll-to-Bottom)
+
+#### Feature #44: Live terminal view per agent via xterm.js - PASSING
+- Created src/renderer/components/AgentTerminal.tsx with full xterm.js integration
+- xterm.js Terminal with dark slate theme matching app design
+- FitAddon for auto-fitting terminal to container with ResizeObserver
+- WebLinksAddon for clickable URLs in terminal output
+- SearchAddon loaded for future search capability
+- JetBrains Mono / Fira Code monospace font family
+- Auto-scroll with toggle button (lock/unlock icons)
+- Text selection and copy support via xterm.js built-in
+- Live output streaming via onAgentOutput IPC event listener
+- Loads existing buffered output on mount via agentOutput IPC
+- User input forwarded to agent pty via agentWrite IPC
+- Terminal resize notifications sent to main process via agentResize IPC
+- Created src/renderer/pages/AgentDetailPage.tsx with tabbed views (Terminal, Logs, Identity, Files, Mail)
+- Updated AgentsPage to accept onSelectAgent prop, table rows and cards clickable to navigate to detail
+- Updated AppLayout with agent-detail routing and back navigation
+- Stop buttons have stopPropagation to prevent navigation on stop click
+
+#### Feature #239: Scroll-to-bottom floating button - PASSING
+- Added floating blue pill button at bottom-right of terminal when scrolled up
+- Button shows arrow-down icon + "Bottom" text
+- Appears when terminal is not at bottom (isAtBottom=false tracked via term.onScroll)
+- Clicking scrolls to bottom and re-enables auto-scroll
+- Button disappears when at bottom
+- Hover scale animation (1.05x) and active press effect (0.95x)
+- Shadow glow effect (shadow-lg shadow-blue-600/25)
+- data-testid="scroll-to-bottom-button" for testability
+
+#### Files Created/Modified
+- NEW: src/renderer/components/AgentTerminal.tsx - xterm.js terminal component
+- NEW: src/renderer/pages/AgentDetailPage.tsx - Agent detail page with tabs
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Clickable rows/cards, onSelectAgent prop
+- MODIFIED: src/renderer/components/AppLayout.tsx - Agent detail routing
+
+#### Current Status
+- 37/366 features passing (added #44 and #239 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Spawn Dialog File Scope & Onboarding Tour)
 
 #### Feature #38: Agent spawn dialog UI - PASSING
