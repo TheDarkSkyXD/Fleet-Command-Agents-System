@@ -723,18 +723,23 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
   const [associatedIssues, setAssociatedIssues] = useState<Issue[]>([]);
   const [activeTab, setActiveTab] = useState<DetailTab>('terminal');
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   const loadSession = useCallback(async () => {
     try {
       const result = await window.electronAPI.agentDetail(agentId);
       if (result.data) {
         setSession(result.data);
+        setNotFound(false);
       } else if (result.error) {
         const msg = handleIpcError(new Error(result.error), {
           context: 'loading agent details',
           showToast: false,
         });
         setError(msg);
+      } else {
+        // No data and no error means agent ID doesn't exist
+        setNotFound(true);
       }
     } catch (err) {
       const msg = handleIpcError(err, {
@@ -872,6 +877,51 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             title="Copy error message"
           >
             <FiCopy size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound && !session) {
+    return (
+      <div className="space-y-4" data-testid="agent-not-found">
+        <Breadcrumbs
+          items={[
+            { label: 'Agents', page: 'agents', onClick: onBack },
+            { label: 'Not Found' },
+          ]}
+        />
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          data-testid="back-to-agents"
+        >
+          <FiArrowLeft className="h-4 w-4" />
+          Back to Agents
+        </button>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-800">
+            <span className="text-3xl font-bold text-slate-500">404</span>
+          </div>
+          <h2 className="mb-2 text-xl font-semibold text-slate-200">Agent Not Found</h2>
+          <p className="mb-1 text-slate-400">
+            No agent session exists with ID{' '}
+            <span className="font-mono text-slate-300" data-testid="agent-not-found-id">
+              "{agentId}"
+            </span>
+          </p>
+          <p className="mb-6 text-sm text-slate-500">
+            The agent may have been removed, or the URL contains an invalid ID.
+          </p>
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500"
+            data-testid="agent-not-found-back-button"
+          >
+            Go to Agents
           </button>
         </div>
       </div>

@@ -119,8 +119,9 @@ export async function initDatabase(): Promise<void> {
   db = new Database(dbPath);
   dbInitialized = false;
 
-  // Enable WAL mode for concurrent access
+  // Enable WAL mode for concurrent access and set busy timeout
   db.pragma('journal_mode = WAL');
+  db.pragma('busy_timeout = 5000');
   db.pragma('foreign_keys = ON');
 
   // Create tables

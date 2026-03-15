@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Project } from '../../shared/types';
 import { formatAbsoluteTime } from '../components/RelativeTime';
+import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { useProjectStore } from '../stores/projectStore';
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -95,6 +96,13 @@ function AddProjectForm({
   const [creating, setCreating] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; path?: string }>({});
   const [touched, setTouched] = useState<{ name?: boolean; path?: boolean }>({});
+
+  // Track project creation form dirty state for beforeunload warning
+  const isProjectFormDirty = useMemo(
+    () => showForm && (name.trim() !== '' || path.trim() !== '' || description.trim() !== ''),
+    [showForm, name, path, description],
+  );
+  useFormDirtyTracking('project-create-form', 'Create Project Form', isProjectFormDirty);
 
   const validateField = (field: 'name' | 'path', value: string) => {
     let error: string | undefined;

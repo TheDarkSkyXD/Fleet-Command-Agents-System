@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiAlertCircle,
   FiAlertTriangle,
@@ -25,6 +25,7 @@ import {
 } from 'react-icons/fi';
 import { toast } from 'sonner';
 import type { Issue, IssuePriority, IssueStatus, IssueType, TaskGroup } from '../../shared/types';
+import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 
 // ID generator (simple nanoid-like)
@@ -120,6 +121,19 @@ export function TasksPage() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
   const [renameGroupName, setRenameGroupName] = useState('');
+
+  // Track form dirty state for beforeunload warning
+  const isIssueFormDirty = useMemo(
+    () => showCreateForm && (form.title.trim() !== '' || form.description.trim() !== ''),
+    [showCreateForm, form.title, form.description],
+  );
+  useFormDirtyTracking('task-create-issue-form', 'Create Issue Form', isIssueFormDirty);
+
+  const isGroupFormDirty = useMemo(
+    () => showCreateGroupForm && groupName.trim() !== '',
+    [showCreateGroupForm, groupName],
+  );
+  useFormDirtyTracking('task-create-group-form', 'Create Group Form', isGroupFormDirty);
 
   // Close with summary state
   const [closingIssueId, setClosingIssueId] = useState<string | null>(null);

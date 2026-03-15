@@ -160,17 +160,23 @@ export function AppLayout() {
     }
   }, []);
 
-  const handleNavigate = useCallback((page: string) => {
-    const allowed = guardNavigation({ type: 'sidebar', page });
-    if (!allowed) return; // Dialog will show
-    executeNavigation(page);
-  }, [guardNavigation, executeNavigation]);
+  const handleNavigate = useCallback(
+    (page: string) => {
+      const allowed = guardNavigation({ type: 'sidebar', page });
+      if (!allowed) return; // Dialog will show
+      executeNavigation(page);
+    },
+    [guardNavigation, executeNavigation],
+  );
 
-  const handleSelectAgent = useCallback((agentId: string) => {
-    const allowed = guardNavigation({ type: 'agent-select', page: 'agent-detail', agentId });
-    if (!allowed) return;
-    executeNavigation('agent-detail', agentId);
-  }, [guardNavigation, executeNavigation]);
+  const handleSelectAgent = useCallback(
+    (agentId: string) => {
+      const allowed = guardNavigation({ type: 'agent-select', page: 'agent-detail', agentId });
+      if (!allowed) return;
+      executeNavigation('agent-detail', agentId);
+    },
+    [guardNavigation, executeNavigation],
+  );
 
   // Handle confirmation from unsaved changes dialog
   const handleConfirmLeave = useCallback(() => {

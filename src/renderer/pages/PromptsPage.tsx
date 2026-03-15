@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fi';
 import type { Prompt, PromptTreeNode, PromptType, PromptVersion } from '../../shared/types';
 import { SlidePanel } from '../components/SlidePanel';
+import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 
 // ── Prompt Type Badge ─────────────────────────────────────────────
 const typeColors: Record<PromptType, string> = {
@@ -356,6 +357,13 @@ function CreatePromptDialog({
   const [type, setType] = useState<PromptType>('system');
   const [selectedParent, setSelectedParent] = useState(parentId || '');
   const [saving, setSaving] = useState(false);
+
+  // Track create prompt form dirty state for beforeunload warning
+  const isCreateDirty = useMemo(
+    () => name.trim() !== '' || description.trim() !== '' || content.trim() !== '',
+    [name, description, content],
+  );
+  useFormDirtyTracking('prompt-create-form', 'Create Prompt Form', isCreateDirty);
 
   const handleCreate = async () => {
     if (!name.trim() || !content.trim()) return;
@@ -816,6 +824,19 @@ function PromptDetail({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [compareVersions, setCompareVersions] = useState<PromptVersion[] | null>(null);
+
+  // Track edit form dirty state for beforeunload warning
+  const isEditDirty = useMemo(
+    () =>
+      editing &&
+      (editContent !== prompt.content ||
+        editName !== prompt.name ||
+        editDescription !== (prompt.description || '') ||
+        editType !== prompt.type ||
+        editParent !== (prompt.parent_id || '')),
+    [editing, editContent, editName, editDescription, editType, editParent, prompt],
+  );
+  useFormDirtyTracking('prompt-edit-form', 'Edit Prompt Form', isEditDirty);
 
   // Reset state when prompt changes
   useEffect(() => {

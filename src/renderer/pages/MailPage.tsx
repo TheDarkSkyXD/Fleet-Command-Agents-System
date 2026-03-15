@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FiAlertTriangle,
   FiCheckCircle,
@@ -24,6 +24,7 @@ import type { Message, MessagePriority, MessageType } from '../../shared/types';
 import { GROUP_BROADCAST_ADDRESSES, PAYLOAD_TEMPLATES, PROTOCOL_TYPES } from '../../shared/types';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { formatAbsoluteTime } from '../components/RelativeTime';
+import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 
 type MailTab = 'inbox' | 'outbox' | 'all';
@@ -156,6 +157,20 @@ export function MailPage() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showCompose, setShowCompose] = useState(false);
   const [composeForm, setComposeForm] = useState<ComposeForm>(defaultCompose);
+
+  // Track compose form dirty state for beforeunload warning
+  const isComposeFormDirty = useMemo(
+    () =>
+      showCompose &&
+      (composeForm.from_agent.trim() !== '' ||
+        composeForm.to_agent.trim() !== '' ||
+        composeForm.subject.trim() !== '' ||
+        composeForm.body.trim() !== '' ||
+        composeForm.payload.trim() !== ''),
+    [showCompose, composeForm],
+  );
+  useFormDirtyTracking('mail-compose-form', 'Mail Compose Form', isComposeFormDirty);
+
   const [sending, setSending] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null,

@@ -278,6 +278,23 @@ function createTray() {
   log.info('System tray icon created');
 }
 
+// Enforce single instance: prevent multiple app windows from corrupting state
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  log.info('Another instance is already running. Quitting duplicate instance.');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Focus the existing window when a second instance is launched
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 app.whenReady().then(async () => {
   log.info('Fleet Command starting...');
 

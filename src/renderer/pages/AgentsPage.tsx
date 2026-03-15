@@ -10,7 +10,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { motion } from 'framer-motion';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FiActivity,
   FiAlertTriangle,
@@ -472,18 +472,19 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [spawnRuntime, setSpawnRuntime] = useState('claude-code');
   const [availableRuntimes, setAvailableRuntimes] = useState<RuntimeInfo[]>([]);
   const [isSpawning, setIsSpawning] = useState(false);
+  const spawnLockRef = useRef(false); // Ref-based guard to prevent double-click race conditions
   const [isOpeningSpawnDialog, setIsOpeningSpawnDialog] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
   // Track dirty state for unsaved changes warning on navigation
-  const isSpawnFormDirty = showSpawnDialog && (
-    spawnName.trim() !== '' ||
-    spawnTaskId.trim() !== '' ||
-    spawnFileScope.trim() !== '' ||
-    spawnPrompt.trim() !== '' ||
-    spawnParentAgent !== '' ||
-    spawnTreePaths.length > 0
-  );
+  const isSpawnFormDirty =
+    showSpawnDialog &&
+    (spawnName.trim() !== '' ||
+      spawnTaskId.trim() !== '' ||
+      spawnFileScope.trim() !== '' ||
+      spawnPrompt.trim() !== '' ||
+      spawnParentAgent !== '' ||
+      spawnTreePaths.length > 0);
   useFormDirtyTracking('agent-spawn-form', 'Agent Spawn Form', isSpawnFormDirty);
 
   const { activeProject, loadActiveProject } = useProjectStore();
@@ -617,6 +618,10 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   };
 
   const handleSpawn = async () => {
+    // Ref-based guard prevents double-click race condition
+    // (React state batching means isSpawning may not disable the button instantly)
+    if (spawnLockRef.current) return;
+    spawnLockRef.current = true;
     setIsSpawning(true);
     setSpawnError(null);
 
@@ -667,6 +672,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       setSpawnError(msg);
     } finally {
       setIsSpawning(false);
+      spawnLockRef.current = false;
     }
   };
 
