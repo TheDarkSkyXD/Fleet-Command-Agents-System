@@ -1,5 +1,42 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Prompt Management)
+
+#### Feature #188: List all prompts with inheritance tree - PASSING
+- Created PromptsPage with collapsible inheritance tree view
+- Added prompts and prompt_versions tables to SQLite database
+- Tree builds parent-child hierarchy with expand/collapse controls
+- Each prompt shows name, type badge (system/user/agent/task/template), active status
+- Left panel shows tree, right panel shows detail view with content preview
+- Create prompt dialog with name, description, type, parent selection, content
+- IPC handlers: prompt:list, prompt:get, prompt:create, prompt:update, prompt:delete, prompt:version-list, prompt:version-get
+- Preload bridge and TypeScript types for Prompt, PromptVersion, PromptTreeNode
+- Integrated into Sidebar (FiFileText icon) and AppLayout routing
+
+#### Feature #190: Edit prompts with versioning - PASSING
+- Edit button switches to edit mode with textarea for content modification
+- On save, prompt:update handler detects content changes and auto-bumps version
+- New prompt_versions record created preserving content and change summary
+- Previous versions preserved in prompt_versions table
+- Version History panel (toggle via History button) shows all versions DESC
+- Click any version to view its historical content
+- Change summary input allows documenting what changed
+- Version 1 auto-created on prompt creation
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/PromptsPage.tsx - Full prompts page with tree, editor, versioning
+- MODIFIED: src/main/db/database.ts - Added prompts and prompt_versions tables with indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added 7 prompt IPC handlers
+- MODIFIED: src/preload/index.ts - Added prompt bridge methods
+- MODIFIED: src/shared/types/index.ts - Added Prompt, PromptVersion, PromptTreeNode types
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated PromptsPage
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Prompts nav item
+
+#### Current Status
+- 67/366 features passing (added #188 and #190 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Guard Rules & Violation Logging)
 
 #### Feature #171: Per-capability tool allowlists configuration - PASSING
