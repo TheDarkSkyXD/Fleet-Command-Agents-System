@@ -887,18 +887,21 @@ export function CoordinatorPanel() {
                         {Math.round(askResult.elapsed_ms / 1000)}s elapsed
                       </span>
                     </div>
-                    <div className="text-[10px] text-slate-500 mb-1" data-testid="ask-correlation-id">
+                    <div
+                      className="text-[10px] text-slate-500 mb-1"
+                      data-testid="ask-correlation-id"
+                    >
                       Correlation: {askResult.correlation_id}
                     </div>
                     {askResult.reply ? (
                       <div className="text-xs text-slate-200" data-testid="ask-reply-body">
-                        {askResult.reply.subject && (
+                        {askResult.reply.subject ? (
                           <div className="font-medium text-slate-300 mb-0.5">
                             {String(askResult.reply.subject)}
                           </div>
-                        )}
+                        ) : null}
                         <p className="text-slate-400 whitespace-pre-wrap">
-                          {String(askResult.reply.body || '')}
+                          {String(askResult.reply.body ?? '')}
                         </p>
                       </div>
                     ) : (
@@ -975,9 +978,7 @@ export function CoordinatorPanel() {
                       {operatorHistory.map((msg) => {
                         const timeStr = msg.created_at
                           ? new Date(
-                              msg.created_at.includes('Z')
-                                ? msg.created_at
-                                : `${msg.created_at}Z`,
+                              msg.created_at.includes('Z') ? msg.created_at : `${msg.created_at}Z`,
                             ).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit',
