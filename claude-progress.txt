@@ -1,5 +1,29 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Layout & Resizable Panels)
+
+#### Feature #8: Main content area renders correctly - PASSING
+- Main content area already well-structured with flex-1 filling available space
+- Layout: flex h-screen w-screen flex-col with sidebar + main + status bar
+- overflow-hidden on container prevents double scrollbars, overflow-auto on main content
+- No layout issues found, verified build passes
+
+#### Feature #20: Resizable panels work - PASSING
+- Integrated react-resizable-panels into MailPage (message list + detail/compose split)
+- PanelGroup with horizontal direction and autoSaveId for layout persistence
+- Panel components with minSize constraints (25% for list, 30% for detail)
+- PanelResizeHandle with styled drag indicator (rounded pill, blue highlight on hover/drag)
+- Resize handle only shown when detail/compose pane is visible
+- Build passes cleanly for renderer, main, and preload targets
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MailPage.tsx - Replaced flex layout with react-resizable-panels
+
+#### Current Status
+- 75/366 features passing (added #8 and #20 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Prompt Management)
 
 #### Feature #188: List all prompts with inheritance tree - PASSING
