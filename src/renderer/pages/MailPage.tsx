@@ -300,18 +300,30 @@ export function MailPage() {
   };
 
   const handleMarkAllRead = async () => {
-    const result = await window.electronAPI.mailMarkAllRead();
-    if (result.error) {
-      setStatusMsg({ type: 'error', text: `Failed: ${result.error}` });
-    } else {
-      setMessages((prev) => prev.map((m) => ({ ...m, read: 1 })));
-      setUnreadCount(0);
-      if (selectedMessage) {
-        setSelectedMessage({ ...selectedMessage, read: 1 });
+    setMarkingAllRead(true);
+    try {
+      const result = await window.electronAPI.mailMarkAllRead();
+      if (result.error) {
+        setStatusMsg({ type: 'error', text: `Failed: ${result.error}` });
+      } else {
+        setMessages((prev) => prev.map((m) => ({ ...m, read: 1 })));
+        setUnreadCount(0);
+        if (selectedMessage) {
+          setSelectedMessage({ ...selectedMessage, read: 1 });
+        }
+        setStatusMsg({ type: 'success', text: 'All messages marked as read' });
       }
-      setStatusMsg({ type: 'success', text: 'All messages marked as read' });
+    } catch (err) {
+      const msg = handleIpcError(err, { context: 'marking all as read', showToast: false });
+      setStatusMsg({ type: 'error', text: msg });
+    } finally {
+      setMarkingAllRead(false);
     }
   };
+
+  // Processing states for action buttons
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [purging, setPurging] = useState(false);
 
   // Purge state
   const [showPurgeMenu, setShowPurgeMenu] = useState(false);
@@ -333,39 +345,63 @@ export function MailPage() {
 
   const handlePurgeAll = async () => {
     if (!confirm('Delete ALL messages? This cannot be undone.')) return;
-    const result = await window.electronAPI.mailPurge();
-    setMessages([]);
-    setUnreadCount(0);
-    setSelectedMessage(null);
-    setShowPurgeMenu(false);
-    const deleted = (result?.data as { deleted?: number } | null)?.deleted ?? 0;
-    setStatusMsg({ type: 'success', text: `Purged all messages (${deleted} removed)` });
+    setPurging(true);
+    try {
+      const result = await window.electronAPI.mailPurge();
+      setMessages([]);
+      setUnreadCount(0);
+      setSelectedMessage(null);
+      setShowPurgeMenu(false);
+      const deleted = (result?.data as { deleted?: number } | null)?.deleted ?? 0;
+      setStatusMsg({ type: 'success', text: `Purged all messages (${deleted} removed)` });
+    } catch (err) {
+      const msg = handleIpcError(err, { context: 'purging messages', showToast: false });
+      setStatusMsg({ type: 'error', text: msg });
+    } finally {
+      setPurging(false);
+    }
   };
 
   const handlePurgeByAge = async (hours: number) => {
     const label = hours >= 24 ? `${hours / 24} day(s)` : `${hours} hour(s)`;
     if (!confirm(`Delete messages older than ${label}? This cannot be undone.`)) return;
-    if (hours >= 24) {
-      await window.electronAPI.mailPurge({ olderThanDays: hours / 24 });
-    } else {
-      await window.electronAPI.mailPurge({ olderThanHours: hours });
+    setPurging(true);
+    try {
+      if (hours >= 24) {
+        await window.electronAPI.mailPurge({ olderThanDays: hours / 24 });
+      } else {
+        await window.electronAPI.mailPurge({ olderThanHours: hours });
+      }
+      setShowPurgeMenu(false);
+      setSelectedMessage(null);
+      loadMessages();
+      setStatusMsg({ type: 'success', text: `Purged messages older than ${label}` });
+    } catch (err) {
+      const msg = handleIpcError(err, { context: 'purging messages', showToast: false });
+      setStatusMsg({ type: 'error', text: msg });
+    } finally {
+      setPurging(false);
     }
-    setShowPurgeMenu(false);
-    setSelectedMessage(null);
-    loadMessages();
-    setStatusMsg({ type: 'success', text: `Purged messages older than ${label}` });
   };
 
   const handlePurgeByAgent = async () => {
     const name = purgeAgentName.trim();
     if (!name) return;
     if (!confirm(`Delete all messages for agent "${name}"? This cannot be undone.`)) return;
-    await window.electronAPI.mailPurge({ agentName: name });
-    setPurgeAgentName('');
-    setShowPurgeMenu(false);
-    setSelectedMessage(null);
-    loadMessages();
-    setStatusMsg({ type: 'success', text: `Purged messages for agent "${name}"` });
+    setPurging(true);
+    try {
+      await window.electronAPI.mailPurge({ agentName: name });
+      setPurgeAgentName('');
+      setShowPurgeMenu(false);
+      setSelectedMessage(null);
+      loadMessages();
+      setStatusMsg({ type: 'success', text: `Purged messages for agent "${name}"` });
+    } catch (err) {
+      const msg = handleIpcError(err, { context: 'purging messages', showToast: false });
+      setStatusMsg({ type: 'error', text: msg });
+    } finally {
+      setPurging(false);
+    }
   };
 
   const loadThread = async (threadId: string) => {
@@ -490,10 +526,12 @@ export function MailPage() {
             <button
               type="button"
               onClick={handleMarkAllRead}
-              className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+              disabled={markingAllRead}
+              className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Mark all as read"
+              data-testid="mail-mark-all-read"
             >
-              <FiCheckCircle size={14} />
+              <FiCheckCircle size={14} className={markingAllRead ? 'animate-spin' : ''} />
             </button>
           )}
           <div className="relative" ref={purgeMenuRef}>
@@ -525,7 +563,8 @@ export function MailPage() {
                         key={opt.hours}
                         type="button"
                         onClick={() => handlePurgeByAge(opt.hours)}
-                        className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 transition-colors hover:border-red-600 hover:bg-red-900/30 hover:text-red-300"
+                        disabled={purging}
+                        className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 transition-colors hover:border-red-600 hover:bg-red-900/30 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         &gt; {opt.label}
                       </button>
@@ -550,10 +589,10 @@ export function MailPage() {
                     <button
                       type="button"
                       onClick={handlePurgeByAgent}
-                      disabled={!purgeAgentName.trim()}
+                      disabled={!purgeAgentName.trim() || purging}
                       className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 transition-colors hover:border-red-600 hover:bg-red-900/30 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Purge
+                      {purging ? 'Purging...' : 'Purge'}
                     </button>
                   </div>
                 </div>
@@ -562,9 +601,10 @@ export function MailPage() {
                 <button
                   type="button"
                   onClick={handlePurgeAll}
-                  className="w-full rounded border border-red-800 bg-red-900/20 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40"
+                  disabled={purging}
+                  className="w-full rounded border border-red-800 bg-red-900/20 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Purge All Messages
+                  {purging ? 'Purging...' : 'Purge All Messages'}
                 </button>
               </div>
             )}

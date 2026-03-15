@@ -23,7 +23,7 @@ import { useProjectStore } from '../stores/projectStore';
 export function WorktreesPage() {
   const { activeProject } = useProjectStore();
   const [worktrees, setWorktrees] = useState<Worktree[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingPaths, setRemovingPaths] = useState<Set<string>>(new Set());
   const [cleaningAll, setCleaningAll] = useState(false);

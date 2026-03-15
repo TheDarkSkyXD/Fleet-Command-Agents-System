@@ -471,6 +471,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [spawnRuntime, setSpawnRuntime] = useState('claude-code');
   const [availableRuntimes, setAvailableRuntimes] = useState<RuntimeInfo[]>([]);
   const [isSpawning, setIsSpawning] = useState(false);
+  const [isOpeningSpawnDialog, setIsOpeningSpawnDialog] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
   const { activeProject, loadActiveProject } = useProjectStore();
@@ -565,6 +566,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   }, [capabilityFilter]);
 
   const openSpawnDialog = async () => {
+    setIsOpeningSpawnDialog(true);
     setSpawnCapability('scout');
     const modelDefaults = appSettings.modelDefaultsPerCapability ?? DEFAULT_MODEL_DEFAULTS;
     setSpawnModel(modelDefaults.scout || 'haiku');
@@ -593,6 +595,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     }
 
     setShowSpawnDialog(true);
+    setIsOpeningSpawnDialog(false);
   };
 
   const handleSpawn = async () => {
@@ -1144,11 +1147,21 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           <button
             type="button"
             onClick={openSpawnDialog}
+            disabled={isOpeningSpawnDialog}
             data-testid="spawn-agent-button"
-            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <FiPlay className="h-4 w-4" />
-            Spawn Agent
+            {isOpeningSpawnDialog ? (
+              <>
+                <FiLoader className="h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <FiPlay className="h-4 w-4" />
+                Spawn Agent
+              </>
+            )}
           </button>
         </div>
       </div>
