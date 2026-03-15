@@ -2851,3 +2851,38 @@
 - 187/366 features passing (added #148 and #165 this session)
 - All code passes Biome lint and TypeScript check (no new errors)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Manual Update Check and Orphan Detection)
+
+#### Feature #150: Manual update check in settings - PASSING
+- Added Updates tab to SettingsPage with full update management UI
+- Check for Updates button triggers manual update check via updateCheck IPC
+- Displays current version, last checked timestamp
+- Shows contextual results: up to date, update available, downloading with progress, ready to install
+- Download progress with bytes transferred, total size, and speed metrics
+- Release notes display, error state display
+- Listens for live update events from main process
+
+#### Feature #153: Detect orphaned agent processes - PASSING
+- Added orphan:detect IPC handler scanning sessions in active states not tracked by agentProcessManager
+- Checks PID liveness via process.kill(pid, 0) for each untracked session
+- Added orphan:reconnect, orphan:kill, orphan:dismiss IPC handlers
+- Created OrphanedProcessDialog component shown on app startup (1.5s delay)
+- Dialog shows alive processes with Reconnect/Kill buttons, dead processes with Dismiss
+- Added OrphanedProcess type and ElectronAPI methods
+- Integrated dialog into AppLayout for both welcome and main views
+
+#### Files Created
+- NEW: src/renderer/components/OrphanedProcessDialog.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Added Updates tab
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added OrphanedProcessDialog
+- MODIFIED: src/main/ipc/handlers.ts - Orphan IPC handlers
+- MODIFIED: src/preload/index.ts - Orphan bridge methods
+- MODIFIED: src/shared/types/index.ts - OrphanedProcess interface
+
+#### Current Status
+- 191/366 features passing (added #150 and #153 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
