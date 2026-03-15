@@ -2408,3 +2408,31 @@
 - 161/366 features passing (added #105 and #106 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Command Palette Agent Actions & History)
+
+#### Feature #107: Command palette agent actions - PASSING
+- Added "Agent Actions" group to command palette with 4 actions:
+  - Spawn Agent (FiPlay icon) - navigates to agents page for spawning
+  - Stop All Agents (FiSquare icon) - calls agentStopAll IPC to terminate all agents
+  - Nudge Agent (FiZap icon) - navigates to agents page for nudging
+  - Inspect Agent (FiEye icon) - navigates to agents page for inspection
+- All actions searchable via fuzzy search with relevant keywords
+- Agent action icons styled in amber color to distinguish from navigation items
+- Custom filter updated to search across both navigation and agent action items
+
+#### Feature #108: Command palette recent actions history - PASSING
+- Actions stored in localStorage under 'fleet-command-recent-actions' key
+- Capped at 50 items maximum with FIFO eviction
+- Shows top 5 most recent entries with FiClock icon and group badge
+- Clear button (FiTrash2) removes all history from localStorage
+- Deduplication ensures same action only appears once (most recent timestamp wins)
+- History persists across palette open/close and app restarts
+
+#### Files Modified
+- MODIFIED: src/renderer/components/CommandPalette.tsx - Agent actions group, recent actions history
+
+#### Current Status
+- 163/366 features passing (added #107 and #108 this session)
+- All code passes Biome lint and TypeScript check (no new errors)
+- No mock data patterns in codebase
