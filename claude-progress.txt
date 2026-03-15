@@ -1,5 +1,31 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (No Horizontal Scroll & Focus Rings)
+
+#### Feature #330: No horizontal scrollbar on main views - PASSING
+- Changed main content area from overflow-auto to overflow-y-auto overflow-x-hidden in AppLayout.tsx
+- Applied same change to welcome page main area
+- Added overflow-x: hidden to main element in globals.css as reinforcement
+- Combined with existing min-w-0, table-fixed, and truncate prevents horizontal scrollbar
+- Added data-no-horizontal-scroll attribute for testability
+
+#### Feature #332: Focus rings visible on interactive elements - PASSING
+- Enhanced global :focus-visible rule with !important to override Tailwind focus:outline-none classes
+- Added specific focus-visible rules for button, a, input, select, textarea, [role=button], [tabindex]
+- Blue-500 (#3b82f6) outline with 2px offset provides sufficient contrast on dark slate backgrounds
+- Added focus-visible:ring-2 focus-visible:ring-blue-500 to Sidebar nav buttons and collapse button
+- Existing Tailwind focus:ring-* classes on inputs/selects provide visible rings on regular focus
+
+#### Files Modified
+- src/renderer/styles/globals.css - Enhanced focus-visible rules, overflow-x: hidden on main
+- src/renderer/components/AppLayout.tsx - overflow-y-auto overflow-x-hidden on main content
+- src/renderer/components/Sidebar.tsx - focus-visible:ring-2 on nav buttons and collapse button
+
+#### Current Status
+- 331/366 features passing (added #330 and #332 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Window Size and Tab Navigation)
 
 #### Feature #328: Minimum window size enforcement - PASSING
