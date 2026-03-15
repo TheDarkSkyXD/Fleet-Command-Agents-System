@@ -571,6 +571,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hookDeploy: (hookIds: string[], worktreePaths: string[]) =>
     ipcRenderer.invoke('hook:deploy', hookIds, worktreePaths),
 
+  // Hook Events
+  hookEventList: (filters?: {
+    hook_id?: string;
+    hook_type?: string;
+    status?: string;
+    limit?: number;
+  }) => ipcRenderer.invoke('hookEvent:list', filters),
+  hookEventCreate: (event: {
+    hook_id: string;
+    hook_name: string;
+    hook_type: string;
+    trigger: string;
+    status: string;
+    worktree?: string;
+    agent_name?: string;
+    details?: string;
+    error_message?: string;
+    duration_ms?: number;
+  }) => ipcRenderer.invoke('hookEvent:create', event),
+
+  // Nuclear Cleanup
+  cleanupExecute: (options?: { target?: string }) => ipcRenderer.invoke('cleanup:execute', options),
+
   // Dialog
   dialogSelectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 

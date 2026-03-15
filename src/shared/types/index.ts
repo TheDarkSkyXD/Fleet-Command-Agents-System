@@ -638,6 +638,22 @@ export interface HookDeployResult {
   error?: string;
 }
 
+// Hook event types
+export interface HookEvent {
+  id: string;
+  hook_id: string;
+  hook_name: string;
+  hook_type: string;
+  trigger: string;
+  status: 'success' | 'failure' | 'error';
+  worktree: string | null;
+  agent_name: string | null;
+  details: string | null;
+  error_message: string | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
 // App log entry
 export interface AppLogEntry {
   id: number;
@@ -1503,6 +1519,32 @@ export interface ElectronAPI {
     hookIds: string[],
     worktreePaths: string[],
   ) => Promise<{ data: HookDeployResult[] | null; error: string | null }>;
+
+  // Hook Events
+  hookEventList: (filters?: {
+    hook_id?: string;
+    hook_type?: string;
+    status?: string;
+    limit?: number;
+  }) => Promise<{ data: HookEvent[] | null; error: string | null }>;
+  hookEventCreate: (event: {
+    hook_id: string;
+    hook_name: string;
+    hook_type: string;
+    trigger: string;
+    status: string;
+    worktree?: string;
+    agent_name?: string;
+    details?: string;
+    error_message?: string;
+    duration_ms?: number;
+  }) => Promise<{ data: HookEvent | null; error: string | null }>;
+
+  // Nuclear Cleanup
+  cleanupExecute: (options?: { target?: string }) => Promise<{
+    data: boolean;
+    error: string | null;
+  }>;
 
   // Checkpoints
   checkpointList: () => Promise<{ data: Checkpoint[] | null; error: string | null }>;

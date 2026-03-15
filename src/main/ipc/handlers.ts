@@ -3589,6 +3589,220 @@ export function registerIpcHandlers(): void {
         });
       }
 
+      // 5. Config validation check
+      try {
+        const activeProject = loggedPrepare(
+          'SELECT id, path FROM projects WHERE is_active = 1 LIMIT 1',
+        ).get() as { id: string; path: string } | undefined;
+
+        if (!activeProject) {
+          checks.push({
+            name: 'Config',
+            status: 'fail',
+            version: null,
+            detail: 'No active project selected',
+            fixable: false,
+          });
+        } else {
+          const fsSync = require('node:fs');
+          const pathMod = require('node:path');
+          const configPath = pathMod.join(activeProject.path, '.overstory', 'config.json');
+
+          if (!fsSync.existsSync(configPath)) {
+            checks.push({
+              name: 'Config',
+              status: 'fail',
+              version: null,
+              detail: `Config file not found at ${configPath}`,
+              fixable: true,
+              fixAction: 'Initialize .overstory directory',
+            });
+          } else {
+            const configRaw = fsSync.readFileSync(configPath, 'utf-8');
+            let configObj: Record<string, unknown>;
+            try {
+              configObj = JSON.parse(configRaw);
+            } catch (_parseErr) {
+              checks.push({
+                name: 'Config',
+                status: 'fail',
+                version: null,
+                detail: 'Config file contains invalid JSON',
+                fixable: true,
+                fixAction: 'Reinitialize config file',
+              });
+              configObj = null as unknown as Record<string, unknown>;
+            }
+
+            if (configObj) {
+              const issues: string[] = [];
+
+              // Check required top-level fields
+              if (typeof configObj.version !== 'number') {
+                issues.push('Missing or invalid "version" field');
+              }
+
+              // Check project section
+              const project = configObj.project as Record<string, unknown> | undefined;
+              if (!project || typeof project !== 'object') {
+                issues.push('Missing "project" section');
+              } else {
+                if (!project.name || typeof project.name !== 'string') {
+                  issues.push('Missing or invalid "project.name"');
+                }
+                if (!project.path || typeof project.path !== 'string') {
+                  issues.push('Missing or invalid "project.path"');
+                } else if (!fsSync.existsSync(project.path as string)) {
+                  issues.push(`Project path does not exist: ${project.path}`);
+                }
+              }
+
+              // Check settings section
+              const settings = configObj.settings as Record<string, unknown> | undefined;
+              if (!settings || typeof settings !== 'object') {
+                issues.push('Missing "settings" section');
+              } else {
+                if (
+                  settings.maxConcurrentAgents !== undefined &&
+                  (typeof settings.maxConcurrentAgents !== 'number' ||
+                    (settings.maxConcurrentAgents as number) < 1)
+                ) {
+                  issues.push('Invalid "settings.maxConcurrentAgents" (must be a positive number)');
+                }
+                if (
+                  settings.defaultModel !== undefined &&
+                  typeof settings.defaultModel !== 'string'
+                ) {
+                  issues.push('Invalid "settings.defaultModel" (must be a string)');
+                }
+              }
+
+              if (issues.length === 0) {
+                checks.push({
+                  name: 'Config',
+                  status: 'pass',
+                  version: `v${configObj.version || '?'}`,
+                  detail: `Valid config for "${(project as Record<string, unknown>)?.name || 'unknown'}"`,
+                  fixable: false,
+                });
+              } else {
+                checks.push({
+                  name: 'Config',
+                  status: 'fail',
+                  version: null,
+                  detail: issues.join('; '),
+                  fixable: true,
+                  fixAction: 'Reinitialize config file',
+                });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        checks.push({
+          name: 'Config',
+          status: 'fail',
+          version: null,
+          detail: `Config validation error: ${String(err)}`,
+          fixable: false,
+        });
+      }
+
+      // 6. Database integrity check
+      try {
+        const expectedTables = [
+          'sessions',
+          'runs',
+          'messages',
+          'events',
+          'metrics',
+          'merge_queue',
+          'task_groups',
+          'agent_identities',
+          'checkpoints',
+          'issues',
+          'app_settings',
+          'agent_definitions',
+          'projects',
+          'config_profiles',
+          'app_logs',
+          'discovery_scans',
+          'discovery_findings',
+          'prompts',
+          'prompt_versions',
+          'guard_violations',
+          'hooks',
+          'quality_gates',
+          'quality_gate_results',
+          'session_handoffs',
+          'hook_events',
+          'expertise_records',
+        ];
+
+        // Run SQLite integrity check
+        const integrityResult = loggedPrepare('PRAGMA integrity_check').get() as {
+          integrity_check: string;
+        };
+        const integrityOk = integrityResult?.integrity_check === 'ok';
+
+        // Check WAL mode
+        const journalMode = loggedPrepare('PRAGMA journal_mode').get() as {
+          journal_mode: string;
+        };
+        const walEnabled = journalMode?.journal_mode?.toLowerCase() === 'wal';
+
+        // Check which tables exist
+        const existingTables = loggedPrepare(
+          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+        ).all() as Array<{ name: string }>;
+        const tableSet = new Set(existingTables.map((t) => t.name));
+        const missingTables = expectedTables.filter((t) => !tableSet.has(t));
+
+        const dbIssues: string[] = [];
+        if (!integrityOk) {
+          dbIssues.push(`Integrity check failed: ${integrityResult?.integrity_check || 'unknown'}`);
+        }
+        if (!walEnabled) {
+          dbIssues.push('WAL mode not enabled');
+        }
+        if (missingTables.length > 0) {
+          dbIssues.push(`Missing tables: ${missingTables.join(', ')}`);
+        }
+
+        if (dbIssues.length === 0) {
+          checks.push({
+            name: 'DB Integrity',
+            status: 'pass',
+            version: `${existingTables.length} tables`,
+            detail: `All ${expectedTables.length} tables present, integrity OK, WAL mode active`,
+            fixable: false,
+          });
+        } else {
+          checks.push({
+            name: 'DB Integrity',
+            status: 'fail',
+            version: `${existingTables.length} tables`,
+            detail: dbIssues.join('; '),
+            fixable: integrityOk,
+            fixAction:
+              missingTables.length > 0
+                ? 'Reinitialize missing tables'
+                : walEnabled
+                  ? undefined
+                  : 'Enable WAL mode',
+          });
+        }
+      } catch (err) {
+        checks.push({
+          name: 'DB Integrity',
+          status: 'fail',
+          version: null,
+          detail: `Database integrity check failed: ${String(err)}`,
+          fixable: true,
+          fixAction: 'Reinitialize database connection',
+        });
+      }
+
       const allPassing = checks.every((c) => c.status === 'pass');
       log.info(`[IPC] doctor:run - ${checks.length} checks, all passing: ${allPassing}`);
 
@@ -3655,6 +3869,93 @@ export function registerIpcHandlers(): void {
           },
           error: null,
         };
+      }
+
+      if (checkName === 'Config') {
+        try {
+          const activeProject = loggedPrepare(
+            'SELECT id, path FROM projects WHERE is_active = 1 LIMIT 1',
+          ).get() as { id: string; path: string } | undefined;
+          if (!activeProject) {
+            return {
+              data: {
+                name: checkName,
+                success: false,
+                message: 'No active project selected. Add and activate a project first.',
+              },
+              error: null,
+            };
+          }
+          const fsMod = require('node:fs');
+          const pathMod = require('node:path');
+          const overstoryDir = pathMod.join(activeProject.path, '.overstory');
+          if (!fsMod.existsSync(overstoryDir)) {
+            fsMod.mkdirSync(overstoryDir, { recursive: true });
+          }
+          const configPath = pathMod.join(overstoryDir, 'config.json');
+          const config = {
+            version: 1,
+            project: {
+              name: pathMod.basename(activeProject.path),
+              path: activeProject.path,
+            },
+            settings: {
+              maxConcurrentAgents: 5,
+              defaultModel: 'sonnet',
+              autoMerge: false,
+            },
+            created_at: new Date().toISOString(),
+          };
+          fsMod.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+          return {
+            data: {
+              name: checkName,
+              success: true,
+              message: `Config file created/reinitialized at ${configPath}`,
+            },
+            error: null,
+          };
+        } catch (configErr) {
+          return {
+            data: {
+              name: checkName,
+              success: false,
+              message: `Config fix failed: ${String(configErr)}`,
+            },
+            error: null,
+          };
+        }
+      }
+
+      if (checkName === 'DB Integrity') {
+        try {
+          const db = getDatabase();
+          db.pragma('journal_mode = WAL');
+          db.pragma('wal_checkpoint(TRUNCATE)');
+          const result = loggedPrepare('PRAGMA integrity_check').get() as {
+            integrity_check: string;
+          };
+          return {
+            data: {
+              name: checkName,
+              success: result?.integrity_check === 'ok',
+              message:
+                result?.integrity_check === 'ok'
+                  ? 'Database integrity verified, WAL mode enabled'
+                  : `Integrity check: ${result?.integrity_check || 'unknown'}`,
+            },
+            error: null,
+          };
+        } catch (dbErr) {
+          return {
+            data: {
+              name: checkName,
+              success: false,
+              message: `DB integrity fix failed: ${String(dbErr)}`,
+            },
+            error: null,
+          };
+        }
       }
 
       return {
@@ -7563,8 +7864,24 @@ export function registerIpcHandlers(): void {
             const hookFilePath = path.join(hooksDir, hookFileName);
             fs.writeFileSync(hookFilePath, hook.script_content, { mode: 0o755 });
             results.push({ hookId, worktree: wt, success: true });
+            // Log deploy event
+            const evtId = `hevt-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            loggedPrepare(
+              `INSERT INTO hook_events (id, hook_id, hook_name, hook_type, trigger, status, worktree, details)
+               VALUES (?, ?, ?, ?, 'deploy', 'success', ?, 'Deployed to worktree')`,
+            ).run(evtId, hookId, hook.name, hook.hook_type, wt);
           } catch (err) {
             results.push({ hookId, worktree: wt, success: false, error: String(err) });
+            // Log failed deploy event
+            const evtId = `hevt-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            try {
+              loggedPrepare(
+                `INSERT INTO hook_events (id, hook_id, hook_name, hook_type, trigger, status, worktree, error_message)
+                 VALUES (?, ?, ?, ?, 'deploy', 'failure', ?, ?)`,
+              ).run(evtId, hookId, hook.name, hook.hook_type, wt, String(err));
+            } catch {
+              /* ignore logging failure */
+            }
           }
         }
       }
@@ -7577,6 +7894,90 @@ export function registerIpcHandlers(): void {
       return { data: null, error: String(error) };
     }
   });
+
+  // ─── Hook Events ──────────────────────────────────────────
+
+  ipcMain.handle(
+    'hookEvent:list',
+    (
+      _event,
+      filters?: { hook_id?: string; hook_type?: string; status?: string; limit?: number },
+    ) => {
+      try {
+        let sql = 'SELECT * FROM hook_events WHERE 1=1';
+        const params: unknown[] = [];
+        if (filters?.hook_id) {
+          sql += ' AND hook_id = ?';
+          params.push(filters.hook_id);
+        }
+        if (filters?.hook_type) {
+          sql += ' AND hook_type = ?';
+          params.push(filters.hook_type);
+        }
+        if (filters?.status) {
+          sql += ' AND status = ?';
+          params.push(filters.status);
+        }
+        sql += ' ORDER BY created_at DESC';
+        const limit = filters?.limit ?? 200;
+        sql += ' LIMIT ?';
+        params.push(limit);
+        const rows = loggedPrepare(sql).all(...params);
+        log.info(`[IPC] hookEvent:list - returned ${(rows as unknown[]).length} events`);
+        return { data: rows, error: null };
+      } catch (error) {
+        log.error('hookEvent:list failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'hookEvent:create',
+    (
+      _event,
+      event: {
+        hook_id: string;
+        hook_name: string;
+        hook_type: string;
+        trigger: string;
+        status: string;
+        worktree?: string;
+        agent_name?: string;
+        details?: string;
+        error_message?: string;
+        duration_ms?: number;
+      },
+    ) => {
+      try {
+        const id = `hevt-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          `INSERT INTO hook_events (id, hook_id, hook_name, hook_type, trigger, status, worktree, agent_name, details, error_message, duration_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          id,
+          event.hook_id,
+          event.hook_name,
+          event.hook_type,
+          event.trigger,
+          event.status,
+          event.worktree ?? null,
+          event.agent_name ?? null,
+          event.details ?? null,
+          event.error_message ?? null,
+          event.duration_ms ?? null,
+        );
+        const created = loggedPrepare('SELECT * FROM hook_events WHERE id = ?').get(id);
+        log.info(
+          `[IPC] hookEvent:create - logged event for hook ${event.hook_name} (${event.status})`,
+        );
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('hookEvent:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   // Dialog - folder picker
   ipcMain.handle('dialog:selectFolder', async () => {

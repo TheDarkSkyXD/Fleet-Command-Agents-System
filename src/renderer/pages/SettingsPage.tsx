@@ -110,6 +110,7 @@ export function SettingsPage() {
     | 'project-config'
     | 'notifications'
     | 'updates'
+    | 'cleanup'
   >('agents');
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export function SettingsPage() {
     { id: 'notifications' as const, label: 'Notifications' },
     { id: 'project-config' as const, label: 'Project Config' },
     { id: 'updates' as const, label: 'Updates' },
+    { id: 'cleanup' as const, label: 'Cleanup' },
   ];
 
   return (
@@ -189,6 +191,7 @@ export function SettingsPage() {
       {activeTab === 'notifications' && <NotificationPreferencesSettings />}
       {activeTab === 'project-config' && <ProjectConfigEditor />}
       {activeTab === 'updates' && <UpdateSettings />}
+      {activeTab === 'cleanup' && <CleanupSettings />}
     </div>
   );
 }
@@ -2838,6 +2841,215 @@ function UpdateSettings() {
           installed when you quit the application.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ── Cleanup Settings Tab ─────────────────────────────────────────────
+
+type CleanupTarget = 'mail' | 'sessions' | 'metrics' | 'events' | 'issues' | 'all';
+
+function CleanupSettings() {
+  const [confirmTarget, setConfirmTarget] = useState<CleanupTarget | null>(null);
+  const [wiping, setWiping] = useState(false);
+  const [lastResult, setLastResult] = useState<{ target: string; success: boolean } | null>(null);
+
+  const targets: {
+    id: CleanupTarget;
+    label: string;
+    description: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'mail',
+      label: 'Wipe Mail Database',
+      description:
+        'Delete all messages from the mail inbox. This removes all agent-to-agent and system messages.',
+      icon: <FiTrash2 size={16} />,
+    },
+    {
+      id: 'sessions',
+      label: 'Wipe Sessions Database',
+      description:
+        'Delete all agent session records. This removes session history, handoffs, and logs.',
+      icon: <FiTrash2 size={16} />,
+    },
+    {
+      id: 'metrics',
+      label: 'Wipe Metrics Database',
+      description:
+        'Delete all metrics and token usage data. This removes cost tracking and performance records.',
+      icon: <FiTrash2 size={16} />,
+    },
+    {
+      id: 'events',
+      label: 'Wipe Events Database',
+      description: 'Delete all event feed entries. This removes the activity log and timeline.',
+      icon: <FiTrash2 size={16} />,
+    },
+    {
+      id: 'issues',
+      label: 'Wipe Issues Database',
+      description: 'Delete all tracked issues and tasks.',
+      icon: <FiTrash2 size={16} />,
+    },
+    {
+      id: 'all',
+      label: 'Nuclear Cleanup — Wipe Everything',
+      description:
+        'Delete ALL data from all tables: mail, sessions, metrics, events, merge queue, checkpoints, and issues. This cannot be undone.',
+      icon: <FiAlertTriangle size={16} />,
+    },
+  ];
+
+  const handleWipe = async (target: CleanupTarget) => {
+    setWiping(true);
+    setLastResult(null);
+    try {
+      const result = await window.electronAPI.cleanupExecute(
+        target === 'all' ? undefined : { target },
+      );
+      setLastResult({ target, success: !!result.data });
+      setConfirmTarget(null);
+    } catch (err) {
+      console.error('Cleanup failed:', err);
+      setLastResult({ target, success: false });
+      setConfirmTarget(null);
+    } finally {
+      setWiping(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6" data-testid="cleanup-settings">
+      {/* Warning banner */}
+      <div className="flex items-start gap-3 rounded-lg border border-amber-800/50 bg-amber-900/20 p-4">
+        <FiAlertTriangle size={20} className="text-amber-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <h3 className="text-sm font-semibold text-amber-300">Nuclear Cleanup</h3>
+          <p className="mt-1 text-xs text-amber-400/80">
+            These actions permanently delete data from the database. Each action requires explicit
+            confirmation. This cannot be undone.
+          </p>
+        </div>
+      </div>
+
+      {/* Success/failure notification */}
+      {lastResult && (
+        <div
+          className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${
+            lastResult.success
+              ? 'border-green-800 bg-green-900/20 text-green-400'
+              : 'border-red-800 bg-red-900/20 text-red-400'
+          }`}
+        >
+          {lastResult.success ? <FiCheckCircle size={14} /> : <FiAlertTriangle size={14} />}
+          {lastResult.success
+            ? `Successfully wiped ${lastResult.target === 'all' ? 'all databases' : `${lastResult.target} database`}.`
+            : `Failed to wipe ${lastResult.target} database.`}
+        </div>
+      )}
+
+      {/* Cleanup actions */}
+      <div className="space-y-3">
+        {targets.map((target) => (
+          <div
+            key={target.id}
+            className={`rounded-lg border p-4 transition-colors ${
+              target.id === 'all'
+                ? 'border-red-800/50 bg-red-900/10'
+                : 'border-slate-700 bg-slate-800/50'
+            }`}
+            data-testid={`cleanup-${target.id}`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3
+                  className={`text-sm font-medium ${target.id === 'all' ? 'text-red-300' : 'text-slate-200'}`}
+                >
+                  {target.label}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">{target.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmTarget(target.id)}
+                disabled={wiping}
+                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  target.id === 'all'
+                    ? 'bg-red-600 text-white hover:bg-red-500'
+                    : 'bg-amber-600 text-white hover:bg-amber-500'
+                }`}
+                data-testid={`cleanup-btn-${target.id}`}
+              >
+                {target.icon}
+                Wipe
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Confirmation dialog */}
+      {confirmTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            className="mx-4 w-full max-w-md rounded-lg border border-slate-600 bg-slate-800 p-6 shadow-xl"
+            data-testid="cleanup-confirm-dialog"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-900/50">
+                <FiAlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-50">Confirm Wipe</h3>
+                <p className="text-sm text-slate-400">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="mb-6 text-sm text-slate-300">
+              Are you sure you want to{' '}
+              <span className="font-semibold text-red-400">
+                {confirmTarget === 'all'
+                  ? 'wipe ALL databases'
+                  : `wipe the ${confirmTarget} database`}
+              </span>
+              ? All data will be permanently deleted.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmTarget(null)}
+                disabled={wiping}
+                className="rounded-md bg-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-600 disabled:opacity-50"
+                data-testid="cleanup-cancel-btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleWipe(confirmTarget)}
+                disabled={wiping}
+                className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                data-testid="cleanup-confirm-btn"
+              >
+                {wiping ? (
+                  <>
+                    <FiRefreshCw size={14} className="animate-spin" />
+                    Wiping...
+                  </>
+                ) : (
+                  <>
+                    <FiTrash2 size={14} />
+                    Confirm Wipe
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -330,6 +330,21 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS hook_events (
+      id TEXT PRIMARY KEY,
+      hook_id TEXT NOT NULL,
+      hook_name TEXT NOT NULL,
+      hook_type TEXT NOT NULL,
+      trigger TEXT NOT NULL DEFAULT 'manual',
+      status TEXT NOT NULL DEFAULT 'success' CHECK(status IN ('success', 'failure', 'error')),
+      worktree TEXT,
+      agent_name TEXT,
+      details TEXT,
+      error_message TEXT,
+      duration_ms INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS expertise_records (
       id TEXT PRIMARY KEY,
       domain TEXT NOT NULL,
