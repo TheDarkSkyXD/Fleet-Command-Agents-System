@@ -1,5 +1,55 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Truncated Text & Icon Tooltips)
+
+#### Feature #217: Truncated text expansion on hover - PASSING
+- Added title attributes to all truncated text elements across 20+ files
+- Covers: agent names, file paths, project names/paths, branch names, commit messages, issue titles, mail subjects, event data, expertise records, guard rule descriptions, worktree paths, prompt names, error messages, and more
+- Created reusable Tooltip component (src/renderer/components/Tooltip.tsx) for future styled tooltips
+- Also created TruncatedText utility component for common pattern
+
+#### Feature #218: Icon tooltips throughout app - PASSING
+- Added title attributes to all icon-only buttons (FiX close buttons, navigation back buttons, dismiss buttons)
+- Sidebar collapse/expand button gets title matching label
+- Modal close buttons across AgentsPage, AgentDefinitionsPage, GuardRulesPage, SettingsPage, TasksPage, PromptsPage all get title="Close"
+- Search clear buttons get title="Clear search"
+- Error dismiss buttons get title="Dismiss error"
+- Onboarding tour dismiss gets title="Dismiss tour"
+- Back navigation button gets title="Back to domains"
+
+#### Files Created
+- NEW: src/renderer/components/Tooltip.tsx - Reusable tooltip component with auto-positioning
+
+#### Files Modified (20+ files)
+- MODIFIED: src/renderer/components/AgentHierarchyTree.tsx - Agent name tooltip
+- MODIFIED: src/renderer/components/CoordinatorPanel.tsx - Agent names, objectives, stream names, summaries, details
+- MODIFIED: src/renderer/components/DiffViewer.tsx - File name tooltip
+- MODIFIED: src/renderer/components/OnboardingTour.tsx - Dismiss tour title
+- MODIFIED: src/renderer/components/OrphanedProcessDialog.tsx - Agent name tooltips
+- MODIFIED: src/renderer/components/ProjectSwitcher.tsx - Project name/path tooltips
+- MODIFIED: src/renderer/components/Sidebar.tsx - Collapse/expand title
+- MODIFIED: src/renderer/components/StatusBar.tsx - Profile name tooltip
+- MODIFIED: src/renderer/pages/AgentDefinitionsPage.tsx - Close button titles
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Close/clear search titles
+- MODIFIED: src/renderer/pages/DebugPage.tsx - Log message, agent name tooltips
+- MODIFIED: src/renderer/pages/EventFeedPage.tsx - Agent name, tool name, data tooltips
+- MODIFIED: src/renderer/pages/ExpertisePage.tsx - Record title tooltips, back button
+- MODIFIED: src/renderer/pages/GuardRulesPage.tsx - Scope/boundary tooltips, close button
+- MODIFIED: src/renderer/pages/HooksPage.tsx - Worktree path, hook result, description
+- MODIFIED: src/renderer/pages/MailPage.tsx - Subject tooltip
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Branch name, dependency tooltips
+- MODIFIED: src/renderer/pages/NuclearCleanupPage.tsx - Worktree branch/path tooltip
+- MODIFIED: src/renderer/pages/PromptsPage.tsx - Prompt name, version summary, close button
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Close button title
+- MODIFIED: src/renderer/pages/TasksPage.tsx - Group name, issue title, agent, dependency titles
+- MODIFIED: src/renderer/pages/WelcomePage.tsx - Project name/path tooltips
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Branch, message, path tooltips
+
+#### Current Status
+- 226/366 features passing (added #217 and #218 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Timestamp Tooltips & Mail Skeleton Loading)
 
 #### Feature #219: Timestamp tooltips relative to absolute - PASSING
