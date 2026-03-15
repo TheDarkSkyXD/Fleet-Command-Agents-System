@@ -2,7 +2,13 @@ import path from 'node:path';
 import { BrowserWindow, Menu, Tray, app, dialog } from 'electron';
 import log from 'electron-log';
 import windowStateKeeper from 'electron-window-state';
-import { closeDatabase, initDatabase } from './db/database';
+import {
+  checkDatabaseHealth,
+  closeDatabase,
+  getDatabasePath,
+  initDatabase,
+  recreateDatabase,
+} from './db/database';
 import { registerIpcHandlers } from './ipc/handlers';
 import { agentProcessManager } from './services/agentProcessManager';
 import { checkpointService } from './services/checkpointService';
@@ -278,12 +284,78 @@ app.whenReady().then(async () => {
   // Show splash screen immediately
   createSplashWindow();
 
-  // Initialize database
+  // Initialize database with graceful recovery for missing/corrupted files
   try {
-    await initDatabase();
-    log.info('Database initialized successfully');
+    // Pre-check database health before attempting to open
+    const healthCheck = checkDatabaseHealth();
+    if (healthCheck.corrupted) {
+      log.warn(`[DB] Database corruption detected: ${healthCheck.error}`);
+      const dbPath = getDatabasePath();
+      const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Database Issue Detected',
+        message: 'Fleet Command detected a corrupted database file.',
+        detail: `The database at "${dbPath}" appears to be corrupted.\n\nWould you like to recreate it? This will reset all stored data (agents, messages, settings) but allow the app to start fresh.`,
+        buttons: ['Recreate Database', 'Quit'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+
+      if (response === 0) {
+        const success = await recreateDatabase();
+        if (success) {
+          log.info('[DB] Database recreated successfully after corruption');
+        } else {
+          log.error('[DB] Failed to recreate database');
+          dialog.showErrorBox(
+            'Database Error',
+            'Failed to recreate the database. The application may not work correctly.',
+          );
+        }
+      } else {
+        log.info('[DB] User chose to quit after database corruption');
+        app.quit();
+        return;
+      }
+    } else {
+      // Database file is missing (will be auto-created) or healthy
+      if (!healthCheck.exists) {
+        log.info('[DB] No existing database found - creating new database');
+      }
+      await initDatabase();
+      log.info('Database initialized successfully');
+    }
   } catch (error) {
     log.error('Failed to initialize database:', error);
+    const dbPath = getDatabasePath();
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Database Initialization Failed',
+      message: 'Fleet Command could not initialize the database.',
+      detail: `Error: ${String(error)}\n\nDatabase path: ${dbPath}\n\nWould you like to recreate the database? This will reset all stored data.`,
+      buttons: ['Recreate Database', 'Continue Without Database', 'Quit'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    });
+
+    if (response === 0) {
+      try {
+        const success = await recreateDatabase();
+        if (success) {
+          log.info('[DB] Database recreated successfully after init failure');
+        } else {
+          log.error('[DB] Failed to recreate database after init failure');
+        }
+      } catch (recreateError) {
+        log.error('[DB] Recreate also failed:', recreateError);
+      }
+    } else if (response === 2) {
+      app.quit();
+      return;
+    }
+    // response === 1: continue without database (degraded mode)
   }
 
   // Register IPC handlers

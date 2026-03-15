@@ -704,26 +704,54 @@ export interface DoctorFixResult {
 }
 
 // Electron API type for renderer process
-// Health check response
-export interface HealthCheckResponse {
+// Health check response data (wrapped in { data, error } envelope)
+export interface HealthCheckData {
   status: 'healthy' | 'unhealthy';
-  database: 'connected' | 'disconnected' | 'error';
+  database: 'connected' | 'disconnected' | 'error' | 'not_initialized';
   walMode?: string;
   foreignKeys?: boolean;
   dbPath?: string;
   timestamp: string;
-  error?: string;
 }
 
-// Database status response
-export interface DbStatusResponse {
-  status: 'connected' | 'disconnected';
+// Health check response (consistent { data, error } format)
+export interface HealthCheckResponse {
+  data: HealthCheckData;
+  error: string | null;
+}
+
+// Database status response data (wrapped in { data, error } envelope)
+export interface DbStatusData {
+  status: 'connected' | 'disconnected' | 'not_initialized';
   walMode?: string;
   foreignKeys?: boolean;
   tables?: string[];
   tableDetails?: Record<string, { columns: string[]; rowCount: number }>;
   dbPath?: string;
-  error?: string;
+}
+
+// Database status response (consistent { data, error } format)
+export interface DbStatusResponse {
+  data: DbStatusData;
+  error: string | null;
+}
+
+// Database health check response
+export interface DbHealthResponse {
+  data: {
+    exists: boolean;
+    corrupted: boolean;
+    initialized: boolean;
+    dbPath: string;
+    error: string | null;
+  } | null;
+  error: string | null;
+}
+
+// Database recreate response
+export interface DbRecreateResponse {
+  data: { success: boolean; dbPath?: string } | null;
+  error: string | null;
 }
 
 // Agent spawn options for the renderer
@@ -773,6 +801,8 @@ export interface AgentProcessInfo {
 export interface ElectronAPI {
   healthCheck: () => Promise<HealthCheckResponse>;
   dbStatus: () => Promise<DbStatusResponse>;
+  dbHealth: () => Promise<DbHealthResponse>;
+  dbRecreate: () => Promise<DbRecreateResponse>;
   agentList: () => Promise<{ data: Session[] | null; error: string | null }>;
   agentDetail: (id: string) => Promise<{ data: Session | null; error: string | null }>;
   agentSpawn: (

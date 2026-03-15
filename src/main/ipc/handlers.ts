@@ -5,7 +5,13 @@ import * as path from 'node:path';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import log from 'electron-log';
 import * as nodePty from 'node-pty';
-import { getDatabase } from '../db/database';
+import {
+  checkDatabaseHealth,
+  getDatabase,
+  getDatabasePath,
+  isDatabaseInitialized,
+  recreateDatabase,
+} from '../db/database';
 import {
   type AgentCapability,
   agentProcessManager,
@@ -131,34 +137,95 @@ function validateIpcParams(
 
 export function registerIpcHandlers(): void {
   // Health check - verifies DB connection and WAL mode
+  // Returns consistent { data, error } format
   ipcMain.handle('health:check', () => {
     try {
+      if (!isDatabaseInitialized()) {
+        log.warn('[IPC] health:check - database not initialized');
+        return {
+          data: {
+            status: 'unhealthy',
+            database: 'not_initialized',
+            dbPath: getDatabasePath(),
+            timestamp: new Date().toISOString(),
+          },
+          error: 'Database not initialized',
+        };
+      }
       const result = loggedPrepare('SELECT 1 as ok').get() as { ok: number };
       const walMode = loggedPrepare('PRAGMA journal_mode').get() as { journal_mode: string };
       const foreignKeys = loggedPrepare('PRAGMA foreign_keys').get() as { foreign_keys: number };
       const db = getDatabase();
       log.info('[IPC] health:check - real SELECT query executed on SQLite database');
       return {
-        status: 'healthy',
-        database: result.ok === 1 ? 'connected' : 'error',
-        walMode: walMode.journal_mode,
-        foreignKeys: foreignKeys.foreign_keys === 1,
-        dbPath: db.name,
-        timestamp: new Date().toISOString(),
+        data: {
+          status: 'healthy',
+          database: result.ok === 1 ? 'connected' : 'error',
+          walMode: walMode.journal_mode,
+          foreignKeys: foreignKeys.foreign_keys === 1,
+          dbPath: db.name,
+          timestamp: new Date().toISOString(),
+        },
+        error: null,
       };
     } catch (error) {
       log.error('Health check failed:', error);
       return {
-        status: 'unhealthy',
-        database: 'disconnected',
+        data: {
+          status: 'unhealthy',
+          database: 'disconnected',
+          dbPath: getDatabasePath(),
+          timestamp: new Date().toISOString(),
+        },
         error: String(error),
       };
     }
   });
 
+  // Database health check - checks for missing/corrupted database files
+  ipcMain.handle('db:health', () => {
+    try {
+      const health = checkDatabaseHealth();
+      const initialized = isDatabaseInitialized();
+      log.info(`[IPC] db:health - exists=${health.exists}, corrupted=${health.corrupted}, initialized=${initialized}`);
+      return {
+        data: {
+          exists: health.exists,
+          corrupted: health.corrupted,
+          initialized,
+          dbPath: getDatabasePath(),
+          error: health.error,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('db:health failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // Database recreation - handles corrupted/missing database recovery
+  ipcMain.handle('db:recreate', async () => {
+    try {
+      log.warn('[IPC] db:recreate - user requested database recreation');
+      const success = await recreateDatabase();
+      return { data: { success, dbPath: getDatabasePath() }, error: null };
+    } catch (error) {
+      log.error('db:recreate failed:', error);
+      return { data: { success: false }, error: String(error) };
+    }
+  });
+
   // Database status (detailed) - lists all tables, columns, and row counts
+  // Returns consistent { data, error } format
   ipcMain.handle('db:status', () => {
     try {
+      if (!isDatabaseInitialized()) {
+        return {
+          data: { status: 'not_initialized', dbPath: getDatabasePath() },
+          error: 'Database not initialized',
+        };
+      }
       const db = getDatabase();
       const walMode = loggedPrepare('PRAGMA journal_mode').get() as { journal_mode: string };
       const foreignKeys = loggedPrepare('PRAGMA foreign_keys').get() as { foreign_keys: number };
@@ -186,16 +253,19 @@ export function registerIpcHandlers(): void {
 
       log.info('[IPC] db:status - real SQLite queries for all table metadata');
       return {
-        status: 'connected',
-        walMode: walMode.journal_mode,
-        foreignKeys: foreignKeys.foreign_keys === 1,
-        tables: tableNames,
-        tableDetails,
-        dbPath: db.name,
+        data: {
+          status: 'connected',
+          walMode: walMode.journal_mode,
+          foreignKeys: foreignKeys.foreign_keys === 1,
+          tables: tableNames,
+          tableDetails,
+          dbPath: db.name,
+        },
+        error: null,
       };
     } catch (error) {
       log.error('db:status failed:', error);
-      return { status: 'disconnected', error: String(error) };
+      return { data: { status: 'disconnected' }, error: String(error) };
     }
   });
 

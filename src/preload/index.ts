@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Health & Database
   healthCheck: () => ipcRenderer.invoke('health:check'),
   dbStatus: () => ipcRenderer.invoke('db:status'),
+  dbHealth: () => ipcRenderer.invoke('db:health'),
+  dbRecreate: () => ipcRenderer.invoke('db:recreate'),
 
   // Agents
   agentList: () => ipcRenderer.invoke('agent:list'),

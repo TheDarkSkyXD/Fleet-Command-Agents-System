@@ -1,13 +1,25 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import log from 'electron-log';
 
 let db: Database.Database | null = null;
+let dbInitialized = false;
 
 function getDbPath(): string {
   const userDataPath = app.getPath('userData');
   return path.join(userDataPath, 'fleet-command.db');
+}
+
+/** Returns whether the database has been successfully initialized */
+export function isDatabaseInitialized(): boolean {
+  return dbInitialized && db !== null;
+}
+
+/** Returns the path to the database file */
+export function getDatabasePath(): string {
+  return getDbPath();
 }
 
 export function getDatabase(): Database.Database {
@@ -17,11 +29,95 @@ export function getDatabase(): Database.Database {
   return db;
 }
 
+/**
+ * Checks if the database file exists and is not corrupted.
+ * Returns { exists, corrupted, error } status.
+ */
+export function checkDatabaseHealth(): {
+  exists: boolean;
+  corrupted: boolean;
+  error: string | null;
+} {
+  const dbPath = getDbPath();
+
+  // Check if file exists
+  if (!fs.existsSync(dbPath)) {
+    return { exists: false, corrupted: false, error: null };
+  }
+
+  // Try to open and run integrity check
+  try {
+    const testDb = new Database(dbPath);
+    try {
+      const result = testDb.pragma('integrity_check') as Array<{ integrity_check: string }>;
+      const isOk = result.length > 0 && result[0].integrity_check === 'ok';
+      testDb.close();
+      if (!isOk) {
+        return { exists: true, corrupted: true, error: 'Integrity check failed' };
+      }
+      return { exists: true, corrupted: false, error: null };
+    } catch (innerError) {
+      try {
+        testDb.close();
+      } catch {
+        // ignore close error
+      }
+      return { exists: true, corrupted: true, error: String(innerError) };
+    }
+  } catch (openError) {
+    return { exists: true, corrupted: true, error: String(openError) };
+  }
+}
+
+/**
+ * Removes the existing (corrupted) database file and its WAL/SHM companions,
+ * then reinitializes a fresh database. Returns true on success.
+ */
+export async function recreateDatabase(): Promise<boolean> {
+  const dbPath = getDbPath();
+  log.warn(`[DB Recovery] Recreating database at: ${dbPath}`);
+
+  // Close existing connection if any
+  if (db) {
+    try {
+      db.close();
+    } catch {
+      // ignore
+    }
+    db = null;
+    dbInitialized = false;
+  }
+
+  // Remove corrupted files
+  const filesToRemove = [dbPath, `${dbPath}-wal`, `${dbPath}-shm`];
+  for (const file of filesToRemove) {
+    try {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+        log.info(`[DB Recovery] Removed: ${file}`);
+      }
+    } catch (err) {
+      log.error(`[DB Recovery] Failed to remove ${file}:`, err);
+    }
+  }
+
+  // Reinitialize
+  try {
+    await initDatabase();
+    log.info('[DB Recovery] Database recreated successfully');
+    return true;
+  } catch (error) {
+    log.error('[DB Recovery] Failed to recreate database:', error);
+    return false;
+  }
+}
+
 export async function initDatabase(): Promise<void> {
   const dbPath = getDbPath();
   log.info(`Initializing database at: ${dbPath}`);
 
   db = new Database(dbPath);
+  dbInitialized = false;
 
   // Enable WAL mode for concurrent access
   db.pragma('journal_mode = WAL');
@@ -711,6 +807,7 @@ export async function initDatabase(): Promise<void> {
     log.info('Seeded 7 default agent definitions');
   }
 
+  dbInitialized = true;
   log.info('Database schema applied successfully');
 }
 
@@ -718,6 +815,7 @@ export function closeDatabase(): void {
   if (db) {
     db.close();
     db = null;
+    dbInitialized = false;
     log.info('Database closed');
   }
 }
