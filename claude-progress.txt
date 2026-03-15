@@ -3288,3 +3288,43 @@
 - 217/366 features passing (added #203 and #204 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Error Notifications & Notification History)
+
+#### Feature #214: Error failure notification - PASSING
+- Added in-app toast notifications via sonner for agent error/failure events
+- Red-styled toasts (bg-red-900, border-red-600) for agent_error, merge_failed, health_alert
+- Amber-styled toasts for agent_stalled, agent_zombie warnings
+- Green success toasts for agent_completed, merge_ready
+- NotificationService broadcasts notification:event IPC to renderer
+- AppLayout useEffect listener shows styled toast via sonner
+
+#### Feature #215: Notification history log - PASSING
+- Added notification_history table to database (id, title, body, event_type, agent_name, created_at)
+- NotificationService stores every notification in DB via storeNotification()
+- Added notification:history and notification:clear-history IPC handlers
+- Created NotificationsPage with full history list view
+- Color-coded event type badges with icons (red=error, amber=warning, green=success)
+- Relative timestamps (Just now, 5m ago, 2h ago, etc.)
+- Filter dropdown by event type with clear button
+- Summary cards showing error/warning/success counts
+- Clear history with confirmation modal
+- Live refresh when new notifications arrive
+- Added to sidebar navigation with FiBell icon
+
+#### Files Created
+- NEW: src/renderer/pages/NotificationsPage.tsx
+
+#### Files Modified
+- MODIFIED: src/main/db/database.ts - notification_history table and indexes
+- MODIFIED: src/main/services/notificationService.ts - DB storage, renderer broadcast, history methods
+- MODIFIED: src/main/ipc/handlers.ts - notification:history, notification:clear-history handlers
+- MODIFIED: src/preload/index.ts - onNotificationEvent, notificationHistory, notificationClearHistory bridges
+- MODIFIED: src/shared/types/index.ts - ElectronAPI notification history types
+- MODIFIED: src/renderer/components/AppLayout.tsx - toast listener, NotificationsPage route
+- MODIFIED: src/renderer/components/Sidebar.tsx - notifications nav item with FiBell
+
+#### Current Status
+- 219/366 features passing (added #214 and #215 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
