@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Database Recovery & IPC Consistency)
+
+#### Feature #292: Graceful handling of missing database - PASSING
+- Added checkDatabaseHealth() function with SQLite PRAGMA integrity_check
+- Added recreateDatabase() function that removes corrupted files and reinitializes
+- Added isDatabaseInitialized() and getDatabasePath() utility exports
+- Main process shows dialog on database corruption: "Recreate Database" or "Quit"
+- On init failure: "Recreate Database", "Continue Without Database", or "Quit"
+- Auto-creates new database when file is missing (no user action needed)
+- Added db:health IPC handler to check database file health from renderer
+- Added db:recreate IPC handler to trigger recreation from renderer
+
+#### Feature #293: IPC request-response format consistency - PASSING
+- Updated health:check handler to return { data: { status, database, ... }, error: null/string }
+- Updated db:status handler to return { data: { status, walMode, ... }, error: null/string }
+- Both handlers previously returned flat objects without data/error envelope
+- Updated HealthCheckResponse and DbStatusResponse types with data envelope
+- Added HealthCheckData and DbStatusData inner types
+- Added DbHealthResponse and DbRecreateResponse types
+- All IPC handlers now consistently use { data, error } format
+
+#### Files Modified
+- MODIFIED: src/main/db/database.ts - checkDatabaseHealth, recreateDatabase, isDatabaseInitialized, getDatabasePath
+- MODIFIED: src/main/index.ts - Graceful database init with dialog recovery
+- MODIFIED: src/main/ipc/handlers.ts - Consistent { data, error } for health:check and db:status, new db:health and db:recreate
+- MODIFIED: src/preload/index.ts - dbHealth and dbRecreate bridges
+- MODIFIED: src/shared/types/index.ts - Updated response types with data envelope
+
+#### Current Status
+- 292/366 features passing (added #292 and #293 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Loading States & Button Disabled During Processing)
 
 #### Feature #290: Loading states during data fetch - PASSING
