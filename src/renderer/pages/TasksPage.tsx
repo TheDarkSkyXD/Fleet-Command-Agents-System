@@ -3,13 +3,16 @@ import {
   FiAlertCircle,
   FiAlertTriangle,
   FiArrowDown,
+  FiArrowLeft,
   FiArrowUp,
   FiCheckCircle,
   FiChevronDown,
   FiChevronRight,
   FiCircle,
   FiClock,
+  FiEdit3,
   FiFolder,
+  FiHash,
   FiLink,
   FiLoader,
   FiMinus,
@@ -76,11 +79,13 @@ interface GroupProgress {
   blocked: number;
 }
 
-type ActiveTab = 'issues' | 'groups';
+type ActiveTab = 'issues' | 'groups' | 'ready';
 
 export function TasksPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('issues');
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [readyIssues, setReadyIssues] = useState<Issue[]>([]);
+  const [readyLoading, setReadyLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -151,6 +156,20 @@ export function TasksPage() {
     }
   }, []);
 
+  const loadReadyQueue = useCallback(async () => {
+    setReadyLoading(true);
+    try {
+      const result = await window.electronAPI.issueReadyQueue();
+      if (result.data) {
+        setReadyIssues(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to load ready queue:', err);
+    } finally {
+      setReadyLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadIssues();
   }, [loadIssues]);
@@ -158,6 +177,12 @@ export function TasksPage() {
   useEffect(() => {
     loadGroups();
   }, [loadGroups]);
+
+  useEffect(() => {
+    if (activeTab === 'ready') {
+      loadReadyQueue();
+    }
+  }, [activeTab, loadReadyQueue]);
 
   const handleCreate = async () => {
     if (!form.title.trim()) return;
@@ -365,6 +390,18 @@ export function TasksPage() {
           data-testid="tab-groups"
         >
           Groups ({groups.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('ready')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'ready'
+              ? 'border-green-500 text-green-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+          data-testid="tab-ready-queue"
+        >
+          Ready Queue ({readyIssues.length})
         </button>
       </div>
 
@@ -947,6 +984,54 @@ export function TasksPage() {
           )}
         </>
       )}
+      {/* Ready Queue Tab */}
+      {activeTab === 'ready' && (
+        <>
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+            <p className="text-sm text-green-300">
+              <FiCheckCircle className="inline mr-1.5 -mt-0.5" size={14} />
+              Ready Queue shows issues with no unresolved blocking dependencies — available to work
+              on now.
+            </p>
+          </div>
+
+          {readyLoading ? (
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
+              <FiLoader className="mx-auto mb-2 animate-spin" size={24} />
+              <p>Loading ready queue...</p>
+            </div>
+          ) : readyIssues.length === 0 ? (
+            <div
+              className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400"
+              data-testid="ready-queue-empty"
+            >
+              <p className="text-lg mb-2">No ready issues</p>
+              <p className="text-sm">
+                All open issues have unresolved dependencies, or there are no open issues
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2" data-testid="ready-queue-list">
+              {readyIssues.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  statusConfig={statusConfig}
+                  getPriorityInfo={getPriorityInfo}
+                  getTypeInfo={getTypeInfo}
+                  claimingId={claimingId}
+                  claimAgent={claimAgent}
+                  setClaimAgent={setClaimAgent}
+                  setClaimingId={setClaimingId}
+                  handleClaim={handleClaim}
+                  handleDelete={handleDelete}
+                  onSelect={(id) => setSelectedIssueId(id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -1048,7 +1133,8 @@ function IssueCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: parent handles keyboard */}
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           {/* Claim button (only for open issues) */}
           {issue.status === 'open' && claimingId === issue.id && (
             <div className="flex items-center gap-1">
@@ -1145,6 +1231,236 @@ function FilterSelect({
         className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"
         size={12}
       />
+    </div>
+  );
+}
+
+function IssueDetailModal({
+  issue,
+  statusConfig: statuses,
+  getPriorityInfo,
+  getTypeInfo,
+  onClose,
+  onStatusChange,
+  allIssues,
+  onDependenciesChange,
+}: {
+  issue: Issue | null;
+  statusConfig: Record<
+    IssueStatus,
+    { label: string; icon: typeof FiCircle; color: string; bg: string }
+  >;
+  getPriorityInfo: (p: IssuePriority) => {
+    value: IssuePriority;
+    label: string;
+    icon: typeof FiArrowUp;
+    color: string;
+  };
+  getTypeInfo: (t: IssueType) => { value: IssueType; label: string; color: string };
+  onClose: () => void;
+  onStatusChange: (id: string, status: IssueStatus) => void;
+  allIssues: Issue[];
+  onDependenciesChange: (id: string, depIds: string[]) => void;
+}) {
+  if (!issue) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="w-full max-w-2xl rounded-lg border border-slate-700 bg-slate-800 p-6 shadow-xl">
+          <p className="text-slate-400 text-center">Issue not found</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-4 mx-auto block rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const status = statuses[issue.status];
+  const priorityInfo = getPriorityInfo(issue.priority);
+  const typeInfo = getTypeInfo(issue.type);
+  const PriorityIcon = priorityInfo.icon;
+  const StatusIcon = status.icon;
+
+  const allStatuses: IssueStatus[] = ['open', 'in_progress', 'closed', 'blocked'];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div
+        className="w-full max-w-2xl rounded-lg border border-slate-700 bg-slate-800 shadow-xl overflow-hidden"
+        data-testid="issue-detail-modal"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+              title="Back to list"
+            >
+              <FiArrowLeft size={18} />
+            </button>
+            <h2 className="text-lg font-semibold text-slate-50">Issue Details</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+          >
+            <FiX size={18} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Title */}
+          <div>
+            <h3 className="text-xl font-semibold text-slate-50" data-testid="issue-detail-title">
+              {issue.title}
+            </h3>
+            <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
+              <FiHash size={11} />
+              <span className="font-mono">{issue.id}</span>
+            </div>
+          </div>
+
+          {/* Metadata grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Status */}
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
+              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                Status
+              </span>
+              <div className="flex items-center gap-2" data-testid="issue-detail-status">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium ${status.color} ${status.bg}`}
+                >
+                  <StatusIcon size={14} />
+                  {status.label}
+                </span>
+              </div>
+              {/* Quick status change */}
+              <div className="flex items-center gap-1.5 mt-3">
+                {allStatuses
+                  .filter((s) => s !== issue.status)
+                  .map((s) => {
+                    const sConf = statuses[s];
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => onStatusChange(issue.id, s)}
+                        className={`rounded px-2 py-0.5 text-[10px] border border-slate-700 hover:border-slate-500 ${sConf.color} transition-colors`}
+                        title={`Change to ${sConf.label}`}
+                      >
+                        {sConf.label}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Type */}
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
+              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                Type
+              </span>
+              <span
+                className={`text-sm font-medium ${typeInfo.color}`}
+                data-testid="issue-detail-type"
+              >
+                {typeInfo.label}
+              </span>
+            </div>
+
+            {/* Priority */}
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
+              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                Priority
+              </span>
+              <div className="flex items-center gap-2" data-testid="issue-detail-priority">
+                <PriorityIcon size={16} className={priorityInfo.color} />
+                <span className={`text-sm font-medium ${priorityInfo.color}`}>
+                  {priorityInfo.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Assigned Agent */}
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
+              <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                Assigned Agent
+              </span>
+              <div data-testid="issue-detail-assigned-agent">
+                {issue.assigned_agent ? (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-400">
+                    <FiUser size={14} />
+                    {issue.assigned_agent}
+                  </span>
+                ) : (
+                  <span className="text-sm text-slate-500 italic">Unassigned</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
+            <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+              Description
+            </span>
+            <div data-testid="issue-detail-description">
+              {issue.description ? (
+                <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                  {issue.description}
+                </p>
+              ) : (
+                <p className="text-sm text-slate-500 italic">No description provided</p>
+              )}
+            </div>
+          </div>
+
+          {/* Dependencies */}
+          <DependencyManager
+            issue={issue}
+            allIssues={allIssues}
+            statusConfig={statuses}
+            onDependenciesChange={onDependenciesChange}
+          />
+
+          {/* Timestamps & metadata footer */}
+          <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-700/50 pt-4">
+            <div className="flex items-center gap-4">
+              <span className="inline-flex items-center gap-1">
+                <FiClock size={11} />
+                Created: {new Date(issue.created_at).toLocaleString()}
+              </span>
+              {issue.updated_at && issue.updated_at !== issue.created_at && (
+                <span className="inline-flex items-center gap-1">
+                  <FiEdit3 size={11} />
+                  Updated: {new Date(issue.updated_at).toLocaleString()}
+                </span>
+              )}
+              {issue.closed_at && (
+                <span className="inline-flex items-center gap-1 text-green-400">
+                  <FiCheckCircle size={11} />
+                  Closed: {new Date(issue.closed_at).toLocaleString()}
+                </span>
+              )}
+            </div>
+            {issue.group_id && (
+              <span className="inline-flex items-center gap-1 text-purple-400">
+                <FiFolder size={11} />
+                Grouped
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
