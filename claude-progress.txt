@@ -5117,3 +5117,28 @@
 - 347/366 features passing (added #349 and #350 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Virtualized Log Viewer & Mail List)
+
+#### Feature #351: Virtualized log viewer for thousands of entries - PASSING
+- AppLogPanel already had VirtualizedLogList with @tanstack/react-virtual
+- Increased log fetch limit from 500 to 5000 in frontend and backend default
+- Increased virtualizer overscan from 15 to 20 for smoother scrolling
+- Added data-testid, data-total-items, data-rendered-items attributes
+- Search is server-side SQL, no lag with large datasets
+
+#### Feature #352: Virtualized mail list for high-volume messaging - PASSING
+- VirtualizedMailList already used @tanstack/react-virtual
+- Backend mail:list has no LIMIT, returns all messages
+- Increased overscan from 10 to 15 for smoother scrolling
+- Added data-rendered-items attribute for DOM node verification
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/DebugPage.tsx - limit 5000, overscan 20, data attributes
+- MODIFIED: src/main/ipc/handlers.ts - default limit 5000 for appLog:list
+- MODIFIED: src/renderer/pages/MailPage.tsx - overscan 15, data-rendered-items
+
+#### Current Status
+- 352/366 features passing (added #351 and #352 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
