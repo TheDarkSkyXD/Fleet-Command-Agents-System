@@ -1,5 +1,53 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (IPC Listener Cleanup & Export Definitions)
+
+#### Feature #342: Rapid page navigation doesn't cause errors - PASSING
+- Root cause: IPC event listeners (onAgentUpdate, onNotificationEvent, etc.) registered without cleanup
+- Updated preload/index.ts: all on* functions now return unsubscribe functions using ipcRenderer.removeListener
+- Added IpcRendererEvent import to preload
+- Updated ElectronAPI type declarations: return types changed from void to () => void
+- Fixed cleanup in 11 files:
+  - AppLayout.tsx: onAgentUpdate, onNotificationEvent, onNotificationNavigateToAgent
+  - AgentDetailPage.tsx: onAgentUpdate
+  - AgentsPage.tsx: onAgentUpdate
+  - NotificationsPage.tsx: onNotificationEvent
+  - Sidebar.tsx: onMailPurged, onMailReceived
+  - StatusBar.tsx: onAgentUpdate
+  - UpdateBanner.tsx: 4 update event listeners (replaced removeAllListeners)
+  - SettingsPage.tsx: 4 update event listeners (replaced removeAllListeners)
+  - MailPage.tsx: onMailReceived, onMailPurged (replaced removeAllListeners)
+  - AgentTerminal.tsx: onAgentOutput (replaced removeAllListeners)
+  - DebugPage.tsx: onDebugShellOutput (replaced removeAllListeners)
+- Using per-listener unsubscribe instead of removeAllListeners prevents cross-component interference
+
+#### Feature #343: Export agent definitions to file - PASSING
+- Export functionality was already fully implemented
+- Export button opens selection mode with per-role checkboxes
+- Downloads JSON file: agent-definitions-{date}.json with version, exported_at, definitions array
+- Added data-testid attributes: export-definitions-btn, export-definitions-confirm, export-definitions-cancel, export-select-{role}
+
+#### Files Modified
+- MODIFIED: src/preload/index.ts - All on* functions return unsubscribe cleanup functions
+- MODIFIED: src/shared/types/index.ts - Updated return types to () => void
+- MODIFIED: src/renderer/components/AppLayout.tsx - 3 listener cleanups
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - 1 listener cleanup
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - 1 listener cleanup
+- MODIFIED: src/renderer/pages/NotificationsPage.tsx - 1 listener cleanup
+- MODIFIED: src/renderer/components/Sidebar.tsx - 2 listener cleanups
+- MODIFIED: src/renderer/components/StatusBar.tsx - 1 listener cleanup
+- MODIFIED: src/renderer/components/UpdateBanner.tsx - 4 listener cleanups
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - 4 listener cleanups
+- MODIFIED: src/renderer/pages/MailPage.tsx - 2 listener cleanups
+- MODIFIED: src/renderer/components/AgentTerminal.tsx - 1 listener cleanup
+- MODIFIED: src/renderer/pages/DebugPage.tsx - 1 listener cleanup
+- MODIFIED: src/renderer/pages/AgentDefinitionsPage.tsx - Export data-testid attrs
+
+#### Current Status
+- 341/366 features passing (added #342 and #343 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (date-fns Timestamps & Accurate created_at)
 
 #### Feature #336: Timestamps display with date-fns formatting - PASSING
