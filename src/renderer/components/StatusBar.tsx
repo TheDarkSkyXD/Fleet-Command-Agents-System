@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FiCheck, FiCheckCircle, FiChevronUp, FiClock, FiFolder, FiList, FiPlay, FiSquare, FiStar } from 'react-icons/fi';
+import {
+  FiCheck,
+  FiCheckCircle,
+  FiChevronUp,
+  FiClock,
+  FiFolder,
+  FiList,
+  FiPlay,
+  FiSquare,
+  FiStar,
+} from 'react-icons/fi';
 import type { ConfigProfile } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
 import { useRunStore } from '../stores/runStore';
@@ -68,7 +78,8 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  const { activeRun, runs, startRun, stopRun, completeRun, fetchActiveRun, fetchRuns } = useRunStore();
+  const { activeRun, runs, startRun, stopRun, completeRun, fetchActiveRun, fetchRuns } =
+    useRunStore();
   const [showRunHistory, setShowRunHistory] = useState(false);
   const runHistoryRef = useRef<HTMLDivElement>(null);
   const { activeProject, loadActiveProject } = useProjectStore();
@@ -329,6 +340,16 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
             <span className="text-slate-300">{runDuration}</span>
             <button
               type="button"
+              onClick={handleCompleteRun}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors"
+              title="Mark run as completed and record outcome"
+              data-testid="mark-run-completed-btn"
+            >
+              <FiCheckCircle className="h-3 w-3" />
+              Complete
+            </button>
+            <button
+              type="button"
               onClick={handleStopRun}
               className="flex items-center gap-1 rounded px-1.5 py-0.5 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
               title="Stop run"
@@ -338,16 +359,85 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
             </button>
           </span>
         ) : (
+          <span className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleStartRun}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors"
+              title="Start a new coordinator run"
+            >
+              <FiPlay className="h-3 w-3" />
+              Start Run
+            </button>
+          </span>
+        )}
+
+        {/* Run History */}
+        <div className="relative" ref={runHistoryRef}>
           <button
             type="button"
-            onClick={handleStartRun}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors"
-            title="Start a new coordinator run"
+            onClick={() => setShowRunHistory((prev) => !prev)}
+            className="flex items-center gap-1 cursor-pointer rounded px-1.5 py-0.5 hover:bg-slate-800 transition-colors"
+            data-testid="run-history-btn"
+            title="View run history"
           >
-            <FiPlay className="h-3 w-3" />
-            Start Run
+            <FiList className="h-3 w-3 text-slate-400" />
+            <span className="text-slate-400">History</span>
           </button>
-        )}
+
+          {showRunHistory && (
+            <div
+              className="absolute bottom-full right-0 mb-1 w-80 rounded-lg border border-slate-700 bg-slate-800 shadow-xl z-50 py-1 max-h-64 overflow-y-auto"
+              data-testid="run-history-dropdown"
+            >
+              <div className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Run History
+              </div>
+              {runs.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-slate-500 text-center">No runs yet</div>
+              ) : (
+                runs.map((run) => (
+                  <div
+                    key={run.id}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-700 transition-colors"
+                    data-testid={`run-history-item-${run.id}`}
+                  >
+                    {run.status === 'active' ? (
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    ) : run.status === 'completed' ? (
+                      <FiCheckCircle className="h-3 w-3 text-blue-400 shrink-0" />
+                    ) : (
+                      <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                    )}
+                    <span className="truncate text-slate-300" title={run.id}>
+                      {run.id.substring(0, 16)}...
+                    </span>
+                    <span
+                      className={`ml-auto shrink-0 ${
+                        run.status === 'active'
+                          ? 'text-emerald-400'
+                          : run.status === 'completed'
+                            ? 'text-blue-400'
+                            : 'text-red-400'
+                      }`}
+                    >
+                      {run.status}
+                    </span>
+                    {run.completed_at && (
+                      <span
+                        className="text-slate-500 shrink-0 flex items-center gap-0.5"
+                        title={`Completed: ${run.completed_at}`}
+                      >
+                        <FiClock className="h-2.5 w-2.5" />
+                        {new Date(run.completed_at).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </footer>
   );
