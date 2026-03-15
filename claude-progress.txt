@@ -5001,3 +5001,25 @@
 - 341/366 features passing (added #340 and #341 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Date Sorting & Uptime Accuracy)
+
+#### Feature #338: Date sorting across midnight boundary - PASSING
+- All date sorting uses getTime() for numeric comparison or SQL ORDER BY on ISO 8601 strings
+- AgentsPage uptime column: added explicit sortingFn and sortDescFirst
+- Added data-testid and data-created-at attributes for verification
+
+#### Feature #339: Uptime display accuracy - PASSING
+- Added 1-second tick timer to AgentsPage and AgentDetailPage for real-time uptime updates
+- Fixed hours display bug in AgentsPage local formatUptime (was only showing minutes/seconds)
+- Long-running agents correctly show hours e.g. 2h 15m 30s
+- Added data-testid attributes to uptime displays (table, card, detail page)
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - uptimeTick, formatUptime hours fix, sortingFn, data-testids
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - uptimeTick, data-testid on uptime span
+
+#### Current Status
+- 339/366 features passing (added #338 and #339 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
