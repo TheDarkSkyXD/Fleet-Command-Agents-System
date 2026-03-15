@@ -280,8 +280,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     file_attempted?: string;
     severity?: string;
   }) => ipcRenderer.invoke('guardViolation:create', violation),
-  guardViolationAcknowledge: (id: string) =>
-    ipcRenderer.invoke('guardViolation:acknowledge', id),
+  guardViolationAcknowledge: (id: string) => ipcRenderer.invoke('guardViolation:acknowledge', id),
   guardViolationPurge: () => ipcRenderer.invoke('guardViolation:purge'),
   guardViolationStats: () => ipcRenderer.invoke('guardViolation:stats'),
 

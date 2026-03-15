@@ -224,6 +224,29 @@ export function registerIpcHandlers(): void {
           `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
         ).run(options.id);
 
+        // Upsert agent identity for persistent identity across sessions
+        const existingIdentity = loggedPrepare(
+          'SELECT * FROM agent_identities WHERE name = ?',
+        ).get(options.agent_name);
+        if (existingIdentity) {
+          // Update capability if changed, update timestamp
+          loggedPrepare(
+            `UPDATE agent_identities SET capability = ?, updated_at = datetime('now') WHERE name = ?`,
+          ).run(options.capability, options.agent_name);
+          log.info(
+            `[IPC] agent:spawn - updated existing identity for ${options.agent_name}`,
+          );
+        } else {
+          // Create new identity record
+          loggedPrepare(
+            `INSERT INTO agent_identities (name, capability, sessions_completed, expertise_domains, recent_tasks)
+             VALUES (?, ?, 0, '[]', '[]')`,
+          ).run(options.agent_name, options.capability);
+          log.info(
+            `[IPC] agent:spawn - created new identity for ${options.agent_name}`,
+          );
+        }
+
         const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(options.id);
         log.info(
           `[IPC] agent:spawn - spawned node-pty process: ${options.agent_name} (${options.capability}), model=${model}, PID=${agentProcess.pid}`,
@@ -2462,9 +2485,9 @@ export function registerIpcHandlers(): void {
         setClauses.push("updated_at = datetime('now')");
         values.push(role);
 
-        loggedPrepare(
-          `UPDATE agent_definitions SET ${setClauses.join(', ')} WHERE role = ?`,
-        ).run(...values);
+        loggedPrepare(`UPDATE agent_definitions SET ${setClauses.join(', ')} WHERE role = ?`).run(
+          ...values,
+        );
 
         const updated = loggedPrepare('SELECT * FROM agent_definitions WHERE role = ?').get(role);
         log.info(`[IPC] guardRule:update - UPDATE guard rules for role=${role}`);
@@ -2649,10 +2672,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'discovery:start',
-    (
-      _event,
-      options: { id: string; categories: string[]; project_id?: string },
-    ) => {
+    (_event, options: { id: string; categories: string[]; project_id?: string }) => {
       try {
         const now = new Date().toISOString();
         const initialProgress: Record<string, string> = {};
@@ -2707,9 +2727,10 @@ export function registerIpcHandlers(): void {
     'discovery:update-progress',
     (_event, id: string, progress: Record<string, string>) => {
       try {
-        loggedPrepare(
-          `UPDATE discovery_scans SET progress = ? WHERE id = ?`,
-        ).run(JSON.stringify(progress), id);
+        loggedPrepare(`UPDATE discovery_scans SET progress = ? WHERE id = ?`).run(
+          JSON.stringify(progress),
+          id,
+        );
         const row = loggedPrepare('SELECT * FROM discovery_scans WHERE id = ?').get(id);
         return { data: row, error: null };
       } catch (error) {
@@ -2719,25 +2740,22 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  ipcMain.handle(
-    'discovery:findings',
-    (_event, scanId: string, category?: string) => {
-      try {
-        let sql = 'SELECT * FROM discovery_findings WHERE scan_id = ?';
-        const params: unknown[] = [scanId];
-        if (category) {
-          sql += ' AND category = ?';
-          params.push(category);
-        }
-        sql += ' ORDER BY severity DESC, created_at ASC';
-        const rows = loggedPrepare(sql).all(...params);
-        return { data: rows, error: null };
-      } catch (error) {
-        log.error('[Discovery] Findings error:', error);
-        return { data: null, error: String(error) };
+  ipcMain.handle('discovery:findings', (_event, scanId: string, category?: string) => {
+    try {
+      let sql = 'SELECT * FROM discovery_findings WHERE scan_id = ?';
+      const params: unknown[] = [scanId];
+      if (category) {
+        sql += ' AND category = ?';
+        params.push(category);
       }
-    },
-  );
+      sql += ' ORDER BY severity DESC, created_at ASC';
+      const rows = loggedPrepare(sql).all(...params);
+      return { data: rows, error: null };
+    } catch (error) {
+      log.error('[Discovery] Findings error:', error);
+      return { data: null, error: String(error) };
+    }
+  });
 
   ipcMain.handle(
     'discovery:add-finding',

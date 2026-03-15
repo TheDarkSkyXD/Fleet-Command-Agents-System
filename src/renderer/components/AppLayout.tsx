@@ -5,6 +5,7 @@ import { AgentsPage } from '../pages/AgentsPage';
 import { DebugPage } from '../pages/DebugPage';
 import { DiscoveryPage } from '../pages/DiscoveryPage';
 import { ExpertisePage } from '../pages/ExpertisePage';
+import { GuardRulesPage } from '../pages/GuardRulesPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { MetricsPage } from '../pages/MetricsPage';
@@ -105,6 +106,8 @@ function PageContent({
       return <WorktreesPage />;
     case 'merge':
       return <MergeQueuePage />;
+    case 'guard-rules':
+      return <GuardRulesPage />;
     case 'tasks':
       return <TasksPage />;
     case 'discovery':

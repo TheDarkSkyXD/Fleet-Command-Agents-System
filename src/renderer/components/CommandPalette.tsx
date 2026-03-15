@@ -7,6 +7,7 @@ import {
   FiGitMerge,
   FiMail,
   FiSettings,
+  FiShield,
   FiTerminal,
   FiUsers,
 } from 'react-icons/fi';
@@ -19,6 +20,7 @@ const navigationItems = [
   { id: 'agents', label: 'Go to Agents', icon: FiUsers, group: 'Navigation' },
   { id: 'mail', label: 'Go to Mail', icon: FiMail, group: 'Navigation' },
   { id: 'merge', label: 'Go to Merge Queue', icon: FiGitMerge, group: 'Navigation' },
+  { id: 'guard-rules', label: 'Go to Guard Rules', icon: FiShield, group: 'Navigation' },
   { id: 'tasks', label: 'Go to Tasks', icon: FiCheckSquare, group: 'Navigation' },
   { id: 'expertise', label: 'Go to Expertise', icon: FiBook, group: 'Navigation' },
   { id: 'metrics', label: 'Go to Metrics', icon: FiBarChart2, group: 'Navigation' },

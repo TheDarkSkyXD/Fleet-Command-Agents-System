@@ -239,6 +239,29 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS prompts (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      content TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL DEFAULT 'system' CHECK(type IN ('system', 'user', 'agent', 'task', 'template')),
+      parent_id TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      tags TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS prompt_versions (
+      id TEXT PRIMARY KEY,
+      prompt_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      change_summary TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS guard_violations (
       id TEXT PRIMARY KEY,
       agent_name TEXT NOT NULL,
@@ -293,6 +316,11 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_discovery_scans_project ON discovery_scans(project_id);
     CREATE INDEX IF NOT EXISTS idx_discovery_findings_scan ON discovery_findings(scan_id);
     CREATE INDEX IF NOT EXISTS idx_discovery_findings_category ON discovery_findings(category);
+    CREATE INDEX IF NOT EXISTS idx_prompts_parent ON prompts(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_prompts_type ON prompts(type);
+    CREATE INDEX IF NOT EXISTS idx_prompts_active ON prompts(is_active);
+    CREATE INDEX IF NOT EXISTS idx_prompt_versions_prompt ON prompt_versions(prompt_id);
+    CREATE INDEX IF NOT EXISTS idx_prompt_versions_version ON prompt_versions(prompt_id, version);
     CREATE INDEX IF NOT EXISTS idx_guard_violations_agent ON guard_violations(agent_name);
     CREATE INDEX IF NOT EXISTS idx_guard_violations_capability ON guard_violations(capability);
     CREATE INDEX IF NOT EXISTS idx_guard_violations_type ON guard_violations(rule_type);

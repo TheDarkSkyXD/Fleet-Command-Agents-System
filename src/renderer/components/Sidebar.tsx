@@ -10,6 +10,7 @@ import {
   FiMail,
   FiSearch,
   FiSettings,
+  FiShield,
   FiTerminal,
   FiUsers,
 } from 'react-icons/fi';
@@ -28,6 +29,7 @@ const navItems = [
   { id: 'merge', label: 'Merge', icon: FiGitMerge },
   { id: 'worktrees', label: 'Worktrees', icon: FiGitBranch },
   { id: 'definitions', label: 'Definitions', icon: FiBookOpen },
+  { id: 'guard-rules', label: 'Guard Rules', icon: FiShield },
   { id: 'tasks', label: 'Tasks', icon: FiCheckSquare },
   { id: 'discovery', label: 'Discovery', icon: FiSearch },
   { id: 'expertise', label: 'Expertise', icon: FiBook },

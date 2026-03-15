@@ -345,7 +345,13 @@ export interface GuardViolation {
 }
 
 // Discovery types
-export type DiscoveryCategory = 'architecture' | 'dependencies' | 'testing' | 'apis' | 'config' | 'conventions';
+export type DiscoveryCategory =
+  | 'architecture'
+  | 'dependencies'
+  | 'testing'
+  | 'apis'
+  | 'config'
+  | 'conventions';
 export type DiscoveryScanStatus = 'pending' | 'running' | 'completed' | 'failed';
 export type FindingSeverity = 'info' | 'warning' | 'important';
 
