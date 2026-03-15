@@ -1521,9 +1521,23 @@ export function registerIpcHandlers(): void {
       }
 
       const IGNORED_DIRS = new Set([
-        'node_modules', '.git', '.next', '.nuxt', 'dist', 'build', 'out',
-        '.cache', '.turbo', '__pycache__', '.venv', 'venv', 'coverage',
-        '.overstory', '.autoforge', '.claude', '.playwright',
+        'node_modules',
+        '.git',
+        '.next',
+        '.nuxt',
+        'dist',
+        'build',
+        'out',
+        '.cache',
+        '.turbo',
+        '__pycache__',
+        '.venv',
+        'venv',
+        'coverage',
+        '.overstory',
+        '.autoforge',
+        '.claude',
+        '.playwright',
       ]);
 
       async function readDir(dirPath: string, depth: number): Promise<FileTreeNode[]> {

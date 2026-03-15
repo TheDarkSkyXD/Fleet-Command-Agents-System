@@ -311,7 +311,10 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_sessions_state ON sessions(state);
     CREATE INDEX IF NOT EXISTS idx_sessions_run_id ON sessions(run_id);
     CREATE INDEX IF NOT EXISTS idx_messages_to_agent ON messages(to_agent);
+    CREATE INDEX IF NOT EXISTS idx_messages_from_agent ON messages(from_agent);
     CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(read);
+    CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(type);
+    CREATE INDEX IF NOT EXISTS idx_messages_priority ON messages(priority);
     CREATE INDEX IF NOT EXISTS idx_events_run_id ON events(run_id);
     CREATE INDEX IF NOT EXISTS idx_events_agent ON events(agent_name);
     CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
@@ -352,9 +355,9 @@ export async function initDatabase(): Promise<void> {
 
   // Migrations: add model column to sessions if not present
   try {
-    db.prepare("SELECT model FROM sessions LIMIT 1").get();
+    db.prepare('SELECT model FROM sessions LIMIT 1').get();
   } catch {
-    db.exec("ALTER TABLE sessions ADD COLUMN model TEXT");
+    db.exec('ALTER TABLE sessions ADD COLUMN model TEXT');
   }
 
   // Seed default agent definitions if table is empty

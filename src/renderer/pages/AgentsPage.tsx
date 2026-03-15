@@ -1041,20 +1041,25 @@ function AgentCard({
       }}
       tabIndex={0}
       role="button"
+      data-testid={`agent-card-${session.id}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* State indicator */}
           <div
             className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[session.state] || 'bg-slate-400'}`}
+            data-testid={`agent-state-dot-${session.state}`}
           />
 
           {/* Agent name */}
-          <span className="font-medium text-slate-50">{session.agent_name}</span>
+          <span className="font-medium text-slate-50" data-testid="agent-card-name">
+            {session.agent_name}
+          </span>
 
           {/* Capability badge */}
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${CAPABILITY_COLORS[session.capability] || 'bg-slate-500/20 text-slate-400'}`}
+            data-testid="agent-card-capability"
           >
             {session.capability}
           </span>
@@ -1062,9 +1067,21 @@ function AgentCard({
           {/* State badge */}
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[session.state] || ''}`}
+            data-testid="agent-card-state"
           >
             {session.state}
           </span>
+
+          {/* Model badge */}
+          {agentModel && (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${MODEL_COLORS[agentModel] || 'bg-slate-500/20 text-slate-400 border-slate-500/30'}`}
+              data-testid="agent-card-model"
+            >
+              <FiCpu className="mr-1 h-3 w-3" />
+              {agentModel}
+            </span>
+          )}
 
           {/* Stale alert */}
           {session.state === 'stalled' && (
@@ -1091,18 +1108,17 @@ function AgentCard({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Model */}
-          {processInfo && <span className="text-xs text-slate-500">{processInfo.model}</span>}
-
           {/* PID */}
           {(session.pid || processInfo?.pid) && (
-            <span className="text-xs text-slate-500 font-mono">
+            <span className="text-xs text-slate-500 font-mono" data-testid="agent-card-pid">
               PID: {session.pid || processInfo?.pid}
             </span>
           )}
 
           {/* Uptime */}
-          <span className="text-xs text-slate-500">{formatUptime(session.created_at)}</span>
+          <span className="text-xs text-slate-500" data-testid="agent-card-uptime">
+            {formatUptime(session.created_at)}
+          </span>
 
           {/* Stop button */}
           <button
@@ -1121,7 +1137,7 @@ function AgentCard({
 
       {/* Details row */}
       <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
-        {session.task_id && <span>Task: {session.task_id}</span>}
+        {session.task_id && <span data-testid="agent-card-task">Task: {session.task_id}</span>}
         {session.worktree_path && <span>Worktree: {session.worktree_path}</span>}
         {session.branch_name && <span>Branch: {session.branch_name}</span>}
         {session.parent_agent && (
