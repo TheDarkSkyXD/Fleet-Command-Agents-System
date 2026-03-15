@@ -1357,3 +1357,33 @@
 - 69/366 features passing (added #199 and #200)
 - All code passes Biome lint and Vite build
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Diff Viewer & File Review)
+
+#### Feature #82: Side-by-side diff viewer with diff2html - PASSING
+- Created src/renderer/components/DiffViewer.tsx using diff2html library
+- Side-by-side and unified (line-by-line) view modes with toggle button
+- Dark theme CSS overrides for all diff2html elements
+- Green highlighting for additions, red for deletions
+- Added merge:diff IPC handler using simple-git for branch diffs
+- View Diff button added to all merge queue entries
+
+#### Feature #83: Approve or reject individual files before merge - PASSING
+- Enhanced DiffViewer with reviewMode prop for per-file review
+- Each file section has Approve/Reject buttons with toggle behavior
+- Approved files: green border/background, Rejected: red border/background
+- Status bar with approved/rejected/pending counts
+- Approve All / Reject All bulk actions
+- Merge button shows count of approved files
+
+#### Files Created/Modified
+- NEW: src/renderer/components/DiffViewer.tsx - Full diff viewer with review mode
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Integrated DiffViewer
+- MODIFIED: src/main/ipc/handlers.ts - Added merge:diff IPC handler
+- MODIFIED: src/preload/index.ts - Added mergeDiff bridge method
+- MODIFIED: src/shared/types/index.ts - Added mergeDiff to ElectronAPI
+
+#### Current Status
+- 89/366 features passing (added #82 and #83 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
