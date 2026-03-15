@@ -1,0 +1,993 @@
+<project_specification>
+  <project_name>Fleet Command Agents System</project_name>
+
+  <overview>
+    Fleet Command Agents System is an Electron desktop application that brings multi-agent AI coding orchestration to a polished graphical interface. Based on Overstory's architecture, it replaces tmux-based terminal management with Electron-managed processes using node-pty, enabling users to spawn, coordinate, and monitor swarms of AI coding agents through a beautiful dark-themed UI. Powered by Claude Code CLI subscription authentication, it requires no API keys — agents run through the user's existing Claude Code subscription.
+  </overview>
+
+  <technology_stack>
+    <desktop>
+      <framework>Electron</framework>
+      <packager>electron-builder (with install wizard / NSIS installer)</packager>
+      <auto_update>electron-updater (GitHub Releases, silent download to app data)</auto_update>
+      <window_state>electron-window-state (remember size/position)</window_state>
+      <logging>electron-log (main process structured logging)</logging>
+      <settings>electron-store (persistent user settings)</settings>
+    </desktop>
+    <frontend>
+      <framework>React 19</framework>
+      <bundler>Vite</bundler>
+      <language>TypeScript (strict mode)</language>
+      <styling>Tailwind CSS v4</styling>
+      <components>Shadcn/ui (Radix-based accessible components)</components>
+      <icons>React Icons</icons>
+      <animations>Framer Motion</animations>
+      <state_management>Zustand</state_management>
+      <routing>TanStack Router</routing>
+      <data_fetching>TanStack Query</data_fetching>
+      <tables>@tanstack/react-table</tables>
+      <command_palette>cmdk</command_palette>
+      <toasts>sonner</toasts>
+      <panels>react-resizable-panels</panels>
+      <terminal>xterm.js + @xterm/addon-fit + @xterm/addon-web-links + @xterm/addon-search</terminal>
+      <diff_viewer>diff2html</diff_viewer>
+      <validation>Zod</validation>
+      <dates>date-fns</dates>
+      <ids>nanoid</ids>
+    </frontend>
+    <backend>
+      <runtime>Node.js (Electron main process)</runtime>
+      <database>better-sqlite3 + drizzle-orm</database>
+      <process_management>node-pty (replaces tmux for agent process spawning)</process_management>
+      <process_cleanup>tree-kill (kill process trees on agent stop)</process_cleanup>
+      <git>simple-git (worktree management, branch operations)</git>
+      <file_watching>chokidar (watch agent logs, config changes, .overstory/ state)</file_watching>
+      <filesystem>graceful-fs (prevent EMFILE errors with many concurrent agents)</filesystem>
+    </backend>
+    <code_quality>
+      <linter_formatter>Biome (replaces ESLint + Prettier)</linter_formatter>
+      <type_checking>TypeScript strict mode</type_checking>
+    </code_quality>
+    <communication>
+      <ipc>Electron IPC with context bridge (secure preload scripts)</ipc>
+      <api>Internal IPC channels between main and renderer processes</api>
+    </communication>
+  </technology_stack>
+
+  <prerequisites>
+    <environment_setup>
+      - Node.js 20+ installed
+      - Claude Code CLI installed and authenticated (OAuth subscription)
+      - Git installed and configured
+      - Windows/macOS/Linux supported
+    </environment_setup>
+  </prerequisites>
+
+  <feature_count>366</feature_count>
+
+  <security_and_access_control>
+    <user_roles>
+      <role name="user">
+        <permissions>
+          - Full access to all features (single-user desktop app)
+          - Spawn, stop, nudge, and manage all agents
+          - Configure settings and profiles
+          - Access all projects and worktrees
+          - Execute merge operations
+          - Run nuclear cleanup
+        </permissions>
+      </role>
+    </user_roles>
+    <authentication>
+      <method>Claude Code CLI OAuth (user's Anthropic subscription)</method>
+      <session_timeout>none (desktop app, always available)</session_timeout>
+      <cli_detection>Binary discovery via PATH lookup + fallback paths, version verification, auth status check</cli_detection>
+    </authentication>
+    <agent_security>
+      <guard_rules>
+        - Per-capability tool allowlists (scouts cannot write files)
+        - Bash pattern restrictions (block git push, git reset --hard)
+        - Path boundary enforcement (agents confined to worktree)
+        - File scope enforcement (builders only modify assigned files)
+        - Tracker closure guards (agents only close own tasks)
+      </guard_rules>
+    </agent_security>
+  </security_and_access_control>
+
+  <core_features>
+    <infrastructure>
+      - Database connection established (better-sqlite3 WAL mode)
+      - Database schema applied correctly (drizzle-orm migrations)
+      - Data persists across app restart
+      - No mock data patterns in codebase
+      - Backend queries real SQLite database
+    </infrastructure>
+
+    <setup_wizard_onboarding>
+      - First-launch setup wizard with step-by-step flow
+      - Claude Code CLI binary detection (PATH lookup + fallback paths)
+      - Claude Code CLI version verification
+      - Authentication status check (OAuth subscription)
+      - Project folder picker with validation
+      - Initial configuration generation
+      - Setup completion confirmation
+      - Onboarding tour with guided tooltips pointing out key features
+    </setup_wizard_onboarding>
+
+    <app_shell_layout>
+      - Dark mode only theme
+      - Left sidebar navigation (Agents, Mail, Merge, Tasks, Settings, Debug)
+      - Collapsible sidebar with mini-icon mode and state persistence
+      - Main content area with resizable panels (react-resizable-panels)
+      - Dynamic window title showing project name and agent count
+      - System tray integration with status indicator
+      - System tray right-click menu (show/hide, agent count, quit)
+      - Minimize-to-tray support
+      - Close dialog with 3 options (keep running in tray, stop all agents and close, cancel)
+      - Window state persistence (size, position, maximized state)
+      - Splash screen on app startup
+      - Status bar (bottom) showing current project, active agent count, CLI status, run ID
+    </app_shell_layout>
+
+    <agent_management>
+      - Spawn scout agents (read-only exploration, haiku model)
+      - Spawn builder agents (implementation, sonnet model)
+      - Spawn reviewer agents (validation, sonnet model)
+      - Spawn lead agents (team coordination + implementation, opus model)
+      - Spawn merger agents (branch integration, sonnet model)
+      - Agent spawn dialog with model picker, file scope, task ID, name
+      - Stop individual agents with confirmation
+      - Stop all agents with confirmation
+      - Nudge stalled agents (send prompt to resume)
+      - Agent status cards showing state, capability, task, uptime, model
+      - Agent state visualization (booting, working, completed, stalled, zombie)
+      - Live terminal view per agent (xterm.js rendering node-pty output)
+      - Agent list with sortable/filterable table (@tanstack/react-table)
+      - Agent detail page with tabbed views (Terminal, Logs, Identity/CV, Files Changed, Mail)
+      - Agent hierarchy tree visualization (coordinator -> leads -> workers with status colors)
+      - Hierarchy depth enforcement (configurable max depth, default 2)
+      - File scope assignment per builder (visual file tree picker)
+      - Parent-child agent relationship tracking
+      - Agent PID tracking and process liveness monitoring
+      - Transcript path tracking per agent
+      - Bulk agent operations (select multiple to stop)
+      - Agent color coding by capability type
+    </agent_management>
+
+    <coordinator_agent>
+      - Start persistent coordinator agent at project root
+      - Stop coordinator with graceful shutdown
+      - Coordinator status display (state, uptime, agents dispatched)
+      - Auto-task decomposition (coordinator analyzes scope, creates work streams)
+      - Lead agent dispatching with high-level objectives
+      - Fleet monitoring via mail polling
+      - Merge authorization and execution triggers
+      - Coordinator output viewer (recent activity log)
+    </coordinator_agent>
+
+    <task_groups>
+      - Create task groups for batch tracking
+      - View group progress (total, completed, in progress, blocked, open)
+      - Add/remove issues from groups
+      - List all groups with status summary
+      - Auto-close groups when all member issues complete
+      - Group-level status reporting
+    </task_groups>
+
+    <agent_definitions_templates>
+      - View all agent role definitions (scout, builder, reviewer, lead, merger, coordinator, monitor)
+      - Edit agent instruction files (.md) with syntax highlighting
+      - Create custom agent roles with custom capabilities
+      - Preview rendered agent overlay (Layer 1 base + Layer 2 profile + Layer 3 task overlay)
+      - Agent manifest viewer (capabilities, models, tools, constraints per agent type)
+      - Import/export agent definitions
+      - Reset agent definitions to defaults
+      - Template variable preview (shows what gets injected at spawn time)
+    </agent_definitions_templates>
+
+    <session_recovery>
+      - Checkpoint save on app close or crash (agent states, progress, files modified)
+      - Checkpoint restore on app restart (reconnect to running processes)
+      - Detect orphaned agent processes and offer to reconnect or kill
+      - Session handoff tracking (fromSession -> toSession with reason)
+      - Pending work recovery from checkpoint data
+      - Recovery status display showing what was restored
+    </session_recovery>
+
+    <messaging_mail>
+      - Send messages between agents (from, to, subject, body)
+      - Semantic message types (status, question, result, error)
+      - Protocol message types (worker_done, merge_ready, merged, merge_failed, escalation, health_check, dispatch, assign)
+      - Priority levels (low, normal, high, urgent)
+      - Thread-based conversations with reply chains
+      - Structured JSON payloads per protocol type
+      - Inbox view with unread indicators
+      - Outbox view with sent messages
+      - Group broadcast addresses (@all, @builders, @scouts, @reviewers, @leads, @mergers, @coordinator, @monitor)
+      - Mail check with injection (surface messages into agent context)
+      - Mark messages as read
+      - Mail purge with TTL (by age, by agent, or all)
+      - Live real-time event feed showing all agent activity
+      - Mail search and filtering
+      - Message detail view with full body and payload
+      - Unread count badge on sidebar navigation
+    </messaging_mail>
+
+    <merge_system>
+      - FIFO merge queue (SQLite-backed, ordered by enqueue time)
+      - Merge queue visualization showing pending, merging, merged, conflict, failed
+      - Side-by-side visual diff viewer (diff2html) for reviewing agent changes
+      - Approve/reject individual files before merging
+      - Tier 1: Clean merge (git merge --no-edit)
+      - Tier 2: Auto-resolve (parse conflict markers, resolve simple conflicts)
+      - Tier 3: AI-resolve (Claude intelligently merges conflicting changes)
+      - Tier 4: Reimagine (abandon merge, reimplement from scratch)
+      - Dry-run merge preview (check for conflicts without merging)
+      - Merge history log with resolution tier tracking
+      - Dependency-based merge ordering
+      - Failed merge blocking subsequent merges
+      - Merge target branch configuration (session branch or canonical)
+      - Rollback support for failed merges
+    </merge_system>
+
+    <project_worktree_management>
+      - Multi-project support (open/switch between projects)
+      - Recent projects list on startup
+      - Project selector/switcher UI
+      - Initialize .overstory/ directory for new projects
+      - Visual worktree manager showing all agent worktrees
+      - Worktree branch and HEAD commit display
+      - Clean completed worktrees (individual or batch)
+      - Force-remove unmerged worktrees with confirmation
+      - Open worktree in VS Code (electron shell)
+      - Open worktree in file explorer (electron shell)
+      - Session branch tracking (merge target default)
+      - Project-level configuration (config.yaml editor)
+    </project_worktree_management>
+
+    <command_palette>
+      - Ctrl+K / Cmd+K activation (cmdk)
+      - Fuzzy search with smart ranking (exact > starts-with > fuzzy)
+      - Quick page navigation (jump to any view)
+      - Agent actions (spawn, stop, nudge, inspect)
+      - Mail actions (check, send, search)
+      - Project actions (open, switch, initialize)
+      - Run any ov CLI command directly
+      - Search across agents, mail, and logs
+      - Recent actions history (capped at 50, clearable)
+      - Context-sensitive commands (only show relevant actions)
+      - Confirmation for destructive commands
+      - Live-updating results (reflect current agent state)
+      - Project context indicator (show which project commands apply to)
+      - Undo support for reversible actions (e.g., undo stop = respawn with same config)
+    </command_palette>
+
+    <debug_observability>
+      - Built-in debug terminal (xterm.js) for running arbitrary commands
+      - App log viewer with filtering by level (debug, info, warn, error)
+      - Agent timeline/trace view (chronological events per agent or task)
+      - Error aggregation view across all agents with filtering
+      - Searchable NDJSON log viewer with time range, agent, and level filters
+      - Interleaved chronological replay across multiple agents
+      - Event store tracking (tool_start, tool_end, session_start, session_end, mail events)
+      - Tool invocation statistics (which tools used most, duration)
+      - Stale agent detection (configurable threshold, default 5 minutes)
+      - Zombie agent detection (configurable threshold, default 15 minutes)
+      - Desktop notifications when agents are stuck or encounter errors
+      - Agent process liveness monitoring (PID checks)
+      - Run app preview to see changes made by agents
+      - Deep agent inspection view (tmux-equivalent: recent output, tool calls, mail)
+      - Health state machine visualization (booting -> working -> stalled -> zombie)
+      - Event correlation (match tool_start with tool_end)
+    </debug_observability>
+
+    <claude_cli_integration>
+      - Binary discovery via PATH lookup (which/where command)
+      - Fallback path checking (common installation locations per platform)
+      - Version verification (claude --version)
+      - Authentication status check (claude auth status, parse JSON response)
+      - Auth decision tree UI (not installed -> installed but broken -> not authenticated -> ready)
+      - Setup guide when CLI is missing (installation instructions per platform)
+      - Status indicator in sidebar/status bar (ready, not authenticated, not installed)
+      - Session spawn via node-pty with --dangerously-skip-permissions
+      - Stream JSON output parsing (--output-format stream-json)
+      - Session resume support (--resume sessionId)
+      - Model picker per agent (sonnet, opus, haiku)
+      - Environment variable management (strip CLAUDECODE, CLAUDE_CODE_ENTRYPOINT before spawning)
+    </claude_cli_integration>
+
+    <settings_profiles>
+      - Dark theme configuration (color palette customization within dark theme)
+      - Claude model defaults (default model per capability)
+      - Max concurrent agents setting
+      - Max hierarchy depth setting
+      - Max agents per lead setting
+      - Terminal font family and size settings
+      - Keyboard shortcut customization
+      - Notification preferences (which events trigger desktop notifications)
+      - Auto-update check toggle
+      - Default project path setting
+      - Agent spawn defaults (default capability, model, file scope behavior)
+      - Named configuration profiles (e.g., "Fast Build" with many agents, "Careful" with scouts + reviewers)
+      - Profile CRUD (create, edit, delete, duplicate profiles)
+      - Active profile indicator and quick-switch
+    </settings_profiles>
+
+    <update_system>
+      - Auto-check for updates on startup (poll GitHub Releases API)
+      - Update available badge/banner (subtle, non-intrusive)
+      - View changelog button (renders release notes from GitHub)
+      - Silent download to app data directory (NOT Downloads folder)
+      - Download progress indicator
+      - Install button appears after download completes
+      - Restart and apply update
+      - Update check in settings (manual trigger)
+    </update_system>
+
+    <notifications_toasts>
+      - Desktop notifications for agent events (via Electron Notification API)
+      - In-app toast notifications (sonner) for quick feedback
+      - Agent completed notification
+      - Merge ready notification
+      - Error/failure notification
+      - Health alert notifications (stalled/zombie agents)
+      - Notification preferences (toggle per event type)
+      - Notification history/log
+    </notifications_toasts>
+
+    <task_issue_tracking>
+      - Built-in task board UI (kanban-style or list view)
+      - Create issues with title, type, priority, description
+      - View issue details
+      - List issues with filtering (status, priority, type)
+      - Find available/unblocked work (ready queue)
+      - Claim issues (update status to in_progress)
+      - Close issues with summary/reason
+      - Issue dependency management (blocks, blocked by)
+      - Sync task state with git
+      - Issue-to-agent mapping (which agent is working on which issue)
+    </task_issue_tracking>
+
+    <expertise_management_mulch>
+      - View expertise records by domain
+      - Record new expertise (convention, pattern, failure, decision, reference, guide)
+      - Classification system (foundational, tactical, observational)
+      - Search expertise across all domains
+      - Domain-scoped context loading (prime specific domains)
+      - File-scoped expertise queries
+      - Domain health dashboard (entry counts, staleness)
+      - Expertise timeline (when insights were recorded, by which agent)
+    </expertise_management_mulch>
+
+    <codebase_discovery>
+      - Brownfield discovery mode UI (explore existing codebase before building)
+      - Category selection (architecture, dependencies, testing, APIs, config, implicit conventions)
+      - Discovery progress tracking (6 scout categories)
+      - Discovery results viewer (findings per category)
+      - Auto-generate mulch expertise records from discovery
+      - Skip categories option
+    </codebase_discovery>
+
+    <guard_rules_tool_enforcement>
+      - Per-capability tool allowlists configuration
+      - Bash pattern restriction rules
+      - Path boundary enforcement rules
+      - File scope enforcement per builder
+      - Guard rule violation logging and alerting
+      - Guard rule editor UI (add/edit/delete rules)
+      - Guard rule preview (see what an agent can/cannot do)
+      - Default guard rules per capability type (scout=read-only, builder=scoped write, etc.)
+    </guard_rules_tool_enforcement>
+
+    <run_management>
+      - Start new run (coordinator session grouping)
+      - View active run status (agents, duration, progress)
+      - List run history with timestamps and agent counts
+      - View run details (which agents, which tasks, outcome)
+      - Mark run as completed
+      - Filter events/mail/merges by run ID
+      - Current run indicator in status bar
+    </run_management>
+
+    <agent_identity_cvs>
+      - Persistent agent identity across sessions (name, capability, expertise domains)
+      - Session history per agent (tasks completed, duration, outcomes)
+      - Agent expertise domain tracking (what they've learned)
+      - Agent CV viewer (identity.yaml rendered as profile card)
+      - Agent performance history (success rate, average duration)
+      - Identity creation on first spawn, persistence across sessions
+    </agent_identity_cvs>
+
+    <token_usage_metrics>
+      - Token usage tracking per agent session (input, output, cache read, cache creation)
+      - Token usage per model breakdown
+      - Session duration tracking
+      - Per-capability aggregation (how much do scouts vs builders use?)
+      - Per-run aggregation (total tokens for a run)
+      - Metrics dashboard with summary statistics
+      - Historical metrics viewer
+      - Export metrics data
+    </token_usage_metrics>
+
+    <prompt_management_canopy>
+      - List all prompts with inheritance tree
+      - Render/preview prompts (resolve inheritance chain)
+      - Edit prompts with versioning
+      - Emit rendered prompts to files
+      - Prompt sync with git
+      - Profile support (named prompt profiles for different deployment contexts)
+      - Prompt diff viewer (compare versions)
+    </prompt_management_canopy>
+
+    <watchdog_system_3tier>
+      - Tier 0: Mechanical process daemon (configurable interval, default 30s)
+      - Tier 0: Process liveness checks (PID alive, node-pty process running)
+      - Tier 0: Progressive nudging (4 levels: warn, nudge, escalate, terminate)
+      - Tier 1: AI-assisted failure triage (Claude classifies errors as retry/terminate/extend)
+      - Tier 1: Last N lines analysis of agent output for failure classification
+      - Tier 1: Triage timeout handling (default 30s, fallback to "extend")
+      - Tier 2: Monitor agent continuous patrol (long-running sentinel)
+      - Health state machine (booting -> working -> stalled -> zombie)
+      - Configurable stale threshold (default 5 min) and zombie threshold (default 15 min)
+      - Watchdog status display in UI
+    </watchdog_system_3tier>
+
+    <quality_gate_system>
+      - Configurable quality gates per project (test command, lint command, typecheck command)
+      - Default gates (test, lint, typecheck)
+      - Gate enforcement per agent type (builders must pass before worker_done)
+      - Gate execution results display
+      - Gate blocking task completion on failure
+      - Gate configuration editor in settings
+      - Gate status per agent (which gates passed/failed)
+    </quality_gate_system>
+
+    <hook_system_ui>
+      - View deployed hooks (SessionStart, UserPromptSubmit, PreToolUse)
+      - Hook status display (installed/not installed per project)
+      - Deploy hooks to worktrees
+      - Hook configuration editor
+      - Hook event log viewer
+      - Uninstall/reinstall hooks
+    </hook_system_ui>
+
+    <nuclear_cleanup>
+      - Granular cleanup controls UI
+      - Wipe mail database
+      - Wipe sessions database
+      - Wipe metrics database
+      - Clean all worktrees (with force option for unmerged branches)
+    </nuclear_cleanup>
+
+    <doctor_system>
+      - Dependencies check (Node.js, Claude CLI, git versions)
+      - Config validation (.overstory/config.yaml structure and values)
+      - Directory structure check (.overstory/ required files)
+      - Database integrity checks (mail.db, sessions.db, events.db, metrics.db)
+      - Consistency check (agents, sessions, worktrees in sync)
+      - Agent health check (identity files, checksums)
+      - Merge queue state check (pending entries, branch existence)
+      - Log directory structure check
+      - Version check (app version, CLI version)
+      - Ecosystem tool check (mulch, seeds, canopy availability)
+      - Provider/runtime check (Claude CLI reachable, auth valid)
+      - Auto-fix option for fixable issues
+    </doctor_system>
+
+    <multi_runtime_abstraction>
+      - Runtime registry with adapter interface
+      - Claude Code adapter (primary, stable)
+      - Architecture supports future runtimes (Pi, Codex, Gemini, Cursor, Sapling, OpenCode, Copilot)
+      - Model resolution chain (explicit flag > capability config > runtime default)
+      - Runtime-specific config deployment
+      - Runtime-specific readiness detection
+      - Runtime-specific transcript parsing
+      - Runtime selector in agent spawn dialog (default: Claude, extensible)
+    </multi_runtime_abstraction>
+
+    <file_scope_enforcement_ui>
+      - Visual file tree with scope assignment (checkbox per file/folder)
+      - Overlap detection (warn when two builders own same file)
+      - Scope visualization on project tree (color-coded by agent)
+      - Scope summary per agent (list of owned files)
+      - Scope conflict resolution UI
+      - Scope templates (save/load common scope patterns)
+    </file_scope_enforcement_ui>
+
+    <operator_messages>
+      - Send fire-and-forget dispatch messages to coordinator
+      - Send synchronous ask/reply to coordinator with correlationId
+      - Reply timeout configuration (default 120s)
+      - Operator message history
+      - Coordinator response display
+    </operator_messages>
+
+    <ui_tooltips>
+      - Hover info on status indicators
+      - Truncated text expansion on hover
+      - Icon tooltips throughout the app
+      - Agent state explanations on hover
+      - Timestamp tooltips (relative -> absolute on hover)
+    </ui_tooltips>
+
+    <ui_context_menus>
+      - Right-click on agents (stop, nudge, inspect, copy ID)
+      - Right-click on messages (reply, mark read, copy content)
+      - Right-click on worktrees (open in VS Code, open in explorer, clean up)
+      - Right-click on terminal (copy selection, clear, scroll to bottom)
+      - Right-click on log entries (copy, filter by level, filter by agent)
+    </ui_context_menus>
+
+    <ui_loading_skeleton_states>
+      - Skeleton screens for agent list loading
+      - Skeleton screens for mail inbox loading
+      - Spinner for agent spawn in progress
+      - Progress bars for merge processing and discovery scanning
+    </ui_loading_skeleton_states>
+
+    <ui_empty_states>
+      - No agents running empty state with call-to-action
+      - No mail messages empty state
+      - No projects configured empty state
+      - No log entries empty state
+    </ui_empty_states>
+
+    <ui_error_boundaries>
+      - React error boundary wrapping major sections
+      - Graceful error screens with retry buttons
+      - Fallback UI when components crash
+      - Error reporting with copy-to-clipboard for bug reports
+    </ui_error_boundaries>
+
+    <ui_sidebar_collapse>
+      - Toggle sidebar collapse/expand
+      - Mini-icon mode when collapsed
+      - Remember collapse state across sessions
+    </ui_sidebar_collapse>
+
+    <ui_tabbed_detail_views>
+      - Agent detail: Terminal tab
+      - Agent detail: Logs tab
+      - Agent detail: Identity/CV tab
+      - Agent detail: Files Changed tab
+      - Agent detail: Mail tab
+    </ui_tabbed_detail_views>
+
+    <ui_copy_to_clipboard>
+      - One-click copy agent IDs
+      - One-click copy branch names
+      - One-click copy error messages
+    </ui_copy_to_clipboard>
+
+    <ui_autoscroll_scroll_controls>
+      - Terminal auto-scroll with scroll-lock toggle
+      - Scroll-to-bottom floating button
+      - Infinite scroll for log entries
+      - Virtualized scrolling for performance
+    </ui_autoscroll_scroll_controls>
+
+    <ui_agent_hierarchy_tree>
+      - Visual tree/graph rendering (coordinator -> leads -> workers)
+      - Status colors per node (green=working, yellow=stalled, red=zombie, gray=completed)
+      - Live connection lines between parent and children
+      - Click node to navigate to agent detail
+    </ui_agent_hierarchy_tree>
+
+    <ui_progress_indicators>
+      - Per-agent progress estimation
+      - Per-run completion percentage
+      - Overall batch progress bar
+      - Task group progress indicators
+    </ui_progress_indicators>
+
+    <ui_virtualized_lists>
+      - Virtualized agent list for large fleets
+      - Virtualized log viewer for thousands of entries
+      - Virtualized mail list for high-volume messaging
+    </ui_virtualized_lists>
+
+    <ui_confirmation_dialogs>
+      - Styled modal for stop all agents
+      - Styled modal for nuclear cleanup
+      - Styled modal for delete project
+    </ui_confirmation_dialogs>
+
+    <ui_form_validation>
+      - Inline Zod validation on agent spawn form
+      - Inline Zod validation on settings forms
+      - Inline Zod validation on profile creation
+    </ui_form_validation>
+
+    <ui_badges_indicators>
+      - Unread mail count badge on sidebar
+      - Activity pulse animation on running agents
+      - Warning icon on stalled agents
+      - Error icon on zombie agents
+    </ui_badges_indicators>
+
+    <ui_page_transitions>
+      - Framer Motion page transitions between views
+      - Panel slide-in animations
+      - Card entrance animations
+    </ui_page_transitions>
+
+    <ui_onboarding_tour>
+      - First-time guided tooltip: sidebar navigation
+      - First-time guided tooltip: agent spawning
+      - First-time guided tooltip: mail checking
+      - First-time guided tooltip: merge workflow
+    </ui_onboarding_tour>
+  </core_features>
+
+  <database_schema>
+    <tables>
+      <sessions>
+        - id (TEXT PRIMARY KEY), run_id, agent_name, capability, state (booting|working|completed|stalled|zombie)
+        - pid, worktree_path, branch_name, task_id, parent_agent, depth
+        - tmux_session (legacy, unused in Electron), transcript_path, prompt_version
+        - escalation_level, stalled_at, created_at, updated_at, completed_at
+      </sessions>
+
+      <runs>
+        - id (TEXT PRIMARY KEY), status (active|completed|failed)
+        - coordinator_session_id, agent_count
+        - started_at, completed_at
+      </runs>
+
+      <messages>
+        - id (TEXT PRIMARY KEY), thread_id, from_agent, to_agent
+        - subject, body, type (status|question|result|error|worker_done|merge_ready|merged|merge_failed|escalation|health_check|dispatch|assign)
+        - priority (low|normal|high|urgent), payload (JSON), read (INTEGER)
+        - created_at
+      </messages>
+
+      <events>
+        - id (TEXT PRIMARY KEY), run_id, agent_name, session_id
+        - event_type (tool_start|tool_end|session_start|session_end|mail_sent|mail_received|spawn|error|custom)
+        - tool_name, tool_args, tool_duration_ms, level (debug|info|warn|error)
+        - data (JSON), created_at
+      </events>
+
+      <metrics>
+        - id (TEXT PRIMARY KEY), agent_name, task_id, capability
+        - input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens
+        - model_used, estimated_cost, duration_ms
+        - parent_agent, run_id
+        - started_at, completed_at
+      </metrics>
+
+      <merge_queue>
+        - id (INTEGER PRIMARY KEY AUTOINCREMENT), branch_name, task_id, agent_name
+        - files_modified (JSON), status (pending|merging|merged|conflict|failed)
+        - resolved_tier (clean-merge|auto-resolve|ai-resolve|reimagine)
+        - enqueued_at
+      </merge_queue>
+
+      <task_groups>
+        - id (TEXT PRIMARY KEY), name, member_issues (JSON)
+        - status (active|completed), created_at, closed_at
+      </task_groups>
+
+      <agent_identities>
+        - name (TEXT PRIMARY KEY), capability
+        - sessions_completed, expertise_domains (JSON), recent_tasks (JSON)
+        - created_at, updated_at
+      </agent_identities>
+
+      <checkpoints>
+        - agent_name (TEXT PRIMARY KEY), task_id, session_id
+        - progress_summary, files_modified (JSON), current_branch
+        - pending_work (JSON), mulch_domains (JSON)
+        - timestamp
+      </checkpoints>
+
+      <app_settings>
+        - key (TEXT PRIMARY KEY), value (JSON)
+      </app_settings>
+    </tables>
+  </database_schema>
+
+  <ipc_channels>
+    <agent_channels>
+      - agent:spawn (spawn new agent with options)
+      - agent:stop (stop agent by name)
+      - agent:stop-all (stop all running agents)
+      - agent:nudge (send nudge to agent)
+      - agent:list (get all agents with status)
+      - agent:detail (get detailed agent info)
+      - agent:terminal-data (stream terminal output to renderer)
+      - agent:terminal-input (send input to agent terminal)
+    </agent_channels>
+    <mail_channels>
+      - mail:send (send message)
+      - mail:check (check unread)
+      - mail:list (list with filters)
+      - mail:read (mark as read)
+      - mail:reply (reply to message)
+      - mail:purge (cleanup messages)
+    </mail_channels>
+    <merge_channels>
+      - merge:enqueue (add branch to merge queue)
+      - merge:execute (run merge operation)
+      - merge:preview (dry-run merge)
+      - merge:history (get merge log)
+    </merge_channels>
+    <project_channels>
+      - project:open (open project directory)
+      - project:list (list recent projects)
+      - project:init (initialize .overstory/)
+      - project:config (read/write config)
+    </project_channels>
+    <claude_channels>
+      - claude:status (check CLI install + auth)
+      - claude:detect (find binary path)
+    </claude_channels>
+    <system_channels>
+      - update:check (check for updates)
+      - update:download (download update)
+      - update:install (install and restart)
+      - doctor:run (run health checks)
+      - cleanup:execute (nuclear cleanup)
+    </system_channels>
+  </ipc_channels>
+
+  <ui_layout>
+    <main_structure>
+      Sidebar (collapsible, left) + Main Content Area (right) + Status Bar (bottom)
+      - Sidebar: Navigation icons with labels, collapsible to mini-icon mode
+      - Main: Resizable panels (react-resizable-panels) for split views
+      - Status Bar: Project name, agent count, CLI status, run ID
+    </main_structure>
+    <pages>
+      - Dashboard (agent overview, hierarchy tree, run status)
+      - Agents (list view, spawn dialog, detail view with tabs)
+      - Mail (inbox, outbox, compose, thread view)
+      - Merge (queue view, diff reviewer, history)
+      - Tasks (kanban/list view, issue detail, dependency graph)
+      - Discovery (category picker, progress, results)
+      - Expertise (domain browser, record viewer, search)
+      - Prompts (prompt list, editor, preview)
+      - Metrics (token usage dashboard, agent performance)
+      - Debug (terminal, log viewer, event timeline, error aggregation)
+      - Doctor (health check results, auto-fix)
+      - Settings (general, profiles, quality gates, guard rules, hooks, about/update)
+    </pages>
+  </ui_layout>
+
+  <design_system>
+    <color_palette>
+      - Dark background: slate-900/950
+      - Card/panel backgrounds: slate-800/850
+      - Borders: slate-700
+      - Text primary: slate-50
+      - Text secondary: slate-400
+      - Accent: blue-500 (primary actions)
+      - Success: emerald-500 (completed, passing)
+      - Warning: amber-500 (stalled, attention needed)
+      - Error: red-500 (zombie, failed, errors)
+      - Info: sky-500 (booting, loading)
+      - Agent capability colors: scout=purple, builder=blue, reviewer=cyan, lead=amber, merger=emerald, coordinator=rose, monitor=teal
+    </color_palette>
+    <typography>
+      - UI font: System font stack (Inter if available)
+      - Monospace: JetBrains Mono / Fira Code (terminals, code, IDs)
+      - Font sizes: Tailwind v4 default scale
+    </typography>
+    <animations>
+      - Page transitions: Framer Motion fade + slide (150ms)
+      - Panel expand/collapse: spring animation
+      - Agent status pulse: CSS animation (working=green pulse, stalled=amber pulse)
+      - Toast enter/exit: sonner defaults
+      - Card hover: subtle scale + shadow lift
+    </animations>
+  </design_system>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Project Foundation</title>
+      <tasks>
+        - Initialize Electron + Vite + React + TypeScript project
+        - Configure Tailwind CSS v4
+        - Set up Biome for linting/formatting
+        - Configure electron-builder with NSIS installer
+        - Set up project directory structure (main, renderer, preload, shared)
+        - Configure secure IPC with context bridge
+      </tasks>
+    </step>
+    <step number="2">
+      <title>Data Layer</title>
+      <tasks>
+        - Set up better-sqlite3 with WAL mode
+        - Define drizzle-orm schema for all tables
+        - Create database migrations
+        - Implement Electron Store for app settings
+        - Set up Zod schemas for all data types
+      </tasks>
+    </step>
+    <step number="3">
+      <title>Core Shell & Navigation</title>
+      <tasks>
+        - Build app shell with sidebar, main area, status bar
+        - Implement TanStack Router with all page routes
+        - Build dark theme with Tailwind v4 + Shadcn/ui
+        - Implement sidebar collapse with state persistence
+        - Build system tray integration
+        - Implement window state persistence
+        - Build splash screen
+      </tasks>
+    </step>
+    <step number="4">
+      <title>Claude CLI Integration</title>
+      <tasks>
+        - Implement binary detection (PATH + fallback paths)
+        - Implement auth status checking
+        - Build setup wizard for first-launch onboarding
+        - Implement node-pty process spawning (replaces tmux)
+        - Build stream-json output parser
+        - Implement environment variable management
+      </tasks>
+    </step>
+    <step number="5">
+      <title>Agent Management</title>
+      <tasks>
+        - Build agent spawn system with node-pty
+        - Implement agent state machine (booting -> working -> completed/stalled/zombie)
+        - Build agent list with @tanstack/react-table
+        - Build agent detail view with tabbed layout
+        - Implement xterm.js terminal per agent
+        - Build agent hierarchy tree visualization
+        - Implement stop, nudge, bulk operations
+      </tasks>
+    </step>
+    <step number="6">
+      <title>Messaging System</title>
+      <tasks>
+        - Implement SQLite mail store with typed protocol messages
+        - Build mail inbox/outbox UI
+        - Implement group broadcast resolution
+        - Build real-time event feed
+        - Implement mail check with agent context injection
+      </tasks>
+    </step>
+    <step number="7">
+      <title>Merge System</title>
+      <tasks>
+        - Implement FIFO merge queue
+        - Build diff viewer with diff2html
+        - Implement 4-tier conflict resolution
+        - Build approve/reject per-file UI
+        - Implement merge history and rollback
+      </tasks>
+    </step>
+    <step number="8">
+      <title>Worktree & Git Management</title>
+      <tasks>
+        - Implement worktree creation/cleanup with simple-git
+        - Build visual worktree manager
+        - Implement branch management
+        - Build file scope assignment UI
+      </tasks>
+    </step>
+    <step number="9">
+      <title>Orchestration Features</title>
+      <tasks>
+        - Implement coordinator agent lifecycle
+        - Build task groups UI
+        - Implement run management
+        - Build operator message system
+        - Implement watchdog 3-tier system
+      </tasks>
+    </step>
+    <step number="10">
+      <title>Observability & Debug</title>
+      <tasks>
+        - Build debug terminal
+        - Implement event store and viewers
+        - Build timeline/trace view
+        - Implement error aggregation
+        - Build doctor health check system
+      </tasks>
+    </step>
+    <step number="11">
+      <title>Advanced Features</title>
+      <tasks>
+        - Implement task/issue tracking UI
+        - Build expertise management (mulch integration)
+        - Implement codebase discovery mode
+        - Build prompt management (canopy integration)
+        - Implement token/usage metrics
+        - Build guard rules and hook system UI
+      </tasks>
+    </step>
+    <step number="12">
+      <title>Settings, Profiles & Quality Gates</title>
+      <tasks>
+        - Build settings pages with all configuration options
+        - Implement named profiles system
+        - Build quality gate configuration
+        - Implement keyboard shortcut customization
+      </tasks>
+    </step>
+    <step number="13">
+      <title>UI Polish & UX</title>
+      <tasks>
+        - Add Framer Motion page transitions and animations
+        - Implement loading skeletons and empty states
+        - Build error boundaries
+        - Add tooltips, context menus, badges
+        - Implement command palette (cmdk)
+        - Build onboarding tour
+        - Add virtualized lists for performance
+        - Implement copy-to-clipboard throughout
+      </tasks>
+    </step>
+    <step number="14">
+      <title>Updates, Packaging & Distribution</title>
+      <tasks>
+        - Implement auto-update system (GitHub Releases check, silent download, install)
+        - Build changelog viewer
+        - Configure electron-builder for Windows/macOS/Linux
+        - Create NSIS installer with wizard
+        - Set up GitHub Releases workflow
+        - Implement session recovery and checkpoint system
+      </tasks>
+    </step>
+    <step number="15">
+      <title>Documentation & Open Source</title>
+      <tasks>
+        - Write comprehensive README
+        - Create contribution guide (CONTRIBUTING.md)
+        - Write architecture documentation
+        - Create issue templates
+        - Set up CI/CD with GitHub Actions
+        - Write user documentation / getting started guide
+      </tasks>
+    </step>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - All 366 features working and stable
+      - Full Overstory feature parity in desktop GUI form
+      - No tmux dependency (node-pty handles all process management)
+      - Claude Code CLI auth works seamlessly (detect, verify, spawn)
+      - Multi-project support with independent state per project
+      - All SQLite databases using WAL mode for concurrent access
+      - Agent hierarchy enforced (configurable max depth)
+      - Merge system handles all 4 resolution tiers
+      - Watchdog system detects and handles stalled/zombie agents
+    </functionality>
+    <user_experience>
+      - Polished dark-only UI with consistent design language
+      - Smooth Framer Motion animations and transitions
+      - Responsive panels with drag-to-resize
+      - Command palette for power users (Ctrl+K)
+      - Context menus, tooltips, and keyboard shortcuts throughout
+      - Onboarding tour for first-time users
+      - Empty states with clear calls-to-action
+      - Loading skeletons that prevent layout shift
+      - Toast notifications for all significant events
+      - Desktop notifications for background events
+    </user_experience>
+    <technical_quality>
+      - TypeScript strict mode with no any types
+      - Biome passing (lint + format)
+      - Secure IPC (context bridge, no nodeIntegration in renderer)
+      - Graceful error handling with error boundaries
+      - Virtualized lists for performance with large datasets
+      - tree-kill for proper process cleanup
+      - graceful-fs to prevent EMFILE errors
+      - WAL mode on all SQLite databases for concurrent agent access
+    </technical_quality>
+    <distribution>
+      - Windows installer (NSIS) with install wizard
+      - macOS .dmg package
+      - Linux .AppImage / .deb packages
+      - Auto-update via GitHub Releases (silent download, user-triggered install)
+      - Changelog viewer integrated into update flow
+      - README, CONTRIBUTING.md, architecture docs
+      - GitHub Actions CI/CD pipeline
+      - Issue templates for bug reports and feature requests
+    </distribution>
+  </success_criteria>
+</project_specification>

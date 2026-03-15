@@ -1,0 +1,198 @@
+// Agent capability types
+export type AgentCapability = 'scout' | 'builder' | 'reviewer' | 'lead' | 'merger' | 'coordinator' | 'monitor';
+
+// Agent state machine
+export type AgentState = 'booting' | 'working' | 'completed' | 'stalled' | 'zombie';
+
+// Message types
+export type MessageType =
+  | 'status'
+  | 'question'
+  | 'result'
+  | 'error'
+  | 'worker_done'
+  | 'merge_ready'
+  | 'merged'
+  | 'merge_failed'
+  | 'escalation'
+  | 'health_check'
+  | 'dispatch'
+  | 'assign';
+
+export type MessagePriority = 'low' | 'normal' | 'high' | 'urgent';
+
+// Merge statuses
+export type MergeStatus = 'pending' | 'merging' | 'merged' | 'conflict' | 'failed';
+export type MergeResolutionTier = 'clean-merge' | 'auto-resolve' | 'ai-resolve' | 'reimagine';
+
+// Run status
+export type RunStatus = 'active' | 'completed' | 'failed';
+
+// Event types
+export type EventType =
+  | 'tool_start'
+  | 'tool_end'
+  | 'session_start'
+  | 'session_end'
+  | 'mail_sent'
+  | 'mail_received'
+  | 'spawn'
+  | 'error'
+  | 'custom';
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+// Database record types
+export interface Session {
+  id: string;
+  run_id: string | null;
+  agent_name: string;
+  capability: AgentCapability;
+  state: AgentState;
+  pid: number | null;
+  worktree_path: string | null;
+  branch_name: string | null;
+  task_id: string | null;
+  parent_agent: string | null;
+  depth: number;
+  transcript_path: string | null;
+  prompt_version: string | null;
+  escalation_level: number;
+  stalled_at: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface Run {
+  id: string;
+  status: RunStatus;
+  coordinator_session_id: string | null;
+  agent_count: number;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface Message {
+  id: string;
+  thread_id: string | null;
+  from_agent: string;
+  to_agent: string;
+  subject: string | null;
+  body: string | null;
+  type: MessageType;
+  priority: MessagePriority;
+  payload: string | null;
+  read: number;
+  created_at: string;
+}
+
+export interface Event {
+  id: string;
+  run_id: string | null;
+  agent_name: string | null;
+  session_id: string | null;
+  event_type: EventType;
+  tool_name: string | null;
+  tool_args: string | null;
+  tool_duration_ms: number | null;
+  level: LogLevel;
+  data: string | null;
+  created_at: string;
+}
+
+export interface Metric {
+  id: string;
+  agent_name: string | null;
+  task_id: string | null;
+  capability: AgentCapability | null;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  model_used: string | null;
+  estimated_cost: number;
+  duration_ms: number;
+  parent_agent: string | null;
+  run_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface MergeQueueEntry {
+  id: number;
+  branch_name: string;
+  task_id: string | null;
+  agent_name: string | null;
+  files_modified: string | null;
+  status: MergeStatus;
+  resolved_tier: MergeResolutionTier | null;
+  enqueued_at: string;
+}
+
+export interface TaskGroup {
+  id: string;
+  name: string;
+  member_issues: string | null;
+  status: 'active' | 'completed';
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface AgentIdentity {
+  name: string;
+  capability: AgentCapability | null;
+  sessions_completed: number;
+  expertise_domains: string | null;
+  recent_tasks: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Checkpoint {
+  agent_name: string;
+  task_id: string | null;
+  session_id: string | null;
+  progress_summary: string | null;
+  files_modified: string | null;
+  current_branch: string | null;
+  pending_work: string | null;
+  mulch_domains: string | null;
+  timestamp: string;
+}
+
+// Electron API type for renderer process
+export interface ElectronAPI {
+  healthCheck: () => Promise<{ status: string; database: string }>;
+  agentList: () => Promise<{ data: Session[] | null; error: string | null }>;
+  agentDetail: (id: string) => Promise<{ data: Session | null; error: string | null }>;
+  agentSpawn: (options: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>;
+  agentStop: (name: string) => Promise<{ data: unknown; error: string | null }>;
+  agentStopAll: () => Promise<{ data: unknown; error: string | null }>;
+  agentNudge: (name: string) => Promise<{ data: unknown; error: string | null }>;
+  mailList: (filters?: Record<string, unknown>) => Promise<{ data: Message[] | null; error: string | null }>;
+  mailUnreadCount: () => Promise<{ data: number; error: string | null }>;
+  mailSend: (message: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>;
+  mailMarkRead: (id: string) => Promise<{ data: unknown; error: string | null }>;
+  mailPurge: (options?: Record<string, unknown>) => Promise<{ data: unknown; error: string | null }>;
+  mergeQueue: () => Promise<{ data: MergeQueueEntry[] | null; error: string | null }>;
+  mergeExecute: (id: number) => Promise<{ data: unknown; error: string | null }>;
+  mergePreview: (id: number) => Promise<{ data: unknown; error: string | null }>;
+  mergeHistory: () => Promise<{ data: unknown; error: string | null }>;
+  settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
+  settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
+  claudeStatus: () => Promise<{ data: unknown; error: string | null }>;
+  claudeDetect: () => Promise<{ data: unknown; error: string | null }>;
+  updateCheck: () => Promise<{ data: unknown; error: string | null }>;
+  doctorRun: () => Promise<{ data: unknown; error: string | null }>;
+  onAgentUpdate: (callback: (data: unknown) => void) => void;
+  onMailReceived: (callback: (data: unknown) => void) => void;
+  onMergeUpdate: (callback: (data: unknown) => void) => void;
+  removeAllListeners: (channel: string) => void;
+}
+
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}
