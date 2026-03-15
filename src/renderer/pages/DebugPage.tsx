@@ -2,12 +2,14 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FiActivity,
   FiAlertTriangle,
   FiBarChart2,
   FiCalendar,
+  FiChevronDown,
+  FiChevronRight,
   FiClock,
   FiFileText,
   FiFilter,
@@ -26,7 +28,7 @@ import {
 } from 'react-icons/fi';
 import type { AppLogEntry, Event, LogLevel, ToolStats } from '../../shared/types';
 
-type DebugTab = 'terminal' | 'events' | 'tool-stats' | 'logs';
+type DebugTab = 'terminal' | 'events' | 'tool-stats' | 'logs' | 'timeline' | 'errors';
 
 export function DebugPage() {
   const [activeTab, setActiveTab] = useState<DebugTab>('terminal');
@@ -90,6 +92,30 @@ export function DebugPage() {
           <FiActivity className="h-4 w-4" />
           Event Log
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('timeline')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'timeline'
+              ? 'bg-slate-700 text-cyan-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <FiClock className="h-4 w-4" />
+          Timeline
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('errors')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'errors'
+              ? 'bg-slate-700 text-red-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <FiAlertTriangle className="h-4 w-4" />
+          Errors
+        </button>
       </div>
 
       {activeTab === 'terminal' ? (
@@ -98,6 +124,10 @@ export function DebugPage() {
         <AppLogPanel />
       ) : activeTab === 'tool-stats' ? (
         <ToolStatsPanel />
+      ) : activeTab === 'timeline' ? (
+        <TimelinePanel />
+      ) : activeTab === 'errors' ? (
+        <ErrorAggregationPanel />
       ) : (
         <EventLogPanel />
       )}
@@ -1188,6 +1218,575 @@ function EventTypeBadge({ eventType }: { eventType: string }) {
     >
       {eventType}
     </span>
+  );
+}
+
+// ── Timeline Panel (Feature #126) ──────────────────────────────────
+
+interface TimelineEntry {
+  event: Event;
+  paired?: Event; // tool_start paired with tool_end
+}
+
+function TimelinePanel() {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedAgent, setSelectedAgent] = useState<string>('');
+  const [agents, setAgents] = useState<string[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const loadEvents = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const filters: { agentName?: string; limit?: number } = { limit: 500 };
+      if (selectedAgent) {
+        filters.agentName = selectedAgent;
+      }
+      const result = await window.electronAPI.eventList(filters);
+      if (result.data) {
+        // Reverse to show chronologically (oldest first)
+        setEvents([...result.data].reverse());
+      }
+    } catch (error) {
+      console.error('Failed to load timeline events:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedAgent]);
+
+  // Load unique agent names
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const result = await window.electronAPI.eventList({ limit: 1000 });
+        if (result.data) {
+          const uniqueAgents = [
+            ...new Set(result.data.map((e: Event) => e.agent_name).filter(Boolean)),
+          ] as string[];
+          setAgents(uniqueAgents.sort());
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadAgents();
+  }, []);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  // Correlate tool_start and tool_end events
+  const timelineEntries = useMemo(() => {
+    const entries: TimelineEntry[] = [];
+    const startMap = new Map<string, Event>();
+
+    for (const event of events) {
+      if (event.event_type === 'tool_start' && event.tool_name && event.session_id) {
+        const key = `${event.session_id}:${event.tool_name}:${event.agent_name ?? ''}`;
+        startMap.set(key, event);
+        entries.push({ event });
+      } else if (event.event_type === 'tool_end' && event.tool_name && event.session_id) {
+        const key = `${event.session_id}:${event.tool_name}:${event.agent_name ?? ''}`;
+        const startEvent = startMap.get(key);
+        if (startEvent) {
+          // Find the corresponding start entry and attach the paired end
+          const startEntry = entries.find((e) => e.event.id === startEvent.id);
+          if (startEntry) {
+            startEntry.paired = event;
+          }
+          startMap.delete(key);
+        }
+        entries.push({ event });
+      } else {
+        entries.push({ event });
+      }
+    }
+
+    return entries;
+  }, [events]);
+
+  const getTimelineColor = (eventType: string): string => {
+    switch (eventType) {
+      case 'tool_start':
+        return 'border-blue-500 bg-blue-500';
+      case 'tool_end':
+        return 'border-green-500 bg-green-500';
+      case 'session_start':
+        return 'border-emerald-500 bg-emerald-500';
+      case 'session_end':
+        return 'border-amber-500 bg-amber-500';
+      case 'mail_sent':
+        return 'border-purple-500 bg-purple-500';
+      case 'mail_received':
+        return 'border-violet-500 bg-violet-500';
+      case 'spawn':
+        return 'border-cyan-500 bg-cyan-500';
+      case 'error':
+        return 'border-red-500 bg-red-500';
+      default:
+        return 'border-slate-500 bg-slate-500';
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FiFilter className="h-4 w-4 text-slate-400" />
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
+          >
+            <option value="">All Agents</option>
+            {agents.map((agent) => (
+              <option key={agent} value={agent}>
+                {agent}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-slate-400">{events.length} events</span>
+        </div>
+        <button
+          type="button"
+          onClick={loadEvents}
+          className="flex items-center gap-2 rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-600 transition-colors"
+        >
+          <FiRefreshCw className="h-3.5 w-3.5" />
+          Refresh
+        </button>
+      </div>
+
+      {/* Timeline */}
+      {isLoading ? (
+        <EventLogSkeleton />
+      ) : events.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+          <FiClock className="mb-3 h-12 w-12" />
+          <p className="text-lg font-medium">No timeline events</p>
+          <p className="mt-1 text-sm">
+            {selectedAgent
+              ? `No events recorded for agent "${selectedAgent}"`
+              : 'Events will appear here as agents perform actions'}
+          </p>
+        </div>
+      ) : (
+        <div className="relative ml-4">
+          {/* Vertical timeline line */}
+          <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-700" />
+
+          <div className="space-y-1">
+            {timelineEntries.map((entry) => {
+              const { event, paired } = entry;
+              const isExpanded = expandedId === event.id;
+              const dotColor = getTimelineColor(event.event_type);
+
+              return (
+                <div key={event.id} className="relative pl-8">
+                  {/* Timeline dot */}
+                  <div
+                    className={`absolute left-0 top-3 h-4 w-4 rounded-full border-2 ${dotColor}`}
+                  />
+
+                  {/* Event card */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : event.id)}
+                    className="w-full text-left rounded-md border border-slate-700/50 bg-slate-800 px-4 py-2.5 hover:bg-slate-750 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isExpanded ? (
+                        <FiChevronDown className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                      ) : (
+                        <FiChevronRight className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                      )}
+                      <EventTypeBadge eventType={event.event_type} />
+                      {event.agent_name && (
+                        <span className="text-sm font-medium text-slate-300">
+                          {event.agent_name}
+                        </span>
+                      )}
+                      {event.tool_name && (
+                        <span className="rounded bg-slate-700 px-2 py-0.5 font-mono text-xs text-cyan-400">
+                          {event.tool_name}
+                        </span>
+                      )}
+                      {paired &&
+                        event.event_type === 'tool_start' &&
+                        paired.tool_duration_ms != null && (
+                          <span className="rounded bg-green-900/30 px-2 py-0.5 text-xs text-green-400">
+                            ⏱ {formatDuration(paired.tool_duration_ms)}
+                          </span>
+                        )}
+                      {event.tool_duration_ms != null && event.event_type === 'tool_end' && (
+                        <span className="rounded bg-green-900/30 px-2 py-0.5 text-xs text-green-400">
+                          ⏱ {formatDuration(event.tool_duration_ms)}
+                        </span>
+                      )}
+                      <span className="ml-auto text-xs text-slate-500 flex items-center gap-1 flex-shrink-0">
+                        <FiClock className="h-3 w-3" />
+                        {new Date(event.created_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="mt-1 ml-6 rounded-md border border-slate-700/50 bg-slate-850 px-4 py-3 text-xs">
+                      <div className="grid grid-cols-2 gap-2 text-slate-400">
+                        <div>
+                          <span className="text-slate-500">ID:</span> {event.id}
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Session:</span> {event.session_id ?? '—'}
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Run:</span> {event.run_id ?? '—'}
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Level:</span>{' '}
+                          <span className={event.level === 'error' ? 'text-red-400' : ''}>
+                            {event.level}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Timestamp:</span>{' '}
+                          {new Date(event.created_at).toISOString()}
+                        </div>
+                        {event.tool_duration_ms != null && (
+                          <div>
+                            <span className="text-slate-500">Duration:</span>{' '}
+                            {formatDuration(event.tool_duration_ms)}
+                          </div>
+                        )}
+                      </div>
+                      {paired && event.event_type === 'tool_start' && (
+                        <div className="mt-2 rounded bg-green-900/20 border border-green-800/30 p-2">
+                          <span className="text-green-400 font-medium">Correlated tool_end:</span>
+                          <div className="mt-1 text-slate-400">
+                            <span className="text-slate-500">End time:</span>{' '}
+                            {new Date(paired.created_at).toLocaleTimeString()}
+                            {paired.tool_duration_ms != null && (
+                              <span className="ml-3">
+                                <span className="text-slate-500">Duration:</span>{' '}
+                                {formatDuration(paired.tool_duration_ms)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {event.tool_args && (
+                        <div className="mt-2">
+                          <span className="text-slate-500">Tool Args:</span>
+                          <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
+                            {tryFormatJson(event.tool_args)}
+                          </pre>
+                        </div>
+                      )}
+                      {event.data && (
+                        <div className="mt-2">
+                          <span className="text-slate-500">Data:</span>
+                          <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
+                            {tryFormatJson(event.data)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Error Aggregation Panel (Feature #127) ──────────────────────────
+
+interface AgentErrorSummary {
+  agentName: string;
+  errorCount: number;
+  errors: Event[];
+}
+
+function ErrorAggregationPanel() {
+  const [errors, setErrors] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [agentFilter, setAgentFilter] = useState<string>('');
+  const [errorTypeFilter, setErrorTypeFilter] = useState<string>('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const loadErrors = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Fetch error events + also events with level='error'
+      const [errorTypeResult, allResult] = await Promise.all([
+        window.electronAPI.eventList({ eventType: 'error', limit: 500 }),
+        window.electronAPI.eventList({ limit: 1000 }),
+      ]);
+
+      const errorEvents: Event[] = [];
+      const seenIds = new Set<string>();
+
+      // Add events with event_type = 'error'
+      if (errorTypeResult.data) {
+        for (const e of errorTypeResult.data) {
+          if (!seenIds.has(e.id)) {
+            seenIds.add(e.id);
+            errorEvents.push(e);
+          }
+        }
+      }
+
+      // Add events with level = 'error' (from any event type)
+      if (allResult.data) {
+        for (const e of allResult.data) {
+          if (e.level === 'error' && !seenIds.has(e.id)) {
+            seenIds.add(e.id);
+            errorEvents.push(e);
+          }
+        }
+      }
+
+      // Sort by timestamp descending (newest first)
+      errorEvents.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+
+      setErrors(errorEvents);
+    } catch (error) {
+      console.error('Failed to load errors:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadErrors();
+  }, [loadErrors]);
+
+  // Extract unique agent names and error categories
+  const agents = [...new Set(errors.map((e) => e.agent_name).filter(Boolean))] as string[];
+
+  const getErrorCategory = (event: Event): string => {
+    if (event.data) {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed.type) return parsed.type;
+        if (parsed.code) return parsed.code;
+        if (parsed.name) return parsed.name;
+      } catch {
+        // not JSON
+      }
+      // Try to extract error type from the data string
+      const match = event.data.match(/^(\w+Error):/);
+      if (match) return match[1];
+    }
+    if (event.tool_name) return `tool:${event.tool_name}`;
+    return event.event_type;
+  };
+
+  const errorCategories = [...new Set(errors.map(getErrorCategory))].sort();
+
+  // Filter errors
+  const filteredErrors = errors.filter((e) => {
+    if (agentFilter && e.agent_name !== agentFilter) return false;
+    if (errorTypeFilter && getErrorCategory(e) !== errorTypeFilter) return false;
+    return true;
+  });
+
+  // Group by agent for summary
+  const agentSummaries: AgentErrorSummary[] = agents
+    .map((agentName) => {
+      const agentErrors = filteredErrors.filter((e) => e.agent_name === agentName);
+      return { agentName, errorCount: agentErrors.length, errors: agentErrors };
+    })
+    .filter((s) => s.errorCount > 0)
+    .sort((a, b) => b.errorCount - a.errorCount);
+
+  // Errors without an agent
+  const unattributedErrors = filteredErrors.filter((e) => !e.agent_name);
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FiFilter className="h-4 w-4 text-slate-400" />
+          <select
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
+          >
+            <option value="">All Agents</option>
+            {agents.map((agent) => (
+              <option key={agent} value={agent}>
+                {agent}
+              </option>
+            ))}
+          </select>
+          <select
+            value={errorTypeFilter}
+            onChange={(e) => setErrorTypeFilter(e.target.value)}
+            className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
+          >
+            <option value="">All Error Types</option>
+            {errorCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-slate-400">
+            {filteredErrors.length} error{filteredErrors.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={loadErrors}
+          className="flex items-center gap-2 rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-600 transition-colors"
+        >
+          <FiRefreshCw className="h-3.5 w-3.5" />
+          Refresh
+        </button>
+      </div>
+
+      {/* Error count per agent summary */}
+      {!isLoading && filteredErrors.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {agentSummaries.map((summary) => (
+            <button
+              type="button"
+              key={summary.agentName}
+              onClick={() =>
+                setAgentFilter(agentFilter === summary.agentName ? '' : summary.agentName)
+              }
+              className={`rounded-lg border p-3 text-left transition-colors ${
+                agentFilter === summary.agentName
+                  ? 'border-red-500/50 bg-red-900/20'
+                  : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+              }`}
+            >
+              <div className="text-xs text-slate-400 truncate">{summary.agentName}</div>
+              <div className="mt-1 text-lg font-bold text-red-400">{summary.errorCount}</div>
+            </button>
+          ))}
+          {unattributedErrors.length > 0 && (
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
+              <div className="text-xs text-slate-500 italic">Unattributed</div>
+              <div className="mt-1 text-lg font-bold text-amber-400">
+                {unattributedErrors.length}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Error list */}
+      {isLoading ? (
+        <EventLogSkeleton />
+      ) : filteredErrors.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+          <FiAlertTriangle className="mb-3 h-12 w-12" />
+          <p className="text-lg font-medium">No errors found</p>
+          <p className="mt-1 text-sm">
+            {agentFilter || errorTypeFilter
+              ? 'Try adjusting your filters'
+              : 'No error events have been recorded'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {filteredErrors.map((error) => {
+            const isExpanded = expandedId === error.id;
+            const category = getErrorCategory(error);
+
+            return (
+              <div
+                key={error.id}
+                className="rounded-md border border-red-900/30 bg-slate-800 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isExpanded ? null : error.id)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-750 transition-colors"
+                >
+                  {isExpanded ? (
+                    <FiChevronDown className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  ) : (
+                    <FiChevronRight className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  )}
+                  <FiXCircle className="h-3.5 w-3.5 text-red-400 flex-shrink-0" />
+                  <span className="rounded bg-red-900/50 px-2 py-0.5 text-xs font-medium text-red-300">
+                    {category}
+                  </span>
+                  {error.agent_name && (
+                    <span className="text-sm font-medium text-slate-300">{error.agent_name}</span>
+                  )}
+                  {error.tool_name && (
+                    <span className="rounded bg-slate-700 px-2 py-0.5 font-mono text-xs text-cyan-400">
+                      {error.tool_name}
+                    </span>
+                  )}
+                  <span className="ml-auto text-xs text-slate-500 flex items-center gap-1 flex-shrink-0">
+                    <FiClock className="h-3 w-3" />
+                    {new Date(error.created_at).toLocaleTimeString()}
+                  </span>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-slate-700/50 bg-slate-850 px-4 py-3 text-xs">
+                    <div className="grid grid-cols-2 gap-2 text-slate-400">
+                      <div>
+                        <span className="text-slate-500">ID:</span> {error.id}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Agent:</span> {error.agent_name ?? '—'}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Session:</span> {error.session_id ?? '—'}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Event Type:</span> {error.event_type}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Timestamp:</span>{' '}
+                        {new Date(error.created_at).toISOString()}
+                      </div>
+                      {error.tool_name && (
+                        <div>
+                          <span className="text-slate-500">Tool:</span> {error.tool_name}
+                        </div>
+                      )}
+                    </div>
+                    {error.tool_args && (
+                      <div className="mt-2">
+                        <span className="text-slate-500">Tool Args:</span>
+                        <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-300">
+                          {tryFormatJson(error.tool_args)}
+                        </pre>
+                      </div>
+                    )}
+                    {error.data && (
+                      <div className="mt-2">
+                        <span className="text-slate-500">Error Data:</span>
+                        <pre className="mt-1 overflow-x-auto rounded bg-red-950/50 border border-red-900/30 p-2 font-mono text-red-300">
+                          {tryFormatJson(error.data)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
