@@ -147,10 +147,11 @@ export function NotificationsPage() {
 
   // Listen for live notification events to append to the list
   useEffect(() => {
-    window.electronAPI.onNotificationEvent(() => {
+    const unsubNotificationEvent = window.electronAPI.onNotificationEvent(() => {
       // Refresh notifications when a new one arrives
       fetchNotifications();
     });
+    return () => { unsubNotificationEvent(); };
   }, [fetchNotifications]);
 
   const handleClearHistory = async () => {

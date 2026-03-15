@@ -110,12 +110,13 @@ export function AppLayout() {
     titleIntervalRef.current = setInterval(fetchAgentCount, 3000);
 
     // Listen for agent state change events for immediate cascading updates
-    window.electronAPI.onAgentUpdate(() => {
+    const unsubAgentUpdate = window.electronAPI.onAgentUpdate(() => {
       fetchAgentCount();
     });
 
     return () => {
       if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
+      unsubAgentUpdate();
     };
   }, []);
 
@@ -215,7 +216,7 @@ export function AppLayout() {
 
   // Listen for notification events from main process -> show in-app toasts
   useEffect(() => {
-    window.electronAPI.onNotificationEvent((data) => {
+    const unsubNotificationEvent = window.electronAPI.onNotificationEvent((data) => {
       const isError =
         data.eventType === 'agent_error' ||
         data.eventType === 'merge_failed' ||
@@ -249,11 +250,12 @@ export function AppLayout() {
         });
       }
     });
+    return () => { unsubNotificationEvent(); };
   }, []);
 
   // Listen for notification click -> navigate to agent detail
   useEffect(() => {
-    window.electronAPI.onNotificationNavigateToAgent(async (data: { agentName: string }) => {
+    const unsubNavigateToAgent = window.electronAPI.onNotificationNavigateToAgent(async (data: { agentName: string }) => {
       try {
         const result = await window.electronAPI.agentList();
         if (result.data) {
@@ -271,6 +273,7 @@ export function AppLayout() {
         // Silently ignore - best effort navigation
       }
     });
+    return () => { unsubNavigateToAgent(); };
   }, []);
 
   // Refresh data when window becomes visible (after minimize-to-tray and restore)

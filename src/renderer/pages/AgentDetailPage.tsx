@@ -774,7 +774,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     }, 3000);
 
     // Listen for agent state change events for immediate cascading updates
-    window.electronAPI.onAgentUpdate((data: unknown) => {
+    const unsubAgentUpdate = window.electronAPI.onAgentUpdate((data: unknown) => {
       const event = data as { agentId?: string };
       // Refresh when this agent or any parent changes state
       if (!event.agentId || event.agentId === agentId) {
@@ -783,7 +783,10 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       }
     });
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      unsubAgentUpdate();
+    };
   }, [loadSession, loadProcessInfo, agentId]);
 
   // Load associated issues when session is available

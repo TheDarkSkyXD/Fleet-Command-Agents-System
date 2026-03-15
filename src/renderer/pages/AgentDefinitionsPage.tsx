@@ -1324,12 +1324,21 @@ export function AgentDefinitionsPage() {
         }
       }
 
+      // Detect duplicates before import (existing roles that will be overwritten)
+      const existingRoles = new Set(definitions.map((d) => d.role));
+      const newRoles = defs.filter((d) => !existingRoles.has(d.role));
+      const updatedRoles = defs.filter((d) => existingRoles.has(d.role));
+
       const result = await window.electronAPI.agentDefImport(defs);
       if (result.error) {
         setImportStatus(`Import error: ${result.error}`);
       } else {
-        setImportStatus(`Imported ${defs.length} definitions successfully`);
-        toast.success(`Imported ${defs.length} definitions`);
+        const parts: string[] = [];
+        if (newRoles.length > 0) parts.push(`${newRoles.length} new`);
+        if (updatedRoles.length > 0) parts.push(`${updatedRoles.length} updated`);
+        const summary = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+        setImportStatus(`Imported ${defs.length} definitions successfully${summary}`);
+        toast.success(`Imported ${defs.length} definitions${summary}`);
         if (result.data) {
           setDefinitions(result.data);
         }
@@ -1480,11 +1489,13 @@ export function AgentDefinitionsPage() {
             accept=".json"
             onChange={handleImport}
             className="hidden"
+            data-testid="import-file-input"
           />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 transition-colors"
+            data-testid="import-definitions-btn"
           >
             <FiUpload size={14} />
             Import
@@ -1534,6 +1545,14 @@ export function AgentDefinitionsPage() {
               ? 'bg-red-500/10 text-red-400 border border-red-500/30'
               : 'bg-green-500/10 text-green-400 border border-green-500/30'
           }`}
+          data-testid="import-status-message"
+          data-status={
+            importStatus.includes('error') ||
+            importStatus.includes('failed') ||
+            importStatus.includes('Invalid')
+              ? 'error'
+              : 'success'
+          }
         >
           {importStatus}
         </div>

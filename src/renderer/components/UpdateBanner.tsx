@@ -154,7 +154,7 @@ export function UpdateBanner() {
 
   useEffect(() => {
     // Listen for update status events from main process
-    window.electronAPI.onUpdateStatus((data: unknown) => {
+    const unsubStatus = window.electronAPI.onUpdateStatus((data: unknown) => {
       const updateStatus = data as UpdateStatus;
       setStatus(updateStatus);
       if (updateStatus.isDownloading) {
@@ -162,7 +162,7 @@ export function UpdateBanner() {
       }
     });
 
-    window.electronAPI.onUpdateDownloadProgress((data) => {
+    const unsubProgress = window.electronAPI.onUpdateDownloadProgress((data) => {
       setStatus((prev) =>
         prev
           ? {
@@ -177,7 +177,7 @@ export function UpdateBanner() {
       );
     });
 
-    window.electronAPI.onUpdateDownloaded((data) => {
+    const unsubDownloaded = window.electronAPI.onUpdateDownloaded((data) => {
       setDownloaded(true);
       setDownloading(false);
       setStatus((prev) =>
@@ -194,7 +194,7 @@ export function UpdateBanner() {
       );
     });
 
-    window.electronAPI.onUpdateError((data) => {
+    const unsubError = window.electronAPI.onUpdateError((data) => {
       setDownloading(false);
       setInstalling(false);
       setStatus((prev) => (prev ? { ...prev, error: data.message, isDownloading: false } : null));
@@ -210,10 +210,10 @@ export function UpdateBanner() {
     });
 
     return () => {
-      window.electronAPI.removeAllListeners('update:status');
-      window.electronAPI.removeAllListeners('update:download-progress');
-      window.electronAPI.removeAllListeners('update:downloaded');
-      window.electronAPI.removeAllListeners('update:error');
+      unsubStatus();
+      unsubProgress();
+      unsubDownloaded();
+      unsubError();
     };
   }, []);
 

@@ -570,12 +570,15 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     }, 3000);
 
     // Listen for agent state change events for immediate cascading updates
-    window.electronAPI.onAgentUpdate(() => {
+    const unsubAgentUpdate = window.electronAPI.onAgentUpdate(() => {
       loadSessions();
       loadRunningProcesses();
     });
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      unsubAgentUpdate();
+    };
   }, []);
 
   // Update model when capability changes (use settings-based defaults)

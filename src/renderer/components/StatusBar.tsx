@@ -133,9 +133,10 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
 
   // Refresh active run immediately when an agent state changes (stop/spawn)
   useEffect(() => {
-    window.electronAPI.onAgentUpdate(() => {
+    const unsubAgentUpdate = window.electronAPI.onAgentUpdate(() => {
       fetchActiveRun();
     });
+    return () => { unsubAgentUpdate(); };
   }, [fetchActiveRun]);
 
   // Poll run progress when there's an active run

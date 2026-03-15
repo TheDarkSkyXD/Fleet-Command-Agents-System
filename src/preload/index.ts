@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { type IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -327,24 +327,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
   watchdogPatrolNow: () => ipcRenderer.invoke('watchdog:patrol-now'),
   watchdogPatrolHistory: (limit?: number) => ipcRenderer.invoke('watchdog:patrol-history', limit),
 
-  // Events (renderer -> main)
-  onAgentUpdate: (callback: (data: unknown) => void) =>
-    ipcRenderer.on('agent:update', (_event, data) => callback(data)),
-  onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) =>
-    ipcRenderer.on('agent:output', (_event, data) => callback(data)),
+  // Events (renderer -> main) - each returns an unsubscribe function for cleanup
+  onAgentUpdate: (callback: (data: unknown) => void) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('agent:update', handler);
+    return () => { ipcRenderer.removeListener('agent:update', handler); };
+  },
+  onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { agentId: string; data: string }) => callback(data);
+    ipcRenderer.on('agent:output', handler);
+    return () => { ipcRenderer.removeListener('agent:output', handler); };
+  },
   onAgentParsedEvent: (
     callback: (data: { agentId: string; event: Record<string, unknown> }) => void,
-  ) => ipcRenderer.on('agent:parsed-event', (_event, data) => callback(data)),
-  onMailReceived: (callback: (data: unknown) => void) =>
-    ipcRenderer.on('mail:received', (_event, data) => callback(data)),
-  onMailPurged: (callback: (data: { deleted: number }) => void) =>
-    ipcRenderer.on('mail:purged', (_event, data) => callback(data)),
-  onMergeUpdate: (callback: (data: unknown) => void) =>
-    ipcRenderer.on('merge:update', (_event, data) => callback(data)),
+  ) => {
+    const handler = (_event: IpcRendererEvent, data: { agentId: string; event: Record<string, unknown> }) => callback(data);
+    ipcRenderer.on('agent:parsed-event', handler);
+    return () => { ipcRenderer.removeListener('agent:parsed-event', handler); };
+  },
+  onMailReceived: (callback: (data: unknown) => void) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('mail:received', handler);
+    return () => { ipcRenderer.removeListener('mail:received', handler); };
+  },
+  onMailPurged: (callback: (data: { deleted: number }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { deleted: number }) => callback(data);
+    ipcRenderer.on('mail:purged', handler);
+    return () => { ipcRenderer.removeListener('mail:purged', handler); };
+  },
+  onMergeUpdate: (callback: (data: unknown) => void) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('merge:update', handler);
+    return () => { ipcRenderer.removeListener('merge:update', handler); };
+  },
 
   // Update events (main -> renderer)
-  onUpdateStatus: (callback: (data: unknown) => void) =>
-    ipcRenderer.on('update:status', (_event, data) => callback(data)),
+  onUpdateStatus: (callback: (data: unknown) => void) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('update:status', handler);
+    return () => { ipcRenderer.removeListener('update:status', handler); };
+  },
   onUpdateDownloadProgress: (
     callback: (data: {
       percent: number;
@@ -352,12 +374,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
       total: number;
       bytesPerSecond: number;
     }) => void,
-  ) => ipcRenderer.on('update:download-progress', (_event, data) => callback(data)),
+  ) => {
+    const handler = (_event: IpcRendererEvent, data: { percent: number; transferred: number; total: number; bytesPerSecond: number }) => callback(data);
+    ipcRenderer.on('update:download-progress', handler);
+    return () => { ipcRenderer.removeListener('update:download-progress', handler); };
+  },
   onUpdateDownloaded: (
     callback: (data: { version: string; releaseNotes: string | null }) => void,
-  ) => ipcRenderer.on('update:downloaded', (_event, data) => callback(data)),
-  onUpdateError: (callback: (data: { message: string }) => void) =>
-    ipcRenderer.on('update:error', (_event, data) => callback(data)),
+  ) => {
+    const handler = (_event: IpcRendererEvent, data: { version: string; releaseNotes: string | null }) => callback(data);
+    ipcRenderer.on('update:downloaded', handler);
+    return () => { ipcRenderer.removeListener('update:downloaded', handler); };
+  },
+  onUpdateError: (callback: (data: { message: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { message: string }) => callback(data);
+    ipcRenderer.on('update:error', handler);
+    return () => { ipcRenderer.removeListener('update:error', handler); };
+  },
 
   // Watchdog events (main -> renderer)
   onWatchdogUpdate: (
@@ -375,15 +408,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
         timestamp: string;
       }>;
     }) => void,
-  ) => ipcRenderer.on('watchdog:update', (_event, data) => callback(data)),
-  onWatchdogTriageResult: (callback: (data: unknown) => void) =>
-    ipcRenderer.on('watchdog:triage-result', (_event, data) => callback(data)),
-  onWatchdogPatrolResult: (callback: (data: unknown) => void) =>
-    ipcRenderer.on('watchdog:patrol-result', (_event, data) => callback(data)),
+  ) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data as Parameters<typeof callback>[0]);
+    ipcRenderer.on('watchdog:update', handler);
+    return () => { ipcRenderer.removeListener('watchdog:update', handler); };
+  },
+  onWatchdogTriageResult: (callback: (data: unknown) => void) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('watchdog:triage-result', handler);
+    return () => { ipcRenderer.removeListener('watchdog:triage-result', handler); };
+  },
+  onWatchdogPatrolResult: (callback: (data: unknown) => void) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('watchdog:patrol-result', handler);
+    return () => { ipcRenderer.removeListener('watchdog:patrol-result', handler); };
+  },
 
   // Notification navigation events (main -> renderer)
-  onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) =>
-    ipcRenderer.on('notification:navigate-to-agent', (_event, data) => callback(data)),
+  onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { agentName: string }) => callback(data);
+    ipcRenderer.on('notification:navigate-to-agent', handler);
+    return () => { ipcRenderer.removeListener('notification:navigate-to-agent', handler); };
+  },
 
   // Notification event broadcast (main -> renderer, for in-app toasts)
   onNotificationEvent: (
@@ -394,11 +440,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       agentName: string | null;
       timestamp: string;
     }) => void,
-  ) => ipcRenderer.on('notification:event', (_event, data) => callback(data)),
+  ) => {
+    const handler = (_event: IpcRendererEvent, data: { title: string; body: string; eventType: string; agentName: string | null; timestamp: string }) => callback(data);
+    ipcRenderer.on('notification:event', handler);
+    return () => { ipcRenderer.removeListener('notification:event', handler); };
+  },
 
   // Project switch event for data isolation
-  onProjectSwitched: (callback: (data: { projectId: string; project: unknown }) => void) =>
-    ipcRenderer.on('project:switched', (_event, data) => callback(data)),
+  onProjectSwitched: (callback: (data: { projectId: string; project: unknown }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { projectId: string; project: unknown }) => callback(data);
+    ipcRenderer.on('project:switched', handler);
+    return () => { ipcRenderer.removeListener('project:switched', handler); };
+  },
 
   // Notification history
   notificationHistory: (filters?: {
@@ -668,8 +721,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('debug:shell-resize', cols, rows),
   debugShellOutput: () => ipcRenderer.invoke('debug:shell-output'),
   debugShellKill: () => ipcRenderer.invoke('debug:shell-kill'),
-  onDebugShellOutput: (callback: (data: { data: string }) => void) =>
-    ipcRenderer.on('debug:shell-output', (_event, data) => callback(data)),
+  onDebugShellOutput: (callback: (data: { data: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { data: string }) => callback(data);
+    ipcRenderer.on('debug:shell-output', handler);
+    return () => { ipcRenderer.removeListener('debug:shell-output', handler); };
+  },
 
   // Orphaned process detection
   orphanDetect: () => ipcRenderer.invoke('orphan:detect'),
