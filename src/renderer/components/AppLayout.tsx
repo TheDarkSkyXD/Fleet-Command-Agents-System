@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentsPage } from '../pages/AgentsPage';
+import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
@@ -45,14 +46,7 @@ function PageContent({ page }: { page: string }) {
     case 'agents':
       return <AgentsPage />;
     case 'mail':
-      return (
-        <div>
-          <h1 className="text-2xl font-bold text-slate-50 mb-4">Mail</h1>
-          <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
-            <p>No messages</p>
-          </div>
-        </div>
-      );
+      return <MailPage />;
     case 'definitions':
       return <AgentDefinitionsPage />;
     case 'worktrees':
