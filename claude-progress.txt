@@ -1,5 +1,29 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Settings Features)
+
+#### Feature #138: Max hierarchy depth setting - PASSING
+- Created Zustand settings store (src/renderer/stores/settingsStore.ts)
+- Settings persisted to SQLite app_settings table as JSON via IPC
+- Settings page with tabbed UI (Agents / Terminal tabs)
+- Max hierarchy depth: configurable 1-10, default 2
+- Also added max concurrent agents and max agents per lead settings
+- Number input with +/- buttons and direct text entry
+- Reset to defaults button per section
+
+#### Feature #139: Terminal font settings - PASSING
+- Terminal tab in Settings page with font family dropdown and font size control
+- Font family options: JetBrains Mono, Fira Code, Cascadia Code, Source Code Pro, Ubuntu Mono, Consolas, Courier New, System Monospace
+- Font size: 8-32px range with +/- buttons
+- Live preview showing how terminal text will appear with selected settings
+- Settings persist across app restarts via SQLite
+- No mock data patterns found in new code
+
+#### Files Created/Modified
+- NEW: src/renderer/stores/settingsStore.ts - Zustand store with SQLite persistence
+- NEW: src/renderer/pages/SettingsPage.tsx - Full settings UI with tabs
+- MODIFIED: src/renderer/components/AppLayout.tsx - Integrated SettingsPage component
+
 ### Session: 2026-03-14
 
 #### Feature #5: Backend IPC queries real database - PASSING
