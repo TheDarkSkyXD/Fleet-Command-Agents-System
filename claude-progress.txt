@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Operator Ask-Reply & IPC Validation)
+
+#### Feature #259: Operator synchronous ask-reply - PASSING
+- Added coordinator:ask IPC handler in main process
+- Sends question message to coordinator with auto-generated correlation ID (thread_id)
+- Polls for reply every 2s with configurable timeout (default 120s)
+- Returns reply with correlation_id, elapsed_ms, timed_out status
+- Added coordinatorAsk to preload bridge and ElectronAPI types
+- Added Ask button and form UI in CoordinatorPanel with subject/body inputs
+- Shows waiting spinner during polling, result panel with correlation ID and reply content
+- Handles timeout state with amber warning and informative message
+
+#### Feature #264: Unauthorized IPC channel access blocked - PASSING
+- Created validateIpcParams() utility function for type-safe parameter validation
+- Supports string, number, boolean, object, array type checks
+- Validates non-empty strings, logs rejected requests with log.warn
+- Applied validation to 12 critical IPC handlers:
+  - agent:detail, agent:stop, agent:nudge, agent:spawn
+  - mail:send, mail:read, mail:check, mail:thread
+  - merge:execute, issue:get, issue:delete, project:get, project:delete
+- Returns clean error messages without internal data leaks
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - validateIpcParams helper + validation on 12+ handlers + coordinator:ask handler
+- MODIFIED: src/preload/index.ts - coordinatorAsk bridge
+- MODIFIED: src/shared/types/index.ts - coordinatorAsk type definition
+- MODIFIED: src/renderer/components/CoordinatorPanel.tsx - Ask button, form, and result UI
+
+#### Current Status
+- 257/366 features passing (added #259 and #264 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Progress Estimation & Run Completion)
 
 #### Feature #260: Per-agent progress estimation - PASSING
