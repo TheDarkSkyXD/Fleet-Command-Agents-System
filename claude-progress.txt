@@ -1387,3 +1387,29 @@
 - 89/366 features passing (added #82 and #83 this session)
 - All code passes Biome lint and Vite build
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Task Groups)
+
+#### Feature #122: Create task groups for batch tracking - PASSING
+- Added task group CRUD IPC handlers (list, create, get, delete, addIssue, removeIssue, getProgress, checkAutoClose)
+- Added preload bridge methods and ElectronAPI type definitions for task groups
+- Built Groups tab in TasksPage with expandable group cards
+- Group cards show member count, progress breakdown (completed/in_progress/open/blocked), progress bar
+- Add/remove issues to groups via dropdown selector
+- Groups visually distinguish active (purple) vs completed (green) status
+
+#### Feature #123: Task group auto-close on completion - PASSING
+- Auto-close logic in issue:update IPC handler - when issue status changes to closed, checks if group should auto-close
+- Also implemented in taskGroup:addIssue handler and dedicated taskGroup:checkAutoClose handler
+- Group status changes to completed with closed_at timestamp when all member issues are closed
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added 8 task group IPC handlers + auto-close in issue:update
+- MODIFIED: src/preload/index.ts - Added 8 task group bridge methods
+- MODIFIED: src/shared/types/index.ts - Added task group methods to ElectronAPI interface
+- MODIFIED: src/renderer/pages/TasksPage.tsx - Added Groups tab with full group management UI
+
+#### Current Status
+- 91/366 features passing (added #122 and #123 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
