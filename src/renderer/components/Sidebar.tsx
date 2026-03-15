@@ -18,6 +18,7 @@ import {
   FiShield,
   FiTerminal,
   FiUsers,
+  FiZap,
 } from 'react-icons/fi';
 import { ProjectSwitcher } from './ProjectSwitcher';
 
@@ -43,6 +44,7 @@ const navItems = [
   { id: 'events', label: 'Event Feed', icon: FiActivity },
   { id: 'metrics', label: 'Metrics', icon: FiBarChart2 },
   { id: 'doctor', label: 'Doctor', icon: FiHeart },
+  { id: 'cleanup', label: 'Cleanup', icon: FiZap },
   { id: 'debug', label: 'Debug', icon: FiTerminal },
   { id: 'settings', label: 'Settings', icon: FiSettings },
 ];

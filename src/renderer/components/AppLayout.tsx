@@ -12,6 +12,7 @@ import { HooksPage } from '../pages/HooksPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { MetricsPage } from '../pages/MetricsPage';
+import { NuclearCleanupPage } from '../pages/NuclearCleanupPage';
 import { PromptsPage } from '../pages/PromptsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
@@ -307,6 +308,12 @@ function PageContent({
       return (
         <ErrorBoundary sectionName="Doctor">
           <DoctorPage />
+        </ErrorBoundary>
+      );
+    case 'cleanup':
+      return (
+        <ErrorBoundary sectionName="Nuclear Cleanup">
+          <NuclearCleanupPage />
         </ErrorBoundary>
       );
     case 'debug':
