@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Terminal Scroll-Lock & Virtualized Lists)
+
+#### Feature #238: Terminal auto-scroll with scroll-lock toggle - PASSING
+- Enhanced onScroll handler to automatically disable autoScroll when user scrolls away from bottom
+- Scroll-lock engages when user scrolls up, preventing new output from jumping to bottom
+- Clicking scroll-to-bottom button re-enables auto-scroll
+- Added data-testid="auto-scroll-toggle" to toggle button
+
+#### Feature #240: Virtualized scrolling for long lists - PASSING
+- Installed @tanstack/react-virtual for efficient list rendering
+- Created VirtualizedLogList component for DebugPage log entries (estimateSize: 36px, overscan: 15)
+- Created VirtualizedMailList component for MailPage messages (estimateSize: 80px, overscan: 10)
+- Created VirtualizedTableBody component for AgentsPage agent table (estimateSize: 48px, overscan: 10)
+- All use dynamic measurement via measureElement and absolute positioning
+- Only visible items rendered in DOM for performance with large lists
+- data-testid attributes: virtualized-log-list, virtualized-mail-list, virtualized-agent-list
+
+#### Files Modified
+- MODIFIED: src/renderer/components/AgentTerminal.tsx - Scroll-lock auto-engage on scroll up
+- MODIFIED: src/renderer/pages/DebugPage.tsx - VirtualizedLogList component
+- MODIFIED: src/renderer/pages/MailPage.tsx - VirtualizedMailList component
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - VirtualizedTableBody component
+- MODIFIED: package.json - Added @tanstack/react-virtual dependency
+
+#### Current Status
+- 243/366 features passing (added #238 and #240 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Spawn Spinner & Merge Progress Bar)
 
 #### Feature #226: Spinner for agent spawn in progress - PASSING
