@@ -1,5 +1,29 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Profile CRUD & Quick-Switch)
+
+#### Feature #142: Profile CRUD operations - PASSING
+- Profile Create, Read (list), Update (edit inline), Delete already existed
+- Added Duplicate functionality: FiCopy button on each ProfileCard
+- handleDuplicate creates copy with auto-incremented name suffix (Copy), (Copy 2), etc.
+- Copies all profile settings (hierarchy depth, concurrent agents, capability, model)
+
+#### Feature #143: Active profile indicator and quick-switch - PASSING
+- Added active profile indicator to StatusBar with FiStar icon
+- Blue highlight when profile is active, gray when none
+- Upward dropdown menu for quick-switching between profiles
+- Shows checkmark on active profile, model name per entry
+- Click-outside-to-close behavior, polls every 10s for updates
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Added FiCopy import, handleDuplicate, onDuplicate prop/button
+- MODIFIED: src/renderer/components/StatusBar.tsx - Active profile indicator, quick-switch dropdown
+
+#### Current Status
+- 184/366 features passing (added #142 and #143 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Kanban Board & Update Banner)
 
 #### Feature #121: Task board kanban view - PASSING
