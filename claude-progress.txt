@@ -1,0 +1,26 @@
+## Fleet Command Agents System - Progress Notes
+
+### Session: 2026-03-14
+
+#### Feature #5: Backend IPC queries real database - PASSING
+- Added `loggedPrepare()` wrapper in `src/main/ipc/handlers.ts` that logs all SQL queries with `[SQL] Executing:` prefix
+- Converted all IPC handlers to use `loggedPrepare()` instead of direct `db.prepare()`
+- All handlers confirmed to execute real SQLite queries: SELECT, INSERT, UPDATE, DELETE
+- No mock data patterns found in src/ (checked for globalThis, devStore, mockDb, etc.)
+- `isDev` in index.ts is legitimate Electron dev mode detection, not mock data
+- Biome lint passes cleanly on all source files
+- TypeScript errors are pre-existing across the whole project (module resolution issues), not related to our changes
+
+#### Current Status
+- 1/366 features passing (Feature #5)
+- Other features being worked on by other agents concurrently
+
+#### Architecture Notes
+- IPC handlers: `src/main/ipc/handlers.ts` - all database-backed handlers
+- Database: `src/main/db/database.ts` - better-sqlite3 with WAL mode, 10 tables
+- Preload: `src/preload/index.ts` - context bridge exposing electronAPI
+- Types: `src/shared/types/index.ts` - comprehensive TypeScript interfaces
+
+#### What's Next
+- Continue with next assigned feature
+- Note: TypeScript module resolution issues need fixing (dependencies not resolving for tsc)
