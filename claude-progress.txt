@@ -4084,3 +4084,32 @@
 - 269/366 features passing (added #273 and #274 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Navigation & Deep Linking)
+
+#### Feature #275: All navigation buttons are functional - PASSING
+- All 18 sidebar nav items map to valid pages in PageContent switch
+- Added missing 'notifications' and 'cleanup' items to CommandPalette (was 16, now 18)
+- Created Breadcrumbs component for breadcrumb navigation
+- AgentDetailPage shows breadcrumbs (Home > Agents > Agent Name) in all states
+- Back buttons have data-testid='back-to-agents' for testing
+
+#### Feature #276: Deep links to agent detail work - PASSING
+- Hash-based URL routing: #/agent-detail/{agentId}, #/agents, #/settings, etc.
+- parseHash() and buildHash() functions for URL<->state sync
+- Initial state parsed from URL hash at module load for deep link support
+- Browser history pushState on navigation, popstate listener for back/forward
+- handleBackFromDetail uses window.history.back() for proper history navigation
+
+#### Files Created
+- NEW: src/renderer/components/Breadcrumbs.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/components/AppLayout.tsx - Hash routing, parseHash, buildHash, popstate
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Breadcrumbs in all three states
+- MODIFIED: src/renderer/components/CommandPalette.tsx - Added notifications + cleanup nav items
+
+#### Current Status
+- 275/366 features passing (added #275 and #276 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
