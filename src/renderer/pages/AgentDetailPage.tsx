@@ -223,7 +223,7 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
                   </span>
                   <span className="text-xs text-slate-400 flex items-center gap-1">
                     <FiCalendar className="h-3 w-3" />
-                    Since {formatDateTime(memberSince)}
+                    <span data-testid="agent-created-at" data-created-at={memberSince}>Since {formatDateTime(memberSince)}</span>
                   </span>
                 </div>
               </div>
@@ -332,7 +332,7 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     {s.task_id && <span>Task: {s.task_id}</span>}
-                    <span>{formatDateTime(s.created_at)}</span>
+                    <span data-created-at={s.created_at}>{formatDateTime(s.created_at)}</span>
                   </div>
                 </div>
               ))}

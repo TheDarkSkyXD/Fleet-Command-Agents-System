@@ -1243,6 +1243,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             onChange={(e) => setGlobalFilter(e.target.value)}
             maxLength={200}
             placeholder="Search agents by name..."
+            aria-label="Search agents by name"
             data-testid="agent-global-filter"
             className="w-full rounded-lg border border-slate-600 bg-slate-800 pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
@@ -1267,6 +1268,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             value={capabilityFilter}
             onChange={(e) => setCapabilityFilter(e.target.value)}
             data-testid="agent-capability-filter"
+            aria-label="Filter by capability"
             className="rounded-lg border border-slate-600 bg-slate-800 pl-9 pr-8 py-2 text-sm text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
           >
             <option value="all">All Capabilities</option>
@@ -1509,7 +1511,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                         </div>
                         <span className="text-xs text-slate-400">
                           {session.completed_at
-                            ? new Date(session.completed_at).toLocaleString()
+                            ? formatDateTime(session.completed_at)
                             : ''}
                         </span>
                       </div>

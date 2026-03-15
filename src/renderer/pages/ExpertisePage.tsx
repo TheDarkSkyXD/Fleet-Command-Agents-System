@@ -495,6 +495,7 @@ export function ExpertisePage() {
             onChange={(e) => setGlobalSearchQuery(e.target.value)}
             maxLength={200}
             placeholder="Search expertise across all domains..."
+            aria-label="Search expertise across all domains"
             className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2.5 pl-10 pr-10 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
             data-testid="global-expertise-search"
           />
@@ -975,6 +976,7 @@ export function ExpertisePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 maxLength={200}
                 placeholder="Search records..."
+                aria-label="Search expertise records"
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                 data-testid="expertise-search"
               />

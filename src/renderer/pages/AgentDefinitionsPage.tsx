@@ -24,6 +24,7 @@ import {
 } from 'react-icons/fi';
 import { toast } from 'sonner';
 import type { AgentDefinition } from '../../shared/types';
+import { formatDateTime } from '../lib/dateFormatting';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 
 // Built-in roles that cannot be deleted
@@ -726,8 +727,8 @@ function RoleDetail({
 
           {/* Timestamps */}
           <div className="text-xs text-slate-500 flex gap-4">
-            <span>Created: {new Date(def.created_at).toLocaleString()}</span>
-            <span>Updated: {new Date(def.updated_at).toLocaleString()}</span>
+            <span>Created: {formatDateTime(def.created_at)}</span>
+            <span>Updated: {formatDateTime(def.updated_at)}</span>
           </div>
         </>
       )}

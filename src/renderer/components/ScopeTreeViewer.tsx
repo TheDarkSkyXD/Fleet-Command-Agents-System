@@ -417,6 +417,7 @@ export function ScopeTreeViewer({ maxHeight = '400px' }: ScopeTreeViewerProps) {
           placeholder="Filter files..."
           className="flex-1 bg-transparent text-xs text-slate-200 placeholder-slate-500 focus:outline-none"
           data-testid="scope-tree-search"
+          aria-label="Filter files"
         />
       </div>
 

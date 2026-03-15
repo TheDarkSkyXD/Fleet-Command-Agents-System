@@ -573,6 +573,7 @@ function AppLogPanel() {
             onChange={(e) => setSearchQuery(e.target.value)}
             maxLength={200}
             placeholder="Search logs by keyword..."
+            aria-label="Search logs by keyword"
             className="w-full rounded-md border border-slate-600 bg-slate-800 py-1.5 pl-10 pr-3 text-sm text-slate-200 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
           />
         </div>
@@ -584,6 +585,7 @@ function AppLogPanel() {
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
             className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
+            aria-label="Filter by log level"
           >
             <option value="">All Levels</option>
             <option value="debug">Debug</option>
@@ -598,6 +600,7 @@ function AppLogPanel() {
           value={agentFilter}
           onChange={(e) => setAgentFilter(e.target.value)}
           className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
+          aria-label="Filter by agent"
         >
           <option value="">All Agents</option>
           {agents.map((agent) => (
@@ -616,6 +619,7 @@ function AppLogPanel() {
             onChange={(e) => setStartTime(e.target.value)}
             className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
             title="Start time"
+            aria-label="Start time"
           />
           <span className="text-xs text-slate-400">to</span>
           <input
@@ -624,6 +628,7 @@ function AppLogPanel() {
             onChange={(e) => setEndTime(e.target.value)}
             className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
             title="End time"
+            aria-label="End time"
           />
         </div>
 

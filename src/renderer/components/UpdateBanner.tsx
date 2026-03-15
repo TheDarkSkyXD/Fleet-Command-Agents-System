@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FiDownload, FiFileText, FiRefreshCw, FiX } from 'react-icons/fi';
 import type { UpdateStatus } from '../../shared/types';
+import { formatDateOnly } from '../lib/dateFormatting';
 
 /** Format bytes to human-readable string */
 function formatBytes(bytes: number | null): string {
@@ -76,11 +77,7 @@ function ChangelogModal({
   }, [onClose]);
 
   const formattedDate = releaseDate
-    ? new Date(releaseDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
+    ? formatDateOnly(releaseDate)
     : null;
 
   return (

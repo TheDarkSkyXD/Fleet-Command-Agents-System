@@ -604,6 +604,7 @@ export function MailPage() {
                       value={purgeAgentName}
                       onChange={(e) => setPurgeAgentName(e.target.value)}
                       placeholder="Agent name..."
+                      aria-label="Agent name to purge messages"
                       className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handlePurgeByAgent();
@@ -662,6 +663,7 @@ export function MailPage() {
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search messages by subject, body, or agent..."
+              aria-label="Search messages"
               className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pr-3 pl-9 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
               data-testid="mail-search-input"
             />

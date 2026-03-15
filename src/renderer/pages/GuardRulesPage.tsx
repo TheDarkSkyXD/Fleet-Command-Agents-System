@@ -103,6 +103,7 @@ function ToolAllowlistTester({ role }: { role: string }) {
             setTestResult(null);
           }}
           data-testid="test-tool-select"
+          aria-label="Select tool to test"
           className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200"
         >
           <option value="">Select a tool...</option>
@@ -182,6 +183,7 @@ function BashRestrictionTester({ role }: { role: string }) {
             setTestResult(null);
           }}
           placeholder="e.g. git push origin main"
+          aria-label="Test bash command"
           data-testid="test-bash-command-input"
           className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 font-mono"
           onKeyDown={(e) => {
@@ -883,6 +885,7 @@ export function GuardRulesPage() {
                       <select
                         value={newTool}
                         onChange={(e) => setNewTool(e.target.value)}
+                        aria-label="Select tool to add"
                         className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200"
                       >
                         <option value="">Select a tool to add...</option>
@@ -960,6 +963,7 @@ export function GuardRulesPage() {
                         value={newBashRestriction}
                         onChange={(e) => setNewBashRestriction(e.target.value)}
                         placeholder="e.g. git push"
+                        aria-label="Add bash restriction"
                         className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -999,6 +1003,7 @@ export function GuardRulesPage() {
                       value={editingFileScope}
                       onChange={(e) => setEditingFileScope(e.target.value)}
                       placeholder="e.g. read-only (entire project)"
+                      aria-label="File scope"
                       className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                     />
                   ) : (
@@ -1214,6 +1219,7 @@ export function GuardRulesPage() {
                               type: e.target.value as PathBoundaryRule['type'],
                             }))
                           }
+                          aria-label="Boundary rule type"
                           className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200"
                         >
                           <option value="worktree">Worktree Root (auto-enforced)</option>
@@ -1233,6 +1239,7 @@ export function GuardRulesPage() {
                               ? 'e.g. /home/user/project/src'
                               : 'e.g. !node_modules'
                           }
+                          aria-label="Boundary pattern"
                           className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
                         />
                       )}
@@ -1243,6 +1250,7 @@ export function GuardRulesPage() {
                           setNewBoundary((b) => ({ ...b, description: e.target.value }))
                         }
                         placeholder="Description (optional)"
+                        aria-label="Boundary description"
                         className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
                       />
                       <button
@@ -1276,6 +1284,7 @@ export function GuardRulesPage() {
                         setTestResult(null);
                       }}
                       placeholder="Worktree path, e.g. /home/user/project/worktrees/feature-1"
+                      aria-label="Worktree path for testing"
                       className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                     />
                     <div className="flex gap-2">
@@ -1287,6 +1296,7 @@ export function GuardRulesPage() {
                           setTestResult(null);
                         }}
                         placeholder="File path to test, e.g. /home/user/other-project/secret.txt"
+                        aria-label="File path to test access"
                         className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') validateTestPath();
@@ -1380,6 +1390,7 @@ export function GuardRulesPage() {
                     capability: e.target.value || undefined,
                   }))
                 }
+                aria-label="Filter by capability"
                 className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
               >
                 <option value="">All Capabilities</option>
@@ -1397,6 +1408,7 @@ export function GuardRulesPage() {
                     rule_type: e.target.value || undefined,
                   }))
                 }
+                aria-label="Filter by rule type"
                 className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
               >
                 <option value="">All Rule Types</option>
@@ -1413,6 +1425,7 @@ export function GuardRulesPage() {
                     severity: e.target.value || undefined,
                   }))
                 }
+                aria-label="Filter by severity"
                 className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200"
               >
                 <option value="">All Severities</option>
@@ -1657,6 +1670,7 @@ export function GuardRulesPage() {
                   <select
                     value={addRuleForm.value}
                     onChange={(e) => setAddRuleForm((f) => ({ ...f, value: e.target.value }))}
+                    aria-label="Select tool"
                     className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200"
                     data-testid="add-rule-tool-select"
                   >
@@ -1679,6 +1693,7 @@ export function GuardRulesPage() {
                         ? 'e.g. git push --force'
                         : 'e.g. src/**/*.ts'
                     }
+                    aria-label={addRuleForm.ruleType === 'bash_restriction' ? 'Bash pattern' : 'File scope pattern'}
                     className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                     data-testid="add-rule-value-input"
                     onKeyDown={(e) => {

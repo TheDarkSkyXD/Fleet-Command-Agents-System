@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import type { Issue, IssuePriority, IssueStatus, IssueType, TaskGroup } from '../../shared/types';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
+import { formatDateTime, formatDateOnly } from '../lib/dateFormatting';
 import { handleIpcError } from '../lib/ipcErrorHandler';
 import { useFilterStore } from '../stores/filterStore';
 
@@ -1481,7 +1482,7 @@ export function TasksPage() {
                           {issue.closed_at && (
                             <span className="inline-flex items-center gap-1 text-green-400">
                               <FiClock size={11} />
-                              Closed: {new Date(issue.closed_at).toLocaleString()}
+                              Closed: {formatDateTime(issue.closed_at)}
                             </span>
                           )}
                         </div>
@@ -1799,7 +1800,7 @@ function KanbanCard({
         ) : (
           <span />
         )}
-        <span>{new Date(issue.created_at).toLocaleDateString()}</span>
+        <span>{formatDateOnly(issue.created_at)}</span>
       </div>
     </div>
   );
@@ -1923,7 +1924,7 @@ function IssueCard({
             )}
             <span>
               <FiClock size={11} className="inline mr-1" />
-              {new Date(issue.created_at).toLocaleDateString()}
+              {formatDateOnly(issue.created_at)}
             </span>
           </div>
         </div>
@@ -2411,18 +2412,18 @@ function IssueDetailModal({
             <div className="flex items-center gap-4">
               <span className="inline-flex items-center gap-1">
                 <FiClock size={11} />
-                Created: {new Date(issue.created_at).toLocaleString()}
+                Created: {formatDateTime(issue.created_at)}
               </span>
               {issue.updated_at && issue.updated_at !== issue.created_at && (
                 <span className="inline-flex items-center gap-1">
                   <FiEdit3 size={11} />
-                  Updated: {new Date(issue.updated_at).toLocaleString()}
+                  Updated: {formatDateTime(issue.updated_at)}
                 </span>
               )}
               {issue.closed_at && (
                 <span className="inline-flex items-center gap-1 text-green-400">
                   <FiCheckCircle size={11} />
-                  Closed: {new Date(issue.closed_at).toLocaleString()}
+                  Closed: {formatDateTime(issue.closed_at)}
                 </span>
               )}
             </div>
