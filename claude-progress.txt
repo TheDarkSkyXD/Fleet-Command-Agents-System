@@ -3568,3 +3568,26 @@
 - 238/366 features passing (added #228 and #229 this session)
 - All code passes Biome lint (only pre-existing warnings) and Vite build
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Empty States: No Projects & No Logs)
+
+#### Feature #230: No projects configured empty state - PASSING
+- Enhanced WelcomePage empty state with anchor icon in styled circle
+- Descriptive text explaining how to get started with Fleet Command
+- Prominent 'Open Project' button (blue, with shadow) that triggers add project form
+- data-testid attributes on empty state container and open project button
+
+#### Feature #231: No log entries empty state - PASSING
+- Enhanced DebugPage logs tab empty state with file icon in styled circle
+- Three suggested actions with colored icons: spawn agent (green), import NDJSON (blue), add test logs (amber)
+- Separate filtered empty state message when filters are active
+- data-testid attribute on empty state container
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/WelcomePage.tsx - Enhanced no-projects empty state
+- MODIFIED: src/renderer/pages/DebugPage.tsx - Enhanced no-logs empty state
+
+#### Current Status
+- 238/366 features passing (added #230 and #231 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
