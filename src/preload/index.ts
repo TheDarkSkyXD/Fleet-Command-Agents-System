@@ -84,6 +84,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ) => ipcRenderer.invoke('agentDef:import', definitions),
   agentDefExport: (roles?: string[]) => ipcRenderer.invoke('agentDef:export', roles),
 
+  // Coordinator
+  coordinatorStart: (options?: { prompt?: string; run_id?: string }) =>
+    ipcRenderer.invoke('coordinator:start', options),
+  coordinatorStop: () => ipcRenderer.invoke('coordinator:stop'),
+  coordinatorStatus: () => ipcRenderer.invoke('coordinator:status'),
+
   // Agent process management (node-pty)
   agentOutput: (id: string) => ipcRenderer.invoke('agent:output', id),
   agentWrite: (id: string, data: string) => ipcRenderer.invoke('agent:write', id, data),

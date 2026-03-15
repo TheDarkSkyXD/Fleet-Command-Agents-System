@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FiActivity, FiCpu, FiPlay, FiSquare, FiX, FiZap } from 'react-icons/fi';
 import type { AgentCapability, AgentProcessInfo, Session } from '../../shared/types';
+import { CoordinatorPanel } from '../components/CoordinatorPanel';
 
 /** Default model per capability */
 const CAPABILITY_DEFAULTS: Record<
@@ -241,6 +242,9 @@ export function AgentsPage() {
           </button>
         </div>
       )}
+
+      {/* Coordinator Panel */}
+      <CoordinatorPanel />
 
       {/* Active Agents */}
       {activeSessions.length > 0 ? (

@@ -244,6 +244,160 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Coordinator channels - specialized coordinator agent management
+  ipcMain.handle('coordinator:start', (_event, options?: { prompt?: string; run_id?: string }) => {
+    try {
+      // Check if coordinator is already running
+      const existing = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (existing) {
+        // Check if the process is still alive
+        const proc = agentProcessManager.get(existing.id as string);
+        if (proc?.isRunning) {
+          log.warn('[IPC] coordinator:start - coordinator already running');
+          return { data: existing, error: 'Coordinator is already running' };
+        }
+        // Process died but session not updated - mark it completed
+        loggedPrepare(
+          `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+        ).run(existing.id);
+      }
+
+      const id = `coordinator-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const agentName = `coordinator-${Date.now().toString(36)}`;
+      const model = getDefaultModel('coordinator');
+
+      // Get the active project path for working directory
+      const activeProject = loggedPrepare(
+        'SELECT * FROM projects WHERE is_active = 1 LIMIT 1',
+      ).get() as { path: string } | undefined;
+
+      const worktreePath = activeProject?.path || process.cwd();
+
+      // Spawn via node-pty
+      const agentProcess = agentProcessManager.spawn({
+        id,
+        agentName,
+        capability: 'coordinator',
+        model,
+        worktreePath,
+        runId: options?.run_id,
+        prompt:
+          options?.prompt ||
+          'You are the coordinator agent. Monitor the fleet, decompose tasks, dispatch lead agents, and authorize merges. Poll mail regularly for status updates from workers.',
+        depth: 0,
+      });
+
+      // Insert session record
+      loggedPrepare(
+        `INSERT INTO sessions (id, agent_name, capability, run_id, worktree_path, depth, state, pid, created_at, updated_at)
+        VALUES (?, ?, 'coordinator', ?, ?, 0, 'booting', ?, datetime('now'), datetime('now'))`,
+      ).run(id, agentName, options?.run_id ?? null, worktreePath, agentProcess.pid);
+
+      // Update state to working after brief boot
+      setTimeout(() => {
+        try {
+          loggedPrepare(
+            `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ? AND state = 'booting'`,
+          ).run(id);
+        } catch {
+          // ignore - session may have been stopped
+        }
+      }, 3000);
+
+      const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(id);
+      log.info(
+        `[IPC] coordinator:start - spawned coordinator: ${agentName}, PID=${agentProcess.pid}, cwd=${worktreePath}`,
+      );
+      return { data: session, error: null };
+    } catch (error) {
+      log.error('coordinator:start failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('coordinator:stop', async () => {
+    try {
+      // Find the active coordinator session
+      const coordinator = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (!coordinator) {
+        log.info('[IPC] coordinator:stop - no active coordinator found');
+        return { data: null, error: 'No active coordinator to stop' };
+      }
+
+      const coordinatorId = coordinator.id as string;
+
+      // Graceful shutdown: send SIGTERM via tree-kill
+      await agentProcessManager.stop(coordinatorId);
+
+      // Update session state in database
+      loggedPrepare(
+        `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      ).run(coordinatorId);
+
+      const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(coordinatorId);
+      log.info(`[IPC] coordinator:stop - gracefully stopped coordinator: ${coordinatorId}`);
+      return { data: session, error: null };
+    } catch (error) {
+      log.error('coordinator:stop failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('coordinator:status', () => {
+    try {
+      const coordinator = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (!coordinator) {
+        return {
+          data: { active: false, session: null, processAlive: false },
+          error: null,
+        };
+      }
+
+      // Verify process is actually alive
+      const proc = agentProcessManager.get(coordinator.id as string);
+      const processAlive = proc?.isRunning ?? false;
+
+      // If process died but session not updated, clean up
+      if (!processAlive && coordinator.state !== 'completed') {
+        loggedPrepare(
+          `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+        ).run(coordinator.id);
+        return {
+          data: { active: false, session: null, processAlive: false },
+          error: null,
+        };
+      }
+
+      // Count agents dispatched by this coordinator
+      const dispatched = loggedPrepare(
+        'SELECT COUNT(*) as count FROM sessions WHERE parent_agent = ? AND id != ?',
+      ).get(coordinator.agent_name, coordinator.id) as { count: number };
+
+      log.info('[IPC] coordinator:status - queried coordinator state from real database');
+      return {
+        data: {
+          active: true,
+          session: coordinator,
+          processAlive,
+          agentsDispatched: dispatched.count,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('coordinator:status failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // Mail channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle('mail:list', (_event, filters?: { unreadOnly?: boolean }) => {
     try {

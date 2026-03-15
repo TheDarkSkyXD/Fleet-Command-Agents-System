@@ -289,6 +289,22 @@ export interface ElectronAPI {
   agentStop: (name: string) => Promise<{ data: unknown; error: string | null }>;
   agentStopAll: () => Promise<{ data: unknown; error: string | null }>;
   agentNudge: (name: string) => Promise<{ data: unknown; error: string | null }>;
+  // Coordinator
+  coordinatorStart: (options?: { prompt?: string; run_id?: string }) => Promise<{
+    data: Session | null;
+    error: string | null;
+  }>;
+  coordinatorStop: () => Promise<{ data: Session | null; error: string | null }>;
+  coordinatorStatus: () => Promise<{
+    data: {
+      active: boolean;
+      session: Session | null;
+      processAlive: boolean;
+      agentsDispatched?: number;
+    } | null;
+    error: string | null;
+  }>;
+
   agentOutput: (id: string) => Promise<{ data: string[] | null; error: string | null }>;
   agentWrite: (id: string, data: string) => Promise<{ data: boolean; error: string | null }>;
   agentResize: (
