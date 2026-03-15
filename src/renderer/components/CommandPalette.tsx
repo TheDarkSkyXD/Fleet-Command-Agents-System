@@ -311,6 +311,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
         keywords: ['spawn', 'start', 'launch', 'create', 'new agent', 'run'],
         icon: FiPlay,
         group: 'Agent Actions',
+        contextCheck: (ctx) => ctx.hasActiveProject,
         action: () => {
           onNavigate('agents');
         },
@@ -321,6 +322,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
         keywords: ['stop', 'kill', 'terminate', 'halt', 'shutdown', 'stop all'],
         icon: FiSquare,
         group: 'Agent Actions',
+        contextCheck: (ctx) => ctx.hasRunningAgents,
         action: async () => {
           try {
             await window.electronAPI.agentStopAll();
@@ -335,6 +337,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
         keywords: ['nudge', 'poke', 'wake', 'prompt', 'remind'],
         icon: FiZap,
         group: 'Agent Actions',
+        contextCheck: (ctx) => ctx.hasRunningAgents,
         action: () => {
           onNavigate('agents');
         },
@@ -345,6 +348,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
         keywords: ['inspect', 'view', 'detail', 'info', 'status', 'examine'],
         icon: FiEye,
         group: 'Agent Actions',
+        contextCheck: (ctx) => ctx.hasRunningAgents,
         action: () => {
           onNavigate('agents');
         },
@@ -353,8 +357,20 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
     [onNavigate],
   );
 
+  // Filter agent actions based on current context
+  const contextualAgentActions = useMemo(
+    () =>
+      agentActionItems.filter(
+        (item) => !item.contextCheck || item.contextCheck(commandContext),
+      ),
+    [agentActionItems, commandContext],
+  );
+
   // All items combined for filter lookup
-  const allItems = useMemo(() => [...navigationItems, ...agentActionItems], [agentActionItems]);
+  const allItems = useMemo(
+    () => [...navigationItems, ...contextualAgentActions],
+    [contextualAgentActions],
+  );
 
   const itemLookup = useMemo(() => buildItemLookup(allItems), [allItems]);
 
@@ -521,12 +537,18 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
             </Command.Group>
           )}
 
-          {/* Agent Actions */}
+          {/* Agent Actions - context-sensitive */}
+          {contextualAgentActions.length > 0 && (
           <Command.Group heading="Agent Actions" className="mb-2">
             <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Agent Actions
+              {commandContext.hasRunningAgents && (
+                <span className="ml-2 text-[10px] font-normal text-emerald-400">
+                  ({commandContext.runningAgentCount} running)
+                </span>
+              )}
             </div>
-            {agentActionItems.map((item) => {
+            {contextualAgentActions.map((item) => {
               const Icon = item.icon;
               return (
                 <Command.Item
@@ -541,6 +563,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
               );
             })}
           </Command.Group>
+          )}
 
           {/* Navigation */}
           <Command.Group heading="Navigation" className="mb-2">
