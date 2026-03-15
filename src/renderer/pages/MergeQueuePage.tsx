@@ -63,9 +63,11 @@ function OutcomeBadge({ status }: { status: MergeStatus }) {
 function HistoryEntryRow({
   entry,
   onViewDiff,
+  onRollback,
 }: {
   entry: MergeQueueEntry;
   onViewDiff: (id: number) => void;
+  onRollback?: (id: number) => void;
 }) {
   const filesModified = entry.files_modified ? (JSON.parse(entry.files_modified) as string[]) : [];
   const completedDate = entry.completed_at ? new Date(entry.completed_at) : null;
@@ -101,6 +103,11 @@ function HistoryEntryRow({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-sm text-slate-50 truncate">{entry.branch_name}</span>
               <OutcomeBadge status={entry.status} />
+              {entry.rolled_back === 1 && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-400">
+                  <span>{'\u21A9'}</span> Rolled Back
+                </span>
+              )}
             </div>
 
             {/* Tier badge (prominent) */}
@@ -150,7 +157,7 @@ function HistoryEntryRow({
         </div>
 
         {/* Actions */}
-        <div className="shrink-0 ml-4">
+        <div className="shrink-0 ml-4 flex items-center gap-2">
           <button
             type="button"
             onClick={() => onViewDiff(entry.id)}
@@ -158,6 +165,20 @@ function HistoryEntryRow({
           >
             View Diff
           </button>
+          {(entry.status === 'failed' || entry.status === 'merged') &&
+            entry.rolled_back !== 1 &&
+            entry.pre_merge_commit &&
+            onRollback && (
+              <button
+                type="button"
+                onClick={() => onRollback(entry.id)}
+                data-testid={`rollback-${entry.id}`}
+                className="rounded-md border border-sky-600/50 bg-sky-600/10 px-3 py-1.5 text-xs font-medium text-sky-400 hover:bg-sky-600/20 transition-colors"
+                title="Restore target branch to pre-merge state"
+              >
+                Rollback
+              </button>
+            )}
         </div>
       </div>
     </div>
@@ -394,6 +415,11 @@ function QueueEntryRow({
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm text-slate-50">{entry.branch_name}</span>
               <StatusBadge status={entry.status} />
+              {entry.rolled_back === 1 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-400">
+                  {'\u21A9'} Rolled Back
+                </span>
+              )}
               {isBlocked && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/15 px-2 py-0.5 text-xs font-medium text-orange-400">
                   {'\u23F3'} Waiting on deps
@@ -478,6 +504,20 @@ function QueueEntryRow({
               Reimagine
             </button>
           )}
+          {(entry.status === 'failed' || entry.status === 'merged') &&
+            entry.rolled_back !== 1 &&
+            entry.pre_merge_commit &&
+            onRollback && (
+              <button
+                type="button"
+                onClick={() => onRollback(entry.id)}
+                data-testid={`rollback-${entry.id}`}
+                className="rounded-md border border-sky-600/50 bg-sky-600/10 px-3 py-1.5 text-xs font-medium text-sky-400 hover:bg-sky-600/20 transition-colors"
+                title="Restore target branch to pre-merge state"
+              >
+                Rollback
+              </button>
+            )}
           {entry.status === 'merging' && (
             <>
               <button
@@ -567,6 +607,7 @@ export function MergeQueuePage() {
     autoResolve,
     aiResolve,
     reimagine,
+    rollback,
   } = useMergeStore();
 
   const [showEnqueue, setShowEnqueue] = useState(false);
@@ -624,6 +665,10 @@ export function MergeQueuePage() {
 
   const handleReimagine = async (id: number) => {
     await reimagine(id);
+  };
+
+  const handleRollback = async (id: number) => {
+    await rollback(id);
   };
 
   const handlePreview = async (id: number) => {
@@ -773,6 +818,7 @@ export function MergeQueuePage() {
                 onAutoResolve={handleAutoResolve}
                 onAiResolve={handleAiResolve}
                 onReimagine={handleReimagine}
+                onRollback={handleRollback}
                 onPreview={handlePreview}
                 previewResult={previewResults[entry.id] || null}
                 previewLoading={previewLoadingId === entry.id}
@@ -820,7 +866,12 @@ export function MergeQueuePage() {
             )}
           </div>
           {history.map((entry) => (
-            <HistoryEntryRow key={entry.id} entry={entry} onViewDiff={handleViewDiff} />
+            <HistoryEntryRow
+              key={entry.id}
+              entry={entry}
+              onViewDiff={handleViewDiff}
+              onRollback={handleRollback}
+            />
           ))}
         </div>
       )}

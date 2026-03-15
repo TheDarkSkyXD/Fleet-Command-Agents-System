@@ -790,6 +790,57 @@ export async function reimagineFromScratch(
 }
 
 /**
+ * Rollback a merge by resetting the target branch to the pre-merge commit.
+ * This restores the branch to its exact state before the merge was attempted.
+ *
+ * @param repoPath - Path to the git repository
+ * @param preMergeCommit - The commit SHA to reset to
+ * @param targetBranch - Optional target branch to checkout before resetting
+ */
+export async function rollbackMerge(
+  repoPath: string,
+  preMergeCommit: string,
+  targetBranch?: string,
+): Promise<{ success: boolean; error: string | null }> {
+  const git = simpleGit(repoPath);
+
+  try {
+    // Checkout target branch if specified
+    if (targetBranch) {
+      log.info(`[Merge] Rollback: Checking out target branch: ${targetBranch}`);
+      await git.checkout(targetBranch);
+    }
+
+    const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
+    log.info(
+      `[Merge] Rollback: Resetting ${currentBranch.trim()} to pre-merge commit ${preMergeCommit}`,
+    );
+
+    // Verify the commit exists
+    try {
+      await git.revparse(['--verify', preMergeCommit]);
+    } catch {
+      return {
+        success: false,
+        error: `Pre-merge commit ${preMergeCommit} not found in repository`,
+      };
+    }
+
+    // Reset to the pre-merge commit
+    await git.raw(['reset', '--hard', preMergeCommit]);
+
+    log.info(
+      `[Merge] Rollback: Successfully restored ${currentBranch.trim()} to ${preMergeCommit}`,
+    );
+    return { success: true, error: null };
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log.error(`[Merge] Rollback failed: ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
  * Invoke Claude CLI to resolve conflict content.
  * Uses `claude -p` (print mode) to send a prompt and get a response.
  */

@@ -270,6 +270,8 @@ export interface MergeQueueEntry {
   completed_at: string | null;
   depends_on: string | null; // JSON array of merge queue IDs this entry depends on
   blocked?: boolean; // computed field - true if any dependency has failed status
+  pre_merge_commit: string | null; // commit SHA before merge, used for rollback
+  rolled_back: number; // 0 = not rolled back, 1 = rolled back
 }
 
 export interface TaskGroup {
@@ -871,6 +873,7 @@ export interface ElectronAPI {
     task_id?: string;
     agent_name?: string;
     files_modified?: string[];
+    depends_on?: number[];
   }) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergeNext: () => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergeExecute: (
@@ -910,6 +913,10 @@ export interface ElectronAPI {
     error: string | null;
     reimagineBranch?: string;
   }>;
+  mergeRollback: (
+    id: number,
+    repoPath?: string,
+  ) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
   mergeGetTargetBranch: () => Promise<{ data: string | null; error: string | null }>;
   mergeSetTargetBranch: (branch: string) => Promise<{ data: boolean; error: string | null }>;
   // Issues

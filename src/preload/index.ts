@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     task_id?: string;
     agent_name?: string;
     files_modified?: string[];
+    depends_on?: number[];
   }) => ipcRenderer.invoke('merge:enqueue', entry),
   mergeNext: () => ipcRenderer.invoke('merge:next'),
   mergeExecute: (id: number, repoPath?: string, targetBranch?: string) =>
@@ -51,12 +52,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mergeHistory: () => ipcRenderer.invoke('merge:history'),
   mergeDiff: (id: number, repoPath?: string) => ipcRenderer.invoke('merge:diff', id, repoPath),
   mergeRemove: (id: number) => ipcRenderer.invoke('merge:remove', id),
+  mergeGetTargetBranch: () => ipcRenderer.invoke('merge:get-target-branch'),
+  mergeSetTargetBranch: (branch: string) => ipcRenderer.invoke('merge:set-target-branch', branch),
   mergeAutoResolve: (id: number, repoPath?: string, targetBranch?: string) =>
     ipcRenderer.invoke('merge:auto-resolve', id, repoPath, targetBranch),
   mergeAiResolve: (id: number, repoPath?: string, targetBranch?: string) =>
     ipcRenderer.invoke('merge:ai-resolve', id, repoPath, targetBranch),
   mergeReimagine: (id: number, repoPath?: string, targetBranch?: string) =>
     ipcRenderer.invoke('merge:reimagine', id, repoPath, targetBranch),
+  mergeRollback: (id: number, repoPath?: string) =>
+    ipcRenderer.invoke('merge:rollback', id, repoPath),
 
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) =>

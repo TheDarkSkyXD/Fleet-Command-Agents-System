@@ -420,6 +420,20 @@ export async function initDatabase(): Promise<void> {
     db.exec('ALTER TABLE merge_queue ADD COLUMN depends_on TEXT');
   }
 
+  // Migration: add pre_merge_commit column for rollback support
+  try {
+    db.prepare('SELECT pre_merge_commit FROM merge_queue LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE merge_queue ADD COLUMN pre_merge_commit TEXT');
+  }
+
+  // Migration: add rolled_back flag for rollback status display
+  try {
+    db.prepare('SELECT rolled_back FROM merge_queue LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE merge_queue ADD COLUMN rolled_back INTEGER DEFAULT 0');
+  }
+
   // Seed default agent definitions if table is empty
   const defCount = db.prepare('SELECT COUNT(*) as cnt FROM agent_definitions').get() as {
     cnt: number;
