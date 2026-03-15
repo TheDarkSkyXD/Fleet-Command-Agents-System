@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Default Guard Rules & Run ID Filtering)
+
+#### Feature #363: Default guard rules per capability type - PASSING
+- Default guard rules already seeded in database.ts for all 7 capability types
+- Scout: read-only (Read, Grep, Glob, Bash read-only, WebSearch), file_scope "read-only (entire project)"
+- Builder: scoped write (Read, Write, Edit, Grep, Glob, Bash), file_scope "assigned files only"
+- Reviewer: read+test (Read, Grep, Glob, Bash read-only+tests, Diff), file_scope "read-only (entire project)"
+- Added security posture labels (Read-Only, Scoped Write, Read+Test, etc.) to GuardRulesPage
+- Added data-testid attributes: guard-role-{role}, guard-posture-{role}, guard-tool-allowlist, guard-bash-restrictions, guard-file-scope, guard-file-scope-value, guard-security-posture, guard-rules-for-{role}
+
+#### Feature #364: Filter events and mail by run ID - PASSING
+- Backend: event:list IPC handler now accepts runId filter (WHERE run_id = ?)
+- Backend: mail:list IPC handler accepts runId filter via subquery on sessions table
+- EventFeedPage: added Run filter dropdown (data-testid: event-filter-run) with runs loaded from runList API
+- MailPage: added runId to MailFilters interface, Run filter dropdown (data-testid: mail-filter-run)
+- Filter summary in MailPage shows run ID tag when filtered
+- Preload and shared types updated with runId parameter
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/GuardRulesPage.tsx - security posture labels, data-testid attrs
+- MODIFIED: src/main/ipc/handlers.ts - runId filter in event:list and mail:list
+- MODIFIED: src/preload/index.ts - runId in eventList filter type
+- MODIFIED: src/shared/types/index.ts - runId in eventList ElectronAPI type
+- MODIFIED: src/renderer/pages/EventFeedPage.tsx - Run filter dropdown, runs state
+- MODIFIED: src/renderer/pages/MailPage.tsx - Run filter dropdown, runId in MailFilters
+
+#### Current Status
+- 362/366 features passing (added #363 and #364 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Prompt Git Sync & Guard Rule Preview)
 
 #### Feature #361: Prompt sync with git - PASSING
