@@ -106,6 +106,7 @@ export function TasksPage() {
   const [groupProgress, setGroupProgress] = useState<Record<string, GroupProgress>>({});
   const [addingIssueToGroup, setAddingIssueToGroup] = useState<string | null>(null);
   const [selectedIssueForGroup, setSelectedIssueForGroup] = useState<string>('');
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
   const loadIssues = useCallback(async () => {
     try {
@@ -371,7 +372,7 @@ export function TasksPage() {
       {activeTab === 'issues' && (
         <>
           {/* Filters */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" data-testid="issue-filters">
             <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
               Filter:
             </span>
@@ -379,6 +380,7 @@ export function TasksPage() {
               value={filterStatus}
               onChange={setFilterStatus}
               placeholder="Status"
+              testId="filter-status"
               options={[
                 { value: '', label: 'All Statuses' },
                 { value: 'open', label: 'Open' },
@@ -391,6 +393,7 @@ export function TasksPage() {
               value={filterPriority}
               onChange={setFilterPriority}
               placeholder="Priority"
+              testId="filter-priority"
               options={[
                 { value: '', label: 'All Priorities' },
                 { value: 'critical', label: 'Critical' },
@@ -403,6 +406,7 @@ export function TasksPage() {
               value={filterType}
               onChange={setFilterType}
               placeholder="Type"
+              testId="filter-type"
               options={[
                 { value: '', label: 'All Types' },
                 { value: 'task', label: 'Task' },
@@ -412,6 +416,21 @@ export function TasksPage() {
                 { value: 'spike', label: 'Spike' },
               ]}
             />
+            {(filterStatus || filterPriority || filterType) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterStatus('');
+                  setFilterPriority('');
+                  setFilterType('');
+                }}
+                className="flex items-center gap-1 rounded-md border border-slate-600 bg-slate-700/50 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-600 hover:text-slate-100 transition-colors"
+                data-testid="clear-filters-btn"
+              >
+                <FiX size={12} />
+                Clear Filters
+              </button>
+            )}
           </div>
 
           {/* Create Issue Modal */}
@@ -559,12 +578,23 @@ export function TasksPage() {
               <p>Loading issues...</p>
             </div>
           ) : issues.length === 0 ? (
-            <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
-              <p className="text-lg mb-2">No issues found</p>
-              <p className="text-sm">Create an issue to get started</p>
+            <div
+              className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400"
+              data-testid="issue-list-empty"
+            >
+              <p className="text-lg mb-2">
+                {filterStatus || filterPriority || filterType
+                  ? 'No issues match filters'
+                  : 'No issues found'}
+              </p>
+              <p className="text-sm">
+                {filterStatus || filterPriority || filterType
+                  ? 'Try adjusting your filters or clear them to see all issues'
+                  : 'Create an issue to get started'}
+              </p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2" data-testid="issue-list">
               {issues.map((issue) => (
                 <IssueCard
                   key={issue.id}
@@ -578,9 +608,35 @@ export function TasksPage() {
                   setClaimingId={setClaimingId}
                   handleClaim={handleClaim}
                   handleDelete={handleDelete}
+                  onSelect={(id) => setSelectedIssueId(id)}
                 />
               ))}
             </div>
+          )}
+
+          {/* Issue Detail Modal */}
+          {selectedIssueId && (
+            <IssueDetailModal
+              issue={issues.find((i) => i.id === selectedIssueId) ?? null}
+              statusConfig={statusConfig}
+              getPriorityInfo={getPriorityInfo}
+              getTypeInfo={getTypeInfo}
+              onClose={() => setSelectedIssueId(null)}
+              onStatusChange={async (id, newStatus) => {
+                try {
+                  const result = await window.electronAPI.issueUpdate(id, {
+                    status: newStatus,
+                  });
+                  if (result.data) {
+                    setIssues((prev) =>
+                      prev.map((i) => (i.id === id ? (result.data as Issue) : i)),
+                    );
+                  }
+                } catch (err) {
+                  console.error('Failed to update issue status:', err);
+                }
+              }}
+            />
           )}
         </>
       )}
@@ -906,8 +962,10 @@ function IssueCard({
   setClaimingId,
   handleClaim,
   handleDelete,
+  onSelect,
 }: {
   issue: Issue;
+  onSelect: (id: string) => void;
   statusConfig: Record<
     IssueStatus,
     { label: string; icon: typeof FiCircle; color: string; bg: string }
@@ -933,7 +991,14 @@ function IssueCard({
   const StatusIcon = status.icon;
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 hover:border-slate-600 transition-colors">
+    <div
+      className="rounded-lg border border-slate-700 bg-slate-800 p-4 hover:border-blue-500/50 cursor-pointer transition-colors"
+      onClick={() => onSelect(issue.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onSelect(issue.id);
+      }}
+      data-testid={`issue-card-${issue.id}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -1053,11 +1118,13 @@ function FilterSelect({
   onChange,
   placeholder,
   options,
+  testId,
 }: {
   value: string;
   onChange: (val: string) => void;
   placeholder: string;
   options: { value: string; label: string }[];
+  testId?: string;
 }) {
   return (
     <div className="relative">
@@ -1066,6 +1133,7 @@ function FilterSelect({
         onChange={(e) => onChange(e.target.value)}
         className="appearance-none rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 pr-7 text-xs text-slate-300 focus:border-blue-500 focus:outline-none"
         aria-label={placeholder}
+        data-testid={testId}
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
