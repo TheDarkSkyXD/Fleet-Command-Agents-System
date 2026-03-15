@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Window Restore Persistence & IPC Error Handling)
+
+#### Feature #287: Data persists after window minimize and restore - PASSING
+- Enabled refetchOnWindowFocus in TanStack Query (was false, now true) for auto-refresh on window restore
+- Added staleTime of 5s to prevent excessive re-fetching during normal usage
+- Added visibilitychange event listener in AppLayout that refreshes Zustand stores (projects, settings) when window becomes visible after tray restore
+- Data persists in memory since renderer stays alive during minimize; refreshes from DB on restore
+
+#### Feature #288: Network failure during IPC shows error - PASSING
+- Created IPC error handler utility (src/renderer/lib/ipcErrorHandler.ts)
+- getUserFriendlyMessage() translates raw technical errors (ECONNREFUSED, SQLITE, EACCES, ENOENT, timeout, etc.) into user-friendly messages
+- handleIpcError() shows toast notifications with optional Retry button via sonner action
+- safeIpcCall() wrapper for safe async IPC calls that never throws
+- Integrated across key pages: AgentsPage (load, spawn, stop, nudge), MailPage (load, send, thread), TasksPage (load, create, delete, claim), projectStore (load, create, switch, delete, update)
+- All error toasts show friendly messages with Retry actions where appropriate
+- App never crashes on IPC failure
+
+#### Files Created
+- NEW: src/renderer/lib/ipcErrorHandler.ts (IPC error handler utility)
+
+#### Files Modified
+- MODIFIED: src/renderer/App.tsx - refetchOnWindowFocus: true, staleTime: 5000
+- MODIFIED: src/renderer/components/AppLayout.tsx - visibilitychange handler for store refresh
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - handleIpcError integration
+- MODIFIED: src/renderer/pages/MailPage.tsx - handleIpcError integration
+- MODIFIED: src/renderer/pages/TasksPage.tsx - handleIpcError integration
+- MODIFIED: src/renderer/stores/projectStore.ts - handleIpcError integration
+
+#### Current Status
+- 285/366 features passing (added #287 and #288 this session)
+- All code passes Biome lint (only pre-existing warnings) and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Delete Data Removal & Mail CRUD)
 
 #### Feature #283: Delete data verify removal from all views - PASSING
