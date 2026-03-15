@@ -117,6 +117,8 @@ export function TasksPage() {
   const [addingIssueToGroup, setAddingIssueToGroup] = useState<string | null>(null);
   const [selectedIssueForGroup, setSelectedIssueForGroup] = useState<string>('');
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [renameGroupName, setRenameGroupName] = useState('');
 
   // Close with summary state
   const [closingIssueId, setClosingIssueId] = useState<string | null>(null);
@@ -223,11 +225,23 @@ export function TasksPage() {
 
   const handleDelete = async (id: string) => {
     try {
+      // Find the issue before deletion to check group membership
+      const deletedIssue = issues.find((i) => i.id === id);
       await window.electronAPI.issueDelete(id);
       setIssues((prev) => prev.filter((i) => i.id !== id));
+      // Also remove from ready queue if present
+      setReadyIssues((prev) => prev.filter((i) => i.id !== id));
       // Close detail modal if the deleted issue was being viewed
       if (selectedIssueId === id) {
         setSelectedIssueId(null);
+      }
+      // Refresh group progress if the deleted issue belonged to a group
+      if (deletedIssue?.group_id) {
+        const gid = deletedIssue.group_id;
+        const progResult = await window.electronAPI.taskGroupGetProgress(gid);
+        if (progResult.data) {
+          setGroupProgress((prev) => ({ ...prev, [gid]: progResult.data as GroupProgress }));
+        }
       }
     } catch (err) {
       console.error('Failed to delete issue:', err);
@@ -290,6 +304,45 @@ export function TasksPage() {
       });
     } catch (err) {
       console.error('Failed to delete group:', err);
+    }
+  };
+
+  const handleRenameGroup = async (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      const result = await window.electronAPI.taskGroupUpdate(id, { name: newName.trim() });
+      if (result.data) {
+        setGroups((prev) => prev.map((g) => (g.id === id ? (result.data as TaskGroup) : g)));
+        toast.success(`Group renamed to "${newName.trim()}"`);
+      }
+      setRenamingGroupId(null);
+      setRenameGroupName('');
+    } catch (err) {
+      console.error('Failed to rename group:', err);
+    }
+  };
+
+  const handleCloseGroup = async (id: string) => {
+    try {
+      const result = await window.electronAPI.taskGroupUpdate(id, { status: 'completed' });
+      if (result.data) {
+        setGroups((prev) => prev.map((g) => (g.id === id ? (result.data as TaskGroup) : g)));
+        toast.success('Group closed');
+      }
+    } catch (err) {
+      console.error('Failed to close group:', err);
+    }
+  };
+
+  const handleReopenGroup = async (id: string) => {
+    try {
+      const result = await window.electronAPI.taskGroupUpdate(id, { status: 'active' });
+      if (result.data) {
+        setGroups((prev) => prev.map((g) => (g.id === id ? (result.data as TaskGroup) : g)));
+        toast.success('Group reopened');
+      }
+    } catch (err) {
+      console.error('Failed to reopen group:', err);
     }
   };
 
@@ -886,13 +939,25 @@ export function TasksPage() {
               <p>Loading groups...</p>
             </div>
           ) : groups.length === 0 ? (
-            <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
+            <div
+              className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400"
+              data-testid="groups-empty-state"
+            >
               <FiFolder className="mx-auto mb-2" size={32} />
               <p className="text-lg mb-2">No task groups yet</p>
-              <p className="text-sm">Create a group to batch related issues together</p>
+              <p className="text-sm mb-4">Create a group to batch related issues together</p>
+              <button
+                type="button"
+                onClick={() => setShowCreateGroupForm(true)}
+                className="inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 transition-colors"
+                data-testid="groups-empty-cta"
+              >
+                <FiPlus size={14} />
+                Create Group
+              </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" data-testid="groups-list">
               {groups.map((group) => {
                 const progress = groupProgress[group.id];
                 const isExpanded = expandedGroupId === group.id;
@@ -933,12 +998,46 @@ export function TasksPage() {
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3
-                                className="text-sm font-medium text-slate-50 truncate"
-                                title={group.name}
-                              >
-                                {group.name}
-                              </h3>
+                              {renamingGroupId === group.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={renameGroupName}
+                                    onChange={(e) => setRenameGroupName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleRenameGroup(group.id, renameGroupName);
+                                      if (e.key === 'Escape') { setRenamingGroupId(null); setRenameGroupName(''); }
+                                    }}
+                                    className="rounded-md border border-slate-600 bg-slate-900 px-2 py-0.5 text-sm text-slate-50 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    data-testid={`group-rename-input-${group.id}`}
+                                    // biome-ignore lint/a11y/noAutofocus: intentional for inline rename
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRenameGroup(group.id, renameGroupName)}
+                                    className="rounded bg-blue-600 px-2 py-0.5 text-xs text-white hover:bg-blue-500"
+                                    data-testid={`group-rename-save-${group.id}`}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setRenamingGroupId(null); setRenameGroupName(''); }}
+                                    className="rounded p-0.5 text-slate-400 hover:text-slate-200"
+                                  >
+                                    <FiX size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <h3
+                                  className="text-sm font-medium text-slate-50 truncate"
+                                  title={group.name}
+                                  data-testid={`group-name-${group.id}`}
+                                >
+                                  {group.name}
+                                </h3>
+                              )}
                               <span
                                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                                   isCompleted
@@ -1007,14 +1106,45 @@ export function TasksPage() {
 
                         <div className="flex items-center gap-1">
                           {!isCompleted && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setAddingIssueToGroup(group.id)}
+                                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-purple-400 transition-colors"
+                                title="Add issue to group"
+                                data-testid={`add-issue-to-group-${group.id}`}
+                              >
+                                <FiLink size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setRenamingGroupId(group.id); setRenameGroupName(group.name); }}
+                                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-blue-400 transition-colors"
+                                title="Rename group"
+                                data-testid={`rename-group-${group.id}`}
+                              >
+                                <FiEdit3 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCloseGroup(group.id)}
+                                className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-green-400 transition-colors"
+                                title="Close group"
+                                data-testid={`close-group-${group.id}`}
+                              >
+                                <FiCheckCircle size={14} />
+                              </button>
+                            </>
+                          )}
+                          {isCompleted && (
                             <button
                               type="button"
-                              onClick={() => setAddingIssueToGroup(group.id)}
-                              className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-purple-400 transition-colors"
-                              title="Add issue to group"
-                              data-testid={`add-issue-to-group-${group.id}`}
+                              onClick={() => handleReopenGroup(group.id)}
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-amber-400 transition-colors"
+                              title="Reopen group"
+                              data-testid={`reopen-group-${group.id}`}
                             >
-                              <FiLink size={14} />
+                              <FiLoader size={14} />
                             </button>
                           )}
                           <button
@@ -1022,6 +1152,7 @@ export function TasksPage() {
                             onClick={() => handleDeleteGroup(group.id)}
                             className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
                             title="Delete group"
+                            data-testid={`delete-group-${group.id}`}
                           >
                             <FiTrash2 size={14} />
                           </button>

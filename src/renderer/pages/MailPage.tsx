@@ -349,6 +349,7 @@ export function MailPage() {
       await window.electronAPI.mailPurge({ olderThanHours: hours });
     }
     setShowPurgeMenu(false);
+    setSelectedMessage(null);
     loadMessages();
     setStatusMsg({ type: 'success', text: `Purged messages older than ${label}` });
   };
@@ -360,6 +361,7 @@ export function MailPage() {
     await window.electronAPI.mailPurge({ agentName: name });
     setPurgeAgentName('');
     setShowPurgeMenu(false);
+    setSelectedMessage(null);
     loadMessages();
     setStatusMsg({ type: 'success', text: `Purged messages for agent "${name}"` });
   };

@@ -3381,6 +3381,27 @@ export function registerIpcHandlers(): void {
     const validation = validateIpcParams('issue:delete', { id }, [{ name: 'id', type: 'string' }]);
     if (!validation.valid) return { data: false, error: validation.error };
     try {
+      // Check if issue belongs to a task group and clean up member_issues reference
+      const issue = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(id) as
+        | { group_id: string | null }
+        | undefined;
+      if (issue?.group_id) {
+        const group = loggedPrepare('SELECT member_issues FROM task_groups WHERE id = ?').get(
+          issue.group_id,
+        ) as { member_issues: string | null } | undefined;
+        if (group) {
+          try {
+            const members: string[] = JSON.parse(group.member_issues || '[]');
+            const updated = members.filter((m: string) => m !== id);
+            loggedPrepare('UPDATE task_groups SET member_issues = ? WHERE id = ?').run(
+              JSON.stringify(updated),
+              issue.group_id,
+            );
+          } catch {
+            // member_issues parse failed, skip cleanup
+          }
+        }
+      }
       loggedPrepare('DELETE FROM issues WHERE id = ?').run(id);
       log.info(`[IPC] issue:delete - DELETE issue from real database: id=${id}`);
       return { data: true, error: null };
@@ -3567,6 +3588,29 @@ export function registerIpcHandlers(): void {
       return { data: group || null, error: null };
     } catch (error) {
       log.error('taskGroup:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('taskGroup:update', (_event, id: string, updates: { name?: string; status?: 'active' | 'completed' }) => {
+    try {
+      const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+      if (!group) {
+        return { data: null, error: 'Group not found' };
+      }
+      if (updates.name !== undefined) {
+        loggedPrepare("UPDATE task_groups SET name = ? WHERE id = ?").run(updates.name, id);
+      }
+      if (updates.status === 'completed') {
+        loggedPrepare("UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?").run(id);
+      } else if (updates.status === 'active') {
+        loggedPrepare("UPDATE task_groups SET status = 'active', closed_at = NULL WHERE id = ?").run(id);
+      }
+      const updated = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(id);
+      log.info(`[IPC] taskGroup:update - UPDATE group in real database: id=${id}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('taskGroup:update failed:', error);
       return { data: null, error: String(error) };
     }
   });
