@@ -2763,3 +2763,31 @@
 - All code passes Biome lint (no new issues)
 - No new TypeScript errors (pre-existing errors in other files unchanged)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Changelog Viewer & Install Update)
+
+#### Feature #146: View changelog from GitHub releases - PASSING
+- Added ChangelogModal component to UpdateBanner with markdown rendering
+- Custom renderMarkdown() function handles headers, bold, italic, links, code blocks, inline code, lists, horizontal rules
+- "View Changelog" button appears in all banner states (available, downloading, downloaded)
+- Modal displays version number in header, formatted release date
+- Scrollable content area with max 80vh height
+- Closes on Escape key, backdrop click, or Close button
+- data-testid attributes for testing (changelog-modal, changelog-content, view-changelog-btn)
+
+#### Feature #149: Install update and restart - PASSING
+- Full end-to-end install pipeline already wired: Backend installUpdate() → autoUpdater.quitAndInstall()
+- Enhanced "Restart & Update" button with installing state feedback
+- Spinning icon animation during installation
+- Button disabled with "Installing..." text while install is in progress
+- Error handling resets installing state on failure
+- autoInstallOnAppQuit=true for automatic install on normal app quit
+- data-testid="update-install-btn" for testing
+
+#### Files Modified
+- MODIFIED: src/renderer/components/UpdateBanner.tsx - Added ChangelogModal, renderMarkdown, enhanced install UX
+
+#### Current Status
+- 186/366 features passing (added #146 and #149 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
