@@ -1,15 +1,17 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 import {
   FiAlertTriangle,
   FiCheck,
   FiDatabase,
   FiGitBranch,
   FiLoader,
+  FiShield,
   FiTrash2,
   FiX,
   FiZap,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type { Worktree } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
 
@@ -412,69 +414,112 @@ export function NuclearCleanupPage() {
         </div>
       </div>
 
-      {/* Confirmation Dialog */}
-      {confirmDialog.open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          data-testid="confirm-dialog"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setConfirmDialog((prev) => ({ ...prev, open: false }));
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget)
-              setConfirmDialog((prev) => ({ ...prev, open: false }));
-          }}
-        >
-          <div className="w-full max-w-md rounded-lg border border-slate-600 bg-slate-800 p-6 shadow-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20">
-                <FiAlertTriangle size={20} className="text-red-400" />
+      {/* Nuclear Cleanup Confirmation Dialog - Styled with prominent danger warnings */}
+      <AnimatePresence>
+        {confirmDialog.open && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            data-testid="nuclear-confirm-dialog"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setConfirmDialog((prev) => ({ ...prev, open: false }));
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget)
+                setConfirmDialog((prev) => ({ ...prev, open: false }));
+            }}
+          >
+            <motion.div
+              className="w-full max-w-md rounded-xl border border-red-500/30 bg-slate-800 shadow-2xl ring-1 ring-red-500/10"
+              data-testid="nuclear-confirm-modal"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.8 }}
+            >
+              {/* Header with danger accent bar */}
+              <div className="border-b border-red-500/20 bg-red-500/5 rounded-t-xl px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/20 ring-2 ring-red-500/30">
+                    <FiAlertTriangle size={22} className="text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-50">{confirmDialog.title}</h3>
+                    <p className="text-xs font-medium text-red-400 flex items-center gap-1">
+                      <FiShield size={10} />
+                      Destructive Operation
+                    </p>
+                  </div>
+                </div>
               </div>
-              <h3 className="text-lg font-semibold text-slate-100">{confirmDialog.title}</h3>
-            </div>
-            <p className="text-sm text-slate-300 mb-2">{confirmDialog.description}</p>
-            <p className="text-sm font-medium text-red-400 mb-4">{confirmDialog.danger}</p>
 
-            {/* Show force option in dialog if applicable */}
-            {confirmDialog.forceOption && (
-              <div className="mb-4 flex items-center gap-2 rounded-md bg-slate-700/50 p-3">
-                <label className="flex items-center gap-2 cursor-pointer" htmlFor="force-confirm">
-                  <input
-                    id="force-confirm"
-                    type="checkbox"
-                    data-testid="force-confirm-checkbox"
-                    checked={forceUnmerged}
-                    onChange={(e) => setForceUnmerged(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-red-500"
-                  />
-                  <span className="text-sm text-slate-300">
-                    Force remove unmerged branches (deletes unmerged work)
-                  </span>
-                </label>
+              {/* Body */}
+              <div className="px-6 py-4">
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  {confirmDialog.description}
+                </p>
+
+                {/* Danger warning callout */}
+                <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 flex items-start gap-2.5">
+                  <FiZap size={16} className="mt-0.5 shrink-0 text-red-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-400">{confirmDialog.danger}</p>
+                    <p className="text-xs text-red-400/70 mt-1">
+                      Please ensure you have backups before proceeding.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Show force option in dialog if applicable */}
+                {confirmDialog.forceOption && (
+                  <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-700/50 border border-slate-600 p-3">
+                    <label
+                      className="flex items-center gap-2 cursor-pointer"
+                      htmlFor="force-confirm"
+                    >
+                      <input
+                        id="force-confirm"
+                        type="checkbox"
+                        data-testid="force-confirm-checkbox"
+                        checked={forceUnmerged}
+                        onChange={(e) => setForceUnmerged(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-red-500 focus:ring-red-500/20"
+                      />
+                      <span className="text-sm text-slate-300">
+                        Force remove unmerged branches (deletes unmerged work)
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
-            )}
 
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                data-testid="confirm-cancel-btn"
-                onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
-                className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                data-testid="confirm-proceed-btn"
-                onClick={confirmDialog.onConfirm}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              {/* Footer with action buttons */}
+              <div className="flex items-center justify-end gap-3 border-t border-slate-700 px-6 py-4">
+                <button
+                  type="button"
+                  data-testid="confirm-cancel-btn"
+                  onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+                  className="rounded-md border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  data-testid="confirm-proceed-btn"
+                  onClick={confirmDialog.onConfirm}
+                  className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-red-500/20"
+                >
+                  <FiTrash2 size={14} />
+                  Confirm Destruction
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

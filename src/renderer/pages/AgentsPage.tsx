@@ -183,6 +183,121 @@ function formatUptime(createdAt: string): string {
   return `${minutes}m ${seconds}s`;
 }
 
+/**
+ * Estimate progress for an agent based on its state, uptime, and output lines.
+ * Uses heuristic-based estimation since agents don't report exact progress.
+ */
+function estimateAgentProgress(
+  session: Session,
+  processInfo?: AgentProcessInfo,
+): { percent: number; label: string; phase: string } {
+  if (session.state === 'completed') {
+    return { percent: 100, label: 'Complete', phase: 'Done' };
+  }
+  if (session.state === 'zombie') {
+    return { percent: 0, label: 'Process died', phase: 'Error' };
+  }
+  if (session.state === 'booting') {
+    return { percent: 5, label: 'Starting up…', phase: 'Booting' };
+  }
+  // Ongoing roles don't have a completion point
+  if (session.capability === 'coordinator' || session.capability === 'monitor') {
+    const minutes = Math.floor((Date.now() - new Date(session.created_at).getTime()) / 60000);
+    return { percent: -1, label: `Active ${minutes}m`, phase: 'Ongoing' };
+  }
+
+  const uptimeMin = (Date.now() - new Date(session.created_at).getTime()) / 60000;
+  const outputCount = processInfo?.outputLines || 0;
+
+  // Expected durations per capability (minutes)
+  const expectedDurations: Record<string, number> = {
+    scout: 4,
+    builder: 12,
+    reviewer: 5,
+    lead: 15,
+    merger: 7,
+  };
+  const expectedDuration = expectedDurations[session.capability] || 10;
+
+  const timeProgress = Math.min((uptimeMin / expectedDuration) * 100, 95);
+  const outputProgress = Math.min((outputCount / 200) * 60, 60);
+  const percent = Math.round(Math.min(Math.max(timeProgress, outputProgress), 95));
+
+  let phase: string;
+  if (percent < 15) phase = 'Initializing';
+  else if (percent < 40) phase = 'Analyzing';
+  else if (percent < 70) phase = 'Implementing';
+  else if (percent < 90) phase = 'Finalizing';
+  else phase = 'Wrapping up';
+
+  if (session.state === 'stalled') phase = 'Stalled';
+
+  return { percent, label: `~${percent}%`, phase };
+}
+
+/** Compact progress bar indicator for agent cards and table rows */
+function AgentProgressBar({
+  percent,
+  phase,
+  label,
+  compact,
+}: {
+  percent: number;
+  phase: string;
+  label: string;
+  compact?: boolean;
+}) {
+  // Ongoing agents show a pulsing bar
+  if (percent === -1) {
+    return (
+      <div
+        className={`flex items-center gap-2 ${compact ? '' : 'mt-2'}`}
+        data-testid="agent-progress-indicator"
+      >
+        <div
+          className={`flex-1 ${compact ? 'h-1' : 'h-1.5'} rounded-full bg-slate-700 overflow-hidden`}
+        >
+          <div className="h-full w-1/3 rounded-full bg-blue-500/60 animate-pulse" />
+        </div>
+        <span className={`${compact ? 'text-[10px]' : 'text-xs'} text-slate-500 whitespace-nowrap`}>
+          {label}
+        </span>
+      </div>
+    );
+  }
+
+  let barColor = 'bg-blue-500';
+  if (percent >= 80) barColor = 'bg-emerald-500';
+  else if (percent >= 50) barColor = 'bg-cyan-500';
+  if (phase === 'Stalled') barColor = 'bg-amber-500';
+  if (phase === 'Error') barColor = 'bg-red-500';
+
+  return (
+    <div
+      className={`flex items-center gap-2 ${compact ? '' : 'mt-2'}`}
+      data-testid="agent-progress-indicator"
+      title={`${phase}: ${label}`}
+    >
+      <div
+        className={`flex-1 ${compact ? 'h-1' : 'h-1.5'} rounded-full bg-slate-700 overflow-hidden`}
+        data-testid="agent-progress-bar"
+      >
+        <div
+          className={`h-full rounded-full ${barColor} transition-all duration-1000 ease-out`}
+          style={{ width: `${percent}%` }}
+          data-testid="agent-progress-fill"
+        />
+      </div>
+      <span
+        className={`${compact ? 'text-[10px]' : 'text-xs'} text-slate-500 whitespace-nowrap`}
+        data-testid="agent-progress-label"
+      >
+        {compact ? label : `${phase} · ${label}`}
+      </span>
+    </div>
+  );
+}
+
 /** Confirmation dialog for stopping agents */
 function StopConfirmDialog({
   title,
@@ -192,6 +307,7 @@ function StopConfirmDialog({
   isStopping,
   onConfirm,
   onCancel,
+  testId,
 }: {
   title: string;
   message: string;
@@ -200,17 +316,18 @@ function StopConfirmDialog({
   isStopping: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  testId?: string;
 }) {
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.15 }}
     >
       <motion.div
-        className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-800 shadow-2xl"
-        data-testid="stop-confirm-dialog"
+        className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-800 shadow-2xl ring-1 ring-black/20"
+        data-testid={testId || "stop-confirm-dialog"}
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.8 }}
@@ -876,6 +993,24 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         },
       },
       {
+        id: 'progress',
+        header: 'Progress',
+        size: 140,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const proc = runningProcesses.find((p) => p.id === row.original.id);
+          const progress = estimateAgentProgress(row.original, proc);
+          return (
+            <AgentProgressBar
+              percent={progress.percent}
+              phase={progress.phase}
+              label={progress.label}
+              compact
+            />
+          );
+        },
+      },
+      {
         id: 'actions',
         header: '',
         size: 70,
@@ -1336,15 +1471,16 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         />
       )}
 
-      {/* Stop Confirmation Dialog - All Agents */}
+      {/* Stop Confirmation Dialog - All Agents (styled dark-theme modal) */}
       {stopConfirm?.type === 'all' && (
         <StopConfirmDialog
           title="Stop All Agents"
-          message="Are you sure you want to stop all running agents? All in-progress work will be interrupted and all agent processes will be terminated."
+          message="Are you sure you want to stop all running agents? All in-progress work will be interrupted and all agent processes will be terminated. This is a destructive action."
           agentCount={activeSessions.length}
           isStopping={isStopping}
           onConfirm={confirmStop}
           onCancel={cancelStop}
+          testId="stop-all-confirm-dialog"
         />
       )}
 
@@ -1589,6 +1725,18 @@ function AgentCard({
             </span>
           )}
       </div>
+
+      {/* Progress estimation bar */}
+      {(() => {
+        const progress = estimateAgentProgress(session, processInfo);
+        return (
+          <AgentProgressBar
+            percent={progress.percent}
+            phase={progress.phase}
+            label={progress.label}
+          />
+        );
+      })()}
     </div>
   );
 }
