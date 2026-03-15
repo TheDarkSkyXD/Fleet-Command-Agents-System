@@ -1,5 +1,26 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Reviewer & Merger Agent Spawn Verification)
+
+#### Feature #35: Spawn reviewer agent - PASSING
+- Already fully implemented in SpawnDialog and AgentProcessManager
+- CAPABILITY_DEFAULTS has reviewer: model='sonnet', description='Code review agent', color='cyan'
+- Selecting reviewer in spawn dialog auto-sets model to sonnet
+- AgentProcessManager getDefaultModel('reviewer') returns 'sonnet'
+- Spawned reviewer appears in agent list with cyan reviewer badge
+
+#### Feature #37: Spawn merger agent - PASSING
+- Already fully implemented in SpawnDialog and AgentProcessManager
+- CAPABILITY_DEFAULTS has merger: model='opus' (per spec), description='Merge conflict resolution', color='emerald'
+- Selecting merger in spawn dialog auto-sets model to opus
+- AgentProcessManager getDefaultModel('merger') returns 'opus'
+- Spawned merger appears in agent list with emerald merger badge
+
+#### Current Status
+- 118/366 features passing (added #35 and #37 this session)
+- No code changes needed - features were already fully implemented
+- All code passes Biome lint and Vite build
+
 ### Session: 2026-03-14 (Stream JSON Parser & Model Picker)
 
 #### Feature #29: Stream JSON output parsing - PASSING
