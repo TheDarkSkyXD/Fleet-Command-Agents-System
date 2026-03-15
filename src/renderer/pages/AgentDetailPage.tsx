@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  FiActivity,
+  FiAlertTriangle,
   FiArrowLeft,
   FiAward,
   FiBookOpen,
@@ -10,6 +12,7 @@ import {
   FiFile,
   FiHash,
   FiLayers,
+  FiLoader,
   FiMail,
   FiSquare,
   FiTerminal,
@@ -63,6 +66,18 @@ const STATE_DOT_COLORS: Record<string, string> = {
   completed: 'bg-slate-400',
   stalled: 'bg-amber-400',
   zombie: 'bg-red-400',
+};
+
+/** State-specific icons for visual distinction */
+const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> = {
+  booting: { icon: <FiLoader className="h-3.5 w-3.5 animate-spin" />, className: 'text-blue-400' },
+  working: {
+    icon: <FiActivity className="h-3.5 w-3.5" />,
+    className: 'text-green-400 animate-pulse',
+  },
+  completed: { icon: <FiCheckCircle className="h-3.5 w-3.5" />, className: 'text-slate-400' },
+  stalled: { icon: <FiAlertTriangle className="h-3.5 w-3.5" />, className: 'text-amber-400' },
+  zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
 type DetailTab = 'terminal' | 'logs' | 'identity' | 'files' | 'mail';
@@ -371,6 +386,15 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     }
   };
 
+  const handleNudge = async () => {
+    try {
+      await window.electronAPI.agentNudge(agentId);
+      await loadSession();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
   if (error && !session) {
     return (
       <div className="space-y-4">
@@ -424,10 +448,16 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* State indicator */}
+            {/* State indicator with icon */}
             <div
-              className={`h-3 w-3 rounded-full ${STATE_DOT_COLORS[session.state] || 'bg-slate-400'}`}
-            />
+              className={`flex items-center ${STATE_ICONS[session.state]?.className || 'text-slate-400'}`}
+            >
+              {STATE_ICONS[session.state]?.icon || (
+                <div
+                  className={`h-3 w-3 rounded-full ${STATE_DOT_COLORS[session.state] || 'bg-slate-400'}`}
+                />
+              )}
+            </div>
 
             {/* Agent name */}
             <h1 className="text-xl font-bold text-slate-50">{session.agent_name}</h1>
@@ -439,16 +469,27 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
               {session.capability}
             </span>
 
-            {/* State badge */}
+            {/* State badge with icon */}
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[session.state] || ''}`}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[session.state] || ''}`}
             >
+              {STATE_ICONS[session.state]?.icon}
               {session.state}
             </span>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            {session.state === 'stalled' && (
+              <button
+                type="button"
+                onClick={handleNudge}
+                className="flex items-center gap-2 rounded-md bg-amber-600/20 border border-amber-500/30 px-3 py-1.5 text-sm text-amber-400 hover:bg-amber-600/30 transition-colors"
+              >
+                <FiZap className="h-3.5 w-3.5" />
+                Nudge
+              </button>
+            )}
             {isRunning && (
               <button
                 type="button"

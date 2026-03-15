@@ -479,12 +479,18 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('agent:nudge', (_event, agentId: string) => {
     try {
+      // Send nudge prompt to the agent's terminal
+      const nudgePrompt =
+        'You appear to be stalled. Please continue with your current task or report your status.\n';
+      const written = agentProcessManager.write(agentId, nudgePrompt);
+
+      // Update session state from stalled back to working
       loggedPrepare(
-        `UPDATE sessions SET state = 'working', stalled_at = NULL, updated_at = datetime('now')
+        `UPDATE sessions SET state = 'working', stalled_at = NULL, escalation_level = 0, updated_at = datetime('now')
         WHERE id = ? AND state = 'stalled'`,
       ).run(agentId);
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(agentId);
-      log.info(`[IPC] agent:nudge - UPDATE session in real database: ${agentId}`);
+      log.info(`[IPC] agent:nudge - nudge sent (written=${written}), updated session: ${agentId}`);
       return { data: session, error: null };
     } catch (error) {
       log.error('agent:nudge failed:', error);

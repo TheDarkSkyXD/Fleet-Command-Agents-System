@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiActivity,
   FiAlertTriangle,
+  FiCheckCircle,
   FiChevronDown,
   FiChevronUp,
   FiCpu,
@@ -19,6 +20,7 @@ import {
   FiGitBranch,
   FiGrid,
   FiList,
+  FiLoader,
   FiPlay,
   FiSearch,
   FiSquare,
@@ -98,6 +100,18 @@ const STATE_DOT_COLORS: Record<string, string> = {
   completed: 'bg-slate-400',
   stalled: 'bg-amber-400',
   zombie: 'bg-red-400',
+};
+
+/** State-specific icons for visual distinction */
+const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> = {
+  booting: { icon: <FiLoader className="h-3.5 w-3.5 animate-spin" />, className: 'text-blue-400' },
+  working: {
+    icon: <FiActivity className="h-3.5 w-3.5" />,
+    className: 'text-green-400 animate-pulse',
+  },
+  completed: { icon: <FiCheckCircle className="h-3.5 w-3.5" />, className: 'text-slate-400' },
+  stalled: { icon: <FiAlertTriangle className="h-3.5 w-3.5" />, className: 'text-amber-400' },
+  zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
 const MODELS = ['haiku', 'sonnet', 'opus'];
@@ -458,19 +472,41 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     setStopConfirm(null);
   }, []);
 
+  const handleNudgeAgent = useCallback(
+    async (sessionId: string) => {
+      try {
+        await window.electronAPI.agentNudge(sessionId);
+        await loadSessions();
+      } catch (err) {
+        setError(String(err));
+      }
+    },
+    [loadSessions],
+  );
+
   // Table columns definition
   const columns = useMemo<ColumnDef<Session>[]>(
     () => [
       {
         id: 'state_indicator',
         header: '',
-        size: 30,
+        size: 36,
         enableSorting: false,
-        cell: ({ row }) => (
-          <div
-            className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[row.original.state] || 'bg-slate-400'}`}
-          />
-        ),
+        cell: ({ row }) => {
+          const stateInfo = STATE_ICONS[row.original.state];
+          return (
+            <div
+              className={`flex items-center justify-center ${stateInfo?.className || 'text-slate-400'}`}
+              data-testid={`agent-state-icon-${row.original.state}`}
+            >
+              {stateInfo?.icon || (
+                <div
+                  className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[row.original.state] || 'bg-slate-400'}`}
+                />
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'agent_name',
@@ -582,27 +618,42 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       {
         id: 'actions',
         header: '',
-        size: 40,
+        size: 70,
         enableSorting: false,
         cell: ({ row }) => {
           if (row.original.state === 'completed') return null;
           return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                requestStopAgent(row.original.id, row.original.agent_name);
-              }}
-              className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
-              title="Stop agent"
-            >
-              <FiSquare className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {row.original.state === 'stalled' && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNudgeAgent(row.original.id);
+                  }}
+                  className="rounded-md bg-amber-600/20 p-1.5 text-amber-400 hover:bg-amber-600/30 transition-colors"
+                  title="Nudge stalled agent"
+                >
+                  <FiZap className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  requestStopAgent(row.original.id, row.original.agent_name);
+                }}
+                className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
+                title="Stop agent"
+              >
+                <FiSquare className="h-3.5 w-3.5" />
+              </button>
+            </div>
           );
         },
       },
     ],
-    [runningProcesses, requestStopAgent],
+    [runningProcesses, requestStopAgent, handleNudgeAgent],
   );
 
   const table = useReactTable({
@@ -886,6 +937,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                         processInfo={proc}
                         childCount={childCountMap[session.agent_name] || 0}
                         onStop={() => requestStopAgent(session.id, session.agent_name)}
+                        onNudge={() => handleNudgeAgent(session.id)}
                         onSelect={() => onSelectAgent?.(session.id)}
                       />
                     );
@@ -1021,12 +1073,14 @@ function AgentCard({
   processInfo,
   childCount,
   onStop,
+  onNudge,
   onSelect,
 }: {
   session: Session;
   processInfo?: AgentProcessInfo;
   childCount?: number;
   onStop: () => void;
+  onNudge: () => void;
   onSelect?: () => void;
 }) {
   const agentModel = session.model || processInfo?.model || null;
@@ -1045,11 +1099,17 @@ function AgentCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* State indicator */}
+          {/* State indicator with icon */}
           <div
-            className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[session.state] || 'bg-slate-400'}`}
+            className={`flex items-center ${STATE_ICONS[session.state]?.className || 'text-slate-400'}`}
             data-testid={`agent-state-dot-${session.state}`}
-          />
+          >
+            {STATE_ICONS[session.state]?.icon || (
+              <div
+                className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[session.state] || 'bg-slate-400'}`}
+              />
+            )}
+          </div>
 
           {/* Agent name */}
           <span className="font-medium text-slate-50" data-testid="agent-card-name">
@@ -1119,6 +1179,21 @@ function AgentCard({
           <span className="text-xs text-slate-500" data-testid="agent-card-uptime">
             {formatUptime(session.created_at)}
           </span>
+
+          {/* Nudge button (stalled agents only) */}
+          {session.state === 'stalled' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNudge();
+              }}
+              className="rounded-md bg-amber-600/20 p-1.5 text-amber-400 hover:bg-amber-600/30 transition-colors"
+              title="Nudge stalled agent"
+            >
+              <FiZap className="h-3.5 w-3.5" />
+            </button>
+          )}
 
           {/* Stop button */}
           <button
