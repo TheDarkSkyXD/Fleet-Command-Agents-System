@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FiFolder, FiGitBranch, FiGitCommit, FiRefreshCw, FiUser } from 'react-icons/fi';
+import {
+  FiAlertTriangle,
+  FiCheck,
+  FiFolder,
+  FiFolderPlus,
+  FiGitBranch,
+  FiGitCommit,
+  FiRefreshCw,
+  FiTrash2,
+  FiUser,
+} from 'react-icons/fi';
 import type { Worktree } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
 
@@ -8,6 +18,17 @@ export function WorktreesPage() {
   const [worktrees, setWorktrees] = useState<Worktree[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [removingPaths, setRemovingPaths] = useState<Set<string>>(new Set());
+  const [cleaningAll, setCleaningAll] = useState(false);
+  const [initializingOverstory, setInitializingOverstory] = useState(false);
+  const [overstoryStatus, setOverstoryStatus] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+  const [cleanResult, setCleanResult] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const loadWorktrees = useCallback(async () => {
     if (!activeProject) {
@@ -36,6 +57,107 @@ export function WorktreesPage() {
     loadWorktrees();
   }, [loadWorktrees]);
 
+  // Clear status messages after a few seconds
+  useEffect(() => {
+    if (overstoryStatus) {
+      const timer = setTimeout(() => setOverstoryStatus(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [overstoryStatus]);
+
+  useEffect(() => {
+    if (cleanResult) {
+      const timer = setTimeout(() => setCleanResult(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [cleanResult]);
+
+  const handleInitOverstory = useCallback(async () => {
+    if (!activeProject) return;
+    setInitializingOverstory(true);
+    setOverstoryStatus(null);
+    try {
+      const result = await window.electronAPI.projectInitOverstory(activeProject.path);
+      if (result.error) {
+        setOverstoryStatus({ type: 'error', message: result.error });
+      } else if (result.data?.alreadyExisted) {
+        setOverstoryStatus({
+          type: 'info',
+          message: '.overstory/ directory already exists for this project.',
+        });
+      } else {
+        setOverstoryStatus({
+          type: 'success',
+          message: '.overstory/ directory initialized successfully!',
+        });
+      }
+    } catch (err) {
+      setOverstoryStatus({ type: 'error', message: String(err) });
+    } finally {
+      setInitializingOverstory(false);
+    }
+  }, [activeProject]);
+
+  const handleRemoveWorktree = useCallback(
+    async (worktreePath: string) => {
+      if (!activeProject) return;
+      setRemovingPaths((prev) => new Set(prev).add(worktreePath));
+      setCleanResult(null);
+      try {
+        const result = await window.electronAPI.worktreeRemove(activeProject.path, worktreePath);
+        if (result.error) {
+          setCleanResult({ type: 'error', message: `Failed to remove: ${result.error}` });
+        } else {
+          setCleanResult({ type: 'success', message: `Removed worktree: ${worktreePath}` });
+          await loadWorktrees();
+        }
+      } catch (err) {
+        setCleanResult({ type: 'error', message: String(err) });
+      } finally {
+        setRemovingPaths((prev) => {
+          const next = new Set(prev);
+          next.delete(worktreePath);
+          return next;
+        });
+      }
+    },
+    [activeProject, loadWorktrees],
+  );
+
+  const handleCleanAllCompleted = useCallback(async () => {
+    if (!activeProject) return;
+    setCleaningAll(true);
+    setCleanResult(null);
+    try {
+      const result = await window.electronAPI.worktreeCleanCompleted(activeProject.path);
+      if (result.error) {
+        setCleanResult({ type: 'error', message: result.error });
+      } else if (result.data) {
+        const { removed, errors } = result.data;
+        if (removed.length === 0 && errors.length === 0) {
+          setCleanResult({
+            type: 'success',
+            message: 'No completed worktrees to clean up.',
+          });
+        } else {
+          const msg = [`Removed ${removed.length} worktree${removed.length !== 1 ? 's' : ''}.`];
+          if (errors.length > 0) {
+            msg.push(`${errors.length} failed.`);
+          }
+          setCleanResult({
+            type: errors.length > 0 ? 'error' : 'success',
+            message: msg.join(' '),
+          });
+        }
+        await loadWorktrees();
+      }
+    } catch (err) {
+      setCleanResult({ type: 'error', message: String(err) });
+    } finally {
+      setCleaningAll(false);
+    }
+  }, [activeProject, loadWorktrees]);
+
   const statusColor = (status: Worktree['status']) => {
     switch (status) {
       case 'clean':
@@ -58,20 +180,85 @@ export function WorktreesPage() {
     }
   };
 
+  // Count non-main worktrees without active agents (candidates for cleanup)
+  const completedWorktrees = worktrees.filter((w) => !w.isMain && !w.agentName);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-50">Worktrees</h1>
-        <button
-          type="button"
-          onClick={loadWorktrees}
-          disabled={loading || !activeProject}
-          className="flex items-center gap-2 rounded-md bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-slate-700"
-        >
-          <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Initialize .overstory button */}
+          {activeProject && (
+            <button
+              type="button"
+              onClick={handleInitOverstory}
+              disabled={initializingOverstory}
+              className="flex items-center gap-2 rounded-md bg-emerald-600/20 px-3 py-1.5 text-sm text-emerald-400 hover:bg-emerald-600/30 hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-emerald-500/30"
+            >
+              <FiFolderPlus size={14} className={initializingOverstory ? 'animate-pulse' : ''} />
+              Initialize .overstory
+            </button>
+          )}
+          {/* Clean all completed button */}
+          {activeProject && completedWorktrees.length > 0 && (
+            <button
+              type="button"
+              onClick={handleCleanAllCompleted}
+              disabled={cleaningAll}
+              className="flex items-center gap-2 rounded-md bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-red-500/30"
+            >
+              <FiTrash2 size={14} className={cleaningAll ? 'animate-spin' : ''} />
+              {cleaningAll ? 'Cleaning...' : `Clean All Completed (${completedWorktrees.length})`}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={loadWorktrees}
+            disabled={loading || !activeProject}
+            className="flex items-center gap-2 rounded-md bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-slate-700"
+          >
+            <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Overstory initialization status */}
+      {overstoryStatus && (
+        <div
+          className={`rounded-lg border p-3 text-sm flex items-center gap-2 ${
+            overstoryStatus.type === 'success'
+              ? 'border-green-500/30 bg-green-500/10 text-green-400'
+              : overstoryStatus.type === 'info'
+                ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                : 'border-red-500/30 bg-red-500/10 text-red-400'
+          }`}
+        >
+          {overstoryStatus.type === 'success' ? (
+            <FiCheck size={16} />
+          ) : overstoryStatus.type === 'error' ? (
+            <FiAlertTriangle size={16} />
+          ) : (
+            <FiFolder size={16} />
+          )}
+          {overstoryStatus.message}
+        </div>
+      )}
+
+      {/* Clean result status */}
+      {cleanResult && (
+        <div
+          className={`rounded-lg border p-3 text-sm flex items-center gap-2 ${
+            cleanResult.type === 'success'
+              ? 'border-green-500/30 bg-green-500/10 text-green-400'
+              : 'border-red-500/30 bg-red-500/10 text-red-400'
+          }`}
+        >
+          {cleanResult.type === 'success' ? <FiCheck size={16} /> : <FiAlertTriangle size={16} />}
+          {cleanResult.message}
+        </div>
+      )}
 
       {!activeProject && (
         <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center">
@@ -149,7 +336,7 @@ export function WorktreesPage() {
                   </div>
                 </div>
 
-                {/* Right side: status + agent */}
+                {/* Right side: status + agent + clean button */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   {/* Status badge */}
                   <span
@@ -170,6 +357,23 @@ export function WorktreesPage() {
                       <span>Unassigned</span>
                     </div>
                   )}
+
+                  {/* Clean button - show for non-main, unassigned worktrees */}
+                  {!wt.isMain && !wt.agentName && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveWorktree(wt.path)}
+                      disabled={removingPaths.has(wt.path)}
+                      className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-red-500/20"
+                      title="Remove this worktree"
+                    >
+                      <FiTrash2
+                        size={11}
+                        className={removingPaths.has(wt.path) ? 'animate-spin' : ''}
+                      />
+                      {removingPaths.has(wt.path) ? 'Removing...' : 'Clean'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -186,6 +390,11 @@ export function WorktreesPage() {
           <span>{worktrees.filter((w) => w.status === 'clean').length} clean</span>
           <span>{worktrees.filter((w) => w.status === 'dirty').length} modified</span>
           <span>{worktrees.filter((w) => w.agentName).length} assigned</span>
+          {completedWorktrees.length > 0 && (
+            <span className="text-red-400/70">
+              {completedWorktrees.length} available for cleanup
+            </span>
+          )}
         </div>
       )}
     </div>
