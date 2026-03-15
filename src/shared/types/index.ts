@@ -448,6 +448,7 @@ export interface ExpertiseDomainSummary {
   domain: string;
   record_count: number;
   types: Record<string, number>;
+  last_updated: string | null;
 }
 
 // Prompt types

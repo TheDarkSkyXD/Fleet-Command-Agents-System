@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  FiActivity,
   FiBook,
   FiChevronRight,
   FiClock,
@@ -113,7 +114,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 }
 
 export function ExpertisePage() {
-  const [activeTab, setActiveTab] = useState<'domains' | 'timeline'>('domains');
+  const [activeTab, setActiveTab] = useState<'domains' | 'timeline' | 'health'>('domains');
   const [domains, setDomains] = useState<ExpertiseDomainSummary[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [records, setRecords] = useState<ExpertiseRecord[]>([]);
@@ -462,6 +463,19 @@ export function ExpertisePage() {
             <FiClock className="mr-1.5 inline-block" size={14} />
             Timeline
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('health')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'health'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+            data-testid="expertise-tab-health"
+          >
+            <FiActivity className="mr-1.5 inline-block" size={14} />
+            Health
+          </button>
         </div>
       )}
 
@@ -783,6 +797,154 @@ export function ExpertisePage() {
                   </div>
                 </button>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Health dashboard view */}
+      {!selectedDomain && activeTab === 'health' && (
+        <div data-testid="expertise-health-dashboard">
+          {domains.length === 0 ? (
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-12 text-center">
+              <FiActivity size={40} className="mx-auto mb-3 text-slate-500" />
+              <p className="text-lg font-medium text-slate-300">No domains to analyze</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Record expertise to see domain health metrics
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total Domains</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-100">{domains.length}</p>
+                </div>
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total Entries</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-100">
+                    {domains.reduce((sum, d) => sum + d.record_count, 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Healthy</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-400">
+                    {
+                      domains.filter((d) => {
+                        if (!d.last_updated) return false;
+                        const daysSince =
+                          (Date.now() - new Date(d.last_updated).getTime()) / (1000 * 60 * 60 * 24);
+                        return daysSince <= 7;
+                      }).length
+                    }
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Stale</p>
+                  <p className="mt-1 text-2xl font-bold text-amber-400">
+                    {
+                      domains.filter((d) => {
+                        if (!d.last_updated) return true;
+                        const daysSince =
+                          (Date.now() - new Date(d.last_updated).getTime()) / (1000 * 60 * 60 * 24);
+                        return daysSince > 7;
+                      }).length
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* Per-domain health cards */}
+              <div className="space-y-2" data-testid="health-domain-list">
+                {[...domains]
+                  .sort((a, b) => {
+                    // Sort stale domains first
+                    const aTime = a.last_updated ? new Date(a.last_updated).getTime() : 0;
+                    const bTime = b.last_updated ? new Date(b.last_updated).getTime() : 0;
+                    return aTime - bTime;
+                  })
+                  .map((domain) => {
+                    const lastUpdated = domain.last_updated ? new Date(domain.last_updated) : null;
+                    const daysSince = lastUpdated
+                      ? (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
+                      : null;
+                    const isHealthy = daysSince !== null && daysSince <= 7;
+                    const isStale = daysSince === null || daysSince > 7;
+
+                    // Format relative time
+                    let timeAgo = 'Never updated';
+                    if (lastUpdated) {
+                      if (daysSince !== null && daysSince < 1) {
+                        const hoursSince = Math.floor(daysSince * 24);
+                        timeAgo =
+                          hoursSince <= 1 ? 'Less than an hour ago' : `${hoursSince} hours ago`;
+                      } else if (daysSince !== null && daysSince < 30) {
+                        const days = Math.floor(daysSince);
+                        timeAgo = days === 1 ? '1 day ago' : `${days} days ago`;
+                      } else if (daysSince !== null) {
+                        const months = Math.floor(daysSince / 30);
+                        timeAgo = months === 1 ? '1 month ago' : `${months} months ago`;
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={domain.domain}
+                        className="flex items-center gap-4 rounded-lg border border-slate-700 bg-slate-800/50 p-4 transition-colors hover:border-slate-600"
+                        data-testid={`health-domain-${domain.domain}`}
+                      >
+                        {/* Health indicator dot */}
+                        <div
+                          className={`h-3 w-3 flex-shrink-0 rounded-full ${
+                            isHealthy
+                              ? 'bg-emerald-500 shadow-emerald-500/30 shadow-sm'
+                              : 'bg-amber-500 shadow-amber-500/30 shadow-sm'
+                          }`}
+                          title={isHealthy ? 'Healthy' : 'Stale'}
+                          data-testid={`health-indicator-${domain.domain}`}
+                        />
+
+                        {/* Domain name */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-semibold text-slate-100">{domain.domain}</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {domain.record_count} entr{domain.record_count === 1 ? 'y' : 'ies'}
+                          </p>
+                        </div>
+
+                        {/* Type breakdown mini-badges */}
+                        <div className="hidden sm:flex flex-wrap gap-1">
+                          {Object.entries(domain.types).map(([type, count]) => (
+                            <span
+                              key={type}
+                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs ${TYPE_COLORS[type as ExpertiseType] || 'bg-slate-700 text-slate-300'}`}
+                            >
+                              {type}: {count}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Staleness indicator */}
+                        <div className="flex-shrink-0 text-right">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                              isHealthy
+                                ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-500/30'
+                                : isStale
+                                  ? 'bg-amber-900/40 text-amber-400 border border-amber-500/30'
+                                  : 'bg-slate-700 text-slate-400'
+                            }`}
+                            data-testid={`staleness-badge-${domain.domain}`}
+                          >
+                            <FiClock size={11} />
+                            {timeAgo}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
         </div>

@@ -5927,8 +5927,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('expertise:domains', () => {
     try {
       const domains = loggedPrepare(
-        'SELECT domain, COUNT(*) as record_count FROM expertise_records GROUP BY domain ORDER BY domain ASC',
-      ).all() as Array<{ domain: string; record_count: number }>;
+        'SELECT domain, COUNT(*) as record_count, MAX(COALESCE(updated_at, created_at)) as last_updated FROM expertise_records GROUP BY domain ORDER BY domain ASC',
+      ).all() as Array<{ domain: string; record_count: number; last_updated: string | null }>;
 
       // For each domain, get type breakdown
       const result = domains.map((d) => {
@@ -5945,6 +5945,7 @@ export function registerIpcHandlers(): void {
           domain: d.domain,
           record_count: d.record_count,
           types: typeMap,
+          last_updated: d.last_updated,
         };
       });
 
@@ -6963,6 +6964,71 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('debug:shell-kill failed:', error);
       return { data: false, error: String(error) };
+    }
+  });
+
+  // Session handoff tracking
+  ipcMain.handle(
+    'session:handoff-create',
+    (
+      _event,
+      handoff: { from_session: string; to_session: string; reason?: string },
+    ) => {
+      try {
+        const id = `handoff-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          'INSERT INTO session_handoffs (id, from_session, to_session, reason) VALUES (?, ?, ?, ?)',
+        ).run(id, handoff.from_session, handoff.to_session, handoff.reason ?? null);
+        const created = loggedPrepare('SELECT * FROM session_handoffs WHERE id = ?').get(id);
+        log.info(
+          `[IPC] session:handoff-create - created handoff ${id}: ${handoff.from_session} -> ${handoff.to_session}`,
+        );
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('session:handoff-create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('session:handoff-list', () => {
+    try {
+      const handoffs = loggedPrepare(
+        'SELECT * FROM session_handoffs ORDER BY created_at ASC',
+      ).all();
+      log.info(
+        `[IPC] session:handoff-list - SELECT returned ${handoffs.length} handoffs from real database`,
+      );
+      return { data: handoffs, error: null };
+    } catch (error) {
+      log.error('session:handoff-list failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('session:handoff-get', (_event, id: string) => {
+    try {
+      const handoff = loggedPrepare('SELECT * FROM session_handoffs WHERE id = ?').get(id);
+      log.info(`[IPC] session:handoff-get - SELECT handoff id=${id} from real database`);
+      return { data: handoff || null, error: null };
+    } catch (error) {
+      log.error('session:handoff-get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('session:handoff-by-session', (_event, sessionId: string) => {
+    try {
+      const handoffs = loggedPrepare(
+        'SELECT * FROM session_handoffs WHERE from_session = ? OR to_session = ? ORDER BY created_at ASC',
+      ).all(sessionId, sessionId);
+      log.info(
+        `[IPC] session:handoff-by-session - SELECT ${handoffs.length} handoffs for session=${sessionId}`,
+      );
+      return { data: handoffs, error: null };
+    } catch (error) {
+      log.error('session:handoff-by-session failed:', error);
+      return { data: null, error: String(error) };
     }
   });
 
