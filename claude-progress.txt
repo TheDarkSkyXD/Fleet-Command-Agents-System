@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Overstory Init & Worktree Cleanup)
+
+#### Feature #97: Initialize overstory directory for new projects - PASSING
+- Added project:init-overstory IPC handler creating .overstory/ directory structure
+- Creates subdirectories: agents/, logs/, worktrees/
+- Generates config.json with default settings (maxConcurrentAgents, defaultModel, autoMerge)
+- Generates agents/registry.json and state.json tracking files
+- Idempotent: detects if .overstory/ already exists and reports accordingly
+- Added Initialize .overstory button to WorktreesPage header (emerald themed)
+- Status feedback with auto-dismiss (success/info/error messages)
+
+#### Feature #99: Clean completed worktrees - PASSING
+- Added worktree:remove IPC handler for individual worktree cleanup via git worktree remove --force
+- Added worktree:clean-completed IPC handler for batch cleanup of all non-main unassigned worktrees
+- Checks sessions table for active agents before removing (skips worktrees with running agents)
+- Also cleans up associated branches on batch cleanup (git branch -D)
+- Individual Clean button on each non-main, unassigned worktree card (red themed)
+- Clean All Completed batch button in header showing count of removable worktrees
+- Loading states per-worktree and for batch operation
+- Auto-refresh worktree list after successful cleanup
+- Summary row shows count of worktrees available for cleanup
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added project:init-overstory, worktree:remove, worktree:clean-completed IPC handlers
+- MODIFIED: src/preload/index.ts - Added worktreeRemove, worktreeCleanCompleted, projectInitOverstory bridge methods
+- MODIFIED: src/shared/types/index.ts - Added ElectronAPI types for new IPC channels
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Enhanced with init button, clean buttons, batch cleanup
+
+#### Current Status
+- 155/366 features passing (added #97 and #99 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Merge History & Dependency Ordering)
 
 #### Feature #89: Merge history log with tier tracking - PASSING
