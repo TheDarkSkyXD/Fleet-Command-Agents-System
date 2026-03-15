@@ -1,5 +1,38 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Mark Run Completed & Agent Performance History)
+
+#### Feature #179: Mark run as completed - PASSING
+- Added "Complete" button (FiCheckCircle icon) to StatusBar alongside existing Stop button
+- Complete button calls completeRun() which marks run status='completed', sets completed_at
+- Added completeRun action to runStore (calls run:stop IPC, then refreshes run list)
+- Added run history dropdown (History button with FiList icon) in StatusBar
+- History dropdown shows all runs with status indicators (active=green pulse, completed=blue check, failed=red)
+- Completed runs show completion timestamp
+- data-testid attributes for testing
+
+#### Feature #182: Agent performance history - PASSING
+- Added agent:performance-history IPC handler querying sessions by agent_name
+- Computes success rate (completed/total), average duration, failed count
+- Added AgentPerformanceHistory and AgentPerformanceSession types
+- Added preload bridge method and ElectronAPI type
+- Added Performance tab to AgentDetailPage (6th tab with FiActivity icon)
+- Summary stats: Total Sessions, Success Rate (color-coded progress bar), Avg Duration, Breakdown
+- Task Completion History table: session ID, capability badge, model, task, state dot, duration, started
+
+#### Files Created/Modified
+- MODIFIED: src/renderer/components/StatusBar.tsx - Complete button, run history dropdown
+- MODIFIED: src/renderer/stores/runStore.ts - completeRun action
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Performance tab component
+- MODIFIED: src/main/ipc/handlers.ts - agent:performance-history IPC handler
+- MODIFIED: src/preload/index.ts - agentPerformanceHistory bridge
+- MODIFIED: src/shared/types/index.ts - AgentPerformanceHistory, AgentPerformanceSession types
+
+#### Current Status
+- 204/366 features passing (added #179 and #182 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Auto-generate Expertise & Bash Restriction Enforcement)
 
 #### Feature #170: Auto-generate mulch records from discovery - PASSING
