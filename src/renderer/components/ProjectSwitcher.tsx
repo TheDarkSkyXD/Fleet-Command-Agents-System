@@ -10,6 +10,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import { useProjectStore } from '../stores/projectStore';
+import { useSettingsStore } from '../stores/settingsStore';
 
 interface ProjectSwitcherProps {
   collapsed: boolean;
@@ -28,6 +29,7 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
   } = useProjectStore();
   const [isOpen, setIsOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const defaultProjectPath = useSettingsStore((s) => s.settings.defaultProjectPath);
   const [newName, setNewName] = useState('');
   const [newPath, setNewPath] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -248,7 +250,12 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
         ) : (
           <button
             type="button"
-            onClick={() => setShowCreate(true)}
+            onClick={() => {
+              setShowCreate(true);
+              if (defaultProjectPath && !newPath) {
+                setNewPath(defaultProjectPath);
+              }
+            }}
             className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-400 hover:bg-slate-800/80 hover:text-slate-200 transition-colors"
           >
             <FiFolderPlus size={14} />

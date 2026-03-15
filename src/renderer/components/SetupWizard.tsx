@@ -11,6 +11,7 @@ import {
   FiShield,
   FiX,
 } from 'react-icons/fi';
+import { useSettingsStore } from '../stores/settingsStore';
 
 type WizardStep = 'cli-detect' | 'version' | 'auth' | 'project' | 'config' | 'complete';
 
@@ -50,8 +51,16 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     complete: { status: 'pending' },
   });
   const [cliResult, setCliResult] = useState<CliDetectionResult | null>(null);
+  const defaultProjectPath = useSettingsStore((s) => s.settings.defaultProjectPath);
   const [projectPath, setProjectPath] = useState('');
   const [projectName, setProjectName] = useState('');
+
+  // Pre-fill project path from default setting
+  useEffect(() => {
+    if (defaultProjectPath && !projectPath) {
+      setProjectPath(defaultProjectPath);
+    }
+  }, [defaultProjectPath]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showComplete, setShowComplete] = useState(false);
 
   const updateStatus = useCallback((step: WizardStep, status: StepStatus) => {

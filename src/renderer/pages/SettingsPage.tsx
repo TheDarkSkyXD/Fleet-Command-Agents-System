@@ -202,9 +202,99 @@ export function SettingsPage() {
       {activeTab === 'profiles' && <ProfilesSettings />}
       {activeTab === 'quality-gates' && <QualityGatesSettings />}
       {activeTab === 'notifications' && <NotificationPreferencesSettings />}
-      {activeTab === 'project-config' && <ProjectConfigEditor />}
+      {activeTab === 'project-config' && (
+        <>
+          <DefaultProjectPathSetting />
+          <div className="mt-6">
+            <ProjectConfigEditor />
+          </div>
+        </>
+      )}
       {activeTab === 'updates' && <UpdateSettings />}
       {activeTab === 'cleanup' && <CleanupSettings />}
+    </div>
+  );
+}
+
+// ── Default Project Path Setting ─────────────────────────────────────
+
+function DefaultProjectPathSetting() {
+  const { settings, updateSetting } = useSettingsStore();
+  const [localPath, setLocalPath] = useState(settings.defaultProjectPath || '');
+  const [saved, setSaved] = useState(false);
+
+  // Sync local state if settings load later
+  useEffect(() => {
+    setLocalPath(settings.defaultProjectPath || '');
+  }, [settings.defaultProjectPath]);
+
+  const handleSave = () => {
+    updateSetting('defaultProjectPath', localPath.trim());
+    setSaved(true);
+    toast.success('Default project path saved');
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleClear = () => {
+    setLocalPath('');
+    updateSetting('defaultProjectPath', '');
+    toast.success('Default project path cleared');
+  };
+
+  return (
+    <div
+      className="rounded-lg border border-slate-700 bg-slate-800 p-6"
+      data-testid="default-project-path-setting"
+    >
+      <h2 className="text-lg font-semibold text-slate-100 mb-1">Default Project Path</h2>
+      <p className="text-sm text-slate-400 mb-4">
+        Set a default path that will be pre-filled when creating new projects. This saves time if you
+        keep projects in the same directory.
+      </p>
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          value={localPath}
+          onChange={(e) => {
+            setLocalPath(e.target.value);
+            setSaved(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave();
+          }}
+          placeholder="e.g. /home/user/projects or C:\Users\user\projects"
+          className="flex-1 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:outline-none transition-all font-mono"
+          data-testid="default-project-path-input"
+          aria-label="Default project path"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={localPath.trim() === (settings.defaultProjectPath || '')}
+          className="flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          data-testid="default-project-path-save"
+        >
+          {saved ? <FiCheck size={14} /> : <FiSave size={14} />}
+          {saved ? 'Saved' : 'Save'}
+        </button>
+        {settings.defaultProjectPath && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="flex items-center gap-1.5 rounded-md bg-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600 hover:text-slate-100 transition-colors"
+            data-testid="default-project-path-clear"
+          >
+            <FiX size={14} />
+            Clear
+          </button>
+        )}
+      </div>
+      {settings.defaultProjectPath && (
+        <p className="text-xs text-slate-400 mt-2">
+          Current default:{' '}
+          <span className="font-mono text-slate-300">{settings.defaultProjectPath}</span>
+        </p>
+      )}
     </div>
   );
 }
