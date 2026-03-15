@@ -1,5 +1,41 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Auto-generate Expertise & Bash Restriction Enforcement)
+
+#### Feature #170: Auto-generate mulch records from discovery - PASSING
+- Added "Generate Expertise" button bar to DiscoveryResultsView
+- Button loads ALL findings across all scanned categories from the active scan
+- Maps discovery categories to expertise domains (architecture→Architecture, etc.)
+- Maps severity to expertise type (important→decision, warning→failure, info→convention)
+- Maps severity to classification (important→foundational, warning→tactical, info→observational)
+- Each record tagged with category, 'auto-generated', and source scan ID
+- Shows spinner during generation, count of created records on completion
+- Records created via expertiseCreate IPC with unique IDs
+
+#### Feature #172: Bash pattern restriction rules - PASSING
+- Added guardRule:check-bash IPC handler in main process
+- Handler loads bash_restrictions JSON from agent_definitions for the specified role
+- Normalizes both command and patterns to lowercase for case-insensitive matching
+- Checks if command string contains any restriction pattern substring
+- Returns blocked/allowed result with matched_pattern details
+- Added guardCheckBash preload bridge method and ElectronAPI type
+- Added BashRestrictionTester UI component in GuardRulesPage bash restrictions section
+- Test input with monospace font, "Test" button, Enter key support
+- Color-coded result display: red BLOCKED with matched pattern, green ALLOWED
+- data-testid attributes for all test elements
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/DiscoveryPage.tsx - Generate Expertise button, mapping logic
+- MODIFIED: src/renderer/pages/GuardRulesPage.tsx - BashRestrictionTester component
+- MODIFIED: src/main/ipc/handlers.ts - guardRule:check-bash IPC handler
+- MODIFIED: src/preload/index.ts - guardCheckBash bridge method
+- MODIFIED: src/shared/types/index.ts - guardCheckBash ElectronAPI type
+
+#### Current Status
+- 201/366 features passing (added #170 and #172 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Custom Agent Roles & Overlay Preview)
 
 #### Feature #157: Create custom agent roles - PASSING
