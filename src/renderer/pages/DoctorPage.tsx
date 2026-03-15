@@ -10,6 +10,7 @@ import {
   FiRefreshCw,
   FiTerminal,
   FiTool,
+  FiX,
   FiXCircle,
 } from 'react-icons/fi';
 import type { DoctorCheck, DoctorResult } from '../../shared/types';
@@ -176,8 +177,16 @@ export function DoctorPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 rounded-lg border border-red-700 bg-red-900/20 p-4 text-sm text-red-300">
-          {error}
+        <div className="mb-6 rounded-lg border border-red-700 bg-red-900/20 p-4 text-sm text-red-300 flex items-center justify-between gap-3" data-testid="doctor-error">
+          <span>{error}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button type="button" onClick={runChecks} className="rounded-md bg-red-500/20 px-3 py-1 text-xs font-medium text-red-300 hover:bg-red-500/30 transition-colors" data-testid="doctor-error-retry">
+              Retry
+            </button>
+            <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-200 transition-colors" title="Dismiss error">
+              <FiX className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 

@@ -93,10 +93,43 @@ function AddProjectForm({
   const [path, setPath] = useState('');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; path?: string }>({});
+  const [touched, setTouched] = useState<{ name?: boolean; path?: boolean }>({});
+
+  const validateField = (field: 'name' | 'path', value: string) => {
+    let error: string | undefined;
+    if (field === 'name') {
+      if (!value.trim()) {
+        error = 'Project Name is required';
+      } else if (value.trim().length > 100) {
+        error = 'Project Name must be 100 characters or fewer';
+      }
+    } else if (field === 'path') {
+      if (!value.trim()) {
+        error = 'Project Path is required';
+      } else if (!/^[a-zA-Z]:[/\\]|^\//.test(value.trim())) {
+        error = 'Project Path must be an absolute path (e.g. /home/user/project or C:\\projects)';
+      }
+    }
+    setFieldErrors((prev) => {
+      if (error) return { ...prev, [field]: error };
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    return !error;
+  };
+
+  const validateAll = (): boolean => {
+    const nameValid = validateField('name', name);
+    const pathValid = validateField('path', path);
+    setTouched({ name: true, path: true });
+    return nameValid && pathValid;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !path.trim()) return;
+    if (!validateAll()) return;
     setCreating(true);
     try {
       const project = await createProject(
@@ -109,6 +142,8 @@ function AddProjectForm({
         setName('');
         setPath('');
         setDescription('');
+        setFieldErrors({});
+        setTouched({});
         setShowForm(false);
         onCreated();
       }
@@ -145,10 +180,25 @@ function AddProjectForm({
           id="proj-name"
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (touched.name) validateField('name', e.target.value);
+          }}
+          onBlur={() => {
+            setTouched((prev) => ({ ...prev, name: true }));
+            validateField('name', name);
+          }}
           placeholder="My App"
-          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          data-testid="proj-name-input"
+          className={`w-full rounded-md border bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-1 ${
+            touched.name && fieldErrors.name
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+              : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'
+          }`}
         />
+        {touched.name && fieldErrors.name && (
+          <p className="mt-1 text-xs text-red-400" data-testid="proj-name-error">{fieldErrors.name}</p>
+        )}
       </div>
       <div>
         <label htmlFor="proj-path" className="block text-xs font-medium text-slate-400 mb-1">
@@ -158,10 +208,25 @@ function AddProjectForm({
           id="proj-path"
           type="text"
           value={path}
-          onChange={(e) => setPath(e.target.value)}
+          onChange={(e) => {
+            setPath(e.target.value);
+            if (touched.path) validateField('path', e.target.value);
+          }}
+          onBlur={() => {
+            setTouched((prev) => ({ ...prev, path: true }));
+            validateField('path', path);
+          }}
           placeholder="/home/user/projects/my-app"
-          className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 font-mono placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          data-testid="proj-path-input"
+          className={`w-full rounded-md border bg-slate-900 px-3 py-2 text-sm text-slate-50 font-mono placeholder-slate-500 focus:outline-none focus:ring-1 ${
+            touched.path && fieldErrors.path
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+              : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'
+          }`}
         />
+        {touched.path && fieldErrors.path && (
+          <p className="mt-1 text-xs text-red-400" data-testid="proj-path-error">{fieldErrors.path}</p>
+        )}
       </div>
       <div>
         <label htmlFor="proj-desc" className="block text-xs font-medium text-slate-400 mb-1">

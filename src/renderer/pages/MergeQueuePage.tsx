@@ -235,12 +235,32 @@ function EnqueueDialog({
   const [taskId, setTaskId] = useState('');
   const [agentName, setAgentName] = useState('');
   const [selectedDeps, setSelectedDeps] = useState<number[]>([]);
+  const [branchError, setBranchError] = useState<string | undefined>();
+  const [branchTouched, setBranchTouched] = useState(false);
 
   if (!open) return null;
 
+  const validateBranch = (value: string): boolean => {
+    if (!value.trim()) {
+      setBranchError('Branch Name is required');
+      return false;
+    }
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9/_.-]*$/.test(value.trim())) {
+      setBranchError('Branch Name must start with a letter or number and contain only letters, numbers, /, -, _, or .');
+      return false;
+    }
+    if (value.trim().length > 200) {
+      setBranchError('Branch Name must be 200 characters or fewer');
+      return false;
+    }
+    setBranchError(undefined);
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!branchName.trim()) return;
+    setBranchTouched(true);
+    if (!validateBranch(branchName)) return;
     onEnqueue({
       branch_name: branchName.trim(),
       task_id: taskId.trim() || undefined,
@@ -251,6 +271,8 @@ function EnqueueDialog({
     setTaskId('');
     setAgentName('');
     setSelectedDeps([]);
+    setBranchError(undefined);
+    setBranchTouched(false);
     onClose();
   };
 
@@ -275,10 +297,25 @@ function EnqueueDialog({
               id="branch-name"
               type="text"
               value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
+              onChange={(e) => {
+                setBranchName(e.target.value);
+                if (branchTouched) validateBranch(e.target.value);
+              }}
+              onBlur={() => {
+                setBranchTouched(true);
+                validateBranch(branchName);
+              }}
               placeholder="feature/my-branch"
-              className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              data-testid="enqueue-branch-input"
+              className={`w-full rounded-md border bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-1 ${
+                branchTouched && branchError
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                  : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'
+              }`}
             />
+            {branchTouched && branchError && (
+              <p className="mt-1 text-xs text-red-400" data-testid="enqueue-branch-error">{branchError}</p>
+            )}
           </div>
           <div>
             <label htmlFor="task-id" className="block text-sm font-medium text-slate-300 mb-1">
@@ -920,8 +957,16 @@ export function MergeQueuePage() {
 
       {/* Error display */}
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
-          {error}
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400 flex items-center justify-between gap-3" data-testid="merge-queue-error">
+          <span>{error}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button type="button" onClick={fetchQueue} className="rounded-md bg-red-500/20 px-3 py-1 text-xs font-medium text-red-300 hover:bg-red-500/30 transition-colors" data-testid="merge-queue-error-retry">
+              Retry
+            </button>
+            <button type="button" onClick={() => useMergeStore.setState({ error: null })} className="text-red-400 hover:text-red-200 transition-colors" title="Dismiss error">
+              &#10005;
+            </button>
+          </div>
         </div>
       )}
 

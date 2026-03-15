@@ -329,8 +329,11 @@ function InstructionEditor({
       </div>
 
       {error && (
-        <div className="rounded-md px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/30">
-          {error}
+        <div className="rounded-md px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/30 flex items-center justify-between gap-2" data-testid="config-editor-error">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-200 transition-colors shrink-0" title="Dismiss error">
+            <FiX size={14} />
+          </button>
         </div>
       )}
 
@@ -834,8 +837,11 @@ function CreateRoleModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {error && (
-            <div className="rounded-md px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/30">
-              {error}
+            <div className="rounded-md px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/30 flex items-center justify-between gap-2" data-testid="definition-editor-error">
+              <span>{error}</span>
+              <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-200 transition-colors shrink-0" title="Dismiss error">
+                <FiX size={14} />
+              </button>
             </div>
           )}
 
