@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  FiAlertTriangle,
   FiCheck,
   FiChevronDown,
   FiFolder,
@@ -31,6 +32,8 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
   const [newPath, setNewPath] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [switching, setSwitching] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,9 +82,21 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
     setIsOpen(false);
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
-    await deleteProject(id);
+    setDeleteTarget({ id, name });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await deleteProject(deleteTarget.id);
+    setDeleting(false);
+    setDeleteTarget(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteTarget(null);
   };
 
   if (collapsed) {
@@ -171,9 +186,10 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
                 ) : (
                   <button
                     type="button"
-                    onClick={(e) => handleDelete(e, project.id)}
+                    onClick={(e) => handleDeleteClick(e, project.id, project.name)}
                     className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-600/20 hover:text-red-400 transition-all shrink-0"
-                    title="Remove project"
+                    title="Delete project"
+                    data-testid={`project-delete-${project.id}`}
                   >
                     <FiTrash2 size={12} />
                   </button>
@@ -245,6 +261,84 @@ export function ProjectSwitcher({ collapsed }: ProjectSwitcherProps) {
 
   return (
     <div className="relative px-2 mb-2">
+      {/* Delete project confirmation modal */}
+      {deleteTarget && (
+        <>
+          <div
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+            onClick={handleDeleteCancel}
+            onKeyDown={() => {}}
+            data-testid="delete-project-backdrop"
+          />
+          <div
+            className="fixed left-1/2 top-1/2 z-[101] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/60"
+            data-testid="delete-project-modal"
+          >
+            {/* Warning header */}
+            <div className="flex items-center gap-3 border-b border-slate-700/80 px-5 py-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/15">
+                <FiAlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-100">Delete Project</h3>
+                <p className="text-xs text-slate-400 mt-0.5">This action cannot be undone</p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-slate-300">
+                Are you sure you want to delete this project?
+              </p>
+              <div className="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <FiFolder size={14} className="text-slate-400 shrink-0" />
+                  <span className="text-sm font-medium text-slate-200 truncate" data-testid="delete-project-name">
+                    {deleteTarget.name}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                <p className="text-xs text-amber-400">
+                  <strong>Warning:</strong> All project data including agent sessions, logs, metrics, and configuration will be permanently removed from Fleet Command. Your source code files will not be affected.
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 border-t border-slate-700/80 px-5 py-3">
+              <button
+                type="button"
+                onClick={handleDeleteCancel}
+                className="rounded-md border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+                data-testid="delete-project-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                data-testid="delete-project-confirm"
+              >
+                {deleting ? (
+                  <>
+                    <FiLoader size={14} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <FiTrash2 size={14} />
+                    Delete Project
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Current project button */}
       <button
         type="button"
