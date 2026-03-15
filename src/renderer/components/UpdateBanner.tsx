@@ -71,6 +71,11 @@ export function UpdateBanner() {
     };
   }, []);
 
+  const handleDownload = useCallback(() => {
+    setDownloading(true);
+    window.electronAPI.updateDownload();
+  }, []);
+
   const handleInstall = useCallback(() => {
     window.electronAPI.updateInstall();
   }, []);
@@ -91,7 +96,10 @@ export function UpdateBanner() {
   };
 
   return (
-    <div className="relative flex items-center gap-3 bg-blue-600/90 px-4 py-2 text-white text-sm">
+    <div
+      className="relative flex items-center gap-3 bg-blue-600/90 px-4 py-2 text-white text-sm"
+      data-testid="update-banner"
+    >
       {/* Download progress bar background */}
       {downloading && status.downloadProgress != null && (
         <div
@@ -131,6 +139,15 @@ export function UpdateBanner() {
             <span>
               A new version of Fleet Command is available: <strong>v{status.latestVersion}</strong>
             </span>
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="ml-2 inline-flex items-center gap-1 rounded bg-white/20 px-3 py-1 text-xs font-medium hover:bg-white/30 transition-colors"
+              data-testid="update-download-btn"
+            >
+              <FiDownload className="w-3 h-3" />
+              Download
+            </button>
           </>
         )}
       </div>
