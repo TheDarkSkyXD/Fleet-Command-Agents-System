@@ -424,6 +424,8 @@ function ProfileCard({
   existingNames: string[];
   setStatusMessage: (msg: { type: 'success' | 'error'; text: string }) => void;
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   if (isEditing) {
     return (
       <ProfileEditForm
@@ -517,14 +519,67 @@ function ProfileCard({
           </button>
           <button
             type="button"
-            onClick={onDelete}
+            onClick={() => setShowDeleteConfirm(true)}
             title="Delete profile"
             className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
+            data-testid="profile-delete-btn"
           >
             <FiTrash2 size={16} />
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowDeleteConfirm(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowDeleteConfirm(false);
+          }}
+          data-testid="profile-delete-confirm-dialog"
+        >
+          <div className="mx-4 w-full max-w-md rounded-xl border border-red-500/30 bg-gray-900 p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+                <FiTrash2 className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Delete Profile</h3>
+                <p className="text-sm text-gray-400">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-300 mb-6">
+              Are you sure you want to delete the profile{' '}
+              <span className="font-semibold text-white">"{profile.name}"</span>? All configuration
+              settings in this profile will be permanently removed.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+                data-testid="profile-delete-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  onDelete();
+                }}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"
+                data-testid="profile-delete-confirm"
+              >
+                Delete Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
