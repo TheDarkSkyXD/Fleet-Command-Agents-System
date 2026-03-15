@@ -21,6 +21,7 @@ import {
   autoResolveConflicts,
   executeCleanMerge,
   previewMerge,
+  reimagineFromScratch,
 } from '../services/mergeService';
 import { type NotificationEventType, notificationService } from '../services/notificationService';
 import {
@@ -2036,9 +2037,10 @@ export function registerIpcHandlers(): void {
       try {
         let info: { changes: number };
         if (options?.agentName) {
-          info = loggedPrepare(
-            'DELETE FROM messages WHERE from_agent = ? OR to_agent = ?',
-          ).run(options.agentName, options.agentName) as { changes: number };
+          info = loggedPrepare('DELETE FROM messages WHERE from_agent = ? OR to_agent = ?').run(
+            options.agentName,
+            options.agentName,
+          ) as { changes: number };
         } else if (options?.olderThanHours) {
           info = loggedPrepare(
             `DELETE FROM messages WHERE created_at < datetime('now', '-' || ? || ' hours')`,
@@ -2052,9 +2054,7 @@ export function registerIpcHandlers(): void {
             changes: number;
           };
         }
-        log.info(
-          `[IPC] mail:purge - DELETE removed ${info.changes} messages from real database`,
-        );
+        log.info(`[IPC] mail:purge - DELETE removed ${info.changes} messages from real database`);
         return { data: { deleted: info.changes }, error: null };
       } catch (error) {
         log.error('mail:purge failed:', error);
@@ -2306,6 +2306,59 @@ export function registerIpcHandlers(): void {
         return { data: updated, error: result.error };
       } catch (error) {
         log.error('merge:ai-resolve failed:', error);
+        try {
+          loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        } catch {
+          /* ignore */
+        }
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // Tier 4: Reimagine from scratch - abandon branch and start fresh implementation
+  ipcMain.handle(
+    'merge:reimagine',
+    async (_event, id: number, repoPath?: string, targetBranch?: string) => {
+      try {
+        const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
+          id: number;
+          branch_name: string;
+          task_id: string | null;
+          status: string;
+        } | null;
+        if (!entry) {
+          return { data: null, error: `Merge queue entry ${id} not found` };
+        }
+
+        loggedPrepare("UPDATE merge_queue SET status = 'merging' WHERE id = ?").run(id);
+        log.info(`[IPC] merge:reimagine - starting Tier 4 reimagine for id=${id}`);
+
+        const mergePath = repoPath || process.cwd();
+        const result = await reimagineFromScratch(
+          mergePath,
+          entry.branch_name,
+          targetBranch,
+          entry.task_id || undefined,
+        );
+
+        if (result.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'reimagine' WHERE id = ?",
+          ).run(id);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          log.info(
+            `[IPC] merge:reimagine - Tier 4 succeeded for id=${id}, new branch: ${result.reimagineBranch}`,
+          );
+          return { data: updated, error: null, reimagineBranch: result.reimagineBranch };
+        }
+
+        loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
+        const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+        log.error(`[IPC] merge:reimagine - failed for id=${id}: ${result.error}`);
+        return { data: updated, error: result.error };
+      } catch (error) {
+        log.error('merge:reimagine failed:', error);
         try {
           loggedPrepare("UPDATE merge_queue SET status = 'failed' WHERE id = ?").run(id);
         } catch {

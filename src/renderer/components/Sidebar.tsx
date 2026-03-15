@@ -11,6 +11,7 @@ import {
   FiFileText,
   FiGitBranch,
   FiGitMerge,
+  FiHeart,
   FiMail,
   FiSearch,
   FiSettings,
@@ -39,8 +40,9 @@ const navItems = [
   { id: 'discovery', label: 'Discovery', icon: FiSearch },
   { id: 'prompts', label: 'Prompts', icon: FiFileText },
   { id: 'expertise', label: 'Expertise', icon: FiBook },
+  { id: 'events', label: 'Event Feed', icon: FiActivity },
   { id: 'metrics', label: 'Metrics', icon: FiBarChart2 },
-  { id: 'doctor', label: 'Doctor', icon: FiActivity },
+  { id: 'doctor', label: 'Doctor', icon: FiHeart },
   { id: 'debug', label: 'Debug', icon: FiTerminal },
   { id: 'settings', label: 'Settings', icon: FiSettings },
 ];

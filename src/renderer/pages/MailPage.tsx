@@ -330,7 +330,7 @@ export function MailPage() {
     setUnreadCount(0);
     setSelectedMessage(null);
     setShowPurgeMenu(false);
-    const deleted = result?.data?.deleted ?? 0;
+    const deleted = (result?.data as { deleted?: number } | null)?.deleted ?? 0;
     setStatusMsg({ type: 'success', text: `Purged all messages (${deleted} removed)` });
   };
 
@@ -449,14 +449,79 @@ export function MailPage() {
               <FiCheckCircle size={14} />
             </button>
           )}
-          <button
-            type="button"
-            onClick={handlePurge}
-            className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-red-900/30 hover:text-red-400"
-            title="Purge all messages"
-          >
-            <FiTrash2 size={14} />
-          </button>
+          <div className="relative" ref={purgeMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowPurgeMenu((v) => !v)}
+              className="flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-red-900/30 hover:text-red-400"
+              title="Purge messages"
+            >
+              <FiTrash2 size={14} />
+            </button>
+            {showPurgeMenu && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-lg border border-slate-700 bg-slate-900 p-3 shadow-xl">
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Purge Messages
+                </h4>
+
+                {/* Purge by age */}
+                <div className="mb-3 space-y-1">
+                  <p className="text-xs text-slate-500">By age:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { label: '1 hour', hours: 1 },
+                      { label: '6 hours', hours: 6 },
+                      { label: '24 hours', hours: 24 },
+                      { label: '7 days', hours: 168 },
+                    ].map((opt) => (
+                      <button
+                        key={opt.hours}
+                        type="button"
+                        onClick={() => handlePurgeByAge(opt.hours)}
+                        className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 transition-colors hover:border-red-600 hover:bg-red-900/30 hover:text-red-300"
+                      >
+                        &gt; {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Purge by agent */}
+                <div className="mb-3">
+                  <p className="mb-1 text-xs text-slate-500">By agent:</p>
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={purgeAgentName}
+                      onChange={(e) => setPurgeAgentName(e.target.value)}
+                      placeholder="Agent name..."
+                      className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handlePurgeByAgent();
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePurgeByAgent}
+                      disabled={!purgeAgentName.trim()}
+                      className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 transition-colors hover:border-red-600 hover:bg-red-900/30 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Purge
+                    </button>
+                  </div>
+                </div>
+
+                {/* Purge all */}
+                <button
+                  type="button"
+                  onClick={handlePurgeAll}
+                  className="w-full rounded border border-red-800 bg-red-900/20 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40"
+                >
+                  Purge All Messages
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

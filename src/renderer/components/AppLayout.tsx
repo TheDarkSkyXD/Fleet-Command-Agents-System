@@ -5,6 +5,7 @@ import { AgentsPage } from '../pages/AgentsPage';
 import { DebugPage } from '../pages/DebugPage';
 import { DiscoveryPage } from '../pages/DiscoveryPage';
 import { DoctorPage } from '../pages/DoctorPage';
+import { EventFeedPage } from '../pages/EventFeedPage';
 import { ExpertisePage } from '../pages/ExpertisePage';
 import { GuardRulesPage } from '../pages/GuardRulesPage';
 import { HooksPage } from '../pages/HooksPage';
@@ -238,6 +239,12 @@ function PageContent({
       return (
         <ErrorBoundary sectionName="Expertise">
           <ExpertisePage />
+        </ErrorBoundary>
+      );
+    case 'events':
+      return (
+        <ErrorBoundary sectionName="Event Feed">
+          <EventFeedPage />
         </ErrorBoundary>
       );
     case 'metrics':
