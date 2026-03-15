@@ -20,6 +20,20 @@ const TOUR_STEPS: TourStep[] = [
       'Click here to spawn an AI coding agent. Choose a capability (scout, builder, reviewer, etc.), select a model, and optionally set a file scope to restrict which files the agent can modify.',
     position: 'bottom',
   },
+  {
+    targetSelector: '[data-testid="nav-mail"]',
+    title: 'Check Agent Mail',
+    description:
+      'Agents communicate via an internal mail system. Check the inbox to see status updates, questions, and results from your agents. You can also send messages to coordinate work.',
+    position: 'right',
+  },
+  {
+    targetSelector: '[data-testid="nav-merge"]',
+    title: 'Merge Workflow',
+    description:
+      'When agents finish their work, their branches are enqueued here for merging. Review the queue, preview diffs, and merge changes into your main branch. The system supports 4 resolution tiers: clean merge, auto-resolve, AI-resolve, and reimagine.',
+    position: 'right',
+  },
 ];
 
 const TOUR_STORAGE_KEY = 'fleet-command-onboarding-completed';

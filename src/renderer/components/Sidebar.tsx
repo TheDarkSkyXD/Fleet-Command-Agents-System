@@ -78,6 +78,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
             <button
               type="button"
               key={item.id}
+              data-testid={`nav-${item.id}`}
               onClick={() => onNavigate(item.id)}
               className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
