@@ -2791,3 +2791,31 @@
 - 186/366 features passing (added #146 and #149 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Download Progress & Domain Health)
+
+#### Feature #148: Download progress indicator - PASSING
+- Enhanced UpdateBanner with dedicated progress bar at bottom of banner
+- Bold monospaced percentage display with tabular-nums
+- Downloaded/total bytes display using formatBytes helper
+- Download speed shown alongside progress
+- Smooth transition animation on progress bar fill
+
+#### Feature #165: Domain health dashboard for expertise - PASSING
+- Added Health tab to ExpertisePage alongside Domains and Timeline
+- Summary stats: Total Domains, Total Entries, Healthy count, Stale count
+- Per-domain health rows with green/amber indicators (healthy<=7d, stale>7d)
+- Staleness badges with relative time (hours/days/months ago)
+- Backend expertise:domains query updated to include last_updated (MAX of updated_at/created_at)
+- ExpertiseDomainSummary type extended with last_updated field
+
+#### Files Modified
+- MODIFIED: src/renderer/components/UpdateBanner.tsx - Progress bar, percentage, bytes display
+- MODIFIED: src/renderer/pages/ExpertisePage.tsx - Health tab and dashboard
+- MODIFIED: src/shared/types/index.ts - Added last_updated to ExpertiseDomainSummary
+- MODIFIED: src/main/ipc/handlers.ts - Updated expertise:domains query
+
+#### Current Status
+- 187/366 features passing (added #148 and #165 this session)
+- All code passes Biome lint and TypeScript check (no new errors)
+- No mock data patterns in codebase
