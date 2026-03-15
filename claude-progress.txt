@@ -5023,3 +5023,23 @@
 - 339/366 features passing (added #338 and #339 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Import Definitions & Export Metrics CSV)
+
+#### Feature #344: Import agent definitions from file - PASSING
+- Import functionality was already implemented: file picker, JSON parsing, validation, backend upsert
+- Added data-testid attributes: import-file-input, import-definitions-btn, import-status-message
+- Added data-status attribute (error/success) to import status message
+- Enhanced import status to show breakdown of new vs updated roles for duplicate awareness
+- Backend uses INSERT OR REPLACE to handle duplicates gracefully (no conflicts)
+
+#### Feature #345: Export metrics data to CSV - PASSING
+- Feature was already fully implemented, no code changes needed
+- Frontend: export dropdown with CSV/JSON options (data-testid: export-csv-btn, export-json-btn)
+- Backend: metrics:export queries all metrics, generates CSV with headers, proper escaping, save dialog
+- Toast notifications for success/error
+
+#### Current Status
+- 344/366 features passing (added #344 and #345 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
