@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Database-Driven Dropdowns & Filters)
+
+#### Feature #294: Database-driven dropdowns reflect real data - PASSING
+- Verified all entity-referencing dropdowns pull from database via IPC calls
+- AgentsPage parent agent select: populated from agentList IPC (real SQL)
+- HooksPage project selects: populated from projectList IPC (real SQL)
+- DebugPage agent filters: populated from appLogAgents/eventList IPC (real SQL)
+- PromptsPage parent prompt select: populated from promptList IPC (real SQL)
+- ProjectSwitcher: populated from useProjectStore (real SQL)
+- Enhanced MailPage: agent filter changed from text input to select dropdown with DB-derived agent names
+- Enhanced MailPage compose: From/To agent fields now include datalists with real agent names from messages
+- Added data-testid attributes: hook-project-select, hook-project-filter, prompt-parent-select, compose-from-agent
+
+#### Feature #295: Filters and sorts work with real database data - PASSING
+- Verified all IPC handlers use real SQL queries: agent:list (ORDER BY created_at), mail:list (WHERE + ORDER BY priority, created_at), issue:list (WHERE status/priority/type + ORDER BY created_at), event:list (WHERE eventType/agentName)
+- AgentsPage uses TanStack react-table getSortedRowModel/getFilteredRowModel on DB data
+- TasksPage passes filterStatus/filterPriority/filterType to issueList IPC
+- Added data-testid attributes: agent-global-filter, agent-capability-filter, agent-sort-{column}
+- No mock data patterns found in codebase
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MailPage.tsx - DB-driven agent filter dropdown, compose datalists
+- MODIFIED: src/renderer/pages/HooksPage.tsx - data-testid on project selects
+- MODIFIED: src/renderer/pages/PromptsPage.tsx - data-testid on parent prompt select
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - data-testid on sort headers, global filter, capability filter
+
+#### Current Status
+- 293/366 features passing (added #294 and #295 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Database Recovery & IPC Consistency)
 
 #### Feature #292: Graceful handling of missing database - PASSING
