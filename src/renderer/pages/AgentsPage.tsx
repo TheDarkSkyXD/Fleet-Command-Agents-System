@@ -31,9 +31,11 @@ import {
   FiSquare,
   FiUsers,
   FiX,
+  FiXCircle,
   FiZap,
 } from 'react-icons/fi';
 import { toast } from 'sonner';
+import { z } from 'zod';
 import type {
   AgentCapability,
   AgentProcessInfo,
@@ -126,7 +128,7 @@ const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> 
   },
   completed: { icon: <FiCheckCircle className="h-3.5 w-3.5" />, className: 'text-slate-400' },
   stalled: { icon: <FiAlertTriangle className="h-3.5 w-3.5" />, className: 'text-amber-400' },
-  zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
+  zombie: { icon: <FiXCircle className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
 /** Human-readable state descriptions for hover tooltips */
@@ -135,7 +137,8 @@ const STATE_TOOLTIPS: Record<string, string> = {
   working: 'Agent is actively processing tasks',
   completed: 'Agent has finished all assigned work',
   stalled: 'Agent appears stuck or unresponsive',
-  zombie: 'Agent process is dead but session remains',
+  zombie:
+    'Zombie: Agent process has died unexpectedly. The session remains but the process is no longer running. Stop and respawn to recover.',
 };
 
 /** Human-readable capability descriptions for hover tooltips */
@@ -819,9 +822,10 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
               {state === 'zombie' && (
                 <span
                   className="inline-flex items-center gap-1 text-xs text-red-400 font-semibold animate-pulse"
-                  title={`Zombie agent - stalled for ${stalledMin}m ${stalledSec}s, will be terminated`}
+                  title="Zombie: Agent process has died unexpectedly. The session remains but the process is no longer running. Stop and respawn to recover."
+                  data-testid="agent-zombie-error-icon"
                 >
-                  <FiZap className="h-3 w-3" />
+                  <FiXCircle className="h-3 w-3" />
                   ZOMBIE
                 </span>
               )}
@@ -1480,9 +1484,10 @@ function AgentCard({
           {session.state === 'zombie' && (
             <span
               className="inline-flex items-center gap-1 text-xs text-red-400 font-semibold animate-pulse"
-              title="Zombie agent - being terminated"
+              title="Zombie: Agent process has died unexpectedly. The session remains but the process is no longer running. Stop and respawn to recover."
+              data-testid="agent-card-zombie-error-icon"
             >
-              <FiZap className="h-3 w-3" />
+              <FiXCircle className="h-3 w-3" />
               ZOMBIE
             </span>
           )}
@@ -1570,6 +1575,33 @@ function AgentCard({
   );
 }
 
+/** Zod schema for agent spawn form validation */
+const spawnFormSchema = z.object({
+  name: z
+    .string()
+    .refine((val) => val.length === 0 || val.trim().length > 0, {
+      message: 'Name cannot be only whitespace',
+    })
+    .refine((val) => val.length === 0 || /^[a-zA-Z0-9_-][a-zA-Z0-9_ -]*$/.test(val), {
+      message: 'Name can only contain letters, numbers, spaces, hyphens, and underscores',
+    })
+    .refine((val) => val.length === 0 || val.length <= 64, {
+      message: 'Name must be 64 characters or fewer',
+    }),
+  taskId: z
+    .string()
+    .refine((val) => val.length === 0 || val.trim().length > 0, {
+      message: 'Task ID cannot be only whitespace',
+    })
+    .refine((val) => val.length === 0 || /^[a-zA-Z0-9_-]+$/.test(val.trim()), {
+      message: 'Task ID can only contain letters, numbers, hyphens, and underscores',
+    }),
+  prompt: z.string(),
+  fileScope: z.string(),
+});
+
+type SpawnFormErrors = Partial<Record<keyof z.infer<typeof spawnFormSchema>, string>>;
+
 function SpawnDialog({
   capability,
   model,
@@ -1632,6 +1664,51 @@ function SpawnDialog({
   const [showTreePicker, setShowTreePicker] = useState(capability === 'builder');
   const [scopeOverlaps, setScopeOverlaps] = useState<ScopeOverlap[]>([]);
   const [checkingOverlaps, setCheckingOverlaps] = useState(false);
+  const [formErrors, setFormErrors] = useState<SpawnFormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Validate a single field with Zod
+  const validateField = useCallback(
+    (field: keyof z.infer<typeof spawnFormSchema>, value: string) => {
+      const result = spawnFormSchema.shape[field].safeParse(value);
+      if (!result.success) {
+        setFormErrors((prev) => ({ ...prev, [field]: result.error.errors[0]?.message }));
+      } else {
+        setFormErrors((prev) => {
+          const next = { ...prev };
+          delete next[field];
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
+  // Validate all fields before submit
+  const validateAll = useCallback((): boolean => {
+    const result = spawnFormSchema.safeParse({ name, taskId, prompt, fileScope });
+    if (!result.success) {
+      const errors: SpawnFormErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof SpawnFormErrors;
+        if (!errors[field]) {
+          errors[field] = issue.message;
+        }
+      }
+      setFormErrors(errors);
+      setTouched({ name: true, taskId: true, prompt: true, fileScope: true });
+      return false;
+    }
+    setFormErrors({});
+    return true;
+  }, [name, taskId, prompt, fileScope]);
+
+  // Validated spawn handler
+  const handleValidatedSpawn = useCallback(() => {
+    if (validateAll()) {
+      onSpawn();
+    }
+  }, [validateAll, onSpawn]);
 
   // Check for scope overlaps when file selections change
   useEffect(() => {
@@ -1788,11 +1865,23 @@ function SpawnDialog({
               id="spawn-name"
               type="text"
               value={name}
-              onChange={(e) => onNameChange(e.target.value)}
+              onChange={(e) => {
+                onNameChange(e.target.value);
+                if (touched.name) validateField('name', e.target.value);
+              }}
+              onBlur={() => {
+                setTouched((prev) => ({ ...prev, name: true }));
+                validateField('name', name);
+              }}
               placeholder={`e.g. swift-${capability}-001`}
               data-testid="spawn-name-input"
-              className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={`w-full rounded-lg border ${touched.name && formErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'} bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1`}
             />
+            {touched.name && formErrors.name && (
+              <p className="mt-1 text-xs text-red-400" data-testid="spawn-name-error">
+                {formErrors.name}
+              </p>
+            )}
           </div>
 
           {/* Task ID */}
@@ -1807,11 +1896,23 @@ function SpawnDialog({
               id="spawn-task-id"
               type="text"
               value={taskId}
-              onChange={(e) => onTaskIdChange(e.target.value)}
+              onChange={(e) => {
+                onTaskIdChange(e.target.value);
+                if (touched.taskId) validateField('taskId', e.target.value);
+              }}
+              onBlur={() => {
+                setTouched((prev) => ({ ...prev, taskId: true }));
+                validateField('taskId', taskId);
+              }}
               placeholder="e.g. TASK-42"
               data-testid="spawn-task-id-input"
-              className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={`w-full rounded-lg border ${touched.taskId && formErrors.taskId ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500'} bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1`}
             />
+            {touched.taskId && formErrors.taskId && (
+              <p className="mt-1 text-xs text-red-400" data-testid="spawn-task-id-error">
+                {formErrors.taskId}
+              </p>
+            )}
           </div>
 
           {/* Parent agent */}
@@ -1950,6 +2051,16 @@ function SpawnDialog({
             />
           </div>
 
+          {/* Validation errors summary */}
+          {Object.keys(formErrors).length > 0 && Object.keys(touched).length > 0 && (
+            <div
+              className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400"
+              data-testid="spawn-validation-errors"
+            >
+              Please fix the validation errors above before spawning.
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
@@ -1969,8 +2080,8 @@ function SpawnDialog({
           </button>
           <button
             type="button"
-            onClick={onSpawn}
-            disabled={isSpawning}
+            onClick={handleValidatedSpawn}
+            disabled={isSpawning || Object.keys(formErrors).length > 0}
             data-testid="spawn-confirm-button"
             className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >

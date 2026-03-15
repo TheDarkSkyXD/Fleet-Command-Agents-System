@@ -9,7 +9,7 @@ import {
   FiLoader,
   FiUser,
   FiUsers,
-  FiZap,
+  FiXCircle,
 } from 'react-icons/fi';
 import type { AgentState, Session } from '../../shared/types';
 
@@ -75,7 +75,7 @@ const stateIcon: Record<AgentState, React.ReactNode> = {
   working: <FiActivity className="h-3 w-3" />,
   completed: <FiCheckCircle className="h-3 w-3" />,
   stalled: <FiAlertTriangle className="h-3 w-3" />,
-  zombie: <FiZap className="h-3 w-3" />,
+  zombie: <FiXCircle className="h-3 w-3" />,
 };
 
 function buildTree(sessions: Session[]): TreeNode[] {

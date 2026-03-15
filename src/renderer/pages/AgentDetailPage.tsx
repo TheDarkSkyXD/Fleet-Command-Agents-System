@@ -23,6 +23,7 @@ import {
   FiTerminal,
   FiTool,
   FiUser,
+  FiXCircle,
   FiZap,
 } from 'react-icons/fi';
 import { toast } from 'sonner';
@@ -93,7 +94,7 @@ const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> 
   },
   completed: { icon: <FiCheckCircle className="h-3.5 w-3.5" />, className: 'text-slate-400' },
   stalled: { icon: <FiAlertTriangle className="h-3.5 w-3.5" />, className: 'text-amber-400' },
-  zombie: { icon: <FiZap className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
+  zombie: { icon: <FiXCircle className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
 };
 
 /** Human-readable state descriptions for hover tooltips */
@@ -102,7 +103,7 @@ const STATE_TOOLTIPS: Record<string, string> = {
   working: 'Agent is actively processing tasks',
   completed: 'Agent has finished all assigned work',
   stalled: 'Agent appears stuck or unresponsive',
-  zombie: 'Agent process is dead but session remains',
+  zombie: 'Zombie: Agent process has died unexpectedly. The session remains but the process is no longer running. Stop and respawn to recover.',
 };
 
 /** Human-readable capability descriptions for hover tooltips */
