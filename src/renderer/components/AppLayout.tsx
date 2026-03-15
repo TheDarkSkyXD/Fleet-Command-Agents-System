@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
@@ -210,14 +211,25 @@ export function AppLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-auto bg-slate-900 p-6">
-          <ErrorBoundary sectionName="Page content">
-            <PageContent
-              page={currentPage}
-              selectedAgentId={selectedAgentId}
-              onSelectAgent={handleSelectAgent}
-              onBackFromDetail={handleBackFromDetail}
-            />
-          </ErrorBoundary>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentPage}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              className="h-full"
+            >
+              <ErrorBoundary sectionName="Page content">
+                <PageContent
+                  page={currentPage}
+                  selectedAgentId={selectedAgentId}
+                  onSelectAgent={handleSelectAgent}
+                  onBackFromDetail={handleBackFromDetail}
+                />
+              </ErrorBoundary>
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 

@@ -1,6 +1,7 @@
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  type Row,
   type SortingState,
   flexRender,
   getCoreRowModel,
@@ -8,6 +9,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
+import { motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiActivity,
@@ -40,6 +42,7 @@ import type {
   Session,
 } from '../../shared/types';
 import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
+import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import { ContextMenu, type ContextMenuItem, useContextMenu } from '../components/ContextMenu';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 import { FileTreePicker } from '../components/FileTreePicker';
@@ -194,10 +197,18 @@ function StopConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+    >
+      <motion.div
         className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-800 shadow-2xl"
         data-testid="stop-confirm-dialog"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.8 }}
       >
         <div className="flex items-center gap-3 border-b border-slate-700 px-6 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20">
@@ -250,8 +261,8 @@ function StopConfirmDialog({
             )}
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -728,7 +739,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           const shortId = agentId.length > 8 ? `${agentId.slice(0, 8)}…` : agentId;
           return (
             <div className="flex items-center gap-1 group/id">
-              <span className="text-xs text-slate-500 font-mono" title={agentId}>{shortId}</span>
+              <span className="text-xs text-slate-500 font-mono" title={agentId}>
+                {shortId}
+              </span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1085,13 +1098,22 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         )
       ) : sessions.length === 0 ? (
         /* Empty state */
-        <div data-testid="agents-empty-state" className="rounded-lg border border-slate-700 bg-slate-800 p-12 text-center text-slate-400">
+        <div
+          data-testid="agents-empty-state"
+          className="rounded-lg border border-slate-700 bg-slate-800 p-12 text-center text-slate-400"
+        >
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-700/50">
             <FiCpu className="h-10 w-10 text-slate-500" />
           </div>
-          <p data-testid="agents-empty-title" className="text-xl font-semibold text-slate-300 mb-2">No agents running</p>
-          <p data-testid="agents-empty-message" className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-            Spawn an agent to start coding with AI. Agents can scout, build, review, and orchestrate your codebase autonomously.
+          <p data-testid="agents-empty-title" className="text-xl font-semibold text-slate-300 mb-2">
+            No agents running
+          </p>
+          <p
+            data-testid="agents-empty-message"
+            className="text-sm text-slate-500 mb-6 max-w-md mx-auto"
+          >
+            Spawn an agent to start coding with AI. Agents can scout, build, review, and orchestrate
+            your codebase autonomously.
           </p>
           <button
             type="button"
@@ -1150,37 +1172,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                 </tr>
               ))}
             </thead>
-            <tbody>
-              {filteredRows.length > 0 ? (
-                filteredRows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer"
-                    onClick={() => onSelectAgent?.(row.original.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') onSelectAgent?.(row.original.id);
-                    }}
-                    onContextMenu={(e) => handleAgentContextMenu(e, row.original)}
-                    tabIndex={0}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    className="px-4 py-8 text-center text-sm text-slate-500"
-                  >
-                    No agents match your filters
-                  </td>
-                </tr>
-              )}
-            </tbody>
+            <VirtualizedTableBody
+              filteredRows={filteredRows}
+              colCount={columns.length}
+              onSelectAgent={onSelectAgent}
+              handleAgentContextMenu={handleAgentContextMenu}
+            />
           </table>
           {/* Table footer with count */}
           <div className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500">
@@ -1195,28 +1192,29 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
               <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
                 Active Agents
               </h2>
-              <div className="grid gap-3">
+              <AnimatedCardContainer className="grid gap-3">
                 {filteredRows
                   .filter((r) => r.original.state !== 'completed')
                   .map((row) => {
                     const session = row.original;
                     const proc = runningProcesses.find((p) => p.id === session.id);
                     return (
-                      <AgentCard
-                        key={session.id}
-                        session={session}
-                        processInfo={proc}
-                        childCount={childCountMap[session.agent_name] || 0}
-                        isSelected={selectedAgents.has(session.id)}
-                        onToggleSelect={() => toggleAgentSelection(session.id)}
-                        onStop={() => requestStopAgent(session.id, session.agent_name)}
-                        onNudge={() => handleNudgeAgent(session.id)}
-                        onSelect={() => onSelectAgent?.(session.id)}
-                        onContextMenu={(e) => handleAgentContextMenu(e, session)}
-                      />
+                      <AnimatedCard key={session.id}>
+                        <AgentCard
+                          session={session}
+                          processInfo={proc}
+                          childCount={childCountMap[session.agent_name] || 0}
+                          isSelected={selectedAgents.has(session.id)}
+                          onToggleSelect={() => toggleAgentSelection(session.id)}
+                          onStop={() => requestStopAgent(session.id, session.agent_name)}
+                          onNudge={() => handleNudgeAgent(session.id)}
+                          onSelect={() => onSelectAgent?.(session.id)}
+                          onContextMenu={(e) => handleAgentContextMenu(e, session)}
+                        />
+                      </AnimatedCard>
                     );
                   })}
-              </div>
+              </AnimatedCardContainer>
             </div>
           )}
 
@@ -1666,10 +1664,18 @@ function SpawnDialog({
   }, [treePaths, fileScope]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+    >
+      <motion.div
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 shadow-2xl"
         data-testid="spawn-dialog"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.8 }}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4">
@@ -1978,7 +1984,7 @@ function SpawnDialog({
             )}
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

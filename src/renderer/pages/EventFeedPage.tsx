@@ -13,6 +13,7 @@ import {
   FiZap,
 } from 'react-icons/fi';
 import type { Event, EventType } from '../../shared/types';
+import { SlidePanel } from '../components/SlidePanel';
 
 const EVENT_TYPE_CONFIG: Record<
   EventType,
@@ -234,7 +235,7 @@ export function EventFeedPage() {
       </div>
 
       {/* Filters bar */}
-      {showFilters && (
+      <SlidePanel isOpen={showFilters} direction="top">
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 p-3">
           {/* Event type filter */}
           <div className="flex items-center gap-2">
@@ -303,7 +304,7 @@ export function EventFeedPage() {
             </button>
           )}
         </div>
-      )}
+      </SlidePanel>
 
       {/* Event feed */}
       <div ref={feedRef} className="flex-1 space-y-1 overflow-y-auto pr-1">

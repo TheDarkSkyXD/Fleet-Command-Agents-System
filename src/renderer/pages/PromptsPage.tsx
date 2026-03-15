@@ -14,6 +14,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import type { Prompt, PromptTreeNode, PromptType, PromptVersion } from '../../shared/types';
+import { SlidePanel } from '../components/SlidePanel';
 
 // ── Prompt Type Badge ─────────────────────────────────────────────
 const typeColors: Record<PromptType, string> = {
@@ -1117,7 +1118,7 @@ function PromptDetail({
           </div>
 
           {/* Version history sidebar */}
-          {showVersions && (
+          <SlidePanel isOpen={showVersions} direction="right">
             <div className="w-72 flex-shrink-0 overflow-auto rounded-md border border-slate-700 bg-slate-800/50 p-3">
               <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
                 <FiClock size={14} />
@@ -1129,7 +1130,7 @@ function PromptDetail({
                 onCompareVersions={(v) => setCompareVersions(v)}
               />
             </div>
-          )}
+          </SlidePanel>
         </div>
       )}
 
