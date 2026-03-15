@@ -9,10 +9,12 @@ import { GuardRulesPage } from '../pages/GuardRulesPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
 import { MetricsPage } from '../pages/MetricsPage';
+import { PromptsPage } from '../pages/PromptsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TasksPage } from '../pages/TasksPage';
 import { WorktreesPage } from '../pages/WorktreesPage';
 import { CommandPalette } from './CommandPalette';
+import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingTour } from './OnboardingTour';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
@@ -49,26 +51,32 @@ export function AppLayout() {
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <Sidebar
-          currentPage={currentPage === 'agent-detail' ? 'agents' : currentPage}
-          onNavigate={handleNavigate}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
+        <ErrorBoundary sectionName="Sidebar">
+          <Sidebar
+            currentPage={currentPage === 'agent-detail' ? 'agents' : currentPage}
+            onNavigate={handleNavigate}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
+        </ErrorBoundary>
 
         {/* Content */}
         <main className="flex-1 overflow-auto bg-slate-900 p-6">
-          <PageContent
-            page={currentPage}
-            selectedAgentId={selectedAgentId}
-            onSelectAgent={handleSelectAgent}
-            onBackFromDetail={handleBackFromDetail}
-          />
+          <ErrorBoundary sectionName="Page content">
+            <PageContent
+              page={currentPage}
+              selectedAgentId={selectedAgentId}
+              onSelectAgent={handleSelectAgent}
+              onBackFromDetail={handleBackFromDetail}
+            />
+          </ErrorBoundary>
         </main>
       </div>
 
       {/* Status bar */}
-      <StatusBar />
+      <ErrorBoundary sectionName="Status bar">
+        <StatusBar />
+      </ErrorBoundary>
 
       {/* Command Palette (Ctrl+K / Cmd+K) */}
       <CommandPalette onNavigate={handleNavigate} />
@@ -92,34 +100,96 @@ function PageContent({
 }) {
   switch (page) {
     case 'agents':
-      return <AgentsPage onSelectAgent={onSelectAgent} />;
+      return (
+        <ErrorBoundary sectionName="Agents">
+          <AgentsPage onSelectAgent={onSelectAgent} />
+        </ErrorBoundary>
+      );
     case 'agent-detail':
       if (selectedAgentId) {
-        return <AgentDetailPage agentId={selectedAgentId} onBack={onBackFromDetail} />;
+        return (
+          <ErrorBoundary sectionName="Agent Detail">
+            <AgentDetailPage agentId={selectedAgentId} onBack={onBackFromDetail} />
+          </ErrorBoundary>
+        );
       }
-      return <AgentsPage onSelectAgent={onSelectAgent} />;
+      return (
+        <ErrorBoundary sectionName="Agents">
+          <AgentsPage onSelectAgent={onSelectAgent} />
+        </ErrorBoundary>
+      );
     case 'mail':
-      return <MailPage />;
+      return (
+        <ErrorBoundary sectionName="Mail">
+          <MailPage />
+        </ErrorBoundary>
+      );
     case 'definitions':
-      return <AgentDefinitionsPage />;
+      return (
+        <ErrorBoundary sectionName="Agent Definitions">
+          <AgentDefinitionsPage />
+        </ErrorBoundary>
+      );
     case 'worktrees':
-      return <WorktreesPage />;
+      return (
+        <ErrorBoundary sectionName="Worktrees">
+          <WorktreesPage />
+        </ErrorBoundary>
+      );
     case 'merge':
-      return <MergeQueuePage />;
+      return (
+        <ErrorBoundary sectionName="Merge Queue">
+          <MergeQueuePage />
+        </ErrorBoundary>
+      );
     case 'guard-rules':
-      return <GuardRulesPage />;
+      return (
+        <ErrorBoundary sectionName="Guard Rules">
+          <GuardRulesPage />
+        </ErrorBoundary>
+      );
     case 'tasks':
-      return <TasksPage />;
+      return (
+        <ErrorBoundary sectionName="Tasks">
+          <TasksPage />
+        </ErrorBoundary>
+      );
     case 'discovery':
-      return <DiscoveryPage />;
+      return (
+        <ErrorBoundary sectionName="Discovery">
+          <DiscoveryPage />
+        </ErrorBoundary>
+      );
+    case 'prompts':
+      return (
+        <ErrorBoundary sectionName="Prompts">
+          <PromptsPage />
+        </ErrorBoundary>
+      );
     case 'expertise':
-      return <ExpertisePage />;
+      return (
+        <ErrorBoundary sectionName="Expertise">
+          <ExpertisePage />
+        </ErrorBoundary>
+      );
     case 'metrics':
-      return <MetricsPage />;
+      return (
+        <ErrorBoundary sectionName="Metrics">
+          <MetricsPage />
+        </ErrorBoundary>
+      );
     case 'settings':
-      return <SettingsPage />;
+      return (
+        <ErrorBoundary sectionName="Settings">
+          <SettingsPage />
+        </ErrorBoundary>
+      );
     case 'debug':
-      return <DebugPage />;
+      return (
+        <ErrorBoundary sectionName="Debug">
+          <DebugPage />
+        </ErrorBoundary>
+      );
     default:
       return (
         <div className="text-slate-400">
