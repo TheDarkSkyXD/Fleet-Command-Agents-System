@@ -440,7 +440,10 @@ export function CoordinatorPanel() {
 
             {/* Work Streams (Task Decomposition) */}
             {workStreams.length > 0 && (
-              <div className="rounded-lg bg-slate-900/40 border border-slate-700/50 p-2.5" data-testid="work-streams">
+              <div
+                className="rounded-lg bg-slate-900/40 border border-slate-700/50 p-2.5"
+                data-testid="work-streams"
+              >
                 <div className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
                   <FiLayers className="h-3 w-3" />
                   Work Streams ({workStreams.length})
@@ -457,7 +460,9 @@ export function CoordinatorPanel() {
                     return (
                       <div key={stream.id} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-300 truncate max-w-[180px]">{streamLabel}</span>
+                          <span className="text-slate-300 truncate max-w-[180px]">
+                            {streamLabel}
+                          </span>
                           <span className="text-slate-500 text-[10px]">
                             {stream.completed_tasks}/{stream.total_tasks} tasks
                           </span>
@@ -479,9 +484,7 @@ export function CoordinatorPanel() {
                   })}
                 </div>
                 <div className="mt-2 pt-1.5 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-500">
-                  <span>
-                    Total: {workStreams.reduce((s, w) => s + w.total_tasks, 0)} tasks
-                  </span>
+                  <span>Total: {workStreams.reduce((s, w) => s + w.total_tasks, 0)} tasks</span>
                   <span className="text-green-400">
                     {workStreams.reduce((s, w) => s + w.completed_tasks, 0)} completed
                   </span>
@@ -505,20 +508,29 @@ export function CoordinatorPanel() {
                 </span>
               </button>
               {showActivityLog && (
-                <div className="mt-2 space-y-1 max-h-64 overflow-y-auto" data-testid="coordinator-activity-log">
+                <div
+                  className="mt-2 space-y-1 max-h-64 overflow-y-auto"
+                  data-testid="coordinator-activity-log"
+                >
                   {activityLog.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-2">No activity recorded yet</p>
+                    <p className="text-xs text-slate-500 text-center py-2">
+                      No activity recorded yet
+                    </p>
                   ) : (
                     activityLog.map((entry) => {
                       const timeStr = entry.timestamp
-                        ? new Date(entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`).toLocaleTimeString([], {
+                        ? new Date(
+                            entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`,
+                          ).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
                           })
                         : '';
                       const dateStr = entry.timestamp
-                        ? new Date(entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`).toLocaleDateString([], {
+                        ? new Date(
+                            entry.timestamp.includes('Z') ? entry.timestamp : `${entry.timestamp}Z`,
+                          ).toLocaleDateString([], {
                             month: 'short',
                             day: 'numeric',
                           })
@@ -558,7 +570,10 @@ export function CoordinatorPanel() {
                                 <span className="text-xs text-slate-200 truncate">
                                   {entry.summary}
                                 </span>
-                                <span className="text-[10px] text-slate-500 whitespace-nowrap shrink-0" title={`${dateStr} ${timeStr}`}>
+                                <span
+                                  className="text-[10px] text-slate-500 whitespace-nowrap shrink-0"
+                                  title={`${dateStr} ${timeStr}`}
+                                >
                                   {dateStr} {timeStr}
                                 </span>
                               </div>

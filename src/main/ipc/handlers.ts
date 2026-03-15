@@ -1696,7 +1696,8 @@ export function registerIpcHandlers(): void {
         if (conditions.length > 0) {
           query += ` WHERE ${conditions.join(' AND ')}`;
         }
-        query += ' ORDER BY created_at DESC';
+        query +=
+          " ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END ASC, created_at DESC";
 
         const messages = loggedPrepare(query).all(...params);
         log.info(
