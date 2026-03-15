@@ -738,6 +738,29 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     }
   };
 
+  const [mailCheckResult, setMailCheckResult] = useState<string | null>(null);
+
+  const handleCheckMail = async () => {
+    if (!session) return;
+    try {
+      const result = await window.electronAPI.mailCheck(agentId, session.agent_name);
+      if (result.error) {
+        setMailCheckResult(`Error: ${result.error}`);
+      } else if (result.data) {
+        if (result.data.injected === 0) {
+          setMailCheckResult('No unread messages');
+        } else {
+          setMailCheckResult(`${result.data.injected} message(s) injected into context`);
+        }
+      }
+      // Clear the status after 3 seconds
+      setTimeout(() => setMailCheckResult(null), 3000);
+    } catch (err) {
+      setMailCheckResult(`Error: ${String(err)}`);
+      setTimeout(() => setMailCheckResult(null), 3000);
+    }
+  };
+
   if (error && !session) {
     return (
       <div className="space-y-4">
@@ -834,14 +857,31 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
               </button>
             )}
             {isRunning && (
-              <button
-                type="button"
-                onClick={handleStop}
-                className="flex items-center gap-2 rounded-md bg-red-600/20 border border-red-500/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30 transition-colors"
+              <>
+                <button
+                  type="button"
+                  onClick={handleCheckMail}
+                  className="flex items-center gap-2 rounded-md bg-blue-600/20 border border-blue-500/30 px-3 py-1.5 text-sm text-blue-400 hover:bg-blue-600/30 transition-colors"
+                >
+                  <FiMail className="h-3.5 w-3.5" />
+                  Check Mail
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className="flex items-center gap-2 rounded-md bg-red-600/20 border border-red-500/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30 transition-colors"
+                >
+                  <FiSquare className="h-3.5 w-3.5" />
+                  Stop
+                </button>
+              </>
+            )}
+            {mailCheckResult && (
+              <span
+                className={`text-xs ${mailCheckResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}
               >
-                <FiSquare className="h-3.5 w-3.5" />
-                Stop
-              </button>
+                {mailCheckResult}
+              </span>
             )}
           </div>
         </div>
