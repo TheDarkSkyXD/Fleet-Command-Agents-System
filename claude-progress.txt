@@ -1586,3 +1586,47 @@
 - 96/366 features passing (added #163 and #166 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Minimize to Tray & Sidebar Persistence)
+
+#### Feature #15: Minimize to tray works - PASSING
+- Added minimize event handler on mainWindow that prevents default and hides to tray
+- Tray click handler already restores window (existing code)
+- Log message confirms minimize-to-tray action
+
+#### Feature #19: Sidebar collapse state persists across restart - PASSING
+- Added sidebarCollapsed boolean to AppSettings interface and DEFAULT_SETTINGS
+- AppLayout uses settingsStore (Zustand + SQLite) instead of local useState
+- Toggle calls updateSetting which persists to SQLite app_settings table
+- loadSettings on mount restores collapsed state from database
+
+#### Current Status
+- 106/366 features passing (added #15 and #19 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+
+### Session: 2026-03-14 (Quality Gates)
+
+#### Feature #196: Configurable quality gates per project - PASSING
+- Added quality_gates table to database (project_id, gate_type, name, command, enabled, sort_order)
+- 4 gate types: test, lint, typecheck, custom with default commands
+- Quality Gates tab in Settings page with full CRUD UI
+- Enable/disable toggle, reorder with up/down buttons, edit/delete per gate
+
+#### Feature #197: Gate enforcement per agent type - PASSING
+- Builder agents automatically run quality gates when stopped via agent:stop
+- Added quality_gate_results table for execution history tracking
+- qualityGate:run and qualityGate:results IPC handlers
+- Failed gates send error notification mail to builder agent
+- "Run All Gates" button + Recent Gate Results display in Settings UI
+
+#### Files Modified
+- MODIFIED: src/main/db/database.ts - Added quality_gates and quality_gate_results tables
+- MODIFIED: src/main/ipc/handlers.ts - Quality gate CRUD, run, results handlers + builder enforcement
+- MODIFIED: src/preload/index.ts - Quality gate bridge methods
+- MODIFIED: src/shared/types/index.ts - QualityGate, QualityGateResult, QualityGateRunSummary types
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Quality Gates tab with management UI and results
+
+#### Current Status
+- 108/366 features passing (added #196 and #197 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
