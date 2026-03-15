@@ -1,5 +1,33 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Numeric Validation & Agent Name Format)
+
+#### Feature #321: Numeric field validation - PASSING
+- Enhanced ValidatedNumberInput with non-numeric text detection (empty, text, decimal values)
+- Added onNonNumericError callback for parent error state coordination
+- Added paste validation to reject non-numeric clipboard content
+- Changed input type from "number" to "text" with inputMode="numeric" for better validation control
+- Added aria-invalid attribute and data-testid="numeric-decrement"/"numeric-increment" on buttons
+- Enhanced NumberInput (profile form) with inline validation errors for non-numeric and out-of-range values
+- NumberInput now shows red border + error message below input for invalid values
+- AgentSettings handleNonNumericError wires non-numeric errors to SettingRow error display
+
+#### Feature #322: Agent name format validation - PASSING
+- Frontend Zod schema validates: whitespace-only rejection, character restriction (letters/numbers/spaces/hyphens/underscores), 64-char max length
+- Backend defense-in-depth: agent:spawn IPC handler validates name format and length before spawning
+- UI shows red border + inline error messages on invalid input via touched state
+- Spawn button disabled when validation errors are present
+- handleValidatedSpawn runs validateAll() before allowing spawn
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Enhanced ValidatedNumberInput and NumberInput components
+- MODIFIED: src/main/ipc/handlers.ts - Backend agent name format/length validation
+
+#### Current Status
+- 320/366 features passing (added #321 and #322 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Merge Completion & Default Model)
 
 #### Feature #311: Merge completion updates queue and history - PASSING
