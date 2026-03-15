@@ -5169,3 +5169,28 @@
 - 346/366 features passing (added #346 and #348 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Replay View & Tool Correlation)
+
+#### Feature #353: Interleaved chronological replay across agents - PASSING
+- Added Replay tab to EventFeedPage with chronological ascending event ordering
+- Events from multiple agents interleaved by timestamp with stable agent color assignments
+- Agent legend at top shows all agents with unique color indicators
+- Each event row has: timestamp column, colored agent name, event type icon/badge, tool details
+- Left border color-coded per agent for visual lane identification
+- Time separator dividers when gap between events exceeds 5 seconds
+- data-testid: replay-view, replay-event, replay-event-agent, replay-agent-{name}
+
+#### Feature #354: Event correlation tool_start with tool_end - PASSING
+- Added Tool Correlation tab matching tool_start with tool_end events by agent+session+tool key
+- Duration computed from tool_duration_ms field or timestamp difference
+- Orphaned tool_start events (no matching tool_end) flagged with amber badge
+- Summary stats bar: correlated count, orphaned count, total pairs
+- Duration color-coded: green (<3s), amber (3-10s), red (>10s)
+- Orphaned count badge shown on tab button when orphans exist
+- data-testid: correlation-view, correlation-item, correlation-duration, orphaned-badge
+
+#### Current Status
+- 352/366 features passing (added #353 and #354 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
