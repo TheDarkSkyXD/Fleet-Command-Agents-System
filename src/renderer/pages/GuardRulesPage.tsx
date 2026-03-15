@@ -60,6 +60,17 @@ const ruleTypeLabels: Record<string, string> = {
 };
 
 type TabId = 'allowlists' | 'violations';
+type RuleType = 'tool_allowlist' | 'bash_restriction' | 'file_scope';
+
+interface AddRuleForm {
+  ruleType: RuleType;
+  value: string;
+}
+
+interface DeleteConfirmation {
+  ruleType: RuleType;
+  value: string;
+}
 
 export function GuardRulesPage() {
   const [activeTab, setActiveTab] = useState<TabId>('allowlists');
@@ -75,6 +86,16 @@ export function GuardRulesPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+
+  // Add Rule modal state
+  const [showAddRuleModal, setShowAddRuleModal] = useState(false);
+  const [addRuleForm, setAddRuleForm] = useState<AddRuleForm>({
+    ruleType: 'tool_allowlist',
+    value: '',
+  });
+
+  // Delete confirmation state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
 
   // Violations state
   const [violations, setViolations] = useState<GuardViolation[]>([]);
@@ -216,6 +237,78 @@ export function GuardRulesPage() {
     },
     [editingBashRestrictions],
   );
+
+  // Add Rule modal handlers
+  const openAddRuleModal = useCallback(() => {
+    setAddRuleForm({ ruleType: 'tool_allowlist', value: '' });
+    setShowAddRuleModal(true);
+  }, []);
+
+  const closeAddRuleModal = useCallback(() => {
+    setShowAddRuleModal(false);
+    setAddRuleForm({ ruleType: 'tool_allowlist', value: '' });
+  }, []);
+
+  const handleAddRule = useCallback(() => {
+    if (!addRuleForm.value.trim()) return;
+
+    // Ensure we're in editing mode
+    if (!isEditing) {
+      startEditing();
+    }
+
+    switch (addRuleForm.ruleType) {
+      case 'tool_allowlist':
+        if (editingAllowlist && !editingAllowlist.includes(addRuleForm.value)) {
+          setEditingAllowlist([...editingAllowlist, addRuleForm.value]);
+        }
+        break;
+      case 'bash_restriction':
+        if (editingBashRestrictions) {
+          setEditingBashRestrictions([...editingBashRestrictions, addRuleForm.value.trim()]);
+        }
+        break;
+      case 'file_scope':
+        setEditingFileScope(addRuleForm.value.trim());
+        break;
+    }
+
+    closeAddRuleModal();
+  }, [
+    addRuleForm,
+    isEditing,
+    startEditing,
+    editingAllowlist,
+    editingBashRestrictions,
+    closeAddRuleModal,
+  ]);
+
+  // Delete confirmation handlers
+  const requestDelete = useCallback((ruleType: RuleType, value: string) => {
+    setDeleteConfirmation({ ruleType, value });
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (!deleteConfirmation) return;
+
+    switch (deleteConfirmation.ruleType) {
+      case 'tool_allowlist':
+        removeTool(deleteConfirmation.value);
+        break;
+      case 'bash_restriction':
+        removeBashRestriction(deleteConfirmation.value);
+        break;
+      case 'file_scope':
+        setEditingFileScope('');
+        break;
+    }
+
+    setDeleteConfirmation(null);
+  }, [deleteConfirmation, removeTool, removeBashRestriction]);
+
+  const cancelDelete = useCallback(() => {
+    setDeleteConfirmation(null);
+  }, []);
 
   const acknowledgeViolation = useCallback(
     async (id: string) => {
@@ -386,16 +479,39 @@ export function GuardRulesPage() {
                     <p className="text-sm text-slate-400 mt-1">{selectedDef.description}</p>
                   </div>
                   {!isEditing ? (
-                    <button
-                      type="button"
-                      onClick={startEditing}
-                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
-                    >
-                      <FiEdit3 size={14} />
-                      Edit Rules
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startEditing();
+                          openAddRuleModal();
+                        }}
+                        data-testid="add-rule-btn"
+                        className="flex items-center gap-2 rounded-lg border border-blue-500/30 px-4 py-2 text-sm font-medium text-blue-400 hover:bg-blue-500/10 transition-colors"
+                      >
+                        <FiPlus size={14} />
+                        Add Rule
+                      </button>
+                      <button
+                        type="button"
+                        onClick={startEditing}
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+                      >
+                        <FiEdit3 size={14} />
+                        Edit Rules
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={openAddRuleModal}
+                        className="flex items-center gap-2 rounded-lg border border-blue-500/30 px-3 py-2 text-sm font-medium text-blue-400 hover:bg-blue-500/10 transition-colors"
+                        data-testid="add-rule-editing-btn"
+                      >
+                        <FiPlus size={14} />
+                        Add Rule
+                      </button>
                       <button
                         type="button"
                         onClick={cancelEditing}
@@ -439,9 +555,10 @@ export function GuardRulesPage() {
                           {isEditing && (
                             <button
                               type="button"
-                              onClick={() => removeTool(tool)}
+                              onClick={() => requestDelete('tool_allowlist', tool)}
                               className="text-blue-400/60 hover:text-red-400 transition-colors"
                               title={`Remove ${tool}`}
+                              data-testid={`remove-tool-${tool}`}
                             >
                               <FiX size={12} />
                             </button>
@@ -511,8 +628,9 @@ export function GuardRulesPage() {
                         {isEditing && (
                           <button
                             type="button"
-                            onClick={() => removeBashRestriction(restriction)}
+                            onClick={() => requestDelete('bash_restriction', restriction)}
                             className="text-red-400/60 hover:text-red-400 transition-colors"
+                            data-testid={`remove-restriction-${restriction}`}
                           >
                             <FiX size={12} />
                           </button>
@@ -808,6 +926,210 @@ export function GuardRulesPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Add Rule Modal */}
+      {showAddRuleModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          data-testid="add-rule-modal"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') closeAddRuleModal();
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeAddRuleModal();
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-slate-600 bg-slate-800 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+              <h3 className="text-lg font-semibold text-slate-100">Add New Rule</h3>
+              <button
+                type="button"
+                onClick={closeAddRuleModal}
+                className="text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <FiX size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              {/* Rule Type Selector */}
+              <div>
+                <span className="block text-sm font-medium text-slate-300 mb-2">Rule Type</span>
+                <div className="space-y-2">
+                  {(
+                    [
+                      {
+                        id: 'tool_allowlist' as RuleType,
+                        label: 'Tool Allowlist',
+                        desc: 'Add a tool to the allowed tools list',
+                        icon: FiShield,
+                        color: 'text-blue-400',
+                      },
+                      {
+                        id: 'bash_restriction' as RuleType,
+                        label: 'Bash Restriction',
+                        desc: 'Block a bash command pattern',
+                        icon: FiXCircle,
+                        color: 'text-red-400',
+                      },
+                      {
+                        id: 'file_scope' as RuleType,
+                        label: 'File Scope',
+                        desc: 'Set file access scope',
+                        icon: FiEye,
+                        color: 'text-emerald-400',
+                      },
+                    ] as const
+                  ).map((rt) => {
+                    const Icon = rt.icon;
+                    return (
+                      <button
+                        type="button"
+                        key={rt.id}
+                        onClick={() =>
+                          setAddRuleForm((f) => ({ ...f, ruleType: rt.id, value: '' }))
+                        }
+                        className={`w-full text-left flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+                          addRuleForm.ruleType === rt.id
+                            ? 'border-blue-500 bg-blue-500/10'
+                            : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                        }`}
+                      >
+                        <Icon size={16} className={rt.color} />
+                        <div>
+                          <div className="text-sm font-medium text-slate-200">{rt.label}</div>
+                          <div className="text-xs text-slate-400">{rt.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Value Input */}
+              <div>
+                <span className="block text-sm font-medium text-slate-300 mb-2">
+                  {addRuleForm.ruleType === 'tool_allowlist'
+                    ? 'Select Tool'
+                    : addRuleForm.ruleType === 'bash_restriction'
+                      ? 'Bash Pattern'
+                      : 'File Scope'}
+                </span>
+                {addRuleForm.ruleType === 'tool_allowlist' ? (
+                  <select
+                    value={addRuleForm.value}
+                    onChange={(e) => setAddRuleForm((f) => ({ ...f, value: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200"
+                    data-testid="add-rule-tool-select"
+                  >
+                    <option value="">Select a tool...</option>
+                    {ALL_TOOLS.filter(
+                      (t) => !editingAllowlist || !editingAllowlist.includes(t),
+                    ).map((tool) => (
+                      <option key={tool} value={tool}>
+                        {tool}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={addRuleForm.value}
+                    onChange={(e) => setAddRuleForm((f) => ({ ...f, value: e.target.value }))}
+                    placeholder={
+                      addRuleForm.ruleType === 'bash_restriction'
+                        ? 'e.g. git push --force'
+                        : 'e.g. src/**/*.ts'
+                    }
+                    className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                    data-testid="add-rule-value-input"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && addRuleForm.value.trim()) {
+                        handleAddRule();
+                      }
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-700 px-5 py-4">
+              <button
+                type="button"
+                onClick={closeAddRuleModal}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddRule}
+                disabled={!addRuleForm.value.trim()}
+                data-testid="add-rule-save-btn"
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <FiPlus size={14} />
+                Add Rule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          data-testid="delete-confirm-dialog"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancelDelete();
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) cancelDelete();
+          }}
+        >
+          <div className="w-full max-w-sm rounded-xl border border-slate-600 bg-slate-800 shadow-2xl">
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="rounded-full bg-red-500/10 p-2">
+                  <FiTrash2 className="text-red-400" size={18} />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-100">Delete Rule</h3>
+              </div>
+              <p className="text-sm text-slate-300">
+                Are you sure you want to remove this{' '}
+                <span className="font-medium text-slate-100">
+                  {ruleTypeLabels[deleteConfirmation.ruleType]}
+                </span>{' '}
+                rule?
+              </p>
+              <div className="mt-2 rounded-md bg-slate-700/50 border border-slate-600 px-3 py-2">
+                <code className="text-sm text-red-300">{deleteConfirmation.value}</code>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-700 px-5 py-4">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+                data-testid="delete-cancel-btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                data-testid="delete-confirm-btn"
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"
+              >
+                <FiTrash2 size={14} />
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
