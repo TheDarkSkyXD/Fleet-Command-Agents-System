@@ -1,5 +1,34 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Mail Search & Search Performance)
+
+#### Feature #77: Mail search and filtering - PASSING
+- Added search bar with debounced (250ms) text search across subject, body, and agent fields
+- Filter dropdowns for message type (12 types) and priority level (4 levels)
+- Agent name filter input for filtering by sender/recipient
+- All filtering done server-side via SQL queries with proper WHERE clauses
+- Added database indexes: messages(type), messages(priority), messages(from_agent)
+- Filter UI: toggle button with active filter count badge, filter summary chips, clear all button
+- Empty state shows contextual message when filters return no results
+- data-testid attributes on all search/filter elements for testability
+
+#### Feature #347: Search response time under 500ms - PASSING
+- Mail search: SQL LIKE with indexes on type, priority, from_agent, to_agent columns
+- Log search: SQL LIKE with indexes on level, agent_name, created_at + LIMIT 500
+- Command palette: cmdk client-side fuzzy search on 9 items (sub-1ms)
+- All queries use prepared statements via better-sqlite3 (synchronous, no network overhead)
+- SQLite WAL mode ensures concurrent read performance
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/MailPage.tsx - Added search bar, filter panel, filter state management
+- MODIFIED: src/main/ipc/handlers.ts - Enhanced mail:list with search/type/priority/agent filters
+- MODIFIED: src/main/db/database.ts - Added indexes for messages(type, priority, from_agent)
+
+#### Current Status
+- 82/366 features passing (added #77 and #347 this session)
+- All code passes Biome lint and Vite build
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Agent Status Cards & Color Coding)
 
 #### Feature #42: Agent status cards display - PASSING
