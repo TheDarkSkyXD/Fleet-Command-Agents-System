@@ -4,6 +4,7 @@ import {
   FiCheck,
   FiChevronDown,
   FiChevronUp,
+  FiCopy,
   FiEdit2,
   FiEye,
   FiPlay,
@@ -23,7 +24,9 @@ import { useProjectStore } from '../stores/projectStore';
 import {
   ACCENT_COLORS,
   type AccentColorKey,
+  DEFAULT_MODEL_DEFAULTS,
   DEFAULT_SETTINGS,
+  type ModelDefaultsPerCapability,
   useSettingsStore,
 } from '../stores/settingsStore';
 
@@ -223,6 +226,39 @@ function ProfilesSettings() {
     }
   };
 
+  const handleDuplicate = async (profile: ConfigProfile) => {
+    try {
+      const baseName = profile.name.replace(/\s*\(Copy(?:\s*\d+)?\)\s*$/, '');
+      // Find unique copy name
+      let copyName = `${baseName} (Copy)`;
+      let counter = 2;
+      const existingNames = profiles.map((p) => p.name);
+      while (existingNames.includes(copyName)) {
+        copyName = `${baseName} (Copy ${counter})`;
+        counter++;
+      }
+      const id = `profile-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const result = await window.electronAPI.profileCreate({
+        id,
+        name: copyName,
+        description: profile.description || undefined,
+        max_hierarchy_depth: profile.max_hierarchy_depth,
+        max_concurrent_agents: profile.max_concurrent_agents,
+        max_agents_per_lead: profile.max_agents_per_lead,
+        default_capability: profile.default_capability,
+        default_model: profile.default_model,
+      });
+      if (result.data) {
+        setStatusMessage({ type: 'success', text: `Duplicated profile as "${copyName}"` });
+        loadProfiles();
+      } else {
+        setStatusMessage({ type: 'error', text: result.error || 'Failed to duplicate profile' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Failed to duplicate profile' });
+    }
+  };
+
   const handleActivate = async (id: string, name: string) => {
     try {
       const result = await window.electronAPI.profileActivate(id);
@@ -306,6 +342,7 @@ function ProfilesSettings() {
               }}
               onDelete={() => handleDelete(profile.id, profile.name)}
               onActivate={() => handleActivate(profile.id, profile.name)}
+              onDuplicate={() => handleDuplicate(profile)}
               existingNames={profiles.filter((p) => p.id !== profile.id).map((p) => p.name)}
               setStatusMessage={setStatusMessage}
             />
@@ -340,6 +377,7 @@ function ProfileCard({
   onSaveEdit,
   onDelete,
   onActivate,
+  onDuplicate,
   existingNames,
   setStatusMessage,
 }: {
@@ -350,6 +388,7 @@ function ProfileCard({
   onSaveEdit: () => void;
   onDelete: () => void;
   onActivate: () => void;
+  onDuplicate: () => void;
   existingNames: string[];
   setStatusMessage: (msg: { type: 'success' | 'error'; text: string }) => void;
 }) {
@@ -435,6 +474,14 @@ function ProfileCard({
             className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
           >
             <FiEdit2 size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={onDuplicate}
+            title="Duplicate profile"
+            className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-emerald-400 transition-colors"
+          >
+            <FiCopy size={16} />
           </button>
           <button
             type="button"
@@ -1161,6 +1208,48 @@ function AgentSettings() {
         </SettingRow>
       </div>
 
+      {/* Model Defaults Per Capability */}
+      <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
+        <h2 className="text-lg font-semibold text-slate-100 mb-2">Model Defaults Per Capability</h2>
+        <p className="text-sm text-slate-400 mb-4">
+          Set the default Claude model for each agent capability type. When spawning a new agent, the model picker will pre-select the configured default.
+        </p>
+
+        {(
+          [
+            { cap: 'scout' as const, label: 'Scout', color: 'text-purple-400' },
+            { cap: 'builder' as const, label: 'Builder', color: 'text-blue-400' },
+            { cap: 'reviewer' as const, label: 'Reviewer', color: 'text-cyan-400' },
+            { cap: 'lead' as const, label: 'Lead', color: 'text-amber-400' },
+            { cap: 'merger' as const, label: 'Merger', color: 'text-emerald-400' },
+            { cap: 'coordinator' as const, label: 'Coordinator', color: 'text-rose-400' },
+            { cap: 'monitor' as const, label: 'Monitor', color: 'text-teal-400' },
+          ] as const
+        ).map(({ cap, label, color }) => (
+          <SettingRow
+            key={cap}
+            label={<span className={color}>{label}</span>}
+            description={`Default model when spawning ${label.toLowerCase()} agents.`}
+          >
+            <select
+              value={settings.modelDefaultsPerCapability?.[cap] ?? DEFAULT_MODEL_DEFAULTS[cap]}
+              onChange={(e) => {
+                const current = settings.modelDefaultsPerCapability ?? { ...DEFAULT_MODEL_DEFAULTS };
+                updateSetting('modelDefaultsPerCapability', {
+                  ...current,
+                  [cap]: e.target.value,
+                } as ModelDefaultsPerCapability);
+              }}
+              className="rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="haiku">Haiku (fast)</option>
+              <option value="sonnet">Sonnet (balanced)</option>
+              <option value="opus">Opus (most capable)</option>
+            </select>
+          </SettingRow>
+        ))}
+      </div>
+
       {/* Reset Button */}
       <div className="flex justify-end">
         <button
@@ -1170,6 +1259,7 @@ function AgentSettings() {
             updateSetting('maxHierarchyDepth', DEFAULT_SETTINGS.maxHierarchyDepth);
             updateSetting('maxConcurrentAgents', DEFAULT_SETTINGS.maxConcurrentAgents);
             updateSetting('maxAgentsPerLead', DEFAULT_SETTINGS.maxAgentsPerLead);
+            updateSetting('modelDefaultsPerCapability', { ...DEFAULT_MODEL_DEFAULTS });
           }}
           className="rounded-md border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
         >
@@ -1387,7 +1477,7 @@ function SettingRow({
   error,
   children,
 }: {
-  label: string;
+  label: React.ReactNode;
   description: string;
   error?: string | null;
   children: React.ReactNode;
