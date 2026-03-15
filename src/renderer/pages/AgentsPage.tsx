@@ -1056,15 +1056,21 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         )
       ) : sessions.length === 0 ? (
         /* Empty state */
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
-          <FiCpu className="h-12 w-12 mx-auto mb-3 text-slate-600" />
-          <p className="text-lg mb-2">No agents running</p>
-          <p className="text-sm mb-4">Spawn an agent to start coding with AI</p>
+        <div data-testid="agents-empty-state" className="rounded-lg border border-slate-700 bg-slate-800 p-12 text-center text-slate-400">
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-700/50">
+            <FiCpu className="h-10 w-10 text-slate-500" />
+          </div>
+          <p data-testid="agents-empty-title" className="text-xl font-semibold text-slate-300 mb-2">No agents running</p>
+          <p data-testid="agents-empty-message" className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
+            Spawn an agent to start coding with AI. Agents can scout, build, review, and orchestrate your codebase autonomously.
+          </p>
           <button
             type="button"
+            data-testid="agents-empty-cta"
             onClick={openSpawnDialog}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20"
           >
+            <FiPlay size={14} />
             Spawn Agent
           </button>
         </div>

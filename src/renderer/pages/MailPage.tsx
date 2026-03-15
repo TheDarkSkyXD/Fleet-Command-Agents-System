@@ -808,19 +808,22 @@ export function MailPage() {
                   ))}
                 </div>
               ) : sortedMessages.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-500">
-                  <FiInbox size={48} className="text-slate-600" />
-                  <p className="text-lg font-medium">
-                    {hasAnyFilter ? 'No matching messages' : 'No messages'}
+                <div data-testid="mail-empty-state" className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-slate-500">
+                  <div className="mb-1 flex h-16 w-16 items-center justify-center rounded-full bg-slate-700/50">
+                    <FiInbox size={32} className="text-slate-500" />
+                  </div>
+                  <p data-testid="mail-empty-title" className="text-lg font-semibold text-slate-400">
+                    {hasAnyFilter ? 'No matching messages' : 'No messages yet'}
                   </p>
-                  <p className="text-sm text-slate-600">
+                  <p data-testid="mail-empty-message" className="text-sm text-slate-600 max-w-sm text-center">
                     {hasAnyFilter
                       ? 'Try adjusting your search or filters.'
-                      : 'Agent messages will appear here when agents communicate.'}
+                      : 'The mail system enables inter-agent communication. Messages will appear here when agents send status updates, requests, or reports to each other.'}
                   </p>
                   {hasAnyFilter && (
                     <button
                       type="button"
+                      data-testid="mail-clear-filters-cta"
                       onClick={clearAllFilters}
                       className="mt-2 rounded-md border border-slate-600 px-4 py-1.5 text-sm text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
                     >
