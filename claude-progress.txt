@@ -1,5 +1,31 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Window Size and Tab Navigation)
+
+#### Feature #328: Minimum window size enforcement - PASSING
+- Electron BrowserWindow already had minWidth=1024, minHeight=680 (OS-level enforcement)
+- Added CSS min-w-[1024px] min-h-[680px] to both root layout divs (welcome and main)
+- Content areas use overflow-auto and min-w-0 for graceful handling at minimum size
+- Added data-testid=app-root with data-min-width/data-min-height attributes
+
+#### Feature #331: Tab navigation through interactive elements - PASSING
+- All interactive elements use native HTML elements (button, input, select, a) - natively tab-focusable
+- Global :focus-visible styles (2px solid blue outline) already in globals.css
+- Added skip-to-content link (sr-only, visible on focus) for keyboard users to skip sidebar
+- Added aria-label="Main navigation" to sidebar nav
+- Added aria-current="page" to active sidebar nav item
+- Added id="main-content" to main content area as skip-link target
+- Logical DOM order matches visual order for natural tab flow
+
+#### Files Modified
+- MODIFIED: src/renderer/components/AppLayout.tsx - min-w/min-h CSS, skip-to-content link, main-content id
+- MODIFIED: src/renderer/components/Sidebar.tsx - aria-label, aria-current on nav
+
+#### Current Status
+- 328/366 features passing (added #328 and #331 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Loading Spinners & Desktop Layout)
 
 #### Feature #325: Loading spinner on buttons during async operations - PASSING
