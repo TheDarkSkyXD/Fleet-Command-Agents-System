@@ -50,6 +50,17 @@ const capabilityColors: Record<string, string> = {
   monitor: 'text-teal-400 bg-teal-500/10 border-teal-500/30',
 };
 
+// Default security posture labels per capability type
+const defaultSecurityPosture: Record<string, { label: string; color: string }> = {
+  scout: { label: 'Read-Only', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+  builder: { label: 'Scoped Write', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
+  reviewer: { label: 'Read + Test', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
+  lead: { label: 'Full Access', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
+  merger: { label: 'Merge Scoped', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+  coordinator: { label: 'Read + Spawn', color: 'text-rose-400 bg-rose-500/10 border-rose-500/30' },
+  monitor: { label: 'Monitor Only', color: 'text-teal-400 bg-teal-500/10 border-teal-500/30' },
+};
+
 const severityColors: Record<string, string> = {
   info: 'text-blue-400 bg-blue-500/10',
   warning: 'text-amber-400 bg-amber-500/10',
@@ -235,7 +246,7 @@ function BashRestrictionTester({ role }: { role: string }) {
   );
 }
 
-type TabId = 'allowlists' | 'boundaries' | 'violations';
+type TabId = 'allowlists' | 'boundaries' | 'violations' | 'preview';
 type RuleType = 'tool_allowlist' | 'bash_restriction' | 'file_scope' | 'path_boundary';
 
 interface AddRuleForm {
@@ -731,6 +742,21 @@ export function GuardRulesPage() {
             )}
           </div>
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('preview')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === 'preview'
+              ? 'border-cyan-500 text-cyan-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+          data-testid="guard-preview-tab"
+        >
+          <div className="flex items-center gap-2">
+            <FiEye size={14} />
+            <span>Preview Permissions</span>
+          </div>
+        </button>
       </div>
 
       {activeTab === 'allowlists' && (
@@ -744,6 +770,7 @@ export function GuardRulesPage() {
               const colorClass =
                 capabilityColors[def.role] || 'text-slate-400 bg-slate-500/10 border-slate-500/30';
               const allowlist = getCurrentAllowlist(def);
+              const posture = defaultSecurityPosture[def.role];
               return (
                 <button
                   type="button"
@@ -752,6 +779,8 @@ export function GuardRulesPage() {
                     setSelectedRole(def.role);
                     cancelEditing();
                   }}
+                  data-testid={`guard-role-${def.role}`}
+                  data-security-posture={posture?.label || 'Custom'}
                   className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
                     selectedRole === def.role
                       ? colorClass
@@ -762,6 +791,14 @@ export function GuardRulesPage() {
                     <span className="text-sm font-medium capitalize">{def.display_name}</span>
                     <span className="text-xs text-slate-400">{allowlist.length} tools</span>
                   </div>
+                  {posture && (
+                    <span
+                      className={`inline-block mt-1 text-[10px] font-semibold uppercase tracking-wider rounded-full border px-2 py-0.5 ${posture.color}`}
+                      data-testid={`guard-posture-${def.role}`}
+                    >
+                      {posture.label}
+                    </span>
+                  )}
                   <p
                     className="text-xs text-slate-400 mt-0.5 truncate"
                     title={def.file_scope || 'No scope set'}
@@ -774,15 +811,25 @@ export function GuardRulesPage() {
           </div>
 
           {/* Right: Guard rule detail */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" data-testid="guard-rules-detail">
             {selectedDef ? (
-              <div className="space-y-6">
+              <div className="space-y-6" data-testid={`guard-rules-for-${selectedDef.role}`}>
                 {/* Role header */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-50 capitalize">
-                      {selectedDef.display_name} Guard Rules
-                    </h2>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-lg font-semibold text-slate-50 capitalize">
+                        {selectedDef.display_name} Guard Rules
+                      </h2>
+                      {defaultSecurityPosture[selectedDef.role] && (
+                        <span
+                          className={`text-xs font-semibold uppercase tracking-wider rounded-full border px-2.5 py-0.5 ${defaultSecurityPosture[selectedDef.role].color}`}
+                          data-testid="guard-security-posture"
+                        >
+                          {defaultSecurityPosture[selectedDef.role].label}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-slate-400 mt-1">{selectedDef.description}</p>
                   </div>
                   {!isEditing ? (
@@ -840,7 +887,7 @@ export function GuardRulesPage() {
                 </div>
 
                 {/* Tool Allowlist Section */}
-                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4" data-testid="guard-tool-allowlist">
                   <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
                     <FiShield size={14} className="text-blue-400" />
                     Tool Allowlist
@@ -917,7 +964,7 @@ export function GuardRulesPage() {
                 </div>
 
                 {/* Bash Restrictions Section */}
-                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4" data-testid="guard-bash-restrictions">
                   <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
                     <FiXCircle size={14} className="text-red-400" />
                     Bash Restrictions
@@ -988,7 +1035,7 @@ export function GuardRulesPage() {
                 </div>
 
                 {/* File Scope Section */}
-                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+                <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4" data-testid="guard-file-scope">
                   <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
                     <FiEye size={14} className="text-emerald-400" />
                     File Scope
@@ -1007,7 +1054,7 @@ export function GuardRulesPage() {
                       className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                     />
                   ) : (
-                    <span className="text-sm text-emerald-300">
+                    <span className="text-sm text-emerald-300" data-testid="guard-file-scope-value">
                       {selectedDef.file_scope || 'Not configured'}
                     </span>
                   )}
@@ -1573,6 +1620,204 @@ export function GuardRulesPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'preview' && (
+        <div className="flex gap-6" data-testid="guard-preview-panel">
+          {/* Left: Capability list */}
+          <div className="w-64 flex-shrink-0 space-y-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              Select Agent Type
+            </h2>
+            {definitions.map((def) => {
+              const colorClass =
+                capabilityColors[def.role] || 'text-slate-400 bg-slate-500/10 border-slate-500/30';
+              return (
+                <button
+                  type="button"
+                  key={def.role}
+                  onClick={() => setSelectedRole(def.role)}
+                  data-testid={`preview-role-${def.role}`}
+                  className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                    selectedRole === def.role
+                      ? colorClass
+                      : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="text-sm font-medium capitalize">{def.display_name}</span>
+                  {defaultSecurityPosture[def.role] && (
+                    <span
+                      className={`inline-block mt-1 text-[10px] font-semibold uppercase tracking-wider rounded-full border px-2 py-0.5 ${defaultSecurityPosture[def.role].color}`}
+                    >
+                      {defaultSecurityPosture[def.role].label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right: Effective permissions preview */}
+          <div className="flex-1 min-w-0" data-testid="guard-preview-detail">
+            {selectedDef ? (
+              <div className="space-y-5">
+                {/* Header */}
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-50 capitalize flex items-center gap-2">
+                    <FiEye size={18} className="text-cyan-400" />
+                    {selectedDef.display_name} — Effective Permissions
+                  </h2>
+                  <p className="text-sm text-slate-400 mt-1">{selectedDef.description}</p>
+                </div>
+
+                {/* Allowed Tools */}
+                <div
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 p-4"
+                  data-testid="preview-allowed-tools"
+                >
+                  <h3 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
+                    <FiCheckCircle size={14} />
+                    Allowed Tools
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {getCurrentAllowlist(selectedDef).length > 0 ? (
+                      getCurrentAllowlist(selectedDef).map((tool) => (
+                        <span
+                          key={tool}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-sm text-emerald-400"
+                          data-testid="preview-allowed-tool"
+                        >
+                          <FiCheckCircle size={12} />
+                          {tool}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-slate-400 italic">No tools configured</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Blocked Tools */}
+                <div
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 p-4"
+                  data-testid="preview-blocked-tools"
+                >
+                  <h3 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+                    <FiXCircle size={14} />
+                    Blocked Tools
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const allowed = new Set(
+                        getCurrentAllowlist(selectedDef).map((t) => t.split(' ')[0]),
+                      );
+                      const blocked = ALL_TOOLS.filter((t) => !allowed.has(t.split(' ')[0]));
+                      return blocked.length > 0 ? (
+                        blocked.map((tool) => (
+                          <span
+                            key={tool}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 border border-red-500/30 px-3 py-1 text-sm text-red-400"
+                            data-testid="preview-blocked-tool"
+                          >
+                            <FiXCircle size={12} />
+                            {tool}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-sm text-emerald-400 italic">
+                          All tools are allowed
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Bash Restrictions */}
+                <div
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 p-4"
+                  data-testid="preview-bash-restrictions"
+                >
+                  <h3 className="text-sm font-semibold text-amber-400 mb-3 flex items-center gap-2">
+                    <FiLock size={14} />
+                    Bash Restrictions
+                  </h3>
+                  {getCurrentBashRestrictions(selectedDef).length > 0 ? (
+                    <div className="space-y-1.5">
+                      {getCurrentBashRestrictions(selectedDef).map((restriction) => (
+                        <div
+                          key={restriction}
+                          className="flex items-center gap-2 rounded bg-red-500/5 border border-red-500/20 px-3 py-1.5"
+                          data-testid="preview-bash-restriction"
+                        >
+                          <FiXCircle size={12} className="text-red-400 flex-shrink-0" />
+                          <span className="text-sm text-red-300 font-mono">{restriction}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-slate-400 italic">No bash restrictions</span>
+                  )}
+                </div>
+
+                {/* Path Boundaries */}
+                <div
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 p-4"
+                  data-testid="preview-path-boundaries"
+                >
+                  <h3 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                    <FiFolder size={14} />
+                    Path Boundaries
+                  </h3>
+                  {getCurrentBoundaries(selectedDef).length > 0 ? (
+                    <div className="space-y-1.5">
+                      {getCurrentBoundaries(selectedDef).map((boundary, idx) => (
+                        <div
+                          key={`${boundary.pattern}-${idx}`}
+                          className="flex items-center gap-2 rounded bg-blue-500/5 border border-blue-500/20 px-3 py-1.5"
+                          data-testid="preview-path-boundary"
+                        >
+                          <span
+                            className={`text-[10px] font-semibold uppercase rounded-full border px-2 py-0.5 ${
+                              boundaryTypeColors[boundary.type] || 'text-slate-400 bg-slate-500/10 border-slate-500/30'
+                            }`}
+                          >
+                            {boundaryTypeLabels[boundary.type] || boundary.type}
+                          </span>
+                          <span className="text-sm text-blue-300 font-mono">{boundary.pattern}</span>
+                          {boundary.description && (
+                            <span className="text-xs text-slate-400">— {boundary.description}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-slate-400 italic">No path boundaries set</span>
+                  )}
+                </div>
+
+                {/* File Scope */}
+                <div
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 p-4"
+                  data-testid="preview-file-scope"
+                >
+                  <h3 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
+                    <FiEye size={14} />
+                    File Scope
+                  </h3>
+                  <span
+                    className={`text-sm ${selectedDef.file_scope ? 'text-emerald-300' : 'text-slate-400 italic'}`}
+                  >
+                    {selectedDef.file_scope || 'No file scope configured'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-slate-400">
+                <p>Select an agent type to preview its effective permissions</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

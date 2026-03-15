@@ -1266,7 +1266,7 @@ export interface ElectronAPI {
   ) => Promise<{ data: { imported: number } | null; error: string | null }>;
 
   // Events
-  eventList: (filters?: { eventType?: string; agentName?: string; limit?: number }) => Promise<{
+  eventList: (filters?: { eventType?: string; agentName?: string; runId?: string; limit?: number }) => Promise<{
     data: Event[] | null;
     error: string | null;
   }>;
