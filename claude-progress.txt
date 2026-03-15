@@ -3615,3 +3615,28 @@
 - 241/366 features passing (added #234 and #235 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Copy Branch Names & Error Messages)
+
+#### Feature #236: One-click copy branch names - PASSING
+- Added FiCopy button next to branch names in worktree cards
+- navigator.clipboard.writeText copies branch name on click
+- Toast success notification on copy
+- data-testid attributes for testing
+
+#### Feature #237: One-click copy error messages - PASSING
+- Added copy buttons to error messages in WorktreesPage (load errors, clean results, overstory errors)
+- Added copy buttons to error states in AgentDetailPage (main error, performance error)
+- Added copy buttons to error notification items in NotificationsPage (agent_error, merge_failed, health_alert)
+- ErrorBoundary already had copy functionality via Copy Error Details button
+- Consistent FiCopy icon and toast.success pattern across all locations
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Copy branch + copy error buttons
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Copy error buttons, toast import
+- MODIFIED: src/renderer/pages/NotificationsPage.tsx - Copy error buttons on error notifications
+
+#### Current Status
+- 243/366 features passing (added #236 and #237 this session)
+- Biome lint passes on modified files (only pre-existing warnings)
+- No mock data patterns in codebase
