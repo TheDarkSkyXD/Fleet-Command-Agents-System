@@ -142,6 +142,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>,
   ) => ipcRenderer.invoke('agentDef:import', definitions),
   agentDefExport: (roles?: string[]) => ipcRenderer.invoke('agentDef:export', roles),
+  agentDefCreate: (definition: {
+    role: string;
+    display_name: string;
+    description: string;
+    capabilities: string;
+    default_model: string;
+    tool_allowlist?: string;
+    bash_restrictions?: string;
+    file_scope?: string;
+  }) => ipcRenderer.invoke('agentDef:create', definition),
+  agentDefDelete: (role: string) => ipcRenderer.invoke('agentDef:delete', role),
+  agentDefUpdate: (
+    role: string,
+    updates: {
+      display_name?: string;
+      description?: string;
+      capabilities?: string;
+      default_model?: string;
+      tool_allowlist?: string;
+      bash_restrictions?: string;
+      file_scope?: string;
+    },
+  ) => ipcRenderer.invoke('agentDef:update', role, updates),
 
   // Coordinator
   coordinatorStart: (options?: { prompt?: string; run_id?: string }) =>
@@ -518,6 +541,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Dialog
   dialogSelectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 
+  // Agent Instruction Files
+  agentDefInstructionRead: (role: string) => ipcRenderer.invoke('agentDef:instruction-read', role),
+  agentDefInstructionWrite: (role: string, content: string) =>
+    ipcRenderer.invoke('agentDef:instruction-write', role, content),
+
   // Session Handoffs
   sessionHandoffCreate: (handoff: {
     from_session: string;
@@ -541,6 +569,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugShellKill: () => ipcRenderer.invoke('debug:shell-kill'),
   onDebugShellOutput: (callback: (data: { data: string }) => void) =>
     ipcRenderer.on('debug:shell-output', (_event, data) => callback(data)),
+
+  // Orphaned process detection
+  orphanDetect: () => ipcRenderer.invoke('orphan:detect'),
+  orphanKill: (sessionId: string, pid: number) => ipcRenderer.invoke('orphan:kill', sessionId, pid),
+  orphanReconnect: (sessionId: string) => ipcRenderer.invoke('orphan:reconnect', sessionId),
+  orphanDismiss: (sessionId: string) => ipcRenderer.invoke('orphan:dismiss', sessionId),
 
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),

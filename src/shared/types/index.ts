@@ -1003,6 +1003,29 @@ export interface ElectronAPI {
   agentDefExport: (
     roles?: string[],
   ) => Promise<{ data: AgentDefinition[] | null; error: string | null }>;
+  agentDefCreate: (definition: {
+    role: string;
+    display_name: string;
+    description: string;
+    capabilities: string;
+    default_model: string;
+    tool_allowlist?: string;
+    bash_restrictions?: string;
+    file_scope?: string;
+  }) => Promise<{ data: AgentDefinition | null; error: string | null }>;
+  agentDefDelete: (role: string) => Promise<{ data: boolean; error: string | null }>;
+  agentDefUpdate: (
+    role: string,
+    updates: {
+      display_name?: string;
+      description?: string;
+      capabilities?: string;
+      default_model?: string;
+      tool_allowlist?: string;
+      bash_restrictions?: string;
+      file_scope?: string;
+    },
+  ) => Promise<{ data: AgentDefinition | null; error: string | null }>;
 
   // Projects
   projectList: () => Promise<{ data: Project[] | null; error: string | null }>;
@@ -1446,6 +1469,19 @@ export interface ElectronAPI {
   ) => void;
   // Notification navigation events (main -> renderer)
   onNotificationNavigateToAgent: (callback: (data: { agentName: string }) => void) => void;
+  // Agent Instruction Files
+  agentDefInstructionRead: (role: string) => Promise<{
+    data: { role: string; content: string; filePath: string; isDefault?: boolean } | null;
+    error: string | null;
+  }>;
+  agentDefInstructionWrite: (
+    role: string,
+    content: string,
+  ) => Promise<{
+    data: { role: string; filePath: string; written: boolean } | null;
+    error: string | null;
+  }>;
+
   // Session Handoffs
   sessionHandoffCreate: (handoff: {
     from_session: string;
@@ -1453,9 +1489,7 @@ export interface ElectronAPI {
     reason?: string;
   }) => Promise<{ data: SessionHandoff | null; error: string | null }>;
   sessionHandoffList: () => Promise<{ data: SessionHandoff[] | null; error: string | null }>;
-  sessionHandoffGet: (
-    id: string,
-  ) => Promise<{ data: SessionHandoff | null; error: string | null }>;
+  sessionHandoffGet: (id: string) => Promise<{ data: SessionHandoff | null; error: string | null }>;
   sessionHandoffBySession: (
     sessionId: string,
   ) => Promise<{ data: SessionHandoff[] | null; error: string | null }>;
@@ -1477,7 +1511,41 @@ export interface ElectronAPI {
   debugShellKill: () => Promise<{ data: boolean; error: string | null }>;
   onDebugShellOutput: (callback: (data: { data: string }) => void) => void;
 
+  // Orphaned process detection
+  orphanDetect: () => Promise<{ data: OrphanedProcess[] | null; error: string | null }>;
+  orphanKill: (
+    sessionId: string,
+    pid: number,
+  ) => Promise<{ data: { killed: boolean; sessionId: string } | null; error: string | null }>;
+  orphanReconnect: (sessionId: string) => Promise<{
+    data: {
+      reconnected: boolean;
+      sessionId?: string;
+      agentName?: string;
+      pid?: number;
+      reason?: string;
+    } | null;
+    error: string | null;
+  }>;
+  orphanDismiss: (sessionId: string) => Promise<{
+    data: { dismissed: boolean; sessionId: string } | null;
+    error: string | null;
+  }>;
+
   removeAllListeners: (channel: string) => void;
+}
+
+// Orphaned process types
+export interface OrphanedProcess {
+  sessionId: string;
+  agentName: string;
+  capability: string;
+  model: string;
+  pid: number;
+  state: string;
+  processAlive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Watchdog types

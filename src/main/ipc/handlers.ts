@@ -3946,6 +3946,133 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Agent Definition CRUD - create and delete custom roles
+  ipcMain.handle(
+    'agentDef:create',
+    (
+      _event,
+      definition: {
+        role: string;
+        display_name: string;
+        description: string;
+        capabilities: string;
+        default_model: string;
+        tool_allowlist?: string;
+        bash_restrictions?: string;
+        file_scope?: string;
+      },
+    ) => {
+      try {
+        // Validate required fields
+        if (
+          !definition.role ||
+          !definition.display_name ||
+          !definition.description ||
+          !definition.capabilities ||
+          !definition.default_model
+        ) {
+          return {
+            data: null,
+            error:
+              'Missing required fields: role, display_name, description, capabilities, default_model',
+          };
+        }
+        // Check if role already exists
+        const existing = loggedPrepare('SELECT role FROM agent_definitions WHERE role = ?').get(
+          definition.role,
+        );
+        if (existing) {
+          return { data: null, error: `Role "${definition.role}" already exists` };
+        }
+        loggedPrepare(
+          `INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope)
+           VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope)`,
+        ).run({
+          role: definition.role,
+          display_name: definition.display_name,
+          description: definition.description,
+          capabilities: definition.capabilities,
+          default_model: definition.default_model,
+          tool_allowlist: definition.tool_allowlist || null,
+          bash_restrictions: definition.bash_restrictions || null,
+          file_scope: definition.file_scope || null,
+        });
+        const created = loggedPrepare('SELECT * FROM agent_definitions WHERE role = ?').get(
+          definition.role,
+        );
+        log.info(`[IPC] agentDef:create - INSERT new role=${definition.role} into real database`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('agentDef:create failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('agentDef:delete', (_event, role: string) => {
+    try {
+      // Check if role exists
+      const existing = loggedPrepare('SELECT role FROM agent_definitions WHERE role = ?').get(role);
+      if (!existing) {
+        return { data: false, error: `Role "${role}" not found` };
+      }
+      loggedPrepare('DELETE FROM agent_definitions WHERE role = ?').run(role);
+      log.info(`[IPC] agentDef:delete - DELETE role=${role} from real database`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('agentDef:delete failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'agentDef:update',
+    (
+      _event,
+      role: string,
+      updates: {
+        display_name?: string;
+        description?: string;
+        capabilities?: string;
+        default_model?: string;
+        tool_allowlist?: string;
+        bash_restrictions?: string;
+        file_scope?: string;
+      },
+    ) => {
+      try {
+        const existing = loggedPrepare('SELECT role FROM agent_definitions WHERE role = ?').get(
+          role,
+        );
+        if (!existing) {
+          return { data: null, error: `Role "${role}" not found` };
+        }
+        const setClauses: string[] = [];
+        const values: unknown[] = [];
+        for (const [key, val] of Object.entries(updates)) {
+          if (val !== undefined) {
+            setClauses.push(`${key} = ?`);
+            values.push(val);
+          }
+        }
+        if (setClauses.length === 0) {
+          return { data: null, error: 'No valid fields to update' };
+        }
+        setClauses.push("updated_at = datetime('now')");
+        values.push(role);
+        loggedPrepare(`UPDATE agent_definitions SET ${setClauses.join(', ')} WHERE role = ?`).run(
+          ...values,
+        );
+        const updated = loggedPrepare('SELECT * FROM agent_definitions WHERE role = ?').get(role);
+        log.info(`[IPC] agentDef:update - UPDATE role=${role} in real database`);
+        return { data: updated, error: null };
+      } catch (error) {
+        log.error('agentDef:update failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
   // Project channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle('project:list', () => {
     try {
@@ -6967,6 +7094,53 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Agent instruction file editing (per-role .md files)
+  ipcMain.handle('agentDef:instruction-read', async (_event, role: string) => {
+    try {
+      const fs = await import('node:fs/promises');
+      const userDataPath = (await import('electron')).app.getPath('userData');
+      const instructionsDir = path.join(userDataPath, 'agent-instructions');
+      const filePath = path.join(instructionsDir, `${role}.md`);
+
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        log.info(`[IPC] agentDef:instruction-read - read instruction file for role=${role}`);
+        return { data: { role, content, filePath }, error: null };
+      } catch {
+        // File doesn't exist yet, return default template
+        const defaultContent = `# ${role.charAt(0).toUpperCase() + role.slice(1)} Agent Instructions\n\n## Role\nDescribe the ${role} agent's primary responsibilities.\n\n## Guidelines\n- Follow project conventions\n- Report progress regularly\n\n## Constraints\n- Stay within assigned scope\n`;
+        log.info(
+          `[IPC] agentDef:instruction-read - no instruction file for role=${role}, returning default template`,
+        );
+        return { data: { role, content: defaultContent, filePath, isDefault: true }, error: null };
+      }
+    } catch (error) {
+      log.error('agentDef:instruction-read failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('agentDef:instruction-write', async (_event, role: string, content: string) => {
+    try {
+      const fs = await import('node:fs/promises');
+      const userDataPath = (await import('electron')).app.getPath('userData');
+      const instructionsDir = path.join(userDataPath, 'agent-instructions');
+
+      // Ensure directory exists
+      await fs.mkdir(instructionsDir, { recursive: true });
+
+      const filePath = path.join(instructionsDir, `${role}.md`);
+      await fs.writeFile(filePath, content, 'utf-8');
+      log.info(
+        `[IPC] agentDef:instruction-write - wrote instruction file for role=${role} (${content.length} chars)`,
+      );
+      return { data: { role, filePath, written: true }, error: null };
+    } catch (error) {
+      log.error('agentDef:instruction-write failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // Session handoff tracking
   ipcMain.handle(
     'session:handoff-create',
@@ -7025,6 +7199,192 @@ export function registerIpcHandlers(): void {
       return { data: handoffs, error: null };
     } catch (error) {
       log.error('session:handoff-by-session failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ==========================================
+  // Orphaned Agent Process Detection
+  // ==========================================
+
+  ipcMain.handle('orphan:detect', () => {
+    try {
+      // Find sessions that were in active states (not completed) and have a PID
+      const activeSessions = loggedPrepare(
+        "SELECT id, agent_name, capability, model, pid, state, created_at, updated_at FROM sessions WHERE state IN ('booting', 'working', 'stalled') AND pid IS NOT NULL ORDER BY created_at DESC",
+      ).all() as Array<{
+        id: string;
+        agent_name: string;
+        capability: string;
+        model: string;
+        pid: number;
+        state: string;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      const orphans: Array<{
+        sessionId: string;
+        agentName: string;
+        capability: string;
+        model: string;
+        pid: number;
+        state: string;
+        processAlive: boolean;
+        createdAt: string;
+        updatedAt: string;
+      }> = [];
+
+      for (const session of activeSessions) {
+        // Skip sessions that are currently tracked by agentProcessManager
+        const tracked = agentProcessManager.get(session.id);
+        if (tracked) continue;
+
+        // Check if the OS process is still alive
+        let processAlive = false;
+        try {
+          process.kill(session.pid, 0);
+          processAlive = true;
+        } catch {
+          processAlive = false;
+        }
+
+        orphans.push({
+          sessionId: session.id,
+          agentName: session.agent_name,
+          capability: session.capability,
+          model: session.model,
+          pid: session.pid,
+          state: session.state,
+          processAlive,
+          createdAt: session.created_at,
+          updatedAt: session.updated_at,
+        });
+      }
+
+      log.info(
+        `[IPC] orphan:detect - found ${orphans.length} orphaned session(s), ${orphans.filter((o) => o.processAlive).length} with live processes`,
+      );
+      return { data: orphans, error: null };
+    } catch (error) {
+      log.error('orphan:detect failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('orphan:kill', async (_event, sessionId: string, pid: number) => {
+    try {
+      log.info(`[IPC] orphan:kill - killing orphan PID=${pid}, session=${sessionId}`);
+
+      // Try to kill the process tree
+      let killed = false;
+      try {
+        const treeKill = await import('tree-kill');
+        await new Promise<void>((resolve, reject) => {
+          treeKill.default(pid, 'SIGTERM', (err: Error | undefined) => {
+            if (err) {
+              try {
+                process.kill(pid, 'SIGTERM');
+              } catch {
+                // ignore
+              }
+            }
+            resolve();
+          });
+        });
+        killed = true;
+      } catch {
+        try {
+          process.kill(pid, 'SIGTERM');
+          killed = true;
+        } catch {
+          killed = false;
+        }
+      }
+
+      // Update session state in database
+      loggedPrepare(
+        "UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+      ).run(sessionId);
+
+      log.info(`[IPC] orphan:kill - process killed=${killed}, session state updated to completed`);
+      return { data: { killed, sessionId }, error: null };
+    } catch (error) {
+      log.error('orphan:kill failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('orphan:reconnect', (_event, sessionId: string) => {
+    try {
+      log.info(`[IPC] orphan:reconnect - reconnecting orphan session=${sessionId}`);
+
+      const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as
+        | {
+            id: string;
+            agent_name: string;
+            capability: string;
+            model: string;
+            pid: number;
+            state: string;
+          }
+        | undefined;
+
+      if (!session) {
+        return { data: null, error: `Session ${sessionId} not found` };
+      }
+
+      // Verify the process is still alive
+      let processAlive = false;
+      try {
+        process.kill(session.pid, 0);
+        processAlive = true;
+      } catch {
+        processAlive = false;
+      }
+
+      if (!processAlive) {
+        loggedPrepare(
+          "UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+        ).run(sessionId);
+        return {
+          data: { reconnected: false, reason: 'Process is no longer alive' },
+          error: null,
+        };
+      }
+
+      // Update session state to working
+      loggedPrepare(
+        "UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?",
+      ).run(sessionId);
+
+      log.info(
+        `[IPC] orphan:reconnect - session ${sessionId} reconnected, state updated to working`,
+      );
+      return {
+        data: {
+          reconnected: true,
+          sessionId: session.id,
+          agentName: session.agent_name,
+          pid: session.pid,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('orphan:reconnect failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('orphan:dismiss', (_event, sessionId: string) => {
+    try {
+      loggedPrepare(
+        "UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+      ).run(sessionId);
+      log.info(`[IPC] orphan:dismiss - session ${sessionId} dismissed (marked completed)`);
+      return { data: { dismissed: true, sessionId }, error: null };
+    } catch (error) {
+      log.error('orphan:dismiss failed:', error);
       return { data: null, error: String(error) };
     }
   });

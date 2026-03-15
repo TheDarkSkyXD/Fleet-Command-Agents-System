@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  FiCheck,
   FiCpu,
   FiDownload,
+  FiEdit3,
   FiEye,
   FiLock,
+  FiSave,
   FiSearch,
   FiShield,
   FiTerminal,
   FiTool,
   FiUpload,
   FiUsers,
+  FiX,
 } from 'react-icons/fi';
 import type { AgentDefinition } from '../../shared/types';
 
@@ -137,7 +141,195 @@ function RoleCard({
   );
 }
 
-function RoleDetail({ def }: { def: AgentDefinition }) {
+// Markdown syntax highlighting for the editor
+function highlightMarkdown(text: string): React.ReactNode[] {
+  const lines = text.split('\n');
+  return lines.map((line, i) => {
+    let className = 'text-slate-300';
+    if (/^#{1,6}\s/.test(line)) className = 'text-blue-400 font-bold';
+    else if (/^>\s/.test(line)) className = 'text-green-400 italic';
+    else if (/^[-*]\s/.test(line)) className = 'text-amber-400';
+    else if (/^\d+\.\s/.test(line)) className = 'text-amber-400';
+    else if (/^```/.test(line)) className = 'text-purple-400';
+    else if (/^---/.test(line)) className = 'text-slate-500';
+
+    return (
+      <div key={`line-${i}-${line.slice(0, 20)}`} className="flex">
+        <span className="w-10 text-right pr-3 text-slate-600 select-none text-xs leading-6">
+          {i + 1}
+        </span>
+        <span className={className}>{line || '\u00A0'}</span>
+      </div>
+    );
+  });
+}
+
+function InstructionEditor({
+  role,
+  onClose,
+}: {
+  role: string;
+  onClose: () => void;
+}) {
+  const [content, setContent] = useState('');
+  const [originalContent, setOriginalContent] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isDefault, setIsDefault] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const result = await window.electronAPI.agentDefInstructionRead(role);
+        if (result.error) {
+          setError(result.error);
+        } else if (result.data) {
+          setContent(result.data.content);
+          setOriginalContent(result.data.content);
+          setIsDefault(!!result.data.isDefault);
+        }
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [role]);
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      const result = await window.electronAPI.agentDefInstructionWrite(role, content);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setOriginalContent(content);
+        setIsDefault(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasChanges = content !== originalContent;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-slate-400 flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+          Loading instructions...
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Editor Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FiEdit3 size={16} className="text-blue-400" />
+          <h3 className="text-sm font-medium text-slate-200">Instructions — {role}.md</h3>
+          {isDefault && (
+            <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              Default Template
+            </span>
+          )}
+          {hasChanges && (
+            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
+              Unsaved Changes
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {saved && (
+            <span className="text-xs text-green-400 flex items-center gap-1">
+              <FiCheck size={12} />
+              Saved
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+              hasChanges
+                ? 'bg-blue-600 text-white hover:bg-blue-500'
+                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+            }`}
+            data-testid="save-instruction-btn"
+          >
+            <FiSave size={14} />
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 transition-colors"
+          >
+            <FiX size={14} />
+            Close
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-md px-3 py-2 text-sm bg-red-500/10 text-red-400 border border-red-500/30">
+          {error}
+        </div>
+      )}
+
+      {/* Split Editor: Textarea + Preview */}
+      <div className="grid grid-cols-2 gap-3" style={{ height: 'calc(100vh - 360px)' }}>
+        {/* Left: Edit pane */}
+        <div className="rounded-lg border border-slate-700 bg-slate-900 overflow-hidden flex flex-col">
+          <div className="px-3 py-1.5 bg-slate-800 border-b border-slate-700 text-xs text-slate-400 font-medium">
+            Edit
+          </div>
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="flex-1 w-full bg-transparent text-slate-300 font-mono text-sm p-3 resize-none focus:outline-none leading-6"
+            spellCheck={false}
+            data-testid="instruction-editor"
+          />
+        </div>
+
+        {/* Right: Syntax-highlighted preview */}
+        <div className="rounded-lg border border-slate-700 bg-slate-900 overflow-hidden flex flex-col">
+          <div className="px-3 py-1.5 bg-slate-800 border-b border-slate-700 text-xs text-slate-400 font-medium">
+            Preview (Syntax Highlighted)
+          </div>
+          <div
+            className="flex-1 overflow-y-auto p-3 font-mono text-sm leading-6"
+            data-testid="instruction-preview"
+          >
+            {highlightMarkdown(content)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoleDetail({
+  def,
+  onEditInstructions,
+}: {
+  def: AgentDefinition;
+  onEditInstructions: (role: string) => void;
+}) {
   const config = roleConfig[def.role] || {
     color: 'text-slate-400',
     bgColor: 'bg-slate-500/10',
@@ -159,9 +351,20 @@ function RoleDetail({ def }: { def: AgentDefinition }) {
           <h2 className={`text-xl font-bold ${config.color}`}>{def.display_name}</h2>
           <span className="text-sm text-slate-500">Role: {def.role}</span>
         </div>
-        <span className={`ml-auto text-sm px-3 py-1 rounded-full border ${modelColors}`}>
-          Default Model: {def.default_model}
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onEditInstructions(def.role)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 text-sm hover:bg-blue-600/30 transition-colors"
+            data-testid="edit-instructions-btn"
+          >
+            <FiEdit3 size={14} />
+            Edit Instructions
+          </button>
+          <span className={`text-sm px-3 py-1 rounded-full border ${modelColors}`}>
+            Default Model: {def.default_model}
+          </span>
+        </div>
       </div>
 
       {/* Description */}
@@ -252,6 +455,7 @@ export function AgentDefinitionsPage() {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [selectedForExport, setSelectedForExport] = useState<Set<string>>(new Set());
   const [showExportSelect, setShowExportSelect] = useState(false);
+  const [editingRole, setEditingRole] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadDefinitions = useCallback(async () => {
@@ -528,10 +732,12 @@ export function AgentDefinitionsPage() {
           ))}
         </div>
 
-        {/* Right: Detail View */}
+        {/* Right: Detail View or Instruction Editor */}
         <div className="flex-1 overflow-y-auto rounded-lg border border-slate-700 bg-slate-800/30 p-6">
-          {selectedDef ? (
-            <RoleDetail def={selectedDef} />
+          {editingRole ? (
+            <InstructionEditor role={editingRole} onClose={() => setEditingRole(null)} />
+          ) : selectedDef ? (
+            <RoleDetail def={selectedDef} onEditInstructions={(role) => setEditingRole(role)} />
           ) : (
             <div className="flex items-center justify-center h-full text-slate-500">
               Select a role to view details
