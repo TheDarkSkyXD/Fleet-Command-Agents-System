@@ -2225,3 +2225,31 @@
 - 147/366 features passing (added #87 and #88 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Project Switcher UI & Command Palette Context)
+
+#### Feature #96: Project selector switcher UI - PASSING
+- Enhanced ProjectSwitcher with checkmark icon on active project (FiCheck)
+- Loading spinner (FiLoader with animate-spin) during project switch
+- Blue left-border highlight on active project for clear visual distinction
+- Dropdown header showing project count
+- Escape key support to close dropdown
+- Collapsed mode dropdown positioned to the right of sidebar
+- Improved empty state with folder icon
+- Smooth transitions and improved visual hierarchy throughout
+
+#### Feature #112: Command palette project context indicator - PASSING
+- Added project context bar below search input in CommandPalette
+- Shows FiFolder icon, 'Project: [name]' with active project path
+- Footer updated to show 'Commands apply to [project name]'
+- Uses useProjectStore to read activeProject state
+- Graceful handling when no project is selected ('None selected')
+
+#### Files Modified
+- MODIFIED: src/renderer/components/ProjectSwitcher.tsx - Enhanced switcher UI
+- MODIFIED: src/renderer/components/CommandPalette.tsx - Added project context indicator
+
+#### Current Status
+- 153/366 features passing (added #96 and #112 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
