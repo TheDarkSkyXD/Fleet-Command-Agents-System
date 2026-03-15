@@ -172,15 +172,19 @@ export function NuclearCleanupPage() {
           }
 
           if (errors.length > 0) {
+            const msg = `Removed ${removedCount} worktree(s). ${errors.length} issue(s): ${errors.join('; ')}`;
             setWorktreeResult({
               type: removedCount > 0 ? 'success' : 'error',
-              message: `Removed ${removedCount} worktree(s). ${errors.length} issue(s): ${errors.join('; ')}`,
+              message: msg,
             });
+            if (removedCount > 0) toast.success(`Removed ${removedCount} worktree(s)`);
+            else toast.error('Failed to clean worktrees');
           } else {
             setWorktreeResult({
               type: 'success',
               message: `Successfully removed all ${removedCount} worktree(s).`,
             });
+            toast.success(`Removed all ${removedCount} worktree(s)`);
           }
 
           // Refresh the list

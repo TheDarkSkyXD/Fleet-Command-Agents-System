@@ -21,6 +21,7 @@ import {
   FiUsers,
   FiX,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type { AgentDefinition } from '../../shared/types';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
 
@@ -260,10 +261,12 @@ function InstructionEditor({
       const result = await window.electronAPI.agentDefInstructionWrite(role, content);
       if (result.error) {
         setError(result.error);
+        toast.error(`Failed to save: ${result.error}`);
       } else {
         setOriginalContent(content);
         setIsDefault(false);
         setSaved(true);
+        toast.success('Instructions saved');
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (err) {
@@ -1262,6 +1265,7 @@ export function AgentDefinitionsPage() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         setImportStatus(`Exported ${result.data.length} definitions successfully`);
+        toast.success(`Exported ${result.data.length} definitions`);
         setShowExportSelect(false);
         setSelectedForExport(new Set());
       }
@@ -1321,6 +1325,7 @@ export function AgentDefinitionsPage() {
         setImportStatus(`Import error: ${result.error}`);
       } else {
         setImportStatus(`Imported ${defs.length} definitions successfully`);
+        toast.success(`Imported ${defs.length} definitions`);
         if (result.data) {
           setDefinitions(result.data);
         }
@@ -1351,6 +1356,7 @@ export function AgentDefinitionsPage() {
           setSelectedRole(definitions[0]?.role || null);
         }
         setImportStatus(`Deleted role "${role}" successfully`);
+        toast.success(`Deleted role "${role}"`);
         setConfirmDelete(null);
       }
     } catch (err) {
@@ -1364,6 +1370,7 @@ export function AgentDefinitionsPage() {
     setSelectedRole(def.role);
     setShowCreateModal(false);
     setImportStatus(`Created custom role "${def.display_name}" successfully`);
+    toast.success(`Created custom role "${def.display_name}"`);
     setTimeout(() => setImportStatus(null), 3000);
   };
 
@@ -1377,6 +1384,7 @@ export function AgentDefinitionsPage() {
         setDefinitions(result.data);
         setSelectedRole(result.data[0]?.role || null);
         setImportStatus('All definitions reset to factory defaults');
+        toast.success('Definitions reset to factory defaults');
       }
     } catch (err) {
       setImportStatus(`Reset failed: ${String(err)}`);

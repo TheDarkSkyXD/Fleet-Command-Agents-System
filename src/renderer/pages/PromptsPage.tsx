@@ -8,11 +8,13 @@ import {
   FiFile,
   FiFilePlus,
   FiGitBranch,
+  FiLoader,
   FiPlus,
   FiSave,
   FiTrash2,
   FiX,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type { Prompt, PromptTreeNode, PromptType, PromptVersion } from '../../shared/types';
 import { SlidePanel } from '../components/SlidePanel';
 import { useFormDirtyTracking } from '../hooks/useUnsavedChanges';
@@ -378,10 +380,12 @@ function CreatePromptDialog({
         type,
         parent_id: selectedParent || undefined,
       });
+      toast.success(`Prompt "${name.trim()}" created`);
       onCreated();
       onClose();
     } catch (err) {
       console.error('Failed to create prompt:', err);
+      toast.error('Failed to create prompt');
     } finally {
       setSaving(false);
     }
@@ -485,7 +489,7 @@ function CreatePromptDialog({
             disabled={!name.trim() || !content.trim() || saving}
             className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
           >
-            <FiPlus size={14} />
+            {saving ? <FiLoader size={14} className="animate-spin" /> : <FiPlus size={14} />}
             {saving ? 'Creating...' : 'Create Prompt'}
           </button>
         </div>
@@ -871,12 +875,14 @@ function PromptDetail({
 
       if (Object.keys(updates).length > 0) {
         await window.electronAPI.promptUpdate(prompt.id, updates);
+        toast.success('Prompt saved');
         onUpdated();
       }
       setEditing(false);
       setChangeSummary('');
     } catch (err) {
       console.error('Failed to update prompt:', err);
+      toast.error('Failed to save prompt');
     } finally {
       setSaving(false);
     }
@@ -885,9 +891,11 @@ function PromptDetail({
   const handleDelete = async () => {
     try {
       await window.electronAPI.promptDelete(prompt.id);
+      toast.success('Prompt deleted');
       onDeleted();
     } catch (err) {
       console.error('Failed to delete prompt:', err);
+      toast.error('Failed to delete prompt');
     }
   };
 
@@ -977,7 +985,7 @@ function PromptDetail({
                 disabled={saving}
                 className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
               >
-                <FiSave size={14} />
+                {saving ? <FiLoader size={14} className="animate-spin" /> : <FiSave size={14} />}
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </>

@@ -640,6 +640,7 @@ function ProfileCreateDialog({
         default_model: form.default_model,
       });
       if (result.data) {
+        toast.success(`Profile "${form.name.trim()}" created`);
         onCreated();
       } else {
         setStatusMessage({
@@ -758,6 +759,7 @@ function ProfileEditForm({
       });
       if (result.data) {
         setStatusMessage({ type: 'success', text: `Updated profile "${form.name}"` });
+        toast.success(`Profile "${form.name}" saved`);
         onSaved();
       } else {
         setStatusMessage({ type: 'error', text: result.error || 'Failed to update' });

@@ -17,6 +17,7 @@ import type {
   MetricsSummary,
   ModelBreakdown,
 } from '../../shared/types';
+import { toast } from 'sonner';
 
 type TabId = 'sessions' | 'models' | 'capabilities';
 
@@ -56,9 +57,13 @@ export function MetricsPage() {
       const result = await window.electronAPI.metricsExport(format);
       if (result.error) {
         console.error('Export failed:', result.error);
+        toast.error(`Export failed: ${result.error}`);
+      } else {
+        toast.success(`Metrics exported as ${format.toUpperCase()}`);
       }
     } catch (err) {
       console.error('Export failed:', err);
+      toast.error('Export failed');
     } finally {
       setExporting(false);
     }
@@ -392,10 +397,12 @@ function SessionsTab({
   const handleDelete = async (id: string) => {
     try {
       await window.electronAPI.metricsDelete(id);
+      toast.success('Metric record deleted');
       if (selectedMetric?.id === id) onSelectMetric(null);
       onRefresh();
     } catch (err) {
       console.error('Failed to delete metric:', err);
+      toast.error('Failed to delete metric');
     }
   };
 

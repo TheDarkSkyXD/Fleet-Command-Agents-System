@@ -14,6 +14,7 @@ import {
   FiMessageSquare,
   FiRefreshCw,
   FiSearch,
+  FiLoader,
   FiSend,
   FiTrash2,
   FiX,

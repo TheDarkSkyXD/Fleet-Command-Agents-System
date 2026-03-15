@@ -16,6 +16,7 @@ import {
   FiX,
   FiXCircle,
 } from 'react-icons/fi';
+import { toast } from 'sonner';
 import type { AgentDefinition, GuardViolation, PathBoundaryRule } from '../../shared/types';
 
 // All available tools in the system
@@ -384,6 +385,7 @@ export function GuardRulesPage() {
         setStatusMessage({ type: 'error', text: result.error });
       } else {
         setStatusMessage({ type: 'success', text: `Guard rules updated for ${selectedRole}` });
+        toast.success(`Guard rules updated for ${selectedRole}`);
         setIsEditing(false);
         setEditingAllowlist(null);
         setEditingBashRestrictions(null);
@@ -504,9 +506,11 @@ export function GuardRulesPage() {
     async (id: string) => {
       try {
         await window.electronAPI.guardViolationAcknowledge(id);
+        toast.success('Violation acknowledged');
         loadViolations();
       } catch (err) {
         console.error('Failed to acknowledge violation:', err);
+        toast.error('Failed to acknowledge violation');
       }
     },
     [loadViolations],
@@ -518,6 +522,7 @@ export function GuardRulesPage() {
       await window.electronAPI.guardViolationPurge();
       loadViolations();
       setStatusMessage({ type: 'success', text: 'All violations cleared' });
+      toast.success('All violations cleared');
       setTimeout(() => setStatusMessage(null), 3000);
     } catch (err) {
       console.error('Failed to purge violations:', err);
