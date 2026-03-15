@@ -174,6 +174,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateInstall: () => ipcRenderer.invoke('update:install'),
   doctorRun: () => ipcRenderer.invoke('doctor:run'),
 
+  // Watchdog
+  watchdogStart: () => ipcRenderer.invoke('watchdog:start'),
+  watchdogStop: () => ipcRenderer.invoke('watchdog:stop'),
+  watchdogStatus: () => ipcRenderer.invoke('watchdog:status'),
+  watchdogConfigure: (config: {
+    intervalMs?: number;
+    staleThresholdMs?: number;
+    zombieThresholdMs?: number;
+    enabled?: boolean;
+  }) => ipcRenderer.invoke('watchdog:configure', config),
+  watchdogCheckNow: () => ipcRenderer.invoke('watchdog:check-now'),
+  watchdogEscalationStates: () => ipcRenderer.invoke('watchdog:escalation-states'),
+  watchdogResetEscalation: (agentId: string) =>
+    ipcRenderer.invoke('watchdog:reset-escalation', agentId),
+
   // Events (renderer -> main)
   onAgentUpdate: (callback: (data: unknown) => void) =>
     ipcRenderer.on('agent:update', (_event, data) => callback(data)),
@@ -200,6 +215,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ) => ipcRenderer.on('update:downloaded', (_event, data) => callback(data)),
   onUpdateError: (callback: (data: { message: string }) => void) =>
     ipcRenderer.on('update:error', (_event, data) => callback(data)),
+
+  // Watchdog events (main -> renderer)
+  onWatchdogUpdate: (
+    callback: (data: {
+      checkCount: number;
+      timestamp: string;
+      results: Array<{
+        agentId: string;
+        agentName: string;
+        pidAlive: boolean;
+        ptyRunning: boolean;
+        stalledDurationMs: number | null;
+        escalationLevel: number;
+        action: string;
+        timestamp: string;
+      }>;
+    }) => void,
+  ) => ipcRenderer.on('watchdog:update', (_event, data) => callback(data)),
+
+  // Notifications
+  notificationSend: (options: {
+    title: string;
+    body: string;
+    eventType: string;
+    agentName?: string;
+  }) => ipcRenderer.invoke('notification:send', options),
+  notificationSetEnabled: (enabled: boolean) =>
+    ipcRenderer.invoke('notification:set-enabled', enabled),
+  notificationIsSupported: () => ipcRenderer.invoke('notification:is-supported'),
 
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),

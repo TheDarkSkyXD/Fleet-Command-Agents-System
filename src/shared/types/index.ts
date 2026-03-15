@@ -557,6 +557,37 @@ export interface ElectronAPI {
   updateDownload: () => Promise<{ data: UpdateStatus; error: string | null }>;
   updateInstall: () => Promise<{ data: boolean; error: string | null }>;
   doctorRun: () => Promise<{ data: unknown; error: string | null }>;
+  // Watchdog
+  watchdogStart: () => Promise<{ data: WatchdogStatus | null; error: string | null }>;
+  watchdogStop: () => Promise<{ data: WatchdogStatus | null; error: string | null }>;
+  watchdogStatus: () => Promise<{ data: WatchdogStatus | null; error: string | null }>;
+  watchdogConfigure: (config: Partial<WatchdogConfig>) => Promise<{
+    data: WatchdogStatus | null;
+    error: string | null;
+  }>;
+  watchdogCheckNow: () => Promise<{
+    data: WatchdogCheckResult[] | null;
+    error: string | null;
+  }>;
+  watchdogEscalationStates: () => Promise<{
+    data: Record<string, unknown> | null;
+    error: string | null;
+  }>;
+  watchdogResetEscalation: (agentId: string) => Promise<{
+    data: boolean;
+    error: string | null;
+  }>;
+
+  // Notifications
+  notificationSend: (options: {
+    title: string;
+    body: string;
+    eventType: string;
+    agentName?: string;
+  }) => Promise<{ data: boolean; error: string | null }>;
+  notificationSetEnabled: (enabled: boolean) => Promise<{ data: boolean; error: string | null }>;
+  notificationIsSupported: () => Promise<{ data: boolean; error: string | null }>;
+
   onAgentUpdate: (callback: (data: unknown) => void) => void;
   onAgentOutput: (callback: (data: { agentId: string; data: string }) => void) => void;
   onMailReceived: (callback: (data: unknown) => void) => void;
@@ -574,7 +605,43 @@ export interface ElectronAPI {
     callback: (data: { version: string; releaseNotes: string | null }) => void,
   ) => void;
   onUpdateError: (callback: (data: { message: string }) => void) => void;
+  onWatchdogUpdate: (
+    callback: (data: {
+      checkCount: number;
+      timestamp: string;
+      results: WatchdogCheckResult[];
+    }) => void,
+  ) => void;
   removeAllListeners: (channel: string) => void;
+}
+
+// Watchdog types
+export type EscalationLevel = 0 | 1 | 2 | 3 | 4;
+
+export interface WatchdogCheckResult {
+  agentId: string;
+  agentName: string;
+  pidAlive: boolean;
+  ptyRunning: boolean;
+  stalledDurationMs: number | null;
+  escalationLevel: EscalationLevel;
+  action: 'none' | 'warn' | 'nudge' | 'escalate' | 'terminate';
+  timestamp: string;
+}
+
+export interface WatchdogConfig {
+  intervalMs: number;
+  staleThresholdMs: number;
+  zombieThresholdMs: number;
+  enabled: boolean;
+}
+
+export interface WatchdogStatus {
+  running: boolean;
+  config: WatchdogConfig;
+  checkCount: number;
+  lastCheckAt: string | null;
+  trackedAgents: number;
 }
 
 declare global {

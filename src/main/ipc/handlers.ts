@@ -11,12 +11,14 @@ import {
   detectClaudeCli,
   getClaudeCliStatus,
 } from '../services/claudeCliService';
+import { type NotificationEventType, notificationService } from '../services/notificationService';
 import {
   checkForUpdates,
   downloadUpdate,
   getUpdateStatus,
   installUpdate,
 } from '../services/updateService';
+import { watchdogService } from '../services/watchdogService';
 
 /**
  * Logged database prepare - wraps db.prepare() with SQL query logging.
@@ -544,6 +546,18 @@ export function registerIpcHandlers(): void {
           }),
         });
 
+        // Trigger desktop notification for merge_ready messages
+        if (message.type === 'merge_ready') {
+          const branchName = message.subject || message.body || 'Unknown branch';
+          notificationService.notifyMergeReady(branchName);
+        }
+
+        // Trigger desktop notification for merge_failed messages
+        if (message.type === 'merge_failed') {
+          const branchName = message.subject || message.body || 'Unknown branch';
+          notificationService.notifyMergeFailed(branchName);
+        }
+
         return { data: true, error: null };
       } catch (error) {
         log.error('mail:send failed:', error);
@@ -626,6 +640,10 @@ export function registerIpcHandlers(): void {
         log.info(
           `[IPC] merge:enqueue - INSERT into real database: branch=${entry.branch_name}, id=${result.lastInsertRowid}`,
         );
+
+        // Send desktop notification that a branch is ready for merge review
+        notificationService.notifyMergeReady(entry.branch_name);
+
         return { data: inserted, error: null };
       } catch (error) {
         log.error('merge:enqueue failed:', error);
@@ -2038,6 +2056,132 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       log.error('run:get failed:', error);
       return { data: null, error: String(error) };
+    }
+  });
+
+  // ── Watchdog ──────────────────────────────────────────────────────────
+
+  ipcMain.handle('watchdog:start', () => {
+    try {
+      watchdogService.start();
+      log.info('[IPC] watchdog:start - watchdog daemon started');
+      return { data: watchdogService.getStatus(), error: null };
+    } catch (error) {
+      log.error('watchdog:start failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:stop', () => {
+    try {
+      watchdogService.stop();
+      log.info('[IPC] watchdog:stop - watchdog daemon stopped');
+      return { data: watchdogService.getStatus(), error: null };
+    } catch (error) {
+      log.error('watchdog:stop failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:status', () => {
+    try {
+      return { data: watchdogService.getStatus(), error: null };
+    } catch (error) {
+      log.error('watchdog:status failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'watchdog:configure',
+    (
+      _event,
+      config: {
+        intervalMs?: number;
+        staleThresholdMs?: number;
+        zombieThresholdMs?: number;
+        enabled?: boolean;
+      },
+    ) => {
+      try {
+        watchdogService.updateConfig(config);
+        log.info('[IPC] watchdog:configure - watchdog configuration updated');
+        return { data: watchdogService.getStatus(), error: null };
+      } catch (error) {
+        log.error('watchdog:configure failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('watchdog:check-now', () => {
+    try {
+      const results = watchdogService.runCheck();
+      log.info(`[IPC] watchdog:check-now - manual check: ${results.length} agents checked`);
+      return { data: results, error: null };
+    } catch (error) {
+      log.error('watchdog:check-now failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:escalation-states', () => {
+    try {
+      const states = watchdogService.getAllEscalationStates();
+      return { data: states, error: null };
+    } catch (error) {
+      log.error('watchdog:escalation-states failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('watchdog:reset-escalation', (_event, agentId: string) => {
+    try {
+      watchdogService.resetEscalation(agentId);
+      log.info(`[IPC] watchdog:reset-escalation - reset for agent ${agentId}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('watchdog:reset-escalation failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  // ─── Notification Handlers ───────────────────────────────────────────
+
+  ipcMain.handle(
+    'notification:send',
+    (_event, options: { title: string; body: string; eventType: string; agentName?: string }) => {
+      try {
+        notificationService.notify({
+          title: options.title,
+          body: options.body,
+          eventType: options.eventType as NotificationEventType,
+          agentName: options.agentName,
+        });
+        return { data: true, error: null };
+      } catch (error) {
+        log.error('notification:send failed:', error);
+        return { data: false, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('notification:set-enabled', (_event, enabled: boolean) => {
+    try {
+      notificationService.setEnabled(enabled);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('notification:set-enabled failed:', error);
+      return { data: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('notification:is-supported', () => {
+    try {
+      return { data: notificationService.isSupported(), error: null };
+    } catch (error) {
+      log.error('notification:is-supported failed:', error);
+      return { data: false, error: String(error) };
     }
   });
 

@@ -16,15 +16,18 @@ import {
   FiChevronUp,
   FiCpu,
   FiFilter,
+  FiGitBranch,
   FiGrid,
   FiList,
   FiPlay,
   FiSearch,
   FiSquare,
+  FiUsers,
   FiX,
   FiZap,
 } from 'react-icons/fi';
 import type { AgentCapability, AgentProcessInfo, Session } from '../../shared/types';
+import { AgentHierarchyTree } from '../components/AgentHierarchyTree';
 import { CoordinatorPanel } from '../components/CoordinatorPanel';
 
 /** Default model per capability */
@@ -266,7 +269,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy'>('table');
 
   // Table state
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -281,6 +284,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [spawnTaskId, setSpawnTaskId] = useState('');
   const [spawnFileScope, setSpawnFileScope] = useState('');
   const [spawnPrompt, setSpawnPrompt] = useState('');
+  const [spawnParentAgent, setSpawnParentAgent] = useState('');
   const [isSpawning, setIsSpawning] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
@@ -357,6 +361,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     setSpawnTaskId('');
     setSpawnFileScope('');
     setSpawnPrompt('');
+    setSpawnParentAgent('');
     setSpawnError(null);
     setShowSpawnDialog(true);
   };
@@ -369,6 +374,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
     const agentName = spawnName.trim() || generateName(spawnCapability);
 
     try {
+      // Calculate depth from parent agent
+      const parentSession = spawnParentAgent
+        ? sessions.find((s) => s.agent_name === spawnParentAgent)
+        : undefined;
+      const depth = parentSession ? (parentSession.depth || 0) + 1 : 0;
+
       const result = await window.electronAPI.agentSpawn({
         id,
         agent_name: agentName,
@@ -377,6 +388,8 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         task_id: spawnTaskId.trim() || undefined,
         file_scope: spawnFileScope.trim() || undefined,
         prompt: spawnPrompt.trim() || undefined,
+        parent_agent: spawnParentAgent || undefined,
+        depth,
       });
 
       if (result.error) {
@@ -570,6 +583,17 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const activeSessions = sessions.filter((s) => s.state !== 'completed');
   const completedSessions = sessions.filter((s) => s.state === 'completed');
 
+  // Compute child agent counts for leads/coordinators
+  const childCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const s of sessions) {
+      if (s.parent_agent) {
+        map[s.parent_agent] = (map[s.parent_agent] || 0) + 1;
+      }
+    }
+    return map;
+  }, [sessions]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -683,12 +707,24 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           >
             <FiGrid className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('hierarchy')}
+            className={`p-2 transition-colors ${
+              viewMode === 'hierarchy'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+            }`}
+            title="Hierarchy tree view"
+          >
+            <FiGitBranch className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
       {/* Loading skeleton */}
       {isLoading ? (
-        viewMode === 'table' ? (
+        viewMode === 'table' || viewMode === 'hierarchy' ? (
           <AgentTableSkeleton />
         ) : (
           <AgentCardSkeleton />
@@ -707,6 +743,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             Spawn Agent
           </button>
         </div>
+      ) : viewMode === 'hierarchy' ? (
+        /* Hierarchy tree view */
+        <AgentHierarchyTree
+          sessions={sessions}
+          onSelectAgent={(agentId) => onSelectAgent?.(agentId)}
+        />
       ) : viewMode === 'table' ? (
         /* Table view with @tanstack/react-table */
         <div className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden">
@@ -799,6 +841,7 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                         key={session.id}
                         session={session}
                         processInfo={proc}
+                        childCount={childCountMap[session.agent_name] || 0}
                         onStop={() => requestStopAgent(session.id, session.agent_name)}
                         onSelect={() => onSelectAgent?.(session.id)}
                       />
@@ -861,14 +904,22 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
           taskId={spawnTaskId}
           fileScope={spawnFileScope}
           prompt={spawnPrompt}
+          parentAgent={spawnParentAgent}
+          availableParents={activeSessions.filter(
+            (s) => s.capability === 'lead' || s.capability === 'coordinator',
+          )}
           isSpawning={isSpawning}
           error={spawnError}
-          onCapabilityChange={setSpawnCapability}
+          onCapabilityChange={(cap) => {
+            setSpawnCapability(cap);
+            setSpawnModel(CAPABILITY_DEFAULTS[cap].model);
+          }}
           onModelChange={setSpawnModel}
           onNameChange={setSpawnName}
           onTaskIdChange={setSpawnTaskId}
           onFileScopeChange={setSpawnFileScope}
           onPromptChange={setSpawnPrompt}
+          onParentAgentChange={setSpawnParentAgent}
           onSpawn={handleSpawn}
           onClose={() => setShowSpawnDialog(false)}
         />
@@ -904,11 +955,13 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
 function AgentCard({
   session,
   processInfo,
+  childCount,
   onStop,
   onSelect,
 }: {
   session: Session;
   processInfo?: AgentProcessInfo;
+  childCount?: number;
   onStop: () => void;
   onSelect?: () => void;
 }) {
@@ -981,6 +1034,16 @@ function AgentCard({
         {session.task_id && <span>Task: {session.task_id}</span>}
         {session.worktree_path && <span>Worktree: {session.worktree_path}</span>}
         {session.branch_name && <span>Branch: {session.branch_name}</span>}
+        {session.parent_agent && (
+          <span className="text-amber-400/70">Parent: {session.parent_agent}</span>
+        )}
+        {(session.capability === 'lead' || session.capability === 'coordinator') &&
+          childCount !== undefined && (
+            <span className="inline-flex items-center gap-1 text-amber-400/70">
+              <FiUsers className="h-3 w-3" />
+              {childCount} child{childCount !== 1 ? 'ren' : ''}
+            </span>
+          )}
       </div>
     </div>
   );
@@ -993,6 +1056,8 @@ function SpawnDialog({
   taskId,
   fileScope,
   prompt,
+  parentAgent,
+  availableParents,
   isSpawning,
   error,
   onCapabilityChange,
@@ -1001,6 +1066,7 @@ function SpawnDialog({
   onTaskIdChange,
   onFileScopeChange,
   onPromptChange,
+  onParentAgentChange,
   onSpawn,
   onClose,
 }: {
@@ -1010,6 +1076,8 @@ function SpawnDialog({
   taskId: string;
   fileScope: string;
   prompt: string;
+  parentAgent: string;
+  availableParents: Session[];
   isSpawning: boolean;
   error: string | null;
   onCapabilityChange: (c: AgentCapability) => void;
@@ -1018,6 +1086,7 @@ function SpawnDialog({
   onTaskIdChange: (t: string) => void;
   onFileScopeChange: (f: string) => void;
   onPromptChange: (p: string) => void;
+  onParentAgentChange: (p: string) => void;
   onSpawn: () => void;
   onClose: () => void;
 }) {
@@ -1131,6 +1200,38 @@ function SpawnDialog({
               className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
+
+          {/* Parent agent */}
+          {availableParents.length > 0 && (
+            <div>
+              <label
+                htmlFor="spawn-parent-agent"
+                className="block text-sm font-medium text-slate-300 mb-1"
+              >
+                Parent Agent <span className="text-slate-500 font-normal">(optional)</span>
+              </label>
+              <div className="relative">
+                <select
+                  id="spawn-parent-agent"
+                  value={parentAgent}
+                  onChange={(e) => onParentAgentChange(e.target.value)}
+                  data-testid="spawn-parent-agent"
+                  className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="">No parent (top-level agent)</option>
+                  {availableParents.map((s) => (
+                    <option key={s.id} value={s.agent_name}>
+                      {s.agent_name} ({s.capability})
+                    </option>
+                  ))}
+                </select>
+                <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Assign this agent under a lead or coordinator in the hierarchy
+              </p>
+            </div>
+          )}
 
           {/* File scope */}
           <div>

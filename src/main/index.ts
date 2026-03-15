@@ -7,6 +7,7 @@ import { registerIpcHandlers } from './ipc/handlers';
 import { agentProcessManager } from './services/agentProcessManager';
 import { type TrayIconStatus, generateTrayIcon } from './services/trayIconGenerator';
 import { checkForUpdates, initAutoUpdater } from './services/updateService';
+import { watchdogService } from './services/watchdogService';
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -271,6 +272,9 @@ app.whenReady().then(async () => {
   // Register IPC handlers
   registerIpcHandlers();
 
+  // Start watchdog daemon for agent liveness monitoring
+  watchdogService.start();
+
   // Create window and tray (splash closes when main window is ready)
   createWindow();
   createTray();
@@ -301,6 +305,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async () => {
   isQuitting = true;
+  // Stop watchdog daemon
+  watchdogService.stop();
   // Stop all running agent processes before quitting
   try {
     await agentProcessManager.stopAll();

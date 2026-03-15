@@ -14,7 +14,7 @@
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
     "typecheck": "tsc --noEmit",
-    "start": "electron .",
+    "start": "electron . --remote-debugging-port=9233",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {

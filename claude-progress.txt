@@ -1,5 +1,36 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Watchdog Features & Hierarchy Tree Fix)
+
+#### Feature #192: Watchdog Tier 0 process daemon - PASSING
+- Already fully implemented in src/main/services/watchdogService.ts
+- Runs at configurable interval (default 30s) checking agent liveness
+- Checks PID liveness via process.kill(pid, 0) and node-pty isRunning status
+- Auto-starts on app launch (src/main/index.ts)
+- IPC handlers wired up: watchdog:start, watchdog:stop, watchdog:status, watchdog:configure, watchdog:check-now
+- Preload bridge and shared types all in place
+
+#### Feature #193: Watchdog progressive nudging 4 levels - PASSING
+- Already fully implemented in watchdogService.ts applyProgressiveNudging()
+- Level 1 (warn): Warning logged when agent stalled past stale threshold (5min default)
+- Level 2 (nudge): Resume prompt written to agent's pty terminal
+- Level 3 (escalate): Escalation mail sent to coordinator via messages table
+- Level 4 (terminate): Agent process killed via agentProcessManager.stop()
+- Escalation timeline tracked via levelTimestamps record and stalledSince
+- Session state and escalation_level updated in DB at each level
+- Watchdog events recorded in events table for audit trail
+
+#### Bug Fix: Missing AgentHierarchyTree component
+- Created src/renderer/components/AgentHierarchyTree.tsx (was imported but didn't exist)
+- Tree view of agent hierarchy with parent-child relationships
+- Expand/collapse nodes, state indicators, capability badges, depth display
+- Fixed build failure caused by missing module
+
+#### Current Status
+- 51/366 features passing (added #192 and #193 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Run Management & Status Bar)
 
 #### Feature #176: Start new run - PASSING

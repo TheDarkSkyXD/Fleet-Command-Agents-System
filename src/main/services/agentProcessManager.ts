@@ -3,6 +3,7 @@ import log from 'electron-log';
 import * as nodePty from 'node-pty';
 import { getDatabase } from '../db/database';
 import { detectClaudeCli } from './claudeCliService';
+import { notificationService } from './notificationService';
 
 /**
  * Agent capability type determines model defaults and guard rules.
@@ -203,6 +204,9 @@ class AgentProcessManager {
         `[AgentProcessManager] Agent exited: ${options.agentName} (PID=${pid}), exitCode=${exitCode}, signal=${signal}`,
       );
       agentProcess.isRunning = false;
+
+      // Send desktop notification for agent completion
+      notificationService.notifyAgentCompleted(options.agentName, options.capability);
 
       // Save token usage metrics to database
       this.saveMetrics(agentProcess, options);
