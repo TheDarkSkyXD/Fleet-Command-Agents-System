@@ -306,7 +306,12 @@ export function NotificationsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-slate-100">{notification.title}</span>
+                      <span
+                        className="font-semibold text-slate-100 truncate"
+                        title={notification.title}
+                      >
+                        {notification.title}
+                      </span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${config.color} ${config.bgColor} border ${config.borderColor}`}
                         data-testid={`notification-type-${notification.id}`}

@@ -4745,3 +4745,27 @@
 - 317/366 features passing (added #319 and #320 this session)
 - All code passes Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Toast Confirmations & Error Toasts)
+
+#### Feature #323: Toast confirmation for all successful actions - PASSING
+- Added toast.success() to MailPage (send, mark all read, purge all/by age/by agent)
+- Added toast.success() to ExpertisePage (create record, delete record)
+- Added toast.success() to PromptsPage (create, save, delete prompts)
+- Added toast.success() to MetricsPage (export, delete metric)
+- Added toast.success() to AgentDefinitionsPage (save instructions, export, import, delete, create role, reset defaults)
+- Added toast.success() to GuardRulesPage (save rules, acknowledge violation, purge violations)
+- Added toast.success() to NuclearCleanupPage (worktree cleanup)
+- Added toast.success() to SettingsPage (profile create, profile save)
+
+#### Feature #324: Toast error messages for failed actions - PASSING
+- Added toast.error() to TasksPage (10 group/issue action failures)
+- Added toast.error() to DebugPage (6 debug shell and log action failures)
+- Added toast.error() to MergeQueuePage (preview and diff failures)
+- Added toast.error() to SettingsPage (cleanup failure)
+- Background data loading errors intentionally excluded (not user-triggered)
+
+#### Current Status
+- 322/366 features passing (added #323 and #324 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase

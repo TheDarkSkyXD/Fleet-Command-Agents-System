@@ -851,7 +851,14 @@ export function TasksPage() {
                       disabled={!form.title.trim() || creating}
                       className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      {creating ? <><FiLoader size={14} className="inline animate-spin mr-1" />Creating...</> : 'Create Issue'}
+                      {creating ? (
+                        <>
+                          <FiLoader size={14} className="inline animate-spin mr-1" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Issue'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1003,7 +1010,14 @@ export function TasksPage() {
                       className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       data-testid="confirm-create-group"
                     >
-                      {creatingGroup ? <><FiLoader size={14} className="inline animate-spin mr-1" />Creating...</> : 'Create Group'}
+                      {creatingGroup ? (
+                        <>
+                          <FiLoader size={14} className="inline animate-spin mr-1" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Group'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1084,8 +1098,12 @@ export function TasksPage() {
                                     value={renameGroupName}
                                     onChange={(e) => setRenameGroupName(e.target.value)}
                                     onKeyDown={(e) => {
-                                      if (e.key === 'Enter') handleRenameGroup(group.id, renameGroupName);
-                                      if (e.key === 'Escape') { setRenamingGroupId(null); setRenameGroupName(''); }
+                                      if (e.key === 'Enter')
+                                        handleRenameGroup(group.id, renameGroupName);
+                                      if (e.key === 'Escape') {
+                                        setRenamingGroupId(null);
+                                        setRenameGroupName('');
+                                      }
                                     }}
                                     className="rounded-md border border-slate-600 bg-slate-900 px-2 py-0.5 text-sm text-slate-50 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     data-testid={`group-rename-input-${group.id}`}
@@ -1102,7 +1120,10 @@ export function TasksPage() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => { setRenamingGroupId(null); setRenameGroupName(''); }}
+                                    onClick={() => {
+                                      setRenamingGroupId(null);
+                                      setRenameGroupName('');
+                                    }}
                                     className="rounded p-0.5 text-slate-400 hover:text-slate-200"
                                   >
                                     <FiX size={14} />
@@ -1197,7 +1218,10 @@ export function TasksPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => { setRenamingGroupId(group.id); setRenameGroupName(group.name); }}
+                                onClick={() => {
+                                  setRenamingGroupId(group.id);
+                                  setRenameGroupName(group.name);
+                                }}
                                 className="rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-blue-400 transition-colors"
                                 title="Rename group"
                                 data-testid={`rename-group-${group.id}`}
@@ -1721,7 +1745,9 @@ function KanbanCard({
       data-testid={`kanban-card-${issue.id}`}
     >
       {/* Title */}
-      <h4 className="text-sm font-medium text-slate-100 mb-2 line-clamp-2" title={issue.title}>{issue.title}</h4>
+      <h4 className="text-sm font-medium text-slate-100 mb-2 line-clamp-2" title={issue.title}>
+        {issue.title}
+      </h4>
 
       {/* Badges row */}
       <div className="flex items-center flex-wrap gap-1.5">

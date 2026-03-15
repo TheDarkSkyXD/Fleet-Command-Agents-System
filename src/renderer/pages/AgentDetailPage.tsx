@@ -105,7 +105,8 @@ const STATE_TOOLTIPS: Record<string, string> = {
   working: 'Agent is actively processing tasks',
   completed: 'Agent has finished all assigned work',
   stalled: 'Agent appears stuck or unresponsive',
-  zombie: 'Zombie: Agent process has died unexpectedly. The session remains but the process is no longer running. Stop and respawn to recover.',
+  zombie:
+    'Zombie: Agent process has died unexpectedly. The session remains but the process is no longer running. Stop and respawn to recover.',
 };
 
 /** Human-readable capability descriptions for hover tooltips */
@@ -212,7 +213,7 @@ function AgentCVCard({ agentName, currentSession }: AgentCVCardProps) {
 
   return (
     <div className="p-6 overflow-y-auto h-full">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         {/* Profile Card Header */}
         <div className="rounded-xl border border-slate-700 bg-slate-800/80 overflow-hidden">
           {/* Gradient banner */}
@@ -851,10 +852,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     return (
       <div className="space-y-4">
         <Breadcrumbs
-          items={[
-            { label: 'Agents', page: 'agents', onClick: onBack },
-            { label: 'Error' },
-          ]}
+          items={[{ label: 'Agents', page: 'agents', onClick: onBack }, { label: 'Error' }]}
         />
         <button
           type="button"
@@ -888,10 +886,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     return (
       <div className="space-y-4" data-testid="agent-not-found">
         <Breadcrumbs
-          items={[
-            { label: 'Agents', page: 'agents', onClick: onBack },
-            { label: 'Not Found' },
-          ]}
+          items={[{ label: 'Agents', page: 'agents', onClick: onBack }, { label: 'Not Found' }]}
         />
         <button
           type="button"
@@ -933,10 +928,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     return (
       <div className="space-y-4">
         <Breadcrumbs
-          items={[
-            { label: 'Agents', page: 'agents', onClick: onBack },
-            { label: 'Loading...' },
-          ]}
+          items={[{ label: 'Agents', page: 'agents', onClick: onBack }, { label: 'Loading...' }]}
         />
         <button
           type="button"
@@ -957,7 +949,12 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
   const isRunning = session.state !== 'completed' && (processInfo?.isRunning ?? false);
 
   return (
-    <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 96px)' }} data-testid="agent-detail-page" data-agent-id={agentId}>
+    <div
+      className="flex flex-col h-full"
+      style={{ height: 'calc(100vh - 96px)' }}
+      data-testid="agent-detail-page"
+      data-agent-id={agentId}
+    >
       {/* Header */}
       <div className="flex-shrink-0 space-y-3 pb-4">
         <Breadcrumbs
@@ -991,7 +988,12 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             </div>
 
             {/* Agent name */}
-            <h1 className="text-xl font-bold text-slate-50">{session.agent_name}</h1>
+            <h1
+              className="text-xl font-bold text-slate-50 truncate max-w-[400px]"
+              title={session.agent_name}
+            >
+              {session.agent_name}
+            </h1>
 
             {/* Capability badge */}
             <span
@@ -1131,7 +1133,10 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       </div>
 
       {/* Tabs */}
-      <div className="flex-shrink-0 flex border-b border-slate-700 gap-0" data-testid="agent-detail-tabs">
+      <div
+        className="flex-shrink-0 flex border-b border-slate-700 gap-0"
+        data-testid="agent-detail-tabs"
+      >
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -1153,7 +1158,10 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-hidden" data-testid={`agent-tab-content-${activeTab}`}>
+      <div
+        className="flex-1 min-h-0 overflow-hidden"
+        data-testid={`agent-tab-content-${activeTab}`}
+      >
         {activeTab === 'terminal' && <AgentTerminal agentId={agentId} isRunning={isRunning} />}
         {activeTab === 'logs' && <AgentLogsTab agentName={session.agent_name} />}
         {activeTab === 'identity' && (
@@ -1204,7 +1212,10 @@ function AgentPerformanceTab({ agentName }: { agentName: string }) {
         }
       } catch (err) {
         if (mounted) {
-          const msg = handleIpcError(err, { context: 'loading performance data', showToast: false });
+          const msg = handleIpcError(err, {
+            context: 'loading performance data',
+            showToast: false,
+          });
           setError(msg);
         }
       } finally {

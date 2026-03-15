@@ -310,7 +310,7 @@ export function AppLayout() {
   // Welcome page shows full-screen without sidebar
   if (currentPage === 'welcome') {
     return (
-      <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
+      <div className="flex h-screen w-screen min-w-[1024px] min-h-[680px] flex-col bg-slate-950 text-slate-50" data-testid="app-root" data-min-width="1024" data-min-height="680">
         {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
         <OrphanedProcessDialog />
         <UpdateBanner />
@@ -324,7 +324,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
+    <div className="flex h-screen w-screen min-w-[1024px] min-h-[680px] flex-col bg-slate-950 text-slate-50" data-testid="app-root" data-min-width="1024" data-min-height="680">
       {/* Setup Wizard - shown on first launch */}
       {showSetupWizard && <SetupWizard onComplete={handleSetupComplete} />}
       <OrphanedProcessDialog />

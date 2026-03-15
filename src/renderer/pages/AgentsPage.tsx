@@ -330,7 +330,7 @@ function StopConfirmDialog({
     >
       <motion.div
         className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-800 shadow-2xl ring-1 ring-black/20"
-        data-testid={testId || "stop-confirm-dialog"}
+        data-testid={testId || 'stop-confirm-dialog'}
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 0.8 }}
@@ -454,11 +454,15 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { agentsFilters, setAgentsFilters } = useFilterStore();
-  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy' | 'scope'>(agentsFilters.viewMode);
+  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'hierarchy' | 'scope'>(
+    agentsFilters.viewMode,
+  );
 
   // Table state - initialized from persistent filter store
   const [sorting, setSorting] = useState<SortingState>(agentsFilters.sorting);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(agentsFilters.columnFilters);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
+    agentsFilters.columnFilters,
+  );
   const [globalFilter, setGlobalFilter] = useState(agentsFilters.globalFilter);
   const [capabilityFilter, setCapabilityFilter] = useState<string>(agentsFilters.capabilityFilter);
 
@@ -943,7 +947,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         header: 'Name',
         enableSorting: true,
         cell: ({ getValue }) => (
-          <span className="font-medium text-slate-50 truncate block" title={getValue<string>()}>{getValue<string>()}</span>
+          <span className="font-medium text-slate-50 truncate block" title={getValue<string>()}>
+            {getValue<string>()}
+          </span>
         ),
       },
       {
@@ -1043,7 +1049,9 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         cell: ({ getValue }) => {
           const taskId = getValue<string>();
           return taskId ? (
-            <span className="text-xs text-slate-400 truncate block" title={taskId}>{taskId}</span>
+            <span className="text-xs text-slate-400 truncate block" title={taskId}>
+              {taskId}
+            </span>
           ) : (
             <span className="text-xs text-slate-600">-</span>
           );
@@ -1216,7 +1224,13 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
       <CoordinatorPanel />
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3" data-testid="agent-filter-bar" data-filters-active={globalFilter.trim() !== '' || capabilityFilter !== 'all' ? 'true' : 'false'}>
+      <div
+        className="flex items-center gap-3"
+        data-testid="agent-filter-bar"
+        data-filters-active={
+          globalFilter.trim() !== '' || capabilityFilter !== 'all' ? 'true' : 'false'
+        }
+      >
         {/* Global search */}
         <div className="relative flex-1 max-w-sm">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -1362,7 +1376,10 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
         />
       ) : viewMode === 'table' ? (
         /* Table view with @tanstack/react-table */
-        <div className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden" data-testid="agents-table-container">
+        <div
+          className="rounded-lg border border-slate-700 bg-slate-800 overflow-hidden"
+          data-testid="agents-table-container"
+        >
           <table className="w-full table-fixed">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -1410,7 +1427,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
             />
           </table>
           {/* Table footer with count */}
-          <div className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500" data-testid="agent-filter-count" data-filtered-count={filteredRows.length} data-total-count={sessions.length}>
+          <div
+            className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500"
+            data-testid="agent-filter-count"
+            data-filtered-count={filteredRows.length}
+            data-total-count={sessions.length}
+          >
             Showing {filteredRows.length} of {sessions.length} agents
           </div>
         </div>
@@ -1470,7 +1492,12 @@ export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
                           >
                             {session.capability}
                           </span>
-                          <span className="text-sm text-slate-300 truncate max-w-[200px]" title={session.agent_name}>{session.agent_name}</span>
+                          <span
+                            className="text-sm text-slate-300 truncate max-w-[200px]"
+                            title={session.agent_name}
+                          >
+                            {session.agent_name}
+                          </span>
                         </div>
                         <span className="text-xs text-slate-500">
                           {session.completed_at
@@ -1660,7 +1687,11 @@ function AgentCard({
           </div>
 
           {/* Agent name */}
-          <span className="font-medium text-slate-50 truncate max-w-[200px]" data-testid="agent-card-name" title={session.agent_name}>
+          <span
+            className="font-medium text-slate-50 truncate max-w-[200px]"
+            data-testid="agent-card-name"
+            title={session.agent_name}
+          >
             {session.agent_name}
           </span>
 
@@ -2070,7 +2101,11 @@ function SpawnDialog({
           {/* Model picker */}
           <div>
             <span className="block text-sm font-medium text-slate-300 mb-2">Model</span>
-            <div className="flex gap-2" data-testid="spawn-model-picker" data-default-model={configuredDefault}>
+            <div
+              className="flex gap-2"
+              data-testid="spawn-model-picker"
+              data-default-model={configuredDefault}
+            >
               {MODELS.map((m) => (
                 <button
                   key={m}

@@ -33,7 +33,11 @@ export function Breadcrumbs({ items, onNavigate }: BreadcrumbsProps) {
           <span key={item.label} className="flex items-center gap-1.5">
             <FiChevronRight size={12} className="text-slate-600" />
             {isLast ? (
-              <span className="text-slate-200 font-medium" data-testid={`breadcrumb-${index}`}>
+              <span
+                className="text-slate-200 font-medium truncate max-w-[200px]"
+                data-testid={`breadcrumb-${index}`}
+                title={item.label}
+              >
                 {item.label}
               </span>
             ) : (
