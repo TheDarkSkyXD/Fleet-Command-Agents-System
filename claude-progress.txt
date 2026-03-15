@@ -3640,3 +3640,33 @@
 - 243/366 features passing (added #236 and #237 this session)
 - Biome lint passes on modified files (only pre-existing warnings)
 - No mock data patterns in codebase
+
+### Session: 2026-03-15 (Framer Motion Animations)
+
+#### Feature #241: Framer Motion page transitions - PASSING
+- Added AnimatePresence + motion.div wrapper around PageContent in AppLayout
+- Fade+slide transition (opacity 0->1, y 6->0) with 150ms easeInOut
+- Keyed by currentPage for proper enter/exit animations
+- mode='wait' ensures clean transition between pages
+
+#### Feature #242: Panel slide-in animations - PASSING
+- Created reusable SlidePanel component (src/renderer/components/SlidePanel.tsx)
+- Spring animation (stiffness 400, damping 30, mass 0.8) for smooth feel
+- Supports left/right/top/bottom slide directions
+- Applied spring scale+slide to SpawnDialog and StopConfirmDialog overlays
+- EventFeedPage filter panel slides from top
+- PromptsPage version history sidebar slides from right
+
+#### Files Created
+- NEW: src/renderer/components/SlidePanel.tsx
+
+#### Files Modified
+- MODIFIED: src/renderer/components/AppLayout.tsx - AnimatePresence page transitions
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Motion-animated SpawnDialog and StopConfirmDialog
+- MODIFIED: src/renderer/pages/EventFeedPage.tsx - SlidePanel for filter bar
+- MODIFIED: src/renderer/pages/PromptsPage.tsx - SlidePanel for version history
+
+#### Current Status
+- 246/366 features passing (added #241 and #242 this session)
+- All code passes Biome lint and TypeScript (pre-existing MailPage errors only)
+- No mock data patterns in codebase
