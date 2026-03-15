@@ -1630,3 +1630,29 @@
 - 108/366 features passing (added #196 and #197 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Dynamic Window Title & CLI Version Verification)
+
+#### Feature #21: Dynamic window title shows project and agent count - PASSING
+- Added window:setTitle IPC handler in main process (sets BrowserWindow title)
+- Added windowSetTitle preload bridge method and ElectronAPI type
+- AppLayout polls agent count every 3s via agentRunningList IPC
+- Watches activeProject from projectStore via Zustand
+- Title format: "Fleet Command - ProjectName (N agents)" or "Fleet Command - No Project"
+- Agent count suffix only shown when > 0 agents active
+
+#### Feature #23: Claude CLI version verification - PASSING
+- Already fully implemented in previous sessions via claudeCliService.ts
+- getVersion() runs claude --version with 10s timeout
+- Parses version with regex, version returned via claude:status and claude:detect IPC
+- StatusBar displays version as vX.Y.Z when CLI state is ready
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added window:setTitle IPC handler, imported BrowserWindow
+- MODIFIED: src/preload/index.ts - Added windowSetTitle bridge method
+- MODIFIED: src/shared/types/index.ts - Added windowSetTitle to ElectronAPI interface
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added dynamic window title hook
+
+#### Current Status
+- 109/366 features passing (added #21 and #23 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
