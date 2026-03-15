@@ -30,6 +30,10 @@ import {
   FiZap,
 } from 'react-icons/fi';
 import type { AgentProcessInfo } from '../../shared/types';
+import {
+  matchesKeyCombo,
+  useKeyboardShortcutsStore,
+} from '../stores/keyboardShortcutsStore';
 import { useProjectStore } from '../stores/projectStore';
 
 interface CommandPaletteProps {
@@ -431,9 +435,13 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
     [itemLookup],
   );
 
+  const cmdPaletteShortcut = useKeyboardShortcutsStore(
+    (s) => s.shortcuts['command-palette'],
+  );
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if (cmdPaletteShortcut?.enabled && matchesKeyCombo(e, cmdPaletteShortcut.keys)) {
         e.preventDefault();
         e.stopPropagation();
         setOpen((prev) => !prev);
@@ -441,7 +449,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [cmdPaletteShortcut]);
 
   const executeAction = useCallback(
     (item: CommandItem) => {

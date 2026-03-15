@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useKeyboardShortcutsStore } from '../stores/keyboardShortcutsStore';
 import { hasUnsavedChanges, useNavigationGuard } from '../hooks/useUnsavedChanges';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
 import { AgentDetailPage } from '../pages/AgentDetailPage';
@@ -84,6 +86,11 @@ export function AppLayout() {
       useSettingsStore.getState().loadSettings();
     }
   }, [loaded]);
+
+  // Load keyboard shortcuts on mount
+  useEffect(() => {
+    useKeyboardShortcutsStore.getState().loadShortcuts();
+  }, []);
 
   // Dynamic window title: shows project name and active agent count
   const { activeProject, loadActiveProject } = useProjectStore();
@@ -198,6 +205,24 @@ export function AppLayout() {
     setCurrentPage('agents');
     loadActiveProject();
   }, [loadActiveProject]);
+
+  // Global keyboard shortcuts for navigation
+  useKeyboardShortcuts(
+    useMemo(
+      () => ({
+        'navigate-agents': () => handleNavigate('agents'),
+        'navigate-tasks': () => handleNavigate('tasks'),
+        'navigate-mail': () => handleNavigate('mail'),
+        'navigate-merge': () => handleNavigate('merge'),
+        'navigate-worktrees': () => handleNavigate('worktrees'),
+        'navigate-metrics': () => handleNavigate('metrics'),
+        'navigate-notifications': () => handleNavigate('notifications'),
+        'navigate-settings': () => handleNavigate('settings'),
+        'navigate-debug': () => handleNavigate('debug'),
+      }),
+      [handleNavigate],
+    ),
+  );
 
   // Listen for popstate events (browser back/forward navigation)
   useEffect(() => {

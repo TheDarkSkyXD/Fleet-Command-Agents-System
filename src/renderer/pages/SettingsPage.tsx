@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AnimatedCard, AnimatedCardContainer } from '../components/AnimatedCard';
 import {
@@ -16,6 +16,7 @@ import {
   FiPlay,
   FiPlus,
   FiRefreshCw,
+  FiRotateCcw,
   FiSave,
   FiShield,
   FiStar,
@@ -32,6 +33,13 @@ import type {
 import { AuthDecisionTree } from '../components/AuthDecisionTree';
 import { ProjectConfigEditor } from '../components/ProjectConfigEditor';
 import { useProjectStore } from '../stores/projectStore';
+import {
+  DEFAULT_SHORTCUTS,
+  type ShortcutAction,
+  eventToKeyCombo,
+  formatKeyCombo,
+  useKeyboardShortcutsStore,
+} from '../stores/keyboardShortcutsStore';
 import {
   ACCENT_COLORS,
   type AccentColorKey,
@@ -107,6 +115,7 @@ export function SettingsPage() {
     | 'watchdog'
     | 'terminal'
     | 'theme'
+    | 'keyboard-shortcuts'
     | 'profiles'
     | 'quality-gates'
     | 'project-config'
@@ -136,6 +145,7 @@ export function SettingsPage() {
     { id: 'watchdog' as const, label: 'Watchdog' },
     { id: 'terminal' as const, label: 'Terminal' },
     { id: 'theme' as const, label: 'Theme' },
+    { id: 'keyboard-shortcuts' as const, label: 'Keyboard Shortcuts' },
     { id: 'profiles' as const, label: 'Profiles' },
     { id: 'quality-gates' as const, label: 'Quality Gates' },
     { id: 'notifications' as const, label: 'Notifications' },
@@ -188,12 +198,211 @@ export function SettingsPage() {
       {activeTab === 'watchdog' && <WatchdogSettings />}
       {activeTab === 'terminal' && <TerminalSettings />}
       {activeTab === 'theme' && <ThemeSettings />}
+      {activeTab === 'keyboard-shortcuts' && <KeyboardShortcutsSettings />}
       {activeTab === 'profiles' && <ProfilesSettings />}
       {activeTab === 'quality-gates' && <QualityGatesSettings />}
       {activeTab === 'notifications' && <NotificationPreferencesSettings />}
       {activeTab === 'project-config' && <ProjectConfigEditor />}
       {activeTab === 'updates' && <UpdateSettings />}
       {activeTab === 'cleanup' && <CleanupSettings />}
+    </div>
+  );
+}
+
+// ── Keyboard Shortcuts Tab ───────────────────────────────────────────
+
+function KeyboardShortcutsSettings() {
+  const { shortcuts, loaded, loadShortcuts, updateShortcut, toggleShortcut, resetToDefaults, resetShortcut } =
+    useKeyboardShortcutsStore();
+  const [recordingId, setRecordingId] = useState<ShortcutAction | null>(null);
+  const recordingRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!loaded) {
+      loadShortcuts();
+    }
+  }, [loaded, loadShortcuts]);
+
+  // Listen for key combo when recording
+  useEffect(() => {
+    if (!recordingId) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const combo = eventToKeyCombo(e);
+      if (!combo) return; // Modifier-only press
+
+      // Check for conflicts
+      const conflictEntry = Object.entries(shortcuts).find(
+        ([id, s]) => id !== recordingId && s.enabled && s.keys === combo,
+      );
+
+      if (conflictEntry) {
+        toast.error(
+          `"${combo}" is already used by "${conflictEntry[1].label}". Choose a different shortcut.`,
+        );
+        return;
+      }
+
+      updateShortcut(recordingId!, combo);
+      toast.success(`Shortcut updated to ${formatKeyCombo(combo)}`);
+      setRecordingId(null);
+    }
+
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setRecordingId(null);
+      }
+    }
+
+    // Use capture phase to intercept before other handlers
+    window.addEventListener('keydown', handleEscape, true);
+    // Small delay to avoid capturing the click event's key
+    const timer = setTimeout(() => {
+      window.addEventListener('keydown', handleKeyDown, true);
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keydown', handleEscape, true);
+    };
+  }, [recordingId, shortcuts, updateShortcut]);
+
+  // Group shortcuts by category
+  const categories = Object.entries(shortcuts).reduce(
+    (acc, [id, shortcut]) => {
+      if (!acc[shortcut.category]) acc[shortcut.category] = [];
+      acc[shortcut.category].push({ action: id as ShortcutAction, ...shortcut });
+      return acc;
+    },
+    {} as Record<string, (typeof shortcuts[ShortcutAction] & { action: ShortcutAction })[]>,
+  );
+
+  return (
+    <div data-testid="keyboard-shortcuts-settings">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-50">Keyboard Shortcuts</h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Customize keyboard shortcuts for common actions. Click a shortcut to change it.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            resetToDefaults();
+            toast.success('All shortcuts reset to defaults');
+          }}
+          className="flex items-center gap-2 rounded-md bg-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-600 hover:text-slate-100"
+          data-testid="reset-all-shortcuts-btn"
+        >
+          <FiRotateCcw size={14} />
+          Reset All
+        </button>
+      </div>
+
+      {Object.entries(categories).map(([category, items]) => (
+        <div key={category} className="mb-6">
+          <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-3">
+            {category}
+          </h3>
+          <div className="space-y-2">
+            {items.map((shortcut) => {
+              const isRecording = recordingId === shortcut.action;
+              const isModified = shortcut.keys !== DEFAULT_SHORTCUTS[shortcut.action].keys;
+
+              return (
+                <div
+                  key={shortcut.action}
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
+                    isRecording
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-slate-700 bg-slate-800/50'
+                  }`}
+                  data-testid={`shortcut-row-${shortcut.action}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={shortcut.enabled}
+                        onChange={(e) => {
+                          toggleShortcut(shortcut.action, e.target.checked);
+                          toast.success(
+                            `${shortcut.label} shortcut ${e.target.checked ? 'enabled' : 'disabled'}`,
+                          );
+                        }}
+                        className="sr-only peer"
+                        data-testid={`shortcut-toggle-${shortcut.action}`}
+                        aria-label={`Enable ${shortcut.label} shortcut`}
+                      />
+                      <div className="w-9 h-5 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" />
+                    </label>
+                    <span
+                      className={`text-sm ${shortcut.enabled ? 'text-slate-200' : 'text-slate-500'}`}
+                    >
+                      {shortcut.label}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {isModified && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetShortcut(shortcut.action);
+                          toast.success(`Reset "${shortcut.label}" to default`);
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-300 px-1"
+                        title="Reset to default"
+                        data-testid={`shortcut-reset-${shortcut.action}`}
+                      >
+                        <FiRotateCcw size={12} />
+                      </button>
+                    )}
+
+                    <button
+                      ref={isRecording ? recordingRef : undefined}
+                      type="button"
+                      onClick={() => {
+                        if (isRecording) {
+                          setRecordingId(null);
+                        } else {
+                          setRecordingId(shortcut.action);
+                        }
+                      }}
+                      disabled={!shortcut.enabled}
+                      className={`min-w-[120px] rounded-md px-3 py-1.5 text-sm font-mono transition-all ${
+                        isRecording
+                          ? 'bg-blue-600 text-white animate-pulse'
+                          : shortcut.enabled
+                            ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                            : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                      }`}
+                      data-testid={`shortcut-key-${shortcut.action}`}
+                    >
+                      {isRecording ? 'Press keys...' : formatKeyCombo(shortcut.keys)}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div className="mt-4 rounded-lg border border-slate-700 bg-slate-800/30 p-4">
+        <p className="text-xs text-slate-400">
+          <strong className="text-slate-300">Tip:</strong> Click on a shortcut binding, then press
+          your desired key combination (e.g., Ctrl+Shift+A). Press Escape to cancel. Shortcuts
+          require at least one modifier key (Ctrl, Shift, Alt).
+        </p>
+      </div>
     </div>
   );
 }
