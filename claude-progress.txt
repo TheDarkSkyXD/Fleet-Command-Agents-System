@@ -1,5 +1,31 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Kanban Board & Update Banner)
+
+#### Feature #121: Task board kanban view - PASSING
+- Added kanban board view to TasksPage with 4 status columns (Open, In Progress, Blocked, Completed)
+- View mode toggle (list/kanban) with FiList/FiColumns icon buttons
+- KanbanBoard component renders issues grouped by status with column count badges
+- KanbanCard component with HTML5 drag-and-drop between columns to change issue status
+- Cards show title, type badge, priority badge, dependency count, assigned agent, and date
+- Column headers have color-coded top borders (blue/amber/red/green)
+- Clicking cards opens issue detail modal
+
+#### Feature #145: Update available banner - PASSING
+- UpdateBanner component already existed from feature #144
+- Enhanced with Download action button in the 'available' state
+- Added data-testid attributes for testing
+- Banner appears at top of app, is subtle/non-blocking, shows version number, has action buttons
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/TasksPage.tsx - Kanban board view, view toggle, KanbanBoard + KanbanCard components
+- MODIFIED: src/renderer/components/UpdateBanner.tsx - Download button, test IDs
+
+#### Current Status
+- 177/366 features passing (added #121 and #145 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Close Issues with Summary & Dependency Management)
 
 #### Feature #118: Close issues with summary - PASSING
