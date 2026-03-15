@@ -1,5 +1,29 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Desktop Notifications & Merge Ready Notification)
+
+#### Feature #211: Desktop notifications via Electron Notification API - PASSING
+- NotificationService already fully implemented in src/main/services/notificationService.ts
+- Uses Electron's Notification API with methods for all agent events
+- notifyAgentCompleted called from agentProcessManager on agent exit
+- Clicking notification brings app to foreground via focusMainWindow()
+- IPC handlers: notification:send, notification:set-enabled, notification:is-supported
+- Preload bridge exposes all notification methods
+
+#### Feature #213: Merge ready notification - PASSING
+- Added notificationService.notifyMergeReady() call in merge:enqueue IPC handler
+- Added merge_ready type detection in mail:send IPC handler to trigger notification
+- Added merge_failed type detection in mail:send IPC handler to trigger notification
+- Notification shows branch name and clicking it focuses the app window
+
+#### Files Modified
+- MODIFIED: src/main/ipc/handlers.ts - Added merge ready/failed notification triggers in mail:send and merge:enqueue
+
+#### Current Status
+- 51/366 features passing (added #211 and #213 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Watchdog Features & Hierarchy Tree Fix)
 
 #### Feature #192: Watchdog Tier 0 process daemon - PASSING
