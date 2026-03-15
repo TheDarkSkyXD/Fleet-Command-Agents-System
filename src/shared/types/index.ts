@@ -1505,6 +1505,25 @@ export interface ElectronAPI {
     error: string | null;
   }>;
 
+  promptGitSync: () => Promise<{
+    data: {
+      committedFiles: number;
+      commitHash: string;
+      message: string;
+      promptsDir: string;
+    } | null;
+    error: string | null;
+  }>;
+  promptGitLog: () => Promise<{
+    data: Array<{
+      hash: string;
+      date: string;
+      message: string;
+      author: string;
+    }> | null;
+    error: string | null;
+  }>;
+
   // Guard Rules
   guardRuleGet: (role: string) => Promise<{
     data: {
@@ -1857,6 +1876,24 @@ export interface ElectronAPI {
     explicitModel?: string;
     capabilityConfigModel?: string;
   }) => Promise<{ data: { model: string } | null; error: string | null }>;
+
+  // App Preview (run dev server for project being built)
+  appPreviewStart: () => Promise<{
+    data: { pid: number; alreadyRunning: boolean; url: string | null; projectPath: string } | null;
+    error: string | null;
+  }>;
+  appPreviewStop: () => Promise<{
+    data: { stopped: boolean; wasRunning: boolean } | null;
+    error: string | null;
+  }>;
+  appPreviewStatus: () => Promise<{
+    data: { running: boolean; pid: number | null; url: string | null; projectPath: string | null } | null;
+    error: string | null;
+  }>;
+  appPreviewOutput: () => Promise<{ data: string[] | null; error: string | null }>;
+  appPreviewOpenBrowser: () => Promise<{ data: boolean | null; error: string | null }>;
+  onAppPreviewOutput: (callback: (data: { data: string }) => void) => () => void;
+  onAppPreviewExit: (callback: (data: { exitCode: number }) => void) => () => void;
 
   removeAllListeners: (channel: string) => void;
 }

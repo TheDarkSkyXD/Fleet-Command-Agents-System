@@ -8561,6 +8561,165 @@ export function registerIpcHandlers(): void {
     },
   );
 
+  // ── Prompt Git Sync ──────────────────────────────────────
+  ipcMain.handle('prompt:git-sync', async () => {
+    try {
+      const path = require('node:path');
+      const fs = require('node:fs');
+
+      // Get active project path for git operations
+      const activeProject = loggedPrepare(
+        'SELECT id, path FROM projects WHERE is_active = 1 LIMIT 1',
+      ).get() as { id: string; path: string } | undefined;
+
+      if (!activeProject?.path) {
+        return { data: null, error: 'No active project with a valid path. Set a project path first.' };
+      }
+
+      const projectPath = activeProject.path;
+      const promptsDir = path.join(projectPath, '.overstory', 'prompts');
+
+      // Ensure prompts directory exists
+      if (!fs.existsSync(promptsDir)) {
+        fs.mkdirSync(promptsDir, { recursive: true });
+      }
+
+      // Fetch all prompts from database
+      const prompts = loggedPrepare('SELECT * FROM prompts ORDER BY name ASC').all() as Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        content: string;
+        type: string;
+        parent_id: string | null;
+        version: number;
+        is_active: number;
+        tags: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      // Write each prompt as a markdown file with frontmatter
+      const writtenFiles: string[] = [];
+      for (const p of prompts) {
+        const safeName = p.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+        const fileName = `${safeName}.prompt.md`;
+        const filePath = path.join(promptsDir, fileName);
+
+        const frontmatter = [
+          '---',
+          `id: ${p.id}`,
+          `name: ${p.name}`,
+          `type: ${p.type}`,
+          `version: ${p.version}`,
+          p.parent_id ? `parent_id: ${p.parent_id}` : null,
+          p.description ? `description: ${p.description}` : null,
+          p.tags ? `tags: ${p.tags}` : null,
+          `created_at: ${p.created_at}`,
+          `updated_at: ${p.updated_at}`,
+          '---',
+          '',
+        ]
+          .filter((line) => line !== null)
+          .join('\n');
+
+        fs.writeFileSync(filePath, frontmatter + p.content, 'utf-8');
+        writtenFiles.push(fileName);
+      }
+
+      // Remove prompt files that no longer exist in database
+      const existingFiles = fs.readdirSync(promptsDir).filter((f: string) => f.endsWith('.prompt.md'));
+      const promptFileNames = new Set(writtenFiles);
+      for (const existingFile of existingFiles) {
+        if (!promptFileNames.has(existingFile)) {
+          fs.unlinkSync(path.join(promptsDir, existingFile));
+        }
+      }
+
+      // Git add and commit the prompts directory
+      const simpleGitModule = await import('simple-git');
+      const git = simpleGitModule.default(projectPath);
+
+      // Stage the prompts directory
+      await git.add(path.join('.overstory', 'prompts', '*'));
+
+      // Check if there are staged changes
+      const status = await git.status();
+      const promptChanges = [...status.staged, ...status.created, ...status.deleted, ...status.modified]
+        .filter((f: string) => f.startsWith('.overstory/prompts/'));
+
+      if (promptChanges.length === 0) {
+        return {
+          data: {
+            committedFiles: 0,
+            commitHash: '',
+            message: 'No prompt changes to commit — prompts are already in sync with git.',
+            promptsDir,
+          },
+          error: null,
+        };
+      }
+
+      // Commit
+      const commitMsg = `chore: sync ${writtenFiles.length} prompt(s) to git`;
+      const commitResult = await git.commit(commitMsg, [path.join('.overstory', 'prompts')]);
+
+      log.info(
+        `[IPC] prompt:git-sync - Synced ${writtenFiles.length} prompts, commit ${commitResult.commit}`,
+      );
+
+      return {
+        data: {
+          committedFiles: writtenFiles.length,
+          commitHash: commitResult.commit || '',
+          message: `Synced ${writtenFiles.length} prompt(s) to git.`,
+          promptsDir,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('prompt:git-sync failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ── Prompt Git Log ──────────────────────────────────────
+  ipcMain.handle('prompt:git-log', async () => {
+    try {
+      const path = require('node:path');
+
+      // Get active project path
+      const activeProject = loggedPrepare(
+        'SELECT id, path FROM projects WHERE is_active = 1 LIMIT 1',
+      ).get() as { id: string; path: string } | undefined;
+
+      if (!activeProject?.path) {
+        return { data: null, error: 'No active project with a valid path.' };
+      }
+
+      const simpleGitModule = await import('simple-git');
+      const git = simpleGitModule.default(activeProject.path);
+
+      // Get git log for prompts directory
+      const logResult = await git.log({
+        file: path.join('.overstory', 'prompts'),
+        maxCount: 20,
+      });
+
+      const entries = logResult.all.map((entry) => ({
+        hash: entry.hash.substring(0, 8),
+        date: entry.date,
+        message: entry.message,
+        author: entry.author_name,
+      }));
+
+      return { data: entries, error: null };
+    } catch (error) {
+      log.error('prompt:git-log failed:', error);
+      return { data: [], error: null }; // Return empty array if no history
+    }
+  });
+
   // ─── Quality Gates ──────────────────────────────────────
 
   ipcMain.handle('qualityGate:list', (_event, projectId: string) => {
@@ -9627,6 +9786,186 @@ export function registerIpcHandlers(): void {
       }
     },
   );
+
+  // ── App Preview (Run dev server for the project being built) ──────────
+  let appPreviewPty: nodePty.IPty | null = null;
+  const appPreviewOutputBuffer: string[] = [];
+  const APP_PREVIEW_MAX_BUFFER = 5000;
+  let appPreviewUrl: string | null = null;
+  let appPreviewProjectPath: string | null = null;
+
+  ipcMain.handle('app:preview-start', async () => {
+    try {
+      if (appPreviewPty) {
+        return {
+          data: {
+            pid: appPreviewPty.pid,
+            alreadyRunning: true,
+            url: appPreviewUrl,
+            projectPath: appPreviewProjectPath,
+          },
+          error: null,
+        };
+      }
+
+      // Get active project path
+      const project = loggedPrepare('SELECT * FROM projects WHERE is_active = 1 LIMIT 1').get() as
+        | { path: string; name: string }
+        | undefined;
+      if (!project) {
+        return { data: null, error: 'No active project selected. Please select a project first.' };
+      }
+
+      const fs = await import('node:fs');
+      if (!fs.existsSync(project.path)) {
+        return {
+          data: null,
+          error: `Project path does not exist: ${project.path}`,
+        };
+      }
+
+      // Check for package.json to determine the start command
+      const packageJsonPath = path.join(project.path, 'package.json');
+      let startCommand = 'npm run dev';
+      if (fs.existsSync(packageJsonPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+          if (pkg.scripts?.dev) {
+            startCommand = 'npm run dev';
+          } else if (pkg.scripts?.start) {
+            startCommand = 'npm start';
+          } else if (pkg.scripts?.serve) {
+            startCommand = 'npm run serve';
+          }
+        } catch {
+          // Use default
+        }
+      }
+
+      appPreviewProjectPath = project.path;
+      appPreviewUrl = null;
+      appPreviewOutputBuffer.length = 0;
+
+      const shellCmd =
+        process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
+      const shellArgs =
+        process.platform === 'win32' ? ['-NoProfile', '-Command', startCommand] : ['-c', startCommand];
+
+      appPreviewPty = nodePty.spawn(shellCmd, shellArgs, {
+        name: 'xterm-color',
+        cols: 120,
+        rows: 40,
+        cwd: project.path,
+        env: process.env as Record<string, string>,
+      });
+
+      appPreviewPty.onData((data: string) => {
+        appPreviewOutputBuffer.push(data);
+        if (appPreviewOutputBuffer.length > APP_PREVIEW_MAX_BUFFER) {
+          appPreviewOutputBuffer.splice(0, appPreviewOutputBuffer.length - APP_PREVIEW_MAX_BUFFER);
+        }
+
+        // Try to detect the dev server URL from output
+        const urlMatch = data.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d+/);
+        if (urlMatch && !appPreviewUrl) {
+          appPreviewUrl = urlMatch[0].replace('0.0.0.0', 'localhost');
+          log.info(`[IPC] app:preview - detected dev server URL: ${appPreviewUrl}`);
+        }
+
+        const windows = BrowserWindow.getAllWindows();
+        for (const win of windows) {
+          win.webContents.send('app:preview-output', { data });
+        }
+      });
+
+      appPreviewPty.onExit(({ exitCode }) => {
+        log.info(`[IPC] app:preview - process exited with code ${exitCode}`);
+        appPreviewPty = null;
+        appPreviewUrl = null;
+        appPreviewProjectPath = null;
+        const windows = BrowserWindow.getAllWindows();
+        for (const win of windows) {
+          win.webContents.send('app:preview-exit', { exitCode });
+        }
+      });
+
+      log.info(
+        `[IPC] app:preview-start - started dev server for "${project.name}" at ${project.path}, PID=${appPreviewPty.pid}, cmd="${startCommand}"`,
+      );
+
+      return {
+        data: {
+          pid: appPreviewPty.pid,
+          alreadyRunning: false,
+          url: null,
+          projectPath: project.path,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('app:preview-start failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('app:preview-stop', () => {
+    try {
+      if (!appPreviewPty) {
+        return { data: { stopped: true, wasRunning: false }, error: null };
+      }
+      const pid = appPreviewPty.pid;
+      appPreviewPty.kill();
+      appPreviewPty = null;
+      appPreviewUrl = null;
+      appPreviewProjectPath = null;
+      appPreviewOutputBuffer.length = 0;
+      log.info(`[IPC] app:preview-stop - killed preview process PID=${pid}`);
+      return { data: { stopped: true, wasRunning: true }, error: null };
+    } catch (error) {
+      log.error('app:preview-stop failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('app:preview-status', () => {
+    try {
+      return {
+        data: {
+          running: !!appPreviewPty,
+          pid: appPreviewPty?.pid ?? null,
+          url: appPreviewUrl,
+          projectPath: appPreviewProjectPath,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('app:preview-status failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('app:preview-output', () => {
+    try {
+      return { data: [...appPreviewOutputBuffer], error: null };
+    } catch (error) {
+      log.error('app:preview-output failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('app:preview-open-browser', () => {
+    try {
+      if (!appPreviewUrl) {
+        return { data: false, error: 'No preview URL detected yet. Wait for the dev server to start.' };
+      }
+      shell.openExternal(appPreviewUrl);
+      log.info(`[IPC] app:preview-open-browser - opened ${appPreviewUrl}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('app:preview-open-browser failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
 
   log.info(
     'IPC handlers registered - all database handlers use real SQLite queries via loggedPrepare()',

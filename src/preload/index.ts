@@ -506,6 +506,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     options?: { variables?: Record<string, string>; outputPath?: string },
   ) => ipcRenderer.invoke('prompt:emit', promptId, options),
 
+  promptGitSync: () => ipcRenderer.invoke('prompt:git-sync'),
+  promptGitLog: () => ipcRenderer.invoke('prompt:git-log'),
+
   // Guard Rules
   guardRuleGet: (role: string) => ipcRenderer.invoke('guardRule:get', role),
   guardRuleUpdate: (
@@ -753,6 +756,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     explicitModel?: string;
     capabilityConfigModel?: string;
   }) => ipcRenderer.invoke('runtime:resolve-model', params),
+
+  // App Preview (run dev server for project being built)
+  appPreviewStart: () => ipcRenderer.invoke('app:preview-start'),
+  appPreviewStop: () => ipcRenderer.invoke('app:preview-stop'),
+  appPreviewStatus: () => ipcRenderer.invoke('app:preview-status'),
+  appPreviewOutput: () => ipcRenderer.invoke('app:preview-output'),
+  appPreviewOpenBrowser: () => ipcRenderer.invoke('app:preview-open-browser'),
+  onAppPreviewOutput: (callback: (data: { data: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { data: string }) => callback(data);
+    ipcRenderer.on('app:preview-output', handler);
+    return () => { ipcRenderer.removeListener('app:preview-output', handler); };
+  },
+  onAppPreviewExit: (callback: (data: { exitCode: number }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { exitCode: number }) => callback(data);
+    ipcRenderer.on('app:preview-exit', handler);
+    return () => { ipcRenderer.removeListener('app:preview-exit', handler); };
+  },
 
   // Cleanup listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),

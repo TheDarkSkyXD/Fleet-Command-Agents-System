@@ -9,8 +9,10 @@ import {
   FiFile,
   FiFilePlus,
   FiGitBranch,
+  FiGitCommit,
   FiLoader,
   FiPlus,
+  FiRefreshCw,
   FiSave,
   FiTrash2,
   FiX,
@@ -1231,6 +1233,12 @@ export function PromptsPage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [createParentId, setCreateParentId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [showGitLog, setShowGitLog] = useState(false);
+  const [gitLog, setGitLog] = useState<
+    Array<{ hash: string; date: string; message: string; author: string }>
+  >([]);
+  const [gitLogLoading, setGitLogLoading] = useState(false);
 
   const loadPrompts = useCallback(async () => {
     try {
@@ -1286,6 +1294,48 @@ export function PromptsPage() {
     loadPrompts();
   }, [loadPrompts]);
 
+  const handleGitSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await window.electronAPI.promptGitSync();
+      if (res.error) {
+        toast.error(`Git sync failed: ${res.error}`);
+        return;
+      }
+      if (res.data) {
+        if (res.data.committedFiles === 0) {
+          toast.info(res.data.message);
+        } else {
+          toast.success(res.data.message);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync prompts with git:', err);
+      toast.error('Failed to sync prompts with git');
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  const handleShowGitLog = useCallback(async () => {
+    if (showGitLog) {
+      setShowGitLog(false);
+      return;
+    }
+    setShowGitLog(true);
+    setGitLogLoading(true);
+    try {
+      const res = await window.electronAPI.promptGitLog();
+      if (res.data) {
+        setGitLog(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load git log:', err);
+    } finally {
+      setGitLogLoading(false);
+    }
+  }, [showGitLog]);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -1304,18 +1354,92 @@ export function PromptsPage() {
             Manage canopy prompts with inheritance hierarchy and versioning
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setCreateParentId(null);
-            setShowCreate(true);
-          }}
-          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
-        >
-          <FiFilePlus size={16} />
-          New Prompt
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleShowGitLog}
+            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+              showGitLog
+                ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+                : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+            }`}
+            data-testid="prompt-git-log-btn"
+          >
+            <FiGitCommit size={16} />
+            Git History
+          </button>
+          <button
+            type="button"
+            onClick={handleGitSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 rounded-md border border-emerald-600/50 bg-emerald-600/10 px-3 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-600/20 disabled:opacity-50"
+            data-testid="prompt-git-sync-btn"
+          >
+            {syncing ? (
+              <FiLoader size={16} className="animate-spin" />
+            ) : (
+              <FiRefreshCw size={16} />
+            )}
+            {syncing ? 'Syncing...' : 'Sync to Git'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreateParentId(null);
+              setShowCreate(true);
+            }}
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+          >
+            <FiFilePlus size={16} />
+            New Prompt
+          </button>
+        </div>
       </div>
+
+      {/* Git Log Panel */}
+      {showGitLog && (
+        <div
+          className="mb-4 rounded-lg border border-purple-500/20 bg-slate-800/50 p-3"
+          data-testid="prompt-git-log-panel"
+        >
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <FiGitCommit size={14} className="text-purple-400" />
+            Prompt Git History
+          </h3>
+          {gitLogLoading ? (
+            <div className="flex items-center gap-2 py-2 text-sm text-slate-400">
+              <FiLoader size={14} className="animate-spin" />
+              Loading git history...
+            </div>
+          ) : gitLog.length === 0 ? (
+            <p className="py-2 text-sm text-slate-400">
+              No git history for prompts yet. Use &ldquo;Sync to Git&rdquo; to create the first
+              commit.
+            </p>
+          ) : (
+            <div className="max-h-48 space-y-1 overflow-auto">
+              {gitLog.map((entry) => (
+                <div
+                  key={entry.hash}
+                  className="flex items-center gap-3 rounded px-2 py-1 text-sm hover:bg-slate-700/50"
+                  data-testid="prompt-git-log-entry"
+                >
+                  <code className="flex-shrink-0 font-mono text-xs text-purple-400">
+                    {entry.hash}
+                  </code>
+                  <span className="min-w-0 flex-1 truncate text-slate-300" title={entry.message}>
+                    {entry.message}
+                  </span>
+                  <span className="flex-shrink-0 text-xs text-slate-400">
+                    {new Date(entry.date).toLocaleDateString()}
+                  </span>
+                  <span className="flex-shrink-0 text-xs text-slate-400">{entry.author}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Layout */}
       <div className="flex flex-1 gap-4 overflow-hidden">
