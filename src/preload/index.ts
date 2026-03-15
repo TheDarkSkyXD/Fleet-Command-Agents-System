@@ -389,8 +389,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   guardRuleGet: (role: string) => ipcRenderer.invoke('guardRule:get', role),
   guardRuleUpdate: (
     role: string,
-    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string },
+    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string; path_boundaries?: string },
   ) => ipcRenderer.invoke('guardRule:update', role, updates),
+  guardPathBoundaryValidate: (role: string, filePath: string, worktreePath?: string) =>
+    ipcRenderer.invoke('guardRule:path-boundary-validate', role, filePath, worktreePath),
+  guardCheckBash: (role: string, command: string) =>
+    ipcRenderer.invoke('guardRule:check-bash', role, command),
   guardViolationList: (filters?: {
     capability?: string;
     rule_type?: string;

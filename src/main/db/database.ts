@@ -445,6 +445,13 @@ export async function initDatabase(): Promise<void> {
     db.exec('ALTER TABLE merge_queue ADD COLUMN rolled_back INTEGER DEFAULT 0');
   }
 
+  // Migration: add path_boundaries column for path boundary enforcement
+  try {
+    db.prepare('SELECT path_boundaries FROM agent_definitions LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE agent_definitions ADD COLUMN path_boundaries TEXT');
+  }
+
   // Seed default agent definitions if table is empty
   const defCount = db.prepare('SELECT COUNT(*) as cnt FROM agent_definitions').get() as {
     cnt: number;
@@ -468,6 +475,7 @@ export async function initDatabase(): Promise<void> {
         tool_allowlist: JSON.stringify(['Read', 'Grep', 'Glob', 'Bash (read-only)', 'WebSearch']),
         bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'no git reset']),
         file_scope: 'read-only (entire project)',
+        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
       },
       {
         role: 'builder',
@@ -490,6 +498,7 @@ export async function initDatabase(): Promise<void> {
           'confined to worktree',
         ]),
         file_scope: 'assigned files only',
+        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
       },
       {
         role: 'reviewer',
@@ -514,6 +523,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'test execution only']),
         file_scope: 'read-only (entire project)',
+        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
       },
       {
         role: 'lead',
@@ -541,6 +551,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         bash_restrictions: JSON.stringify(['no git push to main', 'no git reset --hard']),
         file_scope: 'full project access',
+        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
       },
       {
         role: 'merger',
@@ -558,6 +569,7 @@ export async function initDatabase(): Promise<void> {
         tool_allowlist: JSON.stringify(['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash', 'Git']),
         bash_restrictions: JSON.stringify(['no git push --force', 'merge operations only']),
         file_scope: 'merge-scoped files',
+        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
       },
       {
         role: 'coordinator',
@@ -584,6 +596,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'read-only + spawn']),
         file_scope: 'read-only (entire project)',
+        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
       },
       {
         role: 'monitor',
@@ -605,12 +618,13 @@ export async function initDatabase(): Promise<void> {
           'monitoring only',
         ]),
         file_scope: 'read-only (logs and status)',
+        path_boundaries: JSON.stringify([{ pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' }]),
       },
     ];
 
     const insertDef = db.prepare(`
-      INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope)
-      VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope)
+      INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope, path_boundaries)
+      VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope, @path_boundaries)
     `);
 
     for (const def of seedDefs) {

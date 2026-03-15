@@ -391,8 +391,15 @@ export interface AgentDefinition {
   tool_allowlist: string | null; // JSON array
   bash_restrictions: string | null; // JSON array
   file_scope: string | null;
+  path_boundaries: string | null; // JSON array of allowed path patterns
   created_at: string;
   updated_at: string;
+}
+
+export interface PathBoundaryRule {
+  pattern: string; // glob pattern or absolute path
+  type: 'worktree' | 'directory' | 'glob'; // worktree = auto-enforce worktree root
+  description?: string;
 }
 
 // Configuration Profile types
@@ -1303,13 +1310,23 @@ export interface ElectronAPI {
       tool_allowlist: string | null;
       bash_restrictions: string | null;
       file_scope: string | null;
+      path_boundaries: string | null;
     } | null;
     error: string | null;
   }>;
   guardRuleUpdate: (
     role: string,
-    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string },
+    updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string; path_boundaries?: string },
   ) => Promise<{ data: AgentDefinition | null; error: string | null }>;
+  guardPathBoundaryValidate: (
+    role: string,
+    filePath: string,
+    worktreePath?: string,
+  ) => Promise<{ data: { allowed: boolean; reason: string; boundary?: string } | null; error: string | null }>;
+  guardCheckBash: (
+    role: string,
+    command: string,
+  ) => Promise<{ data: { blocked: boolean; reason: string; matched_pattern?: string } | null; error: string | null }>;
   guardViolationList: (filters?: {
     capability?: string;
     rule_type?: string;

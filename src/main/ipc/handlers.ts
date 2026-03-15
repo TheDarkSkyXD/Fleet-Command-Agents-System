@@ -4138,7 +4138,11 @@ export function registerIpcHandlers(): void {
             'Bash (read-only + tests)',
             'Diff',
           ]),
-          bash_restrictions: JSON.stringify(['no file writes', 'no git push', 'test execution only']),
+          bash_restrictions: JSON.stringify([
+            'no file writes',
+            'no git push',
+            'test execution only',
+          ]),
           file_scope: 'read-only (entire project)',
         },
         {
@@ -4224,7 +4228,13 @@ export function registerIpcHandlers(): void {
             'escalate_issues',
           ]),
           default_model: 'haiku',
-          tool_allowlist: JSON.stringify(['Read', 'Grep', 'Bash (read-only)', 'Mail', 'HealthCheck']),
+          tool_allowlist: JSON.stringify([
+            'Read',
+            'Grep',
+            'Bash (read-only)',
+            'Mail',
+            'HealthCheck',
+          ]),
           bash_restrictions: JSON.stringify([
             'no file writes',
             'no git operations',
@@ -4247,7 +4257,9 @@ export function registerIpcHandlers(): void {
       }
 
       const allDefs = loggedPrepare('SELECT * FROM agent_definitions ORDER BY role ASC').all();
-      log.info(`[IPC] agentDef:reset-defaults - Reset ${allDefs.length} definitions to factory defaults`);
+      log.info(
+        `[IPC] agentDef:reset-defaults - Reset ${allDefs.length} definitions to factory defaults`,
+      );
       return { data: allDefs, error: null };
     } catch (error) {
       log.error('agentDef:reset-defaults failed:', error);
@@ -5838,7 +5850,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('guardRule:get', (_event, role: string) => {
     try {
       const row = loggedPrepare(
-        'SELECT role, display_name, tool_allowlist, bash_restrictions, file_scope FROM agent_definitions WHERE role = ?',
+        'SELECT role, display_name, tool_allowlist, bash_restrictions, file_scope, path_boundaries FROM agent_definitions WHERE role = ?',
       ).get(role);
       log.info(`[IPC] guardRule:get - SELECT guard rules for role=${role}`);
       return { data: row || null, error: null };
@@ -5853,7 +5865,12 @@ export function registerIpcHandlers(): void {
     (
       _event,
       role: string,
-      updates: { tool_allowlist?: string; bash_restrictions?: string; file_scope?: string },
+      updates: {
+        tool_allowlist?: string;
+        bash_restrictions?: string;
+        file_scope?: string;
+        path_boundaries?: string;
+      },
     ) => {
       try {
         const setClauses: string[] = [];
@@ -5870,6 +5887,10 @@ export function registerIpcHandlers(): void {
         if (updates.file_scope !== undefined) {
           setClauses.push('file_scope = ?');
           values.push(updates.file_scope);
+        }
+        if (updates.path_boundaries !== undefined) {
+          setClauses.push('path_boundaries = ?');
+          values.push(updates.path_boundaries);
         }
 
         if (setClauses.length === 0) {
@@ -5892,6 +5913,163 @@ export function registerIpcHandlers(): void {
       }
     },
   );
+
+  // Path boundary validation - checks if a file path is within allowed boundaries for a role
+  ipcMain.handle(
+    'guardRule:path-boundary-validate',
+    (_event, role: string, filePath: string, worktreePath?: string) => {
+      try {
+        const row = loggedPrepare(
+          'SELECT path_boundaries FROM agent_definitions WHERE role = ?',
+        ).get(role) as { path_boundaries: string | null } | undefined;
+
+        if (!row) {
+          return { data: { allowed: false, reason: `Role '${role}' not found` }, error: null };
+        }
+
+        if (!row.path_boundaries) {
+          // No boundaries configured = unrestricted
+          return { data: { allowed: true, reason: 'No path boundaries configured' }, error: null };
+        }
+
+        let boundaries: Array<{ pattern: string; type: string; description?: string }>;
+        try {
+          boundaries = JSON.parse(row.path_boundaries);
+        } catch {
+          return { data: { allowed: true, reason: 'Invalid path boundary config' }, error: null };
+        }
+
+        if (boundaries.length === 0) {
+          return { data: { allowed: true, reason: 'No path boundaries configured' }, error: null };
+        }
+
+        const path = require('node:path');
+        const normalizedFile = path.resolve(filePath);
+
+        for (const boundary of boundaries) {
+          if (boundary.type === 'worktree') {
+            // Worktree boundary enforces that filePath is within the worktree root
+            if (!worktreePath) {
+              return {
+                data: {
+                  allowed: false,
+                  reason: 'Worktree path not specified; worktree boundary requires a worktree',
+                  boundary: boundary.pattern,
+                },
+                error: null,
+              };
+            }
+            const normalizedWorktree = path.resolve(worktreePath);
+            if (
+              !normalizedFile.startsWith(normalizedWorktree + path.sep) &&
+              normalizedFile !== normalizedWorktree
+            ) {
+              return {
+                data: {
+                  allowed: false,
+                  reason: `Path '${filePath}' is outside worktree boundary '${worktreePath}'`,
+                  boundary: normalizedWorktree,
+                },
+                error: null,
+              };
+            }
+          } else if (boundary.type === 'directory') {
+            const normalizedDir = path.resolve(boundary.pattern);
+            if (
+              !normalizedFile.startsWith(normalizedDir + path.sep) &&
+              normalizedFile !== normalizedDir
+            ) {
+              return {
+                data: {
+                  allowed: false,
+                  reason: `Path '${filePath}' is outside directory boundary '${boundary.pattern}'`,
+                  boundary: normalizedDir,
+                },
+                error: null,
+              };
+            }
+          } else if (boundary.type === 'glob') {
+            // Simple glob check: if pattern starts with !, it's an exclusion
+            if (boundary.pattern.startsWith('!')) {
+              const excluded = boundary.pattern.slice(1);
+              if (normalizedFile.includes(excluded)) {
+                return {
+                  data: {
+                    allowed: false,
+                    reason: `Path '${filePath}' matches exclusion pattern '${boundary.pattern}'`,
+                    boundary: boundary.pattern,
+                  },
+                  error: null,
+                };
+              }
+            }
+          }
+        }
+
+        log.info(`[IPC] guardRule:path-boundary-validate - ${role} access to ${filePath}: ALLOWED`);
+        return {
+          data: { allowed: true, reason: 'Path is within all configured boundaries' },
+          error: null,
+        };
+      } catch (error) {
+        log.error('guardRule:path-boundary-validate failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // Bash restriction check - validates a command against a role's bash restriction patterns
+  ipcMain.handle('guardRule:check-bash', (_event, role: string, command: string) => {
+    try {
+      const row = loggedPrepare(
+        'SELECT bash_restrictions FROM agent_definitions WHERE role = ?',
+      ).get(role) as { bash_restrictions: string | null } | undefined;
+
+      if (!row) {
+        return { data: { blocked: false, reason: `Role '${role}' not found` }, error: null };
+      }
+
+      if (!row.bash_restrictions) {
+        return { data: { blocked: false, reason: 'No bash restrictions configured' }, error: null };
+      }
+
+      let restrictions: string[];
+      try {
+        restrictions = JSON.parse(row.bash_restrictions);
+      } catch {
+        return {
+          data: { blocked: false, reason: 'Invalid bash restrictions config' },
+          error: null,
+        };
+      }
+
+      const normalizedCommand = command.toLowerCase().trim();
+
+      for (const pattern of restrictions) {
+        const normalizedPattern = pattern.toLowerCase().trim();
+        // Check if the command contains the restriction pattern
+        if (normalizedCommand.includes(normalizedPattern)) {
+          log.warn(
+            `[GUARD] Bash command blocked for role=${role}: "${command}" matches restriction "${pattern}"`,
+          );
+          return {
+            data: {
+              blocked: true,
+              reason: `Command matches bash restriction: "${pattern}"`,
+              matched_pattern: pattern,
+            },
+            error: null,
+          };
+        }
+      }
+
+      log.info(`[IPC] guardRule:check-bash - ${role} command "${command}": ALLOWED`);
+      return { data: { blocked: false, reason: 'Command is allowed' }, error: null };
+    } catch (error) {
+      log.error('guardRule:check-bash failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
 
   ipcMain.handle(
     'guardViolation:list',

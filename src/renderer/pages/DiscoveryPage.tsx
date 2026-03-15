@@ -3,6 +3,7 @@ import {
   FiActivity,
   FiAlertCircle,
   FiAlertTriangle,
+  FiBookOpen,
   FiCheckCircle,
   FiChevronRight,
   FiCode,
@@ -10,6 +11,7 @@ import {
   FiFolder,
   FiInfo,
   FiLayers,
+  FiLoader,
   FiPackage,
   FiPlay,
   FiSearch,
@@ -218,6 +220,73 @@ export function DiscoveryPage() {
     setView('setup');
   }, []);
 
+  const generateExpertiseFromScan = async (): Promise<number> => {
+    if (!activeScan) return 0;
+    const categories = JSON.parse(activeScan.categories) as DiscoveryCategory[];
+
+    // Map discovery category to expertise domain
+    const domainMap: Record<DiscoveryCategory, string> = {
+      architecture: 'Architecture',
+      dependencies: 'Dependencies',
+      testing: 'Testing',
+      apis: 'APIs',
+      config: 'Configuration',
+      conventions: 'Conventions',
+    };
+
+    // Map discovery severity to expertise type
+    const typeMap: Record<string, string> = {
+      important: 'decision',
+      warning: 'failure',
+      info: 'convention',
+    };
+
+    // Map discovery severity to expertise classification
+    const classificationMap: Record<string, string> = {
+      important: 'foundational',
+      warning: 'tactical',
+      info: 'observational',
+    };
+
+    let created = 0;
+
+    for (const catId of categories) {
+      const findingsResult = await window.electronAPI.discoveryFindings(activeScan.id, catId);
+      if (!findingsResult.data) continue;
+
+      for (const finding of findingsResult.data) {
+        const domain = domainMap[catId] || catId;
+        const expertiseType = typeMap[finding.severity] || 'convention';
+        const classification = classificationMap[finding.severity] || 'observational';
+
+        const content = [
+          finding.description,
+          finding.file_path
+            ? `\nSource: ${finding.file_path}${finding.line_number ? `:${finding.line_number}` : ''}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('');
+
+        const result = await window.electronAPI.expertiseCreate({
+          id: `expertise-${generateId()}`,
+          domain,
+          title: finding.title,
+          content,
+          type: expertiseType,
+          classification,
+          agent_name: 'discovery-scanner',
+          source_file: finding.file_path || undefined,
+          tags: JSON.stringify([catId, 'auto-generated', `scan:${activeScan.id}`]),
+        });
+
+        if (result.data) created++;
+      }
+    }
+
+    return created;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -259,6 +328,7 @@ export function DiscoveryPage() {
           findings={findings}
           selectedCategory={selectedResultCategory}
           onSelectCategory={selectCategory}
+          onGenerateExpertise={generateExpertiseFromScan}
         />
       )}
     </div>
@@ -575,109 +645,169 @@ function DiscoveryResultsView({
   findings,
   selectedCategory,
   onSelectCategory,
+  onGenerateExpertise,
 }: {
   scan: DiscoveryScan;
   findings: DiscoveryFinding[];
   selectedCategory: DiscoveryCategory | null;
   onSelectCategory: (category: DiscoveryCategory) => void;
+  onGenerateExpertise: () => Promise<number>;
 }) {
   const categories = JSON.parse(scan.categories) as DiscoveryCategory[];
+  const [generating, setGenerating] = useState(false);
+  const [generatedCount, setGeneratedCount] = useState<number | null>(null);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setGeneratedCount(null);
+    try {
+      const count = await onGenerateExpertise();
+      setGeneratedCount(count);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
-    <div className="grid grid-cols-12 gap-4">
-      {/* Category sidebar */}
-      <div className="col-span-3 space-y-1">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Categories
-        </h3>
-        {categories.map((catId) => {
-          const cat = DISCOVERY_CATEGORIES.find((c) => c.id === catId);
-          if (!cat) return null;
-          const Icon = cat.icon;
-          const isActive = selectedCategory === catId;
-
-          return (
-            <button
-              type="button"
-              key={catId}
-              onClick={() => onSelectCategory(catId)}
-              className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? 'bg-blue-600/20 text-blue-400'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-              }`}
+    <div className="space-y-4">
+      {/* Auto-generate expertise bar */}
+      <div className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-5 py-3">
+        <div className="flex items-center gap-3">
+          <FiBookOpen className="text-emerald-400" size={18} />
+          <div>
+            <span className="text-sm font-medium text-slate-200">Generate Expertise Records</span>
+            <p className="text-xs text-slate-400">
+              Automatically create expertise entries from all discovery findings
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {generatedCount !== null && (
+            <span
+              className="flex items-center gap-1.5 text-xs text-emerald-400"
+              data-testid="generated-count"
             >
-              <Icon size={14} />
-              <span>{cat.label}</span>
-              <FiChevronRight
-                size={12}
-                className={`ml-auto transition-transform ${isActive ? 'rotate-90' : ''}`}
-              />
-            </button>
-          );
-        })}
+              <FiCheckCircle size={12} />
+              {generatedCount} records created
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={generating}
+            data-testid="generate-expertise-btn"
+            className="flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {generating ? (
+              <>
+                <FiLoader className="animate-spin" size={14} />
+                Generating...
+              </>
+            ) : (
+              <>
+                <FiBookOpen size={14} />
+                Generate Expertise
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Findings panel */}
-      <div className="col-span-9">
-        {selectedCategory ? (
-          <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-100">
-                {DISCOVERY_CATEGORIES.find((c) => c.id === selectedCategory)?.label} Findings
-              </h2>
-              <span className="text-sm text-slate-400">{findings.length} findings</span>
-            </div>
+      <div className="grid grid-cols-12 gap-4">
+        {/* Category sidebar */}
+        <div className="col-span-3 space-y-1">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Categories
+          </h3>
+          {categories.map((catId) => {
+            const cat = DISCOVERY_CATEGORIES.find((c) => c.id === catId);
+            if (!cat) return null;
+            const Icon = cat.icon;
+            const isActive = selectedCategory === catId;
 
-            {findings.length === 0 ? (
-              <div className="py-8 text-center text-slate-500">
-                <FiSearch className="mx-auto mb-2" size={24} />
-                <p className="text-sm">No findings in this category</p>
+            return (
+              <button
+                type="button"
+                key={catId}
+                onClick={() => onSelectCategory(catId)}
+                className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                  isActive
+                    ? 'bg-blue-600/20 text-blue-400'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <Icon size={14} />
+                <span>{cat.label}</span>
+                <FiChevronRight
+                  size={12}
+                  className={`ml-auto transition-transform ${isActive ? 'rotate-90' : ''}`}
+                />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Findings panel */}
+        <div className="col-span-9">
+          {selectedCategory ? (
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-100">
+                  {DISCOVERY_CATEGORIES.find((c) => c.id === selectedCategory)?.label} Findings
+                </h2>
+                <span className="text-sm text-slate-400">{findings.length} findings</span>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {findings.map((finding) => (
-                  <div
-                    key={finding.id}
-                    className="rounded-md border border-slate-600 bg-slate-800 p-4"
-                  >
-                    <div className="flex items-start gap-2">
-                      <SeverityIcon severity={finding.severity} />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-slate-200">{finding.title}</h4>
-                        <p className="mt-1 text-xs text-slate-400">{finding.description}</p>
-                        {finding.file_path && (
-                          <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-                            <FiFile size={10} />
-                            <span className="font-mono">
-                              {finding.file_path}
-                              {finding.line_number ? `:${finding.line_number}` : ''}
-                            </span>
-                          </div>
-                        )}
+
+              {findings.length === 0 ? (
+                <div className="py-8 text-center text-slate-500">
+                  <FiSearch className="mx-auto mb-2" size={24} />
+                  <p className="text-sm">No findings in this category</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {findings.map((finding) => (
+                    <div
+                      key={finding.id}
+                      className="rounded-md border border-slate-600 bg-slate-800 p-4"
+                    >
+                      <div className="flex items-start gap-2">
+                        <SeverityIcon severity={finding.severity} />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-medium text-slate-200">{finding.title}</h4>
+                          <p className="mt-1 text-xs text-slate-400">{finding.description}</p>
+                          {finding.file_path && (
+                            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                              <FiFile size={10} />
+                              <span className="font-mono">
+                                {finding.file_path}
+                                {finding.line_number ? `:${finding.line_number}` : ''}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                            finding.severity === 'important'
+                              ? 'bg-red-500/10 text-red-400'
+                              : finding.severity === 'warning'
+                                ? 'bg-amber-500/10 text-amber-400'
+                                : 'bg-blue-500/10 text-blue-400'
+                          }`}
+                        >
+                          {finding.severity}
+                        </span>
                       </div>
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                          finding.severity === 'important'
-                            ? 'bg-red-500/10 text-red-400'
-                            : finding.severity === 'warning'
-                              ? 'bg-amber-500/10 text-amber-400'
-                              : 'bg-blue-500/10 text-blue-400'
-                        }`}
-                      >
-                        {finding.severity}
-                      </span>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-600 py-16">
-            <p className="text-sm text-slate-500">Select a category to view findings</p>
-          </div>
-        )}
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-600 py-16">
+              <p className="text-sm text-slate-500">Select a category to view findings</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

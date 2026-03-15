@@ -8,13 +8,14 @@ import {
   FiClock,
   FiEdit3,
   FiEye,
+  FiFolder,
   FiPlus,
   FiShield,
   FiTrash2,
   FiX,
   FiXCircle,
 } from 'react-icons/fi';
-import type { AgentDefinition, GuardViolation } from '../../shared/types';
+import type { AgentDefinition, GuardViolation, PathBoundaryRule } from '../../shared/types';
 
 // All available tools in the system
 const ALL_TOOLS = [
@@ -57,10 +58,104 @@ const ruleTypeLabels: Record<string, string> = {
   tool_allowlist: 'Tool Allowlist',
   bash_restriction: 'Bash Restriction',
   file_scope: 'File Scope',
+  path_boundary: 'Path Boundary',
 };
 
-type TabId = 'allowlists' | 'violations';
-type RuleType = 'tool_allowlist' | 'bash_restriction' | 'file_scope';
+const boundaryTypeLabels: Record<string, string> = {
+  worktree: 'Worktree Root',
+  directory: 'Directory',
+  glob: 'Glob Pattern',
+};
+
+const boundaryTypeColors: Record<string, string> = {
+  worktree: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+  directory: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
+  glob: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
+};
+
+function BashRestrictionTester({ role }: { role: string }) {
+  const [testCommand, setTestCommand] = useState('');
+  const [testResult, setTestResult] = useState<{
+    blocked: boolean;
+    reason: string;
+    matched_pattern?: string;
+  } | null>(null);
+
+  const handleTest = async () => {
+    if (!testCommand.trim() || !role) return;
+    const result = await window.electronAPI.guardCheckBash(role, testCommand.trim());
+    if (result.data) {
+      setTestResult(result.data);
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-slate-700 pt-4">
+      <h4 className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+        Test Command
+      </h4>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={testCommand}
+          onChange={(e) => {
+            setTestCommand(e.target.value);
+            setTestResult(null);
+          }}
+          placeholder="e.g. git push origin main"
+          data-testid="test-bash-command-input"
+          className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 font-mono"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleTest();
+          }}
+        />
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={!testCommand.trim()}
+          data-testid="test-bash-command-btn"
+          className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <FiShield size={14} />
+          Test
+        </button>
+      </div>
+      {testResult && (
+        <div
+          className={`mt-2 rounded-lg border px-3 py-2 text-sm ${
+            testResult.blocked
+              ? 'border-red-500/30 bg-red-500/10 text-red-400'
+              : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+          }`}
+          data-testid="test-bash-result"
+        >
+          <div className="flex items-center gap-2">
+            {testResult.blocked ? (
+              <>
+                <FiXCircle size={14} />
+                <span className="font-medium">BLOCKED</span>
+              </>
+            ) : (
+              <>
+                <FiCheckCircle size={14} />
+                <span className="font-medium">ALLOWED</span>
+              </>
+            )}
+          </div>
+          <p className="text-xs mt-1 opacity-80">{testResult.reason}</p>
+          {testResult.matched_pattern && (
+            <p className="text-xs mt-0.5 font-mono opacity-70">
+              Matched: &quot;{testResult.matched_pattern}&quot;
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type TabId = 'allowlists' | 'boundaries' | 'violations';
+type RuleType = 'tool_allowlist' | 'bash_restriction' | 'file_scope' | 'path_boundary';
 
 interface AddRuleForm {
   ruleType: RuleType;
@@ -96,6 +191,23 @@ export function GuardRulesPage() {
 
   // Delete confirmation state
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
+
+  // Path boundaries state
+  const [editingBoundaries, setEditingBoundaries] = useState<PathBoundaryRule[] | null>(null);
+  const [boundarySelectedRole, setBoundarySelectedRole] = useState<string | null>(null);
+  const [isBoundaryEditing, setIsBoundaryEditing] = useState(false);
+  const [newBoundary, setNewBoundary] = useState<PathBoundaryRule>({
+    pattern: '',
+    type: 'worktree',
+    description: '',
+  });
+  const [testPath, setTestPath] = useState('');
+  const [testWorktree, setTestWorktree] = useState('');
+  const [testResult, setTestResult] = useState<{
+    allowed: boolean;
+    reason: string;
+    boundary?: string;
+  } | null>(null);
 
   // Violations state
   const [violations, setViolations] = useState<GuardViolation[]>([]);
@@ -350,6 +462,99 @@ export function GuardRulesPage() {
     }
   };
 
+  const getCurrentBoundaries = (def: AgentDefinition): PathBoundaryRule[] => {
+    try {
+      return def.path_boundaries ? JSON.parse(def.path_boundaries) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const boundarySelectedDef = definitions.find((d) => d.role === boundarySelectedRole);
+
+  const startBoundaryEditing = useCallback(() => {
+    if (!boundarySelectedDef) return;
+    try {
+      setEditingBoundaries(
+        boundarySelectedDef.path_boundaries ? JSON.parse(boundarySelectedDef.path_boundaries) : [],
+      );
+      setIsBoundaryEditing(true);
+    } catch {
+      setEditingBoundaries([]);
+      setIsBoundaryEditing(true);
+    }
+  }, [boundarySelectedDef]);
+
+  const cancelBoundaryEditing = useCallback(() => {
+    setIsBoundaryEditing(false);
+    setEditingBoundaries(null);
+    setNewBoundary({ pattern: '', type: 'worktree', description: '' });
+  }, []);
+
+  const saveBoundaryChanges = useCallback(async () => {
+    if (!boundarySelectedRole || !editingBoundaries) return;
+    try {
+      const result = await window.electronAPI.guardRuleUpdate(boundarySelectedRole, {
+        path_boundaries: JSON.stringify(editingBoundaries),
+      });
+      if (result.error) {
+        setStatusMessage({ type: 'error', text: result.error });
+      } else {
+        setStatusMessage({
+          type: 'success',
+          text: `Path boundaries updated for ${boundarySelectedRole}`,
+        });
+        setIsBoundaryEditing(false);
+        setEditingBoundaries(null);
+        loadDefinitions();
+      }
+    } catch (err) {
+      setStatusMessage({ type: 'error', text: String(err) });
+    }
+    setTimeout(() => setStatusMessage(null), 3000);
+  }, [boundarySelectedRole, editingBoundaries, loadDefinitions]);
+
+  const addBoundaryRule = useCallback(() => {
+    if (!editingBoundaries || (!newBoundary.pattern.trim() && newBoundary.type !== 'worktree'))
+      return;
+    const pattern = newBoundary.type === 'worktree' ? '.' : newBoundary.pattern.trim();
+    setEditingBoundaries([
+      ...editingBoundaries,
+      {
+        pattern,
+        type: newBoundary.type,
+        description: newBoundary.description?.trim() || undefined,
+      },
+    ]);
+    setNewBoundary({ pattern: '', type: 'worktree', description: '' });
+  }, [editingBoundaries, newBoundary]);
+
+  const removeBoundaryRule = useCallback(
+    (index: number) => {
+      if (!editingBoundaries) return;
+      setEditingBoundaries(editingBoundaries.filter((_, i) => i !== index));
+    },
+    [editingBoundaries],
+  );
+
+  const validateTestPath = useCallback(async () => {
+    if (!boundarySelectedRole || !testPath.trim()) return;
+    try {
+      const result = await window.electronAPI.guardPathBoundaryValidate(
+        boundarySelectedRole,
+        testPath.trim(),
+        testWorktree.trim() || undefined,
+      );
+      if (result.data) {
+        setTestResult(result.data);
+      } else {
+        setTestResult({ allowed: false, reason: result.error || 'Validation failed' });
+      }
+    } catch (err) {
+      setTestResult({ allowed: false, reason: String(err) });
+    }
+  }, [boundarySelectedRole, testPath, testWorktree]);
+
   // Available tools not yet in the allowlist
   const availableTools = editingAllowlist
     ? ALL_TOOLS.filter((t) => !editingAllowlist.includes(t))
@@ -406,6 +611,20 @@ export function GuardRulesPage() {
           <div className="flex items-center gap-2">
             <FiShield size={14} />
             <span>Tool Allowlists</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('boundaries')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === 'boundaries'
+              ? 'border-amber-500 text-amber-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FiFolder size={14} />
+            <span>Path Boundaries</span>
           </div>
         </button>
         <button
@@ -651,7 +870,7 @@ export function GuardRulesPage() {
                         type="text"
                         value={newBashRestriction}
                         onChange={(e) => setNewBashRestriction(e.target.value)}
-                        placeholder="e.g. no git push --force"
+                        placeholder="e.g. git push"
                         className="flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -670,6 +889,9 @@ export function GuardRulesPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* Test Command against restrictions */}
+                  <BashRestrictionTester role={selectedRole || ''} />
                 </div>
 
                 {/* File Scope Section */}

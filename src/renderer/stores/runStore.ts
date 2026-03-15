@@ -10,6 +10,7 @@ interface RunState {
   // Actions
   startRun: () => Promise<Run | null>;
   stopRun: (id: string) => Promise<void>;
+  completeRun: (id: string) => Promise<void>;
   fetchActiveRun: () => Promise<void>;
   fetchRuns: () => Promise<void>;
 }
@@ -45,6 +46,30 @@ export const useRunStore = create<RunState>((set) => ({
         return;
       }
       set({ activeRun: null, isLoading: false });
+      // Refresh runs list so completed run appears in history
+      const listResult = await window.electronAPI.runList();
+      if (!listResult.error && listResult.data) {
+        set({ runs: listResult.data });
+      }
+    } catch (err) {
+      set({ error: String(err), isLoading: false });
+    }
+  },
+
+  completeRun: async (id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await window.electronAPI.runStop(id);
+      if (result.error) {
+        set({ error: result.error, isLoading: false });
+        return;
+      }
+      set({ activeRun: null, isLoading: false });
+      // Refresh runs list so completed run appears in history
+      const listResult = await window.electronAPI.runList();
+      if (!listResult.error && listResult.data) {
+        set({ runs: listResult.data });
+      }
     } catch (err) {
       set({ error: String(err), isLoading: false });
     }

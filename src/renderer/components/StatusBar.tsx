@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FiCheck, FiChevronUp, FiFolder, FiPlay, FiSquare, FiStar } from 'react-icons/fi';
+import { FiCheck, FiCheckCircle, FiChevronUp, FiClock, FiFolder, FiList, FiPlay, FiSquare, FiStar } from 'react-icons/fi';
 import type { ConfigProfile } from '../../shared/types';
 import { useProjectStore } from '../stores/projectStore';
 import { useRunStore } from '../stores/runStore';
@@ -68,7 +68,9 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  const { activeRun, startRun, stopRun, fetchActiveRun } = useRunStore();
+  const { activeRun, runs, startRun, stopRun, completeRun, fetchActiveRun, fetchRuns } = useRunStore();
+  const [showRunHistory, setShowRunHistory] = useState(false);
+  const runHistoryRef = useRef<HTMLDivElement>(null);
   const { activeProject, loadActiveProject } = useProjectStore();
 
   // Fetch active project on mount
@@ -160,6 +162,25 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
     [loadProfiles],
   );
 
+  // Close run history on click outside
+  useEffect(() => {
+    if (!showRunHistory) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (runHistoryRef.current && !runHistoryRef.current.contains(e.target as Node)) {
+        setShowRunHistory(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showRunHistory]);
+
+  // Fetch run history when dropdown opens
+  useEffect(() => {
+    if (showRunHistory) {
+      fetchRuns();
+    }
+  }, [showRunHistory, fetchRuns]);
+
   // Tick timer every second when run is active
   useEffect(() => {
     if (!activeRun) return;
@@ -176,6 +197,12 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
       await stopRun(activeRun.id);
     }
   }, [activeRun, stopRun]);
+
+  const handleCompleteRun = useCallback(async () => {
+    if (activeRun) {
+      await completeRun(activeRun.id);
+    }
+  }, [activeRun, completeRun]);
 
   const cliState = getCliState(cliStatus, loading);
   const indicator = getCliIndicator(cliState);
