@@ -1,5 +1,43 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Guard Rules & Violation Logging)
+
+#### Feature #171: Per-capability tool allowlists configuration - PASSING
+- Created GuardRulesPage (src/renderer/pages/GuardRulesPage.tsx) with split-view layout
+- Left panel lists all 7 agent capabilities with tool count and file scope summary
+- Right panel shows selected capability's guard rules: tool allowlist, bash restrictions, file scope
+- Edit mode: add/remove tools from dropdown of all available tools (Read, Write, Edit, Grep, Glob, Bash, etc.)
+- Add/remove bash restrictions with text input
+- Edit file scope with text input
+- Save persists to SQLite agent_definitions table via guardRule:update IPC handler
+- Scouts shown as having read-only tools (Read, Grep, Glob, Bash read-only, WebSearch) - cannot use Write tools
+- Added IPC handlers: guardRule:get, guardRule:update
+
+#### Feature #174: Guard rule violation logging - PASSING
+- Created guard_violations SQLite table with: id, agent_name, capability, rule_type, violation, tool_attempted, command_attempted, file_attempted, severity, acknowledged, created_at
+- Added 5 indexes on guard_violations (agent, capability, type, severity, created_at)
+- IPC handlers: guardViolation:list (with filters), guardViolation:create (with [GUARD VIOLATION] log warning), guardViolation:acknowledge, guardViolation:purge, guardViolation:stats
+- Violations tab on GuardRulesPage: stats cards (total, unacknowledged, critical, rule types), filter dropdowns, expandable violation rows
+- Each violation shows severity badge, capability badge, rule type, violation text, timestamp
+- Expanded view shows agent name, tool/command/file attempted, full violation description
+- Acknowledge button per violation, purge all button with confirmation
+- Unacknowledged count badge in tab header and page header
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/GuardRulesPage.tsx - Full guard rules page with allowlist editor and violations log
+- MODIFIED: src/main/db/database.ts - Added guard_violations table with indexes
+- MODIFIED: src/main/ipc/handlers.ts - Added guardRule and guardViolation IPC handlers
+- MODIFIED: src/preload/index.ts - Added guard rule bridge methods
+- MODIFIED: src/shared/types/index.ts - Added GuardViolation interface, GuardRuleType, GuardViolationSeverity types, ElectronAPI methods
+- MODIFIED: src/renderer/components/Sidebar.tsx - Added Guard Rules nav item with FiShield icon
+- MODIFIED: src/renderer/components/AppLayout.tsx - Added GuardRulesPage routing
+- MODIFIED: src/renderer/components/CommandPalette.tsx - Added Guard Rules to command palette
+
+#### Current Status
+- 63/366 features passing (added #171 and #174 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Expertise Management & Global Search)
 
 #### Feature #162: View expertise records by domain - PASSING
