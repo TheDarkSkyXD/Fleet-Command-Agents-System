@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AgentDefinitionsPage } from '../pages/AgentDefinitionsPage';
+import { AgentDetailPage } from '../pages/AgentDetailPage';
 import { AgentsPage } from '../pages/AgentsPage';
 import { MailPage } from '../pages/MailPage';
 import { MergeQueuePage } from '../pages/MergeQueuePage';
@@ -15,6 +16,25 @@ import { StatusBar } from './StatusBar';
 export function AppLayout() {
   const [currentPage, setCurrentPage] = useState('agents');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+
+  const handleNavigate = useCallback((page: string) => {
+    setCurrentPage(page);
+    // Clear agent detail when navigating away
+    if (page !== 'agent-detail') {
+      setSelectedAgentId(null);
+    }
+  }, []);
+
+  const handleSelectAgent = useCallback((agentId: string) => {
+    setSelectedAgentId(agentId);
+    setCurrentPage('agent-detail');
+  }, []);
+
+  const handleBackFromDetail = useCallback(() => {
+    setSelectedAgentId(null);
+    setCurrentPage('agents');
+  }, []);
 
   return (
     <div className="flex h-screen w-screen flex-col bg-slate-950 text-slate-50">
@@ -22,15 +42,20 @@ export function AppLayout() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <Sidebar
-          currentPage={currentPage}
-          onNavigate={setCurrentPage}
+          currentPage={currentPage === 'agent-detail' ? 'agents' : currentPage}
+          onNavigate={handleNavigate}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
         {/* Content */}
         <main className="flex-1 overflow-auto bg-slate-900 p-6">
-          <PageContent page={currentPage} />
+          <PageContent
+            page={currentPage}
+            selectedAgentId={selectedAgentId}
+            onSelectAgent={handleSelectAgent}
+            onBackFromDetail={handleBackFromDetail}
+          />
         </main>
       </div>
 
@@ -38,7 +63,7 @@ export function AppLayout() {
       <StatusBar />
 
       {/* Command Palette (Ctrl+K / Cmd+K) */}
-      <CommandPalette onNavigate={setCurrentPage} />
+      <CommandPalette onNavigate={handleNavigate} />
 
       {/* Onboarding Tour (shows on first launch) */}
       {currentPage === 'agents' && <OnboardingTour />}
@@ -46,10 +71,25 @@ export function AppLayout() {
   );
 }
 
-function PageContent({ page }: { page: string }) {
+function PageContent({
+  page,
+  selectedAgentId,
+  onSelectAgent,
+  onBackFromDetail,
+}: {
+  page: string;
+  selectedAgentId: string | null;
+  onSelectAgent: (agentId: string) => void;
+  onBackFromDetail: () => void;
+}) {
   switch (page) {
     case 'agents':
-      return <AgentsPage />;
+      return <AgentsPage onSelectAgent={onSelectAgent} />;
+    case 'agent-detail':
+      if (selectedAgentId) {
+        return <AgentDetailPage agentId={selectedAgentId} onBack={onBackFromDetail} />;
+      }
+      return <AgentsPage onSelectAgent={onSelectAgent} />;
     case 'mail':
       return <MailPage />;
     case 'definitions':

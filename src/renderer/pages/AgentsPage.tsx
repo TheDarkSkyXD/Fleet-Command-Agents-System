@@ -175,7 +175,11 @@ function AgentCardSkeleton() {
   );
 }
 
-export function AgentsPage() {
+interface AgentsPageProps {
+  onSelectAgent?: (agentId: string) => void;
+}
+
+export function AgentsPage({ onSelectAgent }: AgentsPageProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [runningProcesses, setRunningProcesses] = useState<AgentProcessInfo[]>([]);
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
@@ -429,7 +433,10 @@ export function AgentsPage() {
           return (
             <button
               type="button"
-              onClick={() => handleStop(row.original.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStop(row.original.id);
+              }}
               className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
               title="Stop agent"
             >
@@ -646,7 +653,11 @@ export function AgentsPage() {
                 filteredRows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors"
+                    className="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                    onClick={() => onSelectAgent?.(row.original.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') onSelectAgent?.(row.original.id);
+                    }}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="px-4 py-3">
@@ -692,6 +703,7 @@ export function AgentsPage() {
                         session={session}
                         processInfo={proc}
                         onStop={() => handleStop(session.id)}
+                        onSelect={() => onSelectAgent?.(session.id)}
                       />
                     );
                   })}
@@ -772,13 +784,21 @@ function AgentCard({
   session,
   processInfo,
   onStop,
+  onSelect,
 }: {
   session: Session;
   processInfo?: AgentProcessInfo;
   onStop: () => void;
+  onSelect?: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+    <div
+      className="rounded-lg border border-slate-700 bg-slate-800 p-4 cursor-pointer hover:bg-slate-750 hover:border-slate-600 transition-colors"
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSelect?.();
+      }}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* State indicator */}
@@ -821,7 +841,10 @@ function AgentCard({
           {/* Stop button */}
           <button
             type="button"
-            onClick={onStop}
+            onClick={(e) => {
+              e.stopPropagation();
+              onStop();
+            }}
             className="rounded-md bg-red-600/20 p-1.5 text-red-400 hover:bg-red-600/30 transition-colors"
             title="Stop agent"
           >
