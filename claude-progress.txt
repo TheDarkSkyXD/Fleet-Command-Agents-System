@@ -1,5 +1,35 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Force Remove Unmerged Worktrees & Open in VS Code)
+
+#### Feature #100: Force-remove unmerged worktrees with confirmation - PASSING
+- Added isMerged field to Worktree type, checked via `git branch --merged <mainBranch>`
+- Worktree cards now show Merged (green) or Unmerged (orange) badge with FiGitMerge icon
+- Unmerged worktrees show orange "Force Remove" button instead of normal "Clean" button
+- Clicking Force Remove opens confirmation dialog with warning about unmerged changes
+- Dialog shows branch name, path, and head commit message for context
+- Confirmation calls worktree:force-remove IPC handler which:
+  - Force removes worktree via `git worktree remove --force`
+  - Deletes unmerged branch via `git branch -D`
+  - Returns branchDeleted status for UI feedback
+
+#### Feature #101: Open worktree in VS Code - PASSING
+- Added blue "VS Code" button (FiCode icon) on every worktree card
+- worktree:open-vscode IPC handler runs `code "<path>"` via child_process.exec
+- Error handling with helpful message if VS Code CLI not in PATH
+- Added worktreeOpenVSCode preload bridge method and ElectronAPI type
+
+#### Files Modified
+- MODIFIED: src/shared/types/index.ts - Added isMerged to Worktree, worktreeForceRemove + worktreeOpenVSCode to ElectronAPI
+- MODIFIED: src/preload/index.ts - Added worktreeForceRemove and worktreeOpenVSCode bridge methods
+- MODIFIED: src/main/ipc/handlers.ts - Added isMerged computation in worktree:list, worktree:force-remove and worktree:open-vscode handlers
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Force remove confirmation dialog, VS Code button, merged/unmerged badges
+
+#### Current Status
+- 159/366 features passing (added #100 and #101 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Overstory Init & Worktree Cleanup)
 
 #### Feature #97: Initialize overstory directory for new projects - PASSING
