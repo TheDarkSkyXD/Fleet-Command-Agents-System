@@ -1,5 +1,35 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Per-Capability Aggregation & Metrics Export)
+
+#### Feature #185: Per-capability token aggregation - PASSING
+- Added CapabilityBreakdown interface to shared types (capability, session_count, token fields, cost, duration)
+- Added metrics:by-capability IPC handler with GROUP BY capability SQL query on metrics table
+- Added metricsByCapability preload bridge and ElectronAPI type
+- Added "By Capability" tab to MetricsPage with color-coded cards per capability type
+- Colors: scout=emerald, builder=blue, reviewer=amber, lead=purple, merger=cyan, coordinator=rose, monitor=teal
+- Each card shows session count, stacked token usage bar, 4-column token breakdown, duration, cost
+
+#### Feature #187: Export metrics data - PASSING
+- Added metrics:export IPC handler supporting CSV and JSON formats
+- CSV generation with proper field escaping (commas, quotes, newlines)
+- JSON export with pretty-printed formatting
+- Uses Electron dialog.showSaveDialog for native file save picker
+- Added metricsExport preload bridge and ElectronAPI type
+- Added Export dropdown button in MetricsPage header with CSV/JSON format selection
+- Disabled state when no metrics or export in progress, bounce animation during export
+
+#### Files Modified
+- MODIFIED: src/shared/types/index.ts - CapabilityBreakdown type, ElectronAPI metricsByCapability/metricsExport
+- MODIFIED: src/main/ipc/handlers.ts - metrics:by-capability and metrics:export IPC handlers
+- MODIFIED: src/preload/index.ts - metricsByCapability and metricsExport bridge methods
+- MODIFIED: src/renderer/pages/MetricsPage.tsx - By Capability tab, Export button, capability color helpers
+
+#### Current Status
+- 206/366 features passing (added #185 and #187 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Path Boundaries & Run History)
 
 #### Feature #173: Path boundary enforcement rules - PASSING
