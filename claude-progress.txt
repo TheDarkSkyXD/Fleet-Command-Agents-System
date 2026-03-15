@@ -1,5 +1,42 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-15 (Toast Notifications & Hover Tooltips)
+
+#### Feature #212: In-app toast notifications via sonner - PASSING
+- Toaster component was already configured in App.tsx with dark theme
+- Added toast.success/error calls across key user action handlers:
+  - AgentsPage: spawn, stop (single/bulk/all), nudge
+  - SettingsPage: profile delete/duplicate/activate, quality gate showStatus
+  - HooksPage: hook create/update/delete, deploy
+  - WorktreesPage: init overstory, remove worktree
+  - NuclearCleanupPage: wipe sessions
+  - projectStore: create/switch/delete project
+- All toasts auto-dismiss and use dark theme styling
+
+#### Feature #216: Hover tooltips on status indicators - PASSING
+- Added STATE_TOOLTIPS map with descriptions for all agent states (booting, working, completed, stalled, zombie)
+- Added CAPABILITY_TOOLTIPS map with descriptions for all roles (scout, builder, reviewer, lead, merger, coordinator, monitor)
+- Applied title attributes to AgentsPage (table + card view state dots, state badges, capability badges)
+- Applied title attributes to AgentDetailPage (profile card, session header, session history)
+- Enhanced StatusBar agent count indicator with run details tooltip
+- Added health check tooltips to DoctorPage icons and pass/fail badges
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Toast imports + calls, tooltip maps + title attrs
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Tooltip maps + title attrs on indicators
+- MODIFIED: src/renderer/pages/SettingsPage.tsx - Toast imports + calls on profile/gate handlers
+- MODIFIED: src/renderer/pages/HooksPage.tsx - Toast imports + calls on CRUD/deploy
+- MODIFIED: src/renderer/pages/WorktreesPage.tsx - Toast imports + calls on init/remove
+- MODIFIED: src/renderer/pages/NuclearCleanupPage.tsx - Toast imports + calls on wipe
+- MODIFIED: src/renderer/pages/DoctorPage.tsx - Health check tooltips
+- MODIFIED: src/renderer/components/StatusBar.tsx - Enhanced agent count tooltip
+- MODIFIED: src/renderer/stores/projectStore.ts - Toast imports + calls on CRUD
+
+#### Current Status
+- 223/366 features passing (added #212 and #216 this session)
+- All code passes Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-15 (Hook Event Log and Cleanup Mail Wipe)
 
 #### Feature #201: Hook event log viewer - PASSING
