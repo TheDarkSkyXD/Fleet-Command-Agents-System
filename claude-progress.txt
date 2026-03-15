@@ -1,5 +1,32 @@
 ## Fleet Command Agents System - Progress Notes
 
+### Session: 2026-03-14 (Agent State Icons & Coordinator Display)
+
+#### Feature #43: Agent state visualization - PASSING
+- Added STATE_ICONS mapping with distinct icons per agent state
+- Booting: FiLoader (spinning), Working: FiActivity (pulsing), Completed: FiCheckCircle, Stalled: FiAlertTriangle, Zombie: FiZap (pulsing)
+- Updated AgentsPage table column to show state icon instead of plain dot
+- Updated AgentsPage card view to show state icon
+- Updated AgentDetailPage header to show state icon + state badge with icon
+- Updated AgentHierarchyTree nodes to use state icons instead of dots
+- Updated AgentHierarchyTree legend to show icons instead of color dots
+
+#### Feature #57: Coordinator status display - PASSING
+- CoordinatorPanel already fully implemented with state, uptime, dispatched count
+- Enhanced uptime counter to tick every second (was only updating on 3s poll interval)
+- Added uptimeTick state with 1-second interval for live counter display
+
+#### Files Modified
+- MODIFIED: src/renderer/pages/AgentsPage.tsx - Added STATE_ICONS, updated table/card state indicators
+- MODIFIED: src/renderer/pages/AgentDetailPage.tsx - Added STATE_ICONS, updated header state indicator/badge
+- MODIFIED: src/renderer/components/AgentHierarchyTree.tsx - Added stateIcon, updated tree nodes and legend
+- MODIFIED: src/renderer/components/CoordinatorPanel.tsx - Added 1-second uptimeTick for live uptime display
+
+#### Current Status
+- 121/366 features passing (added #43 and #57 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
+
 ### Session: 2026-03-14 (Reviewer & Merger Agent Spawn Verification)
 
 #### Feature #35: Spawn reviewer agent - PASSING
