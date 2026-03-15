@@ -89,3 +89,16 @@ body {
 .animate-status-pulse {
   animation: status-pulse 2s ease-in-out infinite;
 }
+
+/* Indeterminate progress bar for merge operations */
+@keyframes mergeProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(150%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}

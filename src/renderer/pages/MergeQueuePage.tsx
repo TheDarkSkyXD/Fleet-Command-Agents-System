@@ -612,8 +612,44 @@ function QueueEntryRow({
           )}
         </div>
       )}
+      {entry.status === 'merging' && (
+        <div className="px-4 pb-3" data-testid={`merge-progress-${entry.id}`}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-medium text-blue-400">Merge in progress…</span>
+            <MergeElapsedTimer startTime={entry.enqueued_at} />
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-700">
+            <div
+              className="h-full rounded-full bg-blue-500"
+              style={{
+                animation: 'mergeProgress 2s ease-in-out infinite',
+                width: '40%',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function MergeElapsedTimer({ startTime }: { startTime: string }) {
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    const start = new Date(startTime).getTime();
+    const update = () => {
+      const diff = Math.max(0, Math.floor((Date.now() - start) / 1000));
+      const mins = Math.floor(diff / 60);
+      const secs = diff % 60;
+      setElapsed(mins > 0 ? `${mins}m ${secs}s` : `${secs}s`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  return <span className="text-xs font-mono text-slate-400 tabular-nums">{elapsed}</span>;
 }
 
 function TargetBranchSelector({
