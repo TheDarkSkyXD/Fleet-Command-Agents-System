@@ -2283,3 +2283,42 @@
 - 155/366 features passing (added #91 and #92 this session)
 - All code passes Biome lint and Vite build (renderer, main, preload)
 - No mock data patterns in codebase
+
+### Session: 2026-03-14 (Merge Rollback & Recent Projects)
+
+#### Feature #93: Rollback support for failed merges - PASSING
+- Added rollbackMerge() function in mergeService.ts using git reset --hard to pre-merge commit
+- Added pre_merge_commit and rolled_back columns to merge_queue via DB migrations
+- All merge operations (execute, auto-resolve, ai-resolve, reimagine) capture pre-merge commit SHA before merging
+- Added merge:rollback IPC handler that validates entry status, checks pre_merge_commit exists, resets branch
+- Added mergeRollback preload bridge method and ElectronAPI type
+- Added rollback store action in mergeStore.ts
+- Sky-themed Rollback button on queue and history entries for failed/merged merges with pre_merge_commit
+- "Rolled Back" badge displayed in both queue and history views after successful rollback
+- Prevents double-rollback and shows appropriate error messages
+
+#### Feature #95: Recent projects list on startup - PASSING
+- Created WelcomePage component showing recent projects for quick access on app launch
+- Projects loaded from SQLite database ordered by last_opened_at DESC (up to 10 shown)
+- ProjectCard shows name, path, description, relative timestamp, and active badge
+- Clicking a project switches to it and navigates to agents page
+- AddProjectForm allows creating new projects inline with name, path, and description
+- "Continue with [project]" link when there's already an active project
+- AppLayout starts on 'welcome' page, renders full-screen without sidebar
+- After project selection, transitions to full app layout with sidebar and agents page
+
+#### Files Created/Modified
+- NEW: src/renderer/pages/WelcomePage.tsx - Welcome/startup page with recent projects
+- MODIFIED: src/main/services/mergeService.ts - Added rollbackMerge() function
+- MODIFIED: src/main/ipc/handlers.ts - Pre-merge commit capture + merge:rollback handler
+- MODIFIED: src/main/db/database.ts - Added pre_merge_commit and rolled_back migrations
+- MODIFIED: src/preload/index.ts - Added mergeRollback bridge method
+- MODIFIED: src/shared/types/index.ts - Added mergeRollback to ElectronAPI, updated MergeQueueEntry
+- MODIFIED: src/renderer/stores/mergeStore.ts - Added rollback store action
+- MODIFIED: src/renderer/pages/MergeQueuePage.tsx - Rollback button + Rolled Back badge
+- MODIFIED: src/renderer/components/AppLayout.tsx - Welcome page on startup
+
+#### Current Status
+- 157/366 features passing (added #93 and #95 this session)
+- All code passes Biome lint and Vite build (renderer, main, preload)
+- No mock data patterns in codebase
