@@ -1,0 +1,70 @@
+/* ─── Sidebar ─────────────────────────────────────────────── */
+
+.sidebar-root {
+  background-color: #0c1220; /* Dark blue-tint base */
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-title {
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+}
+
+.sidebar-collapse-btn {
+  color: #94a3b8;
+}
+.sidebar-collapse-btn:hover {
+  color: #e2e8f0;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.sidebar-nav-item {
+  color: #94a3b8;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  border-left: 3px solid transparent;
+  border-radius: 0 10px 10px 0;
+}
+.sidebar-nav-item:hover {
+  color: #e2e8f0;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-nav-item-active {
+  color: #60a5fa;
+  background-color: rgba(96, 165, 250, 0.1);
+  font-weight: 600;
+  border-left: 3px solid #60a5fa;
+  border-radius: 0 10px 10px 0;
+}
+.sidebar-nav-item-active:hover {
+  background-color: rgba(96, 165, 250, 0.15);
+}
+
+.sidebar-section-label {
+  color: #64748b;
+}
+
+.sidebar-section-divider {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-badge {
+  background-color: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+}
