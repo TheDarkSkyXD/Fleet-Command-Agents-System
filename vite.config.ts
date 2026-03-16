@@ -31,6 +31,11 @@ export default defineConfig({
               ],
             },
           },
+          server: {
+            watch: {
+              ignored: ['**/database/**', '**/*.db', '**/*.db-wal', '**/*.db-shm'],
+            },
+          },
         },
       },
       {
@@ -42,11 +47,21 @@ export default defineConfig({
           build: {
             outDir: 'dist/preload',
           },
+          server: {
+            watch: {
+              ignored: ['**/database/**', '**/*.db', '**/*.db-wal', '**/*.db-shm'],
+            },
+          },
         },
       },
     ]),
     electronRenderer(),
   ],
+  server: {
+    watch: {
+      ignored: ['**/database/**', '**/*.db', '**/*.db-wal', '**/*.db-shm'],
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
