@@ -138,7 +138,7 @@ export function QueueEntryRow({
             <Button
               size="sm"
               onClick={() => onExecute(entry.id)}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
             >
               Merge
             </Button>
@@ -192,7 +192,7 @@ export function QueueEntryRow({
               <Button
                 size="sm"
                 onClick={() => onComplete(entry.id)}
-                className="bg-emerald-600 text-white hover:bg-emerald-500"
+                className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
               >
                 Complete
               </Button>

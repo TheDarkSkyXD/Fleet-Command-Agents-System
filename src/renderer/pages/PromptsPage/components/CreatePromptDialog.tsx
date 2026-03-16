@@ -163,7 +163,7 @@ export function CreatePromptDialog({
           <Button
             onClick={handleCreate}
             disabled={!name.trim() || !content.trim() || saving}
-            className="bg-blue-600 text-white hover:bg-blue-500"
+            className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             {saving ? <FiLoader size={14} className="animate-spin" /> : <FiPlus size={14} />}
             {saving ? 'Creating...' : 'Create Prompt'}

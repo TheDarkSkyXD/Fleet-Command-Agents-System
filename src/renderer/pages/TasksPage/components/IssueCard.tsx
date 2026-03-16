@@ -147,7 +147,7 @@ export function IssueCard({
                 size="sm"
                 onClick={() => handleClaim(issue.id)}
                 disabled={!claimAgent.trim()}
-                className="h-7 bg-amber-600 px-2 text-xs text-white hover:bg-amber-500"
+                className="h-7 bg-amber-600/15 px-2 text-xs text-amber-400 border border-amber-500/25 hover:bg-amber-600/25 hover:text-amber-300"
               >
                 Claim
               </Button>

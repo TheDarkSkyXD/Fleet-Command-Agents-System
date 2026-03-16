@@ -49,7 +49,7 @@ export function BashRestrictionTester({ role }: { role: string }) {
           disabled={!testCommand.trim()}
           data-testid="test-bash-command-btn"
           size="sm"
-          className="bg-amber-600 text-white hover:bg-amber-500"
+          className="bg-amber-600/15 text-amber-400 border border-amber-500/25 hover:bg-amber-600/25 hover:text-amber-300"
         >
           <FiShield size={14} />
           Test

@@ -278,7 +278,33 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
 
                       {/* Inline accordion sub-items */}
                       {projectsOpen && !collapsed && (
-                        <div className="sidebar-accordion mt-1 ml-[26px] border-l border-dashed border-slate-600/60 pl-3 pb-1">
+                        <div className="sidebar-accordion mt-1 ml-[26px] border-l border-dashed border-white/10 pl-3 pb-1 flex flex-col gap-1">
+                          {/* All Projects */}
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            onClick={() => {
+                              setProjectsOpen(false);
+                              onNavigate('projects');
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-[8px] text-left text-[13px] text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-150 h-auto justify-start"
+                            data-testid="project-switcher-all-projects"
+                          >
+                            <FiGrid size={13} className="shrink-0" />
+                            <span>All Projects</span>
+                          </Button>
+
+                          {/* Open Project */}
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            onClick={handleBrowseAndCreate}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-[8px] text-left text-[13px] text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-150 h-auto justify-start"
+                          >
+                            <FiFolderPlus size={13} className="shrink-0" />
+                            <span>Open Project</span>
+                          </Button>
+
                           {/* Project list */}
                           {projects.length === 0 && (
                             <div className="py-2 px-2 text-[12px] text-slate-500 italic">
@@ -314,32 +340,6 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
                               </Button>
                             );
                           })}
-
-                          {/* Open Project */}
-                          <Button
-                            variant="ghost"
-                            type="button"
-                            onClick={handleBrowseAndCreate}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-[8px] text-left text-[13px] text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-150 h-auto justify-start"
-                          >
-                            <FiFolderPlus size={13} className="shrink-0" />
-                            <span>Open Project</span>
-                          </Button>
-
-                          {/* All Projects */}
-                          <Button
-                            variant="ghost"
-                            type="button"
-                            onClick={() => {
-                              setProjectsOpen(false);
-                              onNavigate('projects');
-                            }}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-[8px] text-left text-[13px] text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all duration-150 h-auto justify-start"
-                            data-testid="project-switcher-all-projects"
-                          >
-                            <FiGrid size={13} className="shrink-0" />
-                            <span>All Projects</span>
-                          </Button>
                         </div>
                       )}
                     </div>
@@ -407,7 +407,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
           <div className="flex flex-col gap-1.5">
             <Button
               variant="secondary"
-              className="w-full rounded-lg bg-slate-800/80 border border-slate-700 px-3 py-1.5 text-[11px] font-medium text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors h-auto gap-1.5"
+              className="w-full rounded-lg bg-[#222] border border-white/10 px-3 py-1.5 text-[11px] font-medium text-slate-300 hover:bg-[#2a2a2a] hover:text-white transition-colors h-auto gap-1.5"
               onClick={() => window.electronAPI?.openExternal?.('https://github.com/fleet-command/releases')}
             >
               <FiFileText size={12} />

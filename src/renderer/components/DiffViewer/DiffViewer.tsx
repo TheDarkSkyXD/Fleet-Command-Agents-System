@@ -340,34 +340,34 @@ export function DiffViewer({
           background: transparent;
         }
         .diff-viewer-container .d2h-file-header {
-          background-color: #1e293b;
-          border-color: #334155;
-          color: #e2e8f0;
+          background-color: #1a1a1a;
+          border-color: #2e2e2e;
+          color: #e5e5e5;
           padding: 8px 12px;
         }
         .diff-viewer-container .d2h-file-name-wrapper {
-          color: #e2e8f0;
+          color: #e5e5e5;
         }
         .diff-viewer-container .d2h-file-name {
           color: #93c5fd;
         }
         .diff-viewer-container .d2h-tag {
-          background-color: #334155;
-          border-color: #475569;
-          color: #94a3b8;
+          background-color: #2a2a2a;
+          border-color: #404040;
+          color: #a3a3a3;
         }
         .diff-viewer-container .d2h-file-list-wrapper {
-          background-color: #0f172a;
-          border-color: #334155;
+          background-color: #111111;
+          border-color: #2e2e2e;
           margin-bottom: 0;
         }
         .diff-viewer-container .d2h-file-list-header {
-          background-color: #1e293b;
-          border-color: #334155;
-          color: #e2e8f0;
+          background-color: #1a1a1a;
+          border-color: #2e2e2e;
+          color: #e5e5e5;
         }
         .diff-viewer-container .d2h-file-list-line {
-          color: #cbd5e1;
+          color: #d4d4d4;
         }
         .diff-viewer-container .d2h-file-list-line a {
           color: #93c5fd;
@@ -378,29 +378,29 @@ export function DiffViewer({
         .diff-viewer-container .d2h-diff-table {
           font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
           font-size: 13px;
-          border-color: #334155;
+          border-color: #2e2e2e;
         }
         .diff-viewer-container .d2h-code-line,
         .diff-viewer-container .d2h-code-side-line {
-          background-color: #0f172a;
-          color: #e2e8f0;
-          border-color: #1e293b;
+          background-color: #111111;
+          color: #e5e5e5;
+          border-color: #1a1a1a;
         }
         .diff-viewer-container .d2h-code-line-ctn {
-          color: #e2e8f0;
+          color: #e5e5e5;
         }
         /* Line numbers */
         .diff-viewer-container .d2h-code-linenumber,
         .diff-viewer-container .d2h-code-side-linenumber {
-          background-color: #1e293b;
-          color: #64748b;
-          border-color: #334155;
+          background-color: #1a1a1a;
+          color: #737373;
+          border-color: #2e2e2e;
         }
         /* Empty line placeholder */
         .diff-viewer-container .d2h-code-side-emptyplaceholder,
         .diff-viewer-container .d2h-emptyplaceholder {
           background-color: #1a1a2e;
-          border-color: #1e293b;
+          border-color: #1a1a1a;
         }
         /* Additions - green */
         .diff-viewer-container .d2h-ins {
@@ -455,7 +455,7 @@ export function DiffViewer({
         }
         /* File stats */
         .diff-viewer-container .d2h-file-stats {
-          color: #94a3b8;
+          color: #a3a3a3;
         }
         .diff-viewer-container .d2h-lines-added {
           color: #4ade80;
@@ -469,14 +469,14 @@ export function DiffViewer({
           height: 8px;
         }
         .diff-viewer-container::-webkit-scrollbar-track {
-          background: #0f172a;
+          background: #111111;
         }
         .diff-viewer-container::-webkit-scrollbar-thumb {
-          background: #334155;
+          background: #333333;
           border-radius: 4px;
         }
         .diff-viewer-container::-webkit-scrollbar-thumb:hover {
-          background: #475569;
+          background: #444444;
         }
       `}</style>
     </div>

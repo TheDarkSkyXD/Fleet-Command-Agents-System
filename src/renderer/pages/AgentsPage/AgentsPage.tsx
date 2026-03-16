@@ -32,12 +32,12 @@ const ROLE_CONFIG: Record<string, { color: string; bg: string; border: string; i
   monitor:     { color: 'text-teal-400',    bg: 'bg-teal-500/10',    border: 'border-teal-500/30',    icon: <FiShield size={18} /> },
 };
 
-const STATE_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  booting:   { label: 'Booting',   color: 'text-blue-400',    dot: 'bg-blue-400 animate-pulse' },
-  working:   { label: 'Working',   color: 'text-emerald-400', dot: 'bg-emerald-400 animate-pulse' },
-  completed: { label: 'Completed', color: 'text-slate-400',   dot: 'bg-slate-400' },
-  stalled:   { label: 'Stalled',   color: 'text-amber-400',   dot: 'bg-amber-400' },
-  zombie:    { label: 'Zombie',    color: 'text-red-400',     dot: 'bg-red-400' },
+const STATE_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  booting:   { label: 'Booting',   color: 'text-blue-400',    bg: 'bg-blue-500/15',    dot: 'bg-blue-400 animate-pulse' },
+  working:   { label: 'Working',   color: 'text-cyan-400',    bg: 'bg-cyan-500/15',    dot: 'bg-cyan-400 animate-pulse' },
+  completed: { label: 'Completed', color: 'text-green-400',   bg: 'bg-green-500/15',   dot: 'bg-green-400' },
+  stalled:   { label: 'Stalled',   color: 'text-amber-400',   bg: 'bg-amber-500/15',   dot: 'bg-amber-400' },
+  zombie:    { label: 'Zombie',    color: 'text-red-400',     bg: 'bg-red-500/15',     dot: 'bg-red-400' },
 };
 
 const ALL_CAPABILITIES: AgentCapability[] = ['scout', 'builder', 'reviewer', 'lead', 'merger', 'coordinator', 'monitor'];
@@ -224,7 +224,7 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
       <div className="grid grid-cols-4 gap-3">
         <StatCard label="Total Agents" value={stats.total} icon={<FiUsers size={16} />} color="text-blue-400" bg="bg-blue-500/10" />
         <StatCard label="Active" value={stats.running} icon={<FiActivity size={16} />} color="text-emerald-400" bg="bg-emerald-500/10" />
-        <StatCard label="Completed" value={stats.completed} icon={<FiClock size={16} />} color="text-slate-400" bg="bg-slate-500/10" />
+        <StatCard label="Completed" value={stats.completed} icon={<FiClock size={16} />} color="text-green-400" bg="bg-green-500/10" />
         <StatCard label="Needs Attention" value={stats.stalled} icon={<FiZap size={16} />} color="text-amber-400" bg="bg-amber-500/10" />
       </div>
 
@@ -290,7 +290,7 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
                 <button
                   key={st}
                   onClick={() => setStateFilter(st === stateFilter ? '' : st)}
-                  className={`px-2 py-0.5 rounded-full capitalize transition-colors ${stateFilter === st ? `${cfg.color}` : 'text-slate-400 hover:text-slate-200'}`}
+                  className={`px-2 py-0.5 rounded-full capitalize transition-colors ${stateFilter === st ? `${cfg.bg} ${cfg.color}` : 'text-slate-400 hover:text-slate-200'}`}
                 >
                   {st}
                 </button>

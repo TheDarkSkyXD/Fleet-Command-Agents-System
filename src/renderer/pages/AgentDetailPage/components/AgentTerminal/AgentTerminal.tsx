@@ -39,13 +39,13 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
 
     const term = new Terminal({
       theme: {
-        background: '#0f172a', // slate-900
-        foreground: '#f8fafc', // slate-50
-        cursor: '#60a5fa', // blue-400
-        cursorAccent: '#0f172a',
-        selectionBackground: '#334155', // slate-700
-        selectionForeground: '#f8fafc',
-        black: '#1e293b',
+        background: '#111111',
+        foreground: '#fafafa',
+        cursor: '#60a5fa',
+        cursorAccent: '#111111',
+        selectionBackground: '#333333',
+        selectionForeground: '#fafafa',
+        black: '#1a1a1a',
         red: '#ef4444',
         green: '#22c55e',
         yellow: '#eab308',
@@ -53,7 +53,7 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
         magenta: '#a855f7',
         cyan: '#06b6d4',
         white: '#f1f5f9',
-        brightBlack: '#475569',
+        brightBlack: '#525252',
         brightRed: '#f87171',
         brightGreen: '#4ade80',
         brightYellow: '#facc15',
@@ -312,7 +312,7 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
             type="button"
             variant="default"
             onClick={scrollToBottom}
-            className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500 transition-all hover:scale-105 active:scale-95 h-auto"
+            className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full bg-blue-600/15 px-3 py-2 text-sm font-medium text-blue-400 border border-blue-500/25 shadow-lg shadow-blue-600/25 hover:bg-blue-600/25 hover:text-blue-300 transition-all hover:scale-105 active:scale-95 h-auto"
             title="Scroll to bottom"
             data-testid="scroll-to-bottom-button"
           >

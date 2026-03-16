@@ -1,21 +1,21 @@
 /* ─── Sidebar ─────────────────────────────────────────────── */
 
 .sidebar-root {
-  background-color: #0c1220; /* Dark blue-tint base */
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: #0e0e0e; /* Darkest neutral gray */
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-title {
-  color: #94a3b8;
+  color: #a3a3a3;
   letter-spacing: 0.08em;
 }
 
 .sidebar-collapse-btn {
-  color: #94a3b8;
+  color: #a3a3a3;
 }
 .sidebar-collapse-btn:hover {
-  color: #e2e8f0;
-  background-color: rgba(255, 255, 255, 0.05);
+  color: #e5e5e5;
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-nav {
@@ -34,15 +34,15 @@
 }
 
 .sidebar-nav-item {
-  color: #94a3b8;
+  color: #a3a3a3;
   font-weight: 500;
   letter-spacing: 0.005em;
   border-left: 3px solid transparent;
   border-radius: 0 10px 10px 0;
 }
 .sidebar-nav-item:hover {
-  color: #e2e8f0;
-  background-color: rgba(255, 255, 255, 0.05);
+  color: #e5e5e5;
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-nav-item-active {
@@ -57,11 +57,11 @@
 }
 
 .sidebar-section-label {
-  color: #64748b;
+  color: #737373;
 }
 
 .sidebar-section-divider {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-badge {

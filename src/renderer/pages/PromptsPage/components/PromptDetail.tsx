@@ -259,7 +259,7 @@ export function PromptDetail({
                 size="sm"
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-blue-600 text-white hover:bg-blue-500"
+                className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
               >
                 {saving ? <FiLoader size={14} className="animate-spin" /> : <FiSave size={14} />}
                 {saving ? 'Saving...' : 'Save'}

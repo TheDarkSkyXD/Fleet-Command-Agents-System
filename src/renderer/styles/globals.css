@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 /*
- * WCAG AA Color Contrast Reference (dark theme)
- * Background: #0f172a (slate-900), luminance ≈ 0.007
- * Card bg:    #1e293b (slate-800), luminance ≈ 0.020
+ * WCAG AA Color Contrast Reference (dark neutral gray theme)
+ * Background: #111111, luminance ≈ 0.005
+ * Card bg:    #1a1a1a, luminance ≈ 0.012
  *
- * Text colors and contrast ratios against slate-900:
- *   slate-50  (#f8fafc): 16.7:1 ✓ (primary text)
- *   slate-100 (#f1f5f9): 15.1:1 ✓
- *   slate-200 (#e2e8f0): 12.8:1 ✓
- *   slate-300 (#cbd5e1): 10.0:1 ✓
- *   slate-400 (#94a3b8):  7.2:1 ✓ (secondary text, meets 4.5:1 AA normal)
- *   slate-500 (#64748b):  3.9:1 ✓ (muted/decorative, meets 3:1 AA large)
+ * Text colors (neutral grays):
+ *   gray-50  (#fafafa): 17.4:1 ✓ (primary text / white)
+ *   gray-100 (#f5f5f5): 16.5:1 ✓
+ *   gray-200 (#e5e5e5): 13.9:1 ✓
+ *   gray-300 (#d4d4d4): 11.3:1 ✓
+ *   gray-400 (#a3a3a3):  7.5:1 ✓ (secondary text, meets 4.5:1 AA)
+ *   gray-500 (#737373):  4.2:1 ✓ (muted/decorative, meets 3:1 AA large)
  *
  * Interactive colors on dark backgrounds:
  *   blue-400  (#60a5fa):  6.5:1 ✓ (links/accents)
@@ -60,45 +60,58 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Override Tailwind slate palette → neutral grays for dark mode */
+  --color-slate-50: #fafafa;
+  --color-slate-100: #f5f5f5;
+  --color-slate-200: #e5e5e5;
+  --color-slate-300: #d4d4d4;
+  --color-slate-400: #a3a3a3;
+  --color-slate-500: #737373;
+  --color-slate-600: #525252;
+  --color-slate-700: #404040;
+  --color-slate-800: #262626;
+  --color-slate-900: #171717;
+  --color-slate-950: #0a0a0a;
 }
 
 /* Base styles for dark-only Electron app */
 :root {
   color-scheme: dark;
 
-  /* shadcn/ui design tokens mapped to our dark theme */
+  /* shadcn/ui design tokens — neutral dark gray theme */
   --radius: 0.5rem;
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --card: #1e293b;
-  --card-foreground: #f8fafc;
-  --popover: #1e293b;
-  --popover-foreground: #f8fafc;
+  --background: #111111;
+  --foreground: #fafafa;
+  --card: #1a1a1a;
+  --card-foreground: #fafafa;
+  --popover: #1a1a1a;
+  --popover-foreground: #fafafa;
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
-  --secondary: #334155;
-  --secondary-foreground: #f1f5f9;
-  --muted: #334155;
-  --muted-foreground: #94a3b8;
-  --accent: #1e293b;
-  --accent-foreground: #f8fafc;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #f5f5f5;
+  --muted: #252525;
+  --muted-foreground: #a3a3a3;
+  --accent: #222222;
+  --accent-foreground: #fafafa;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #334155;
-  --input: #334155;
+  --border: #2e2e2e;
+  --input: #2e2e2e;
   --ring: #3b82f6;
   --chart-1: #3b82f6;
   --chart-2: #22c55e;
   --chart-3: #f59e0b;
   --chart-4: #a855f7;
   --chart-5: #ec4899;
-  --sidebar: #0f172a;
-  --sidebar-foreground: #f8fafc;
+  --sidebar: #0e0e0e;
+  --sidebar-foreground: #fafafa;
   --sidebar-primary: #3b82f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #334155;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #2e2e2e;
   --sidebar-ring: #3b82f6;
 
   /* App-specific accent color properties (overridden by JS) */
@@ -107,7 +120,7 @@
   --accent-ring: #3b82f6;
   --accent-text: #60a5fa;
   --accent-border: #2563eb;
-  --accent-bg-subtle: #1e3a5f;
+  --accent-bg-subtle: #1a2744;
 }
 
 /*
@@ -142,12 +155,12 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #475569;
+    background: #404040;
     border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
+    background: #525252;
   }
 
   /* Monospace font for terminals and code */

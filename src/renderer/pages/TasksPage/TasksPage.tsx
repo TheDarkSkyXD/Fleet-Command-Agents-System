@@ -527,7 +527,7 @@ export function TasksPage() {
                   onClick={() => setViewMode('list')}
                   className={`rounded-r-none ${
                     viewMode === 'list'
-                      ? 'bg-blue-600 text-white hover:bg-blue-600 hover:text-white'
+                      ? 'bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
                   }`}
                   title="List view"
@@ -541,7 +541,7 @@ export function TasksPage() {
                   onClick={() => setViewMode('kanban')}
                   className={`rounded-l-none ${
                     viewMode === 'kanban'
-                      ? 'bg-blue-600 text-white hover:bg-blue-600 hover:text-white'
+                      ? 'bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
                   }`}
                   title="Kanban board"

@@ -470,7 +470,7 @@ function KeyboardShortcutsSettings() {
                       disabled={!shortcut.enabled}
                       className={`min-w-[120px] font-mono ${
                         isRecording
-                          ? 'bg-blue-600 text-white animate-pulse hover:bg-blue-600'
+                          ? 'bg-blue-600/15 text-blue-400 border border-blue-500/25 animate-pulse hover:bg-blue-600/25 hover:text-blue-300'
                           : ''
                       }`}
                       data-testid={`shortcut-key-${shortcut.action}`}

@@ -41,7 +41,7 @@ const heroVariants = {
 function CommandCenterBg() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#0f172a_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#111111_70%)]" />
       <div
         className="absolute inset-0 opacity-[0.025]"
         style={{
