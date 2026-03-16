@@ -77,10 +77,10 @@ export interface AppSettings {
 
 export type AccentColorKey =
   | 'blue'
-  | 'purple'
+  | 'sky'
   | 'emerald'
   | 'amber'
-  | 'rose'
+  | 'red'
   | 'cyan'
   | 'orange'
   | 'indigo';
@@ -106,14 +106,14 @@ export const ACCENT_COLORS: Record<
     border: '#2563eb',
     bgSubtle: '#1e3a5f',
   },
-  purple: {
-    label: 'Purple',
-    primary: '#8b5cf6',
-    hover: '#7c3aed',
-    ring: '#8b5cf6',
-    text: '#a78bfa',
-    border: '#7c3aed',
-    bgSubtle: '#3b1f6e',
+  sky: {
+    label: 'Sky',
+    primary: '#0ea5e9',
+    hover: '#0284c7',
+    ring: '#0ea5e9',
+    text: '#38bdf8',
+    border: '#0284c7',
+    bgSubtle: '#0c4a6e',
   },
   emerald: {
     label: 'Emerald',
@@ -133,14 +133,14 @@ export const ACCENT_COLORS: Record<
     border: '#d97706',
     bgSubtle: '#78350f',
   },
-  rose: {
-    label: 'Rose',
-    primary: '#f43f5e',
-    hover: '#e11d48',
-    ring: '#f43f5e',
-    text: '#fb7185',
-    border: '#e11d48',
-    bgSubtle: '#881337',
+  red: {
+    label: 'Red',
+    primary: '#ef4444',
+    hover: '#dc2626',
+    ring: '#ef4444',
+    text: '#f87171',
+    border: '#dc2626',
+    bgSubtle: '#7f1d1d',
   },
   cyan: {
     label: 'Cyan',

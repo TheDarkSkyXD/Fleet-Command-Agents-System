@@ -22,11 +22,86 @@
  * Button text: white (#fff) on blue-600/red-600/green-600 → all > 4.5:1 ✓
  */
 
+/* shadcn/ui theme - Tailwind v4 integration */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
 /* Base styles for dark-only Electron app */
 :root {
   color-scheme: dark;
 
-  /* Accent color custom properties (defaults to blue, overridden by JS) */
+  /* shadcn/ui design tokens mapped to our dark theme */
+  --radius: 0.5rem;
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+  --popover: #1e293b;
+  --popover-foreground: #f8fafc;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #334155;
+  --secondary-foreground: #f1f5f9;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #334155;
+  --input: #334155;
+  --ring: #3b82f6;
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #f59e0b;
+  --chart-4: #a855f7;
+  --chart-5: #ec4899;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #334155;
+  --sidebar-ring: #3b82f6;
+
+  /* App-specific accent color properties (overridden by JS) */
   --accent-primary: #3b82f6;
   --accent-hover: #2563eb;
   --accent-ring: #3b82f6;
@@ -35,150 +110,97 @@
   --accent-bg-subtle: #1e3a5f;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/*
+ * Base reset styles — inside @layer base so Tailwind utilities (p-6, px-4, etc.)
+ * in @layer utilities always take cascade priority over these resets.
+ */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
-  background-color: #0f172a;
-  color: #f8fafc;
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+    background-color: var(--background);
+    color: var(--foreground);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-/* Scrollbar styling for dark theme */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+  /* Scrollbar styling for dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-::-webkit-scrollbar-track {
-  background: #1e293b;
-}
+  ::-webkit-scrollbar-track {
+    background: var(--card);
+  }
 
-::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 4px;
-}
+  ::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
+  ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
 
-/* Monospace font for terminals and code */
-.font-mono {
-  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
-}
+  /* Monospace font for terminals and code */
+  .font-mono {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+  }
 
-/* Focus ring styles for accessibility - ensure visible on dark backgrounds */
-:focus-visible {
-  outline: 2px solid var(--accent-ring, #3b82f6) !important;
-  outline-offset: 2px;
-}
+  /* Focus ring styles for accessibility - ensure visible on dark backgrounds */
+  :focus-visible {
+    outline: 2px solid var(--ring) !important;
+    outline-offset: 2px;
+  }
 
-/* Ensure buttons, links, and inputs show focus rings on keyboard navigation */
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[role="button"]:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--accent-ring, #3b82f6) !important;
-  outline-offset: 2px;
-  border-radius: 4px;
+  /* Ensure buttons, links, and inputs show focus rings on keyboard navigation */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--ring) !important;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Ensure layout works at 1280px and above */
+  #root {
+    min-width: 1024px;
+  }
+
+  /* Prevent flex children from overflowing their containers */
+  main {
+    min-width: 0;
+    overflow-x: hidden;
+  }
 }
 
 /* Accent color utility classes */
-.accent-btn {
-  background-color: var(--accent-primary);
-}
-.accent-btn:hover {
-  background-color: var(--accent-hover);
-}
-.accent-text {
-  color: var(--accent-text);
-}
-.accent-border {
-  border-color: var(--accent-border);
-}
-.accent-border-active {
-  border-color: var(--accent-primary);
-}
-
-/* Animation for agent status pulse */
-@keyframes status-pulse {
-  0%,
-  100% {
-    opacity: 1;
+@layer utilities {
+  .accent-btn {
+    background-color: var(--accent-primary);
   }
-  50% {
-    opacity: 0.5;
+  .accent-btn:hover {
+    background-color: var(--accent-hover);
   }
-}
-
-.animate-status-pulse {
-  animation: status-pulse 2s ease-in-out infinite;
-}
-
-/* Green activity pulse animation for running agents */
-@keyframes activity-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  .accent-text {
+    color: var(--accent-text);
   }
-  70% {
-    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  .accent-border {
+    border-color: var(--accent-border);
   }
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  .accent-border-active {
+    border-color: var(--accent-primary);
   }
-}
-
-.animate-activity-pulse {
-  animation: activity-pulse 2s ease-in-out infinite;
-}
-
-/* Green activity pulse glow for agent cards */
-@keyframes card-activity-pulse {
-  0%,
-  100% {
-    border-color: rgba(34, 197, 94, 0.3);
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0), inset 0 0 0 0 rgba(34, 197, 94, 0);
-  }
-  50% {
-    border-color: rgba(34, 197, 94, 0.5);
-    box-shadow: 0 0 8px 0 rgba(34, 197, 94, 0.15), inset 0 0 4px 0 rgba(34, 197, 94, 0.05);
-  }
-}
-
-.animate-card-activity-pulse {
-  animation: card-activity-pulse 2s ease-in-out infinite;
-}
-
-/* Indeterminate progress bar for merge operations */
-@keyframes mergeProgress {
-  0% {
-    transform: translateX(-100%);
-  }
-  50% {
-    transform: translateX(150%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
-/* Ensure layout works at 1280px and above */
-#root {
-  min-width: 1024px;
-}
-
-/* Prevent flex children from overflowing their containers */
-main {
-  min-width: 0;
-  overflow-x: hidden;
 }
