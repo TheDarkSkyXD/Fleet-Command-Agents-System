@@ -1,6 +1,9 @@
 import path from 'node:path';
-import { BrowserWindow, Menu, Tray, app, dialog } from 'electron';
+import { BrowserWindow, Menu, Tray, app, dialog, ipcMain } from 'electron';
 import log from 'electron-log';
+
+// Enable remote debugging for debug-electron-mcp integration
+app.commandLine.appendSwitch('remote-debugging-port', '9233');
 import windowStateKeeper from 'electron-window-state';
 import {
   checkDatabaseHealth,
@@ -21,6 +24,51 @@ import { watchdogService } from './services/watchdogService';
 // Configure logging
 log.transports.file.level = 'info';
 log.transports.console.level = 'debug';
+
+// Persistent key-value store for all settings (survives DB resets)
+// Using a simple JSON file since electron-store v10 is ESM-only
+import fs from 'node:fs';
+
+const storeFilePath = path.join(app.getPath('userData'), 'fleet-command-settings.json');
+
+function loadStore(): Record<string, unknown> {
+  try {
+    if (fs.existsSync(storeFilePath)) {
+      return JSON.parse(fs.readFileSync(storeFilePath, 'utf-8'));
+    }
+  } catch {
+    log.warn('[Store] Failed to load settings file, using defaults');
+  }
+  return {};
+}
+
+function saveStore(data: Record<string, unknown>) {
+  try {
+    fs.writeFileSync(storeFilePath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    log.error('[Store] Failed to save settings file:', err);
+  }
+}
+
+export const persistentStore = {
+  get(key: string, defaultValue?: unknown): unknown {
+    const data = loadStore();
+    return key in data ? data[key] : defaultValue;
+  },
+  set(key: string, value: unknown) {
+    const data = loadStore();
+    data[key] = value;
+    saveStore(data);
+  },
+};
+
+// IPC handlers for persistent store (direct key access)
+ipcMain.handle('store:get', (_event, key: string) => {
+  return persistentStore.get(key);
+});
+ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
+  persistentStore.set(key, value);
+});
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
@@ -110,62 +158,20 @@ function createWindow() {
     mainWindow?.show();
   });
 
-  // Minimize to tray instead of taskbar
+  // Minimize: check setting to decide tray vs taskbar
   mainWindow.on('minimize', (event: Electron.Event) => {
-    event.preventDefault();
-    mainWindow?.hide();
-    log.info('Window minimized to system tray');
+    const minimizeToTray = persistentStore.get('minimizeToTray', false);
+    if (minimizeToTray) {
+      event.preventDefault();
+      mainWindow?.hide();
+      log.info('Window minimized to system tray');
+    }
+    // Otherwise default minimize to taskbar
   });
 
-  // Handle close with dialog offering three options
-  mainWindow.on('close', (event) => {
-    if (!isQuitting && mainWindow) {
-      event.preventDefault();
-
-      const activeAgentCount = agentProcessManager.getAll().filter((a) => a.isRunning).length;
-      const agentInfo =
-        activeAgentCount > 0 ? `\n\n${activeAgentCount} agent(s) currently running.` : '';
-
-      dialog
-        .showMessageBox(mainWindow, {
-          type: 'question',
-          title: 'Close Fleet Command',
-          message: `What would you like to do?${agentInfo}`,
-          buttons: ['Keep Running in Tray', 'Stop All Agents & Close', 'Cancel'],
-          defaultId: 2,
-          cancelId: 2,
-          noLink: true,
-        })
-        .then(async ({ response }) => {
-          if (response === 0) {
-            // Keep running in tray - hide window
-            mainWindow?.hide();
-            log.info('App minimized to tray (agents continue running)');
-          } else if (response === 1) {
-            // Stop all agents and close
-            log.info('Stopping all agents and closing app...');
-            // Save checkpoints before stopping agents
-            try {
-              agentProcessManager.saveCheckpoints();
-              log.info('Agent checkpoints saved before close');
-            } catch (error) {
-              log.error('Error saving checkpoints on close:', error);
-            }
-            try {
-              await agentProcessManager.stopAll();
-              log.info('All agents stopped');
-            } catch (error) {
-              log.error('Error stopping agents on close:', error);
-            }
-            isQuitting = true;
-            app.quit();
-          }
-          // response === 2 is Cancel - do nothing, dialog closes
-        })
-        .catch((err) => {
-          log.error('Close dialog error:', err);
-        });
-    }
+  // Close = quit the app
+  mainWindow.on('close', () => {
+    isQuitting = true;
   });
 
   mainWindow.on('closed', () => {
@@ -257,39 +263,35 @@ function createTray() {
     }
   });
 
-  // Periodically check agent status and update tray icon + menu
+  // Low-frequency tray status poll (30s) — in-memory only, no SQL
   setInterval(() => {
     if (!tray || tray.isDestroyed()) return;
     try {
       const allAgents = agentProcessManager.getAll();
       const count = allAgents.filter((a) => a.isRunning).length;
       updateTrayMenu(count);
-
-      if (count > 0) {
-        updateTrayIcon('active');
-      } else {
-        updateTrayIcon('idle');
-      }
+      updateTrayIcon(count > 0 ? 'active' : 'idle');
     } catch {
       // Silently ignore errors during status check
     }
-  }, 5000);
+  }, 30000);
 
   log.info('System tray icon created');
 }
 
-// Enforce single instance: prevent multiple app windows from corrupting state
+// Enforce single instance
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
-  log.info('Another instance is already running. Quitting duplicate instance.');
+  // Another instance is already running - just quit this one
+  log.info('Another instance is already running. Quitting duplicate.');
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // Focus the existing window when a second instance is launched
+    // Focus the existing window when a second instance tries to launch
     if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
       if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
       mainWindow.focus();
     }
   });

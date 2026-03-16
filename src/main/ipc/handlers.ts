@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import log from 'electron-log';
+import { persistentStore } from '../index';
 import * as nodePty from 'node-pty';
 import {
   checkDatabaseHealth,
@@ -397,13 +398,11 @@ export function registerIpcHandlers(): void {
         const runtimeId = options.runtime || runtimeRegistry.getDefaultRuntimeId();
         let capabilityConfigModel: string | undefined;
         try {
-          const setting = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
-            'app_settings',
-          ) as { value: string } | undefined;
-          if (setting) {
-            const parsed = JSON.parse(setting.value);
-            if (parsed?.modelDefaultsPerCapability?.[capability]) {
-              capabilityConfigModel = parsed.modelDefaultsPerCapability[capability];
+          const appSettings = persistentStore.get('app_settings') as Record<string, unknown> | undefined;
+          if (appSettings?.modelDefaultsPerCapability) {
+            const defaults = appSettings.modelDefaultsPerCapability as Record<string, string>;
+            if (defaults[capability]) {
+              capabilityConfigModel = defaults[capability];
             }
           }
         } catch {
@@ -420,14 +419,9 @@ export function registerIpcHandlers(): void {
         const requestedDepth = options.depth ?? 0;
         let maxDepth = 2; // default
         try {
-          const setting = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
-            'maxHierarchyDepth',
-          ) as { value: string } | undefined;
-          if (setting) {
-            const parsed = JSON.parse(setting.value);
-            if (typeof parsed === 'number' && parsed >= 0) {
-              maxDepth = parsed;
-            }
+          const appSettings = persistentStore.get('app_settings') as Record<string, unknown> | undefined;
+          if (appSettings && typeof appSettings.maxHierarchyDepth === 'number' && appSettings.maxHierarchyDepth >= 0) {
+            maxDepth = appSettings.maxHierarchyDepth;
           }
         } catch (depthErr) {
           log.warn(
@@ -445,19 +439,13 @@ export function registerIpcHandlers(): void {
         // Enforce max concurrent agents limit
         let maxConcurrent = 10; // default
         try {
-          const concurrentSetting = loggedPrepare(
-            'SELECT value FROM app_settings WHERE key = ?',
-          ).get('app_settings') as { value: string } | undefined;
-          if (concurrentSetting) {
-            const parsed = JSON.parse(concurrentSetting.value);
-            if (
-              parsed &&
-              typeof parsed === 'object' &&
-              typeof parsed.maxConcurrentAgents === 'number' &&
-              parsed.maxConcurrentAgents >= 1
-            ) {
-              maxConcurrent = parsed.maxConcurrentAgents;
-            }
+          const appSettings = persistentStore.get('app_settings') as Record<string, unknown> | undefined;
+          if (
+            appSettings &&
+            typeof appSettings.maxConcurrentAgents === 'number' &&
+            appSettings.maxConcurrentAgents >= 1
+          ) {
+            maxConcurrent = appSettings.maxConcurrentAgents;
           }
         } catch (concurrentErr) {
           log.warn(
@@ -2179,8 +2167,6 @@ export function registerIpcHandlers(): void {
 
       // Find the active coordinator session
       const coordinatorSession = loggedPrepare(
-        db,
-        'operator:dispatch',
         `SELECT id, agent_name FROM sessions WHERE capability = 'lead' AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1`,
       ).get() as { id: string; agent_name: string } | undefined;
 
@@ -2188,8 +2174,6 @@ export function registerIpcHandlers(): void {
       const coordSession =
         coordinatorSession ||
         (loggedPrepare(
-          db,
-          'operator:dispatch',
           `SELECT id, agent_name FROM sessions WHERE agent_name LIKE '%coordinator%' AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1`,
         ).get() as { id: string; agent_name: string } | undefined);
 
@@ -2204,8 +2188,6 @@ export function registerIpcHandlers(): void {
       // Store the message in messages table for history
       const msgId = `msg-operator-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       loggedPrepare(
-        db,
-        'operator:dispatch',
         `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, created_at)
            VALUES (?, ?, ?, ?, ?, 'dispatch', 'high', datetime('now'))`,
       ).run(msgId, 'operator', coordSession.agent_name, 'Operator Dispatch', message.trim());
@@ -2234,8 +2216,6 @@ export function registerIpcHandlers(): void {
     try {
       const maxEntries = limit ?? 50;
       const messages = loggedPrepare(
-        db,
-        'operator:history',
         `SELECT id, from_agent, to_agent, subject, body, created_at
          FROM messages
          WHERE from_agent = 'operator' AND type = 'dispatch'
@@ -3324,10 +3304,7 @@ export function registerIpcHandlers(): void {
       // Get target branch from settings
       let targetBranch: string | undefined;
       try {
-        const row = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
-          'mergeTargetBranch',
-        ) as { value: string } | undefined;
-        targetBranch = row ? JSON.parse(row.value) : undefined;
+        targetBranch = persistentStore.get('mergeTargetBranch') as string | undefined;
       } catch {
         // ignore
       }
@@ -3352,10 +3329,7 @@ export function registerIpcHandlers(): void {
   // Get merge target branch setting
   ipcMain.handle('merge:get-target-branch', () => {
     try {
-      const row = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
-        'mergeTargetBranch',
-      ) as { value: string } | undefined;
-      const branch = row ? JSON.parse(row.value) : null;
+      const branch = persistentStore.get('mergeTargetBranch', null);
       log.info(
         `[IPC] merge:get-target-branch - current target: ${branch || 'default (current branch)'}`,
       );
@@ -3369,10 +3343,7 @@ export function registerIpcHandlers(): void {
   // Set merge target branch setting
   ipcMain.handle('merge:set-target-branch', (_event, branch: string) => {
     try {
-      loggedPrepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(
-        'mergeTargetBranch',
-        JSON.stringify(branch),
-      );
+      persistentStore.set('mergeTargetBranch', branch);
       log.info(`[IPC] merge:set-target-branch - set to: ${branch || 'default (current branch)'}`);
       return { data: true, error: null };
     } catch (error) {
@@ -4040,11 +4011,9 @@ export function registerIpcHandlers(): void {
   // Settings channels - use real SQLite queries via loggedPrepare
   ipcMain.handle('settings:get', (_event, key: string) => {
     try {
-      const row = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(key) as
-        | { value: string }
-        | undefined;
-      log.info(`[IPC] settings:get - SELECT from real database: key=${key}`);
-      return { data: row ? JSON.parse(row.value) : null, error: null };
+      const value = persistentStore.get(key);
+      log.info(`[IPC] settings:get - from electron-store: key=${key}`);
+      return { data: value ?? null, error: null };
     } catch (error) {
       log.error('settings:get failed:', error);
       return { data: null, error: String(error) };
@@ -4053,11 +4022,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:set', (_event, key: string, value: unknown) => {
     try {
-      loggedPrepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(
-        key,
-        JSON.stringify(value),
-      );
-      log.info(`[IPC] settings:set - INSERT OR REPLACE in real database: key=${key}`);
+      persistentStore.set(key, value);
+      log.info(`[IPC] settings:set - saved to electron-store: key=${key}`);
       return { data: true, error: null };
     } catch (error) {
       log.error('settings:set failed:', error);
@@ -4289,7 +4255,7 @@ export function registerIpcHandlers(): void {
         } else {
           const fsSync = require('node:fs');
           const pathMod = require('node:path');
-          const configPath = pathMod.join(activeProject.path, '.overstory', 'config.json');
+          const configPath = pathMod.join(activeProject.path, '.fleetcommand', 'config.json');
 
           if (!fsSync.existsSync(configPath)) {
             checks.push({
@@ -4298,7 +4264,7 @@ export function registerIpcHandlers(): void {
               version: null,
               detail: `Config file not found at ${configPath}`,
               fixable: true,
-              fixAction: 'Initialize .overstory directory',
+              fixAction: 'Initialize .fleetcommand directory',
             });
           } else {
             const configRaw = fsSync.readFileSync(configPath, 'utf-8');
@@ -4571,11 +4537,11 @@ export function registerIpcHandlers(): void {
           }
           const fsMod = require('node:fs');
           const pathMod = require('node:path');
-          const overstoryDir = pathMod.join(activeProject.path, '.overstory');
-          if (!fsMod.existsSync(overstoryDir)) {
-            fsMod.mkdirSync(overstoryDir, { recursive: true });
+          const fleetcommandDir = pathMod.join(activeProject.path, '.fleetcommand');
+          if (!fsMod.existsSync(fleetcommandDir)) {
+            fsMod.mkdirSync(fleetcommandDir, { recursive: true });
           }
-          const configPath = pathMod.join(overstoryDir, 'config.json');
+          const configPath = pathMod.join(fleetcommandDir, 'config.json');
           const config = {
             version: 1,
             project: {
@@ -5453,7 +5419,7 @@ export function registerIpcHandlers(): void {
         '.venv',
         'venv',
         'coverage',
-        '.overstory',
+        '.fleetcommand',
         '.autoforge',
         '.claude',
         '.playwright',
@@ -5628,26 +5594,26 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // Project initialization - create .overstory/ directory structure
-  ipcMain.handle('project:init-overstory', async (_event, projectPath: string) => {
+  // Project initialization - create .fleetcommand/ directory structure
+  ipcMain.handle('project:init-fleetcommand', async (_event, projectPath: string) => {
     try {
       const fs = await import('node:fs/promises');
       const path = await import('node:path');
-      const overstoryDir = path.join(projectPath, '.overstory');
+      const fleetcommandDir = path.join(projectPath, '.fleetcommand');
 
       // Check if already initialized
       try {
-        await fs.access(overstoryDir);
+        await fs.access(fleetcommandDir);
         return { data: { initialized: true, alreadyExisted: true }, error: null };
       } catch {
         // Does not exist, proceed to create
       }
 
-      // Create .overstory/ directory structure
-      await fs.mkdir(overstoryDir, { recursive: true });
-      await fs.mkdir(path.join(overstoryDir, 'agents'), { recursive: true });
-      await fs.mkdir(path.join(overstoryDir, 'logs'), { recursive: true });
-      await fs.mkdir(path.join(overstoryDir, 'worktrees'), { recursive: true });
+      // Create .fleetcommand/ directory structure
+      await fs.mkdir(fleetcommandDir, { recursive: true });
+      await fs.mkdir(path.join(fleetcommandDir, 'agents'), { recursive: true });
+      await fs.mkdir(path.join(fleetcommandDir, 'logs'), { recursive: true });
+      await fs.mkdir(path.join(fleetcommandDir, 'worktrees'), { recursive: true });
 
       // Create default config file
       const config = {
@@ -5664,21 +5630,21 @@ export function registerIpcHandlers(): void {
         created_at: new Date().toISOString(),
       };
       await fs.writeFile(
-        path.join(overstoryDir, 'config.json'),
+        path.join(fleetcommandDir, 'config.json'),
         JSON.stringify(config, null, 2),
         'utf-8',
       );
 
       // Create agents registry file
       await fs.writeFile(
-        path.join(overstoryDir, 'agents', 'registry.json'),
+        path.join(fleetcommandDir, 'agents', 'registry.json'),
         JSON.stringify({ agents: [], updated_at: new Date().toISOString() }, null, 2),
         'utf-8',
       );
 
       // Create state file for tracking
       await fs.writeFile(
-        path.join(overstoryDir, 'state.json'),
+        path.join(fleetcommandDir, 'state.json'),
         JSON.stringify(
           {
             status: 'initialized',
@@ -5691,10 +5657,10 @@ export function registerIpcHandlers(): void {
         'utf-8',
       );
 
-      log.info(`[IPC] project:init-overstory - created .overstory/ directory in ${projectPath}`);
+      log.info(`[IPC] project:init-fleetcommand - created .fleetcommand/ directory in ${projectPath}`);
       return { data: { initialized: true, alreadyExisted: false }, error: null };
     } catch (error) {
-      log.error('project:init-overstory failed:', error);
+      log.error('project:init-fleetcommand failed:', error);
       return { data: null, error: String(error) };
     }
   });
@@ -5883,12 +5849,12 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // Project config read - read .overstory/config.json from project directory
+  // Project config read - read .fleetcommand/config.json from project directory
   ipcMain.handle('project:config-read', async (_event, projectPath: string) => {
     try {
       const fs = await import('node:fs/promises');
       const nodePath = await import('node:path');
-      const configPath = nodePath.join(projectPath, '.overstory', 'config.json');
+      const configPath = nodePath.join(projectPath, '.fleetcommand', 'config.json');
 
       try {
         const content = await fs.readFile(configPath, 'utf-8');
@@ -5899,7 +5865,7 @@ export function registerIpcHandlers(): void {
         if ((readErr as NodeJS.ErrnoException).code === 'ENOENT') {
           return {
             data: null,
-            error: 'Config file not found. Initialize .overstory directory first.',
+            error: 'Config file not found. Initialize .fleetcommand directory first.',
           };
         }
         throw readErr;
@@ -5910,21 +5876,21 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // Project config write - write .overstory/config.json to project directory
+  // Project config write - write .fleetcommand/config.json to project directory
   ipcMain.handle(
     'project:config-write',
     async (_event, projectPath: string, config: Record<string, unknown>) => {
       try {
         const fs = await import('node:fs/promises');
         const nodePath = await import('node:path');
-        const configPath = nodePath.join(projectPath, '.overstory', 'config.json');
+        const configPath = nodePath.join(projectPath, '.fleetcommand', 'config.json');
 
-        // Verify .overstory directory exists
-        const overstoryDir = nodePath.join(projectPath, '.overstory');
+        // Verify .fleetcommand directory exists
+        const fleetcommandDir = nodePath.join(projectPath, '.fleetcommand');
         try {
-          await fs.access(overstoryDir);
+          await fs.access(fleetcommandDir);
         } catch {
-          return { data: null, error: '.overstory directory does not exist. Initialize it first.' };
+          return { data: null, error: '.fleetcommand directory does not exist. Initialize it first.' };
         }
 
         // Write config with pretty-printing
@@ -6533,10 +6499,7 @@ export function registerIpcHandlers(): void {
 
       // Auto-set merge target branch to session branch
       if (sessionBranch) {
-        loggedPrepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(
-          'mergeTargetBranch',
-          JSON.stringify(sessionBranch),
-        );
+        persistentStore.set('mergeTargetBranch', sessionBranch);
         log.info(
           `[IPC] run:start - auto-set merge target branch to session branch: ${sessionBranch}`,
         );
@@ -6893,15 +6856,10 @@ export function registerIpcHandlers(): void {
 
   // Load notification preferences from settings on startup
   try {
-    const notifSetting = loggedPrepare('SELECT value FROM app_settings WHERE key = ?').get(
-      'app_settings',
-    ) as { value: string } | undefined;
-    if (notifSetting) {
-      const parsed = JSON.parse(notifSetting.value);
-      if (parsed?.notificationPreferences && typeof parsed.notificationPreferences === 'object') {
-        notificationService.setPreferences(parsed.notificationPreferences);
-        log.info('[IPC] Loaded notification preferences from settings');
-      }
+    const appSettings = persistentStore.get('app_settings') as Record<string, unknown> | undefined;
+    if (appSettings?.notificationPreferences && typeof appSettings.notificationPreferences === 'object') {
+      notificationService.setPreferences(appSettings.notificationPreferences as Record<string, unknown>);
+      log.info('[IPC] Loaded notification preferences from electron-store');
     }
   } catch (prefsErr) {
     log.warn('[IPC] Failed to load notification preferences from settings:', prefsErr);
@@ -8589,7 +8547,7 @@ export function registerIpcHandlers(): void {
       }
 
       const projectPath = activeProject.path;
-      const promptsDir = path.join(projectPath, '.overstory', 'prompts');
+      const promptsDir = path.join(projectPath, '.fleetcommand', 'prompts');
 
       // Ensure prompts directory exists
       if (!fs.existsSync(promptsDir)) {
@@ -8653,12 +8611,12 @@ export function registerIpcHandlers(): void {
       const git = simpleGitModule.default(projectPath);
 
       // Stage the prompts directory
-      await git.add(path.join('.overstory', 'prompts', '*'));
+      await git.add(path.join('.fleetcommand', 'prompts', '*'));
 
       // Check if there are staged changes
       const status = await git.status();
       const promptChanges = [...status.staged, ...status.created, ...status.deleted, ...status.modified]
-        .filter((f: string) => f.startsWith('.overstory/prompts/'));
+        .filter((f: string) => f.startsWith('.fleetcommand/prompts/'));
 
       if (promptChanges.length === 0) {
         return {
@@ -8674,7 +8632,7 @@ export function registerIpcHandlers(): void {
 
       // Commit
       const commitMsg = `chore: sync ${writtenFiles.length} prompt(s) to git`;
-      const commitResult = await git.commit(commitMsg, [path.join('.overstory', 'prompts')]);
+      const commitResult = await git.commit(commitMsg, [path.join('.fleetcommand', 'prompts')]);
 
       log.info(
         `[IPC] prompt:git-sync - Synced ${writtenFiles.length} prompts, commit ${commitResult.commit}`,
@@ -8714,7 +8672,7 @@ export function registerIpcHandlers(): void {
 
       // Get git log for prompts directory
       const logResult = await git.log({
-        file: path.join('.overstory', 'prompts'),
+        file: path.join('.fleetcommand', 'prompts'),
         maxCount: 20,
       });
 

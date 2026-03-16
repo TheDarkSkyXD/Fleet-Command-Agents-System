@@ -1204,7 +1204,7 @@ export interface ElectronAPI {
   ) => Promise<{ data: { opened: boolean } | null; error: string | null }>;
 
   // Project initialization
-  projectInitOverstory: (projectPath: string) => Promise<{
+  projectInitFleetcommand: (projectPath: string) => Promise<{
     data: { initialized: boolean; alreadyExisted: boolean } | null;
     error: string | null;
   }>;
@@ -1325,6 +1325,8 @@ export interface ElectronAPI {
 
   settingsGet: (key: string) => Promise<{ data: unknown; error: string | null }>;
   settingsSet: (key: string, value: unknown) => Promise<{ data: boolean; error: string | null }>;
+  storeGet: (key: string) => Promise<unknown>;
+  storeSet: (key: string, value: unknown) => Promise<void>;
   dialogSelectFolder: () => Promise<{ data: string | null; error: string | null }>;
   claudeStatus: () => Promise<{
     data: {

@@ -125,6 +125,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   settingsGet: (key: string) => ipcRenderer.invoke('settings:get', key),
   settingsSet: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
 
+  // Persistent store (survives DB resets)
+  storeGet: (key: string) => ipcRenderer.invoke('store:get', key),
+  storeSet: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value),
+
   // Claude CLI
   claudeStatus: () => ipcRenderer.invoke('claude:status'),
   claudeDetect: (options?: { forceRefresh?: boolean }) =>
@@ -239,8 +243,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('worktree:open-explorer', worktreePath),
 
   // Project initialization
-  projectInitOverstory: (projectPath: string) =>
-    ipcRenderer.invoke('project:init-overstory', projectPath),
+  projectInitFleetcommand: (projectPath: string) =>
+    ipcRenderer.invoke('project:init-fleetcommand', projectPath),
 
   // Project configuration
   projectConfigRead: (projectPath: string) =>

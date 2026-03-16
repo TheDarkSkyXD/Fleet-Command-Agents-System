@@ -8,8 +8,7 @@ let db: Database.Database | null = null;
 let dbInitialized = false;
 
 function getDbPath(): string {
-  const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'fleet-command.db');
+  return path.join(app.getAppPath(), 'database', 'fleet-command.db');
 }
 
 /** Returns whether the database has been successfully initialized */
@@ -116,6 +115,12 @@ export async function initDatabase(): Promise<void> {
   const dbPath = getDbPath();
   log.info(`Initializing database at: ${dbPath}`);
 
+  // Ensure the database directory exists
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+
   db = new Database(dbPath);
   dbInitialized = false;
 
@@ -146,7 +151,8 @@ export async function initDatabase(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       completed_at TEXT,
-      file_scope TEXT
+      file_scope TEXT,
+      project_id TEXT
     );
 
     CREATE TABLE IF NOT EXISTS runs (

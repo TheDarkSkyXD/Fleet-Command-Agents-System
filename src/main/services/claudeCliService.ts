@@ -151,9 +151,24 @@ function checkAuthentication(binaryPath: string): boolean {
         timeout: 10000,
         stdio: ['pipe', 'pipe', 'pipe'],
       }).trim();
+
+      // Try JSON parse on fallback result too (newer CLI versions return JSON by default)
+      try {
+        const parsed = JSON.parse(result);
+        const isAuth =
+          parsed.authenticated === true ||
+          parsed.status === 'authenticated' ||
+          parsed.loggedIn === true;
+        log.info(
+          `[ClaudeCLI] Auth status (JSON fallback): ${isAuth ? 'authenticated' : 'not authenticated'}`,
+        );
+        return isAuth;
+      } catch {
+        // Not JSON, continue to text parsing
+      }
     }
 
-    // Text-based parsing as fallback
+    // Text-based parsing as last resort
     const lower = result.toLowerCase();
     const isAuthenticated =
       lower.includes('authenticated') ||
