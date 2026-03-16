@@ -270,7 +270,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggleCollapse }
                             <span className="truncate">Projects</span>
                             <FiChevronDown
                               size={14}
-                              className={`shrink-0 text-current opacity-40 transition-transform duration-200 ${projectsOpen ? 'rotate-180' : ''}`}
+                              className={`shrink-0 text-slate-300 opacity-70 transition-transform duration-200 ${projectsOpen ? 'rotate-180' : ''}`}
                             />
                           </span>
                         )}
