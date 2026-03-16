@@ -1,0 +1,82 @@
+/* Activity pulse for running agents */
+@keyframes activity-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.animate-activity-pulse {
+  animation: activity-pulse 2s ease-in-out infinite;
+}
+
+/* Green activity pulse glow for agent cards */
+@keyframes card-activity-pulse {
+  0%,
+  100% {
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0), inset 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+  50% {
+    border-color: rgba(34, 197, 94, 0.5);
+    box-shadow: 0 0 8px 0 rgba(34, 197, 94, 0.15), inset 0 0 4px 0 rgba(34, 197, 94, 0.05);
+  }
+}
+
+.animate-card-activity-pulse {
+  animation: card-activity-pulse 2s ease-in-out infinite;
+}
+
+/* Subtle grid pattern for empty states / command center feel */
+@keyframes gridFade {
+  0%,
+  100% {
+    opacity: 0.03;
+  }
+  50% {
+    opacity: 0.07;
+  }
+}
+
+.agents-grid-bg {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  animation: gridFade 6s ease-in-out infinite;
+}
+
+@keyframes radarPulseRing {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-radar-pulse-ring {
+  animation: radarPulseRing 3s ease-out infinite;
+}
+
+/* Shimmer effect for skeleton loading */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
