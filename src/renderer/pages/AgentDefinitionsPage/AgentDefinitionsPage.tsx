@@ -214,7 +214,7 @@ function highlightMarkdown(text: string): React.ReactNode[] {
 
     return (
       <div key={`line-${i}-${line.slice(0, 20)}`} className="flex">
-        <span className="w-10 text-right pr-3 text-slate-500 select-none text-xs leading-6">
+        <span className="w-10 text-right pr-3 text-slate-400 select-none text-xs leading-6">
           {i + 1}
         </span>
         <span className={className}>{line || '\u00A0'}</span>
@@ -458,7 +458,7 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
             <div className="space-y-1">
               {capabilities.map((cap, i) => (
                 <div key={cap} className="flex items-center gap-2">
-                  <span className="text-slate-500 w-5 text-right">{i}:</span>
+                  <span className="text-slate-400 w-5 text-right">{i}:</span>
                   <span className={`${config.color} flex items-center gap-1.5`}>
                     <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                     {cap}
@@ -485,7 +485,7 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
                 ))}
               </div>
             ) : (
-              <span className="text-slate-500 italic">
+              <span className="text-slate-400 italic">
                 No tool restrictions (all tools allowed)
               </span>
             )}
@@ -512,7 +512,7 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
                   ))}
                 </div>
               ) : (
-                <span className="text-slate-500 italic ml-3">none</span>
+                <span className="text-slate-400 italic ml-3">none</span>
               )}
             </div>
 
@@ -520,10 +520,40 @@ function ManifestViewer({ def }: { def: AgentDefinition }) {
             <div>
               <div className="text-xs text-slate-400 mb-1">file_scope:</div>
               <span
-                className={`ml-3 ${def.file_scope ? 'text-amber-400/80' : 'text-slate-500 italic'}`}
+                className={`ml-3 ${def.file_scope ? 'text-amber-400/80' : 'text-slate-400 italic'}`}
               >
                 {def.file_scope || 'unrestricted'}
               </span>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-700/50" />
+
+          {/* Spawn Permissions Section */}
+          <div>
+            <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+              Spawn Permissions
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-y-1.5">
+              <span className="text-slate-400">can_spawn:</span>
+              <span className={def.can_spawn ? 'text-green-400' : 'text-red-400'}>
+                {def.can_spawn ? '✓ true' : '✗ false'}
+              </span>
+              <span className="text-slate-400">constraints:</span>
+              <div className="flex flex-wrap gap-1">
+                {parseJsonArray(def.constraints).length > 0 ? (
+                  parseJsonArray(def.constraints).map((c) => (
+                    <span
+                      key={c}
+                      className="px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                    >
+                      {c}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-slate-400 italic">none</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -591,7 +621,7 @@ function RoleDetail({
             variant="outline"
             size="sm"
             onClick={() => onPreviewOverlay(def.role)}
-            className="gap-1.5 h-auto px-3 py-1.5 bg-slate-800/90 border border-cyan-500/30 text-cyan-300 hover:bg-slate-700/90 hover:border-cyan-400/40 shadow-sm"
+            className="gap-1.5 h-auto px-3 py-1.5 bg-cyan-600/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-600/25 hover:text-cyan-300"
             data-testid="preview-overlay-btn"
           >
             <FiLayers size={14} />
@@ -612,7 +642,7 @@ function RoleDetail({
               variant="outline"
               size="sm"
               onClick={() => onDelete(def.role)}
-              className="gap-1.5 h-auto px-3 py-1.5 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+              className="gap-1.5 h-auto px-3 py-1.5 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
               data-testid="delete-role-btn"
             >
               <FiTrash2 size={14} />
@@ -735,8 +765,41 @@ function RoleDetail({
             </div>
           )}
 
+          {/* Spawn Permissions */}
+          <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+            <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+              <FiUsers size={14} />
+              Spawn Permissions
+            </h3>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className={def.can_spawn ? 'text-green-400' : 'text-red-400'}>
+                  {def.can_spawn ? '✓' : '✗'}
+                </span>
+                <span className="text-slate-300">
+                  {def.can_spawn ? 'Can spawn child agents' : 'Cannot spawn child agents'}
+                </span>
+              </div>
+              {parseJsonArray(def.constraints).length > 0 && (
+                <div>
+                  <span className="text-xs text-slate-400">Constraints:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {parseJsonArray(def.constraints).map((c) => (
+                      <span
+                        key={c}
+                        className="px-2 py-0.5 rounded text-xs bg-amber-500/15 text-amber-400 border border-amber-500/25"
+                      >
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Timestamps */}
-          <div className="text-xs text-slate-500 flex gap-4">
+          <div className="text-xs text-slate-400 flex gap-4">
             <span>Created: {formatDateTime(def.created_at)}</span>
             <span>Updated: {formatDateTime(def.updated_at)}</span>
           </div>
@@ -1019,7 +1082,7 @@ function CreateRoleModal({
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="gap-2 h-auto px-4 py-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="gap-2 h-auto px-4 py-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             data-testid="create-role-submit"
           >
             {saving ? <FiLoader size={14} className="animate-spin" /> : <FiPlus size={14} />}
@@ -1454,7 +1517,7 @@ export function AgentDefinitionsPage() {
         <p className="text-red-400">Failed to load agent definitions: {error}</p>
         <Button
           onClick={loadDefinitions}
-          className="mt-3 bg-slate-800/90 border border-amber-500/30 text-amber-300 hover:bg-slate-700/90 hover:border-amber-400/40 shadow-sm"
+          className="mt-3 bg-amber-600/15 text-amber-400 border border-amber-500/25 hover:bg-amber-600/25 hover:text-amber-300"
         >
           Retry
         </Button>
@@ -1483,7 +1546,7 @@ export function AgentDefinitionsPage() {
             variant="outline"
             size="sm"
             onClick={() => setShowResetConfirm(true)}
-            className="gap-2 h-auto px-3 py-2 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+            className="gap-2 h-auto px-3 py-2 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
             data-testid="reset-defaults-btn"
           >
             <FiRefreshCw size={14} />
@@ -1493,7 +1556,7 @@ export function AgentDefinitionsPage() {
           <Button
             size="sm"
             onClick={() => setShowCreateModal(true)}
-            className="gap-2 h-auto px-3 py-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="gap-2 h-auto px-3 py-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             data-testid="create-role-btn"
           >
             <FiPlus size={14} />
@@ -1634,7 +1697,7 @@ export function AgentDefinitionsPage() {
           <Button
             size="sm"
             onClick={() => handleDelete(confirmDelete)}
-            className="h-auto px-3 py-1.5 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+            className="h-auto px-3 py-1.5 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
             data-testid="confirm-delete-btn"
           >
             Confirm Delete
@@ -1702,7 +1765,7 @@ export function AgentDefinitionsPage() {
               <Button
                 onClick={handleResetToDefaults}
                 disabled={resetting}
-                className="gap-2 h-auto px-4 py-2 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                className="gap-2 h-auto px-4 py-2 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
                 data-testid="confirm-reset-btn"
               >
                 <FiRefreshCw size={14} className={resetting ? 'animate-spin' : ''} />

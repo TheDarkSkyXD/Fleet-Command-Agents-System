@@ -28,6 +28,7 @@ import {
   FiPlay,
   FiSearch,
   FiSquare,
+  FiTrash2,
   FiX,
   FiXCircle,
   FiZap,
@@ -86,6 +87,31 @@ import {
 import { Table, TableHeader, TableHead, TableRow } from '../../components/ui/table';
 import './CommandCenterPage.css';
 
+/** Normalize SQLite UTC timestamps for correct local time display */
+function normalizeTimestamp(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dateStr) && !dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('T')) {
+    return new Date(`${dateStr.replace(' ', 'T')}Z`);
+  }
+  return new Date(dateStr);
+}
+
+/** Live-updating uptime display that ticks every second */
+function LiveUptime({ createdAt }: { createdAt: string }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span
+      className="text-xs text-slate-400 tabular-nums"
+      data-testid="agent-uptime-cell"
+      data-created-at={createdAt}
+    >
+      {formatUptime(createdAt)}
+    </span>
+  );
+}
 
 interface CommandCenterPageProps {
   onSelectAgent?: (agentId: string) => void;
@@ -327,9 +353,9 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
       toast.success(`Agent "${agentName}" spawned successfully`);
       await loadSessions();
       await loadRunningProcesses();
-      // Navigate to the newly spawned agent's detail view
-      if (onSelectAgent) {
-        onSelectAgent(agentName);
+      // Navigate to the newly spawned agent's detail view using session ID
+      if (onSelectAgent && result.data?.id) {
+        onSelectAgent(result.data.id as string);
       }
     } catch (err) {
       const msg = handleIpcError(err, { context: 'spawning agent' });
@@ -521,41 +547,15 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
         ),
         size: 36,
         enableSorting: false,
-        cell: ({ row }) => {
-          if (row.original.state === 'completed') return null;
-          return (
-            <Checkbox
-              checked={selectedAgents.has(row.original.id)}
-              onCheckedChange={() => { toggleAgentSelection(row.original.id); }}
-              onClick={(e) => e.stopPropagation()}
-              className="border-slate-500 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 cursor-pointer"
-              data-testid={`select-agent-${row.original.id}`}
-            />
-          );
-        },
-      },
-      {
-        id: 'state_indicator',
-        header: '',
-        size: 36,
-        enableSorting: false,
-        cell: ({ row }) => {
-          const stateInfo = STATE_ICONS[row.original.state];
-          return (
-            <div
-              className={`flex items-center justify-center ${stateInfo?.className || 'text-slate-400'}`}
-              data-testid={`agent-state-icon-${row.original.state}`}
-              title={STATE_TOOLTIPS[row.original.state] || row.original.state}
-            >
-              {stateInfo?.icon || (
-                <div
-                  className={`h-2.5 w-2.5 rounded-full ${STATE_DOT_COLORS[row.original.state] || 'bg-slate-400'}`}
-                  title={STATE_TOOLTIPS[row.original.state] || row.original.state}
-                />
-              )}
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <Checkbox
+            checked={selectedAgents.has(row.original.id)}
+            onCheckedChange={() => { toggleAgentSelection(row.original.id); }}
+            onClick={(e) => e.stopPropagation()}
+            className="border-slate-500 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 cursor-pointer"
+            data-testid={`select-agent-${row.original.id}`}
+          />
+        ),
       },
       {
         accessorKey: 'id',
@@ -626,7 +626,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
           const escalation = row.original.escalation_level || 0;
           const stalledAt = row.original.stalled_at;
           const stalledDuration = stalledAt
-            ? Math.floor((Date.now() - new Date(stalledAt).getTime()) / 1000)
+            ? Math.floor((Date.now() - normalizeTimestamp(stalledAt).getTime()) / 1000)
             : 0;
           const stalledMin = Math.floor(stalledDuration / 60);
           const stalledSec = stalledDuration % 60;
@@ -665,6 +665,29 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
         },
       },
       {
+        id: 'active',
+        header: 'Active',
+        size: 110,
+        enableSorting: true,
+        accessorFn: (row) => row.state !== 'completed',
+        cell: ({ row }) => {
+          const active = row.original.state !== 'completed';
+          return (
+            <Badge
+              variant="outline"
+              className={`gap-1.5 whitespace-nowrap px-2.5 py-0.5 text-xs font-semibold ${
+                active
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
+                  : 'bg-red-500/15 text-red-400 border-red-500/25'
+              }`}
+            >
+              <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${active ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+              {active ? 'Active' : 'Stopped'}
+            </Badge>
+          );
+        },
+      },
+      {
         id: 'pid',
         header: 'PID',
         enableSorting: true,
@@ -677,7 +700,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
           return pid ? (
             <span className="text-xs text-slate-400 font-mono">{pid}</span>
           ) : (
-            <span className="text-xs text-slate-500">-</span>
+            <span className="text-xs text-slate-400">-</span>
           );
         },
       },
@@ -686,18 +709,10 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
         header: 'Uptime',
         enableSorting: true,
         // Uses numeric milliseconds for correct sorting across midnight/day boundaries
-        accessorFn: (row) => new Date(row.created_at).getTime(),
+        accessorFn: (row) => normalizeTimestamp(row.created_at).getTime(),
         sortingFn: 'basic',
         sortDescFirst: true,
-        cell: ({ row }) => (
-          <span
-            className="text-xs text-slate-400"
-            data-testid="agent-uptime-cell"
-            data-created-at={row.original.created_at}
-          >
-            {formatUptime(row.original.created_at)}
-          </span>
-        ),
+        cell: ({ row }) => <LiveUptime createdAt={row.original.created_at} />,
       },
       {
         id: 'task',
@@ -711,7 +726,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
               {taskId}
             </span>
           ) : (
-            <span className="text-xs text-slate-500">-</span>
+            <span className="text-xs text-slate-400">-</span>
           );
         },
       },
@@ -844,7 +859,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
                 </Badge>
               )}
               {activeSessions.length === 0 && completedSessions.length === 0 && (
-                <span className="text-sm text-slate-500">No agents deployed</span>
+                <span className="text-sm text-slate-400">No agents deployed</span>
               )}
             </div>
           </div>
@@ -855,15 +870,79 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.15 }}
+              className="flex items-center gap-2"
             >
+              <span className="text-xs text-slate-400 mr-1">
+                {selectedAgents.size} selected
+              </span>
               <Button
                 variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const promises = Array.from(selectedAgents).map((id) => {
+                    const s = sessions.find((sess) => sess.id === id);
+                    if (s && (s.state === 'stalled' || s.state === 'working')) {
+                      return window.electronAPI.agentNudge(id).catch(() => {});
+                    }
+                    return Promise.resolve();
+                  });
+                  await Promise.allSettled(promises);
+                  toast.success(`Nudged ${selectedAgents.size} agent(s)`);
+                }}
+                className="bg-amber-600/15 text-amber-400 border border-amber-500/25 hover:bg-amber-600/25 hover:text-amber-300"
+                data-testid="bulk-nudge-button"
+              >
+                <FiZap className="size-3.5" />
+                Nudge
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={requestBulkStop}
-                className="bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
-                    data-testid="bulk-stop-button"
+                className="bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
+                data-testid="bulk-stop-button"
               >
                 <FiSquare className="size-3.5" />
-                Stop Selected ({selectedAgents.size})
+                Stop
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const ids = Array.from(selectedAgents);
+                  const count = ids.length;
+                  let deleted = 0;
+                  for (const id of ids) {
+                    try {
+                      const result = await window.electronAPI.agentDelete(id);
+                      if (result.data) deleted++;
+                      else if (result.error) toast.error(`Failed to delete agent: ${result.error}`);
+                    } catch (err) {
+                      toast.error(`Delete failed: ${err}`);
+                    }
+                  }
+                  // Remove from local state immediately
+                  const deletedSet = new Set(ids);
+                  setSessions((prev) => prev.filter((s) => !deletedSet.has(s.id)));
+                  setSelectedAgents(new Set());
+                  loadRunningProcesses();
+                  if (deleted > 0) toast.success(`Deleted ${deleted} agent(s)`);
+                }}
+                className="bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
+                data-testid="bulk-delete-button"
+              >
+                <FiTrash2 className="size-3.5" />
+                Delete
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedAgents(new Set())}
+                className="text-slate-400 hover:text-white"
+                data-testid="bulk-deselect-button"
+              >
+                <FiX className="size-3.5" />
+                Clear
               </Button>
             </motion.div>
           )}
@@ -871,7 +950,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
             <Button
               variant="outline"
               onClick={requestStopAll}
-              className="bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+              className="bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
               >
               <FiSquare className="size-3.5" />
               Stop All
@@ -881,7 +960,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
             onClick={openSpawnDialog}
             disabled={isOpeningSpawnDialog}
             data-testid="spawn-agent-button"
-            className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             {isOpeningSpawnDialog ? (
               <>
@@ -939,7 +1018,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
       >
         {/* Global search */}
         <div className="relative flex-1 max-w-sm">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             type="text"
             value={globalFilter}
@@ -981,7 +1060,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
             }`}
           >
             <div className="flex items-center gap-2">
-              <FiFilter className="h-4 w-4 text-slate-500" />
+              <FiFilter className="h-4 w-4 text-slate-400" />
               <SelectValue placeholder="All Capabilities" />
             </div>
           </SelectTrigger>
@@ -1112,7 +1191,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
               <Button
                 data-testid="agents-empty-cta"
                 onClick={openSpawnDialog}
-                className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                   >
                 <FiPlay className="size-3.5" />
                 Spawn Agent
@@ -1136,7 +1215,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
                   {cap}
                 </Badge>
               ))}
-              <span className="text-xs text-slate-500">+3 more</span>
+              <span className="text-xs text-slate-400">+3 more</span>
             </motion.div>
           </div>
         </motion.div>
@@ -1155,42 +1234,46 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
         >
-          <Table className="table-fixed">
+          <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-b border-slate-700/60 bg-slate-800/80 hover:bg-slate-800/80">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead
-                      key={header.id}
-                      data-testid={`agent-sort-${header.id}`}
-                      className={`h-auto px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider ${
-                        header.column.getCanSort()
-                          ? 'cursor-pointer select-none hover:text-slate-200 transition-colors'
-                          : ''
-                      }`}
-                      style={header.getSize() !== 150 ? { width: header.getSize() } : undefined}
-                      onClick={header.column.getToggleSortingHandler()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          header.column.getToggleSortingHandler()?.(e);
-                        }
-                      }}
-                      tabIndex={header.column.getCanSort() ? 0 : undefined}
-                    >
-                      <div className="flex items-center gap-1">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getIsSorted() === 'asc' && (
-                          <FiChevronUp className="h-3 w-3 text-blue-400" />
-                        )}
-                        {header.column.getIsSorted() === 'desc' && (
-                          <FiChevronDown className="h-3 w-3 text-blue-400" />
-                        )}
-                      </div>
-                    </TableHead>
-                  ))}
+                <TableRow key={headerGroup.id} className="border-b border-slate-700/60 bg-slate-800/80 hover:bg-slate-800/80 flex">
+                  {headerGroup.headers.map((header) => {
+                    const size = header.getSize();
+                    const hasExplicitSize = size !== 150;
+                    return (
+                      <TableHead
+                        key={header.id}
+                        data-testid={`agent-sort-${header.id}`}
+                        className={`h-auto px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider ${
+                          header.column.getCanSort()
+                            ? 'cursor-pointer select-none hover:text-slate-200 transition-colors'
+                            : ''
+                        }`}
+                        style={hasExplicitSize ? { width: size, flexShrink: 0 } : { flex: 1, minWidth: 0 }}
+                        onClick={header.column.getToggleSortingHandler()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            header.column.getToggleSortingHandler()?.(e);
+                          }
+                        }}
+                        tabIndex={header.column.getCanSort() ? 0 : undefined}
+                      >
+                        <div className="flex items-center gap-1">
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(header.column.columnDef.header, header.getContext())}
+                          {header.column.getIsSorted() === 'asc' && (
+                            <FiChevronUp className="h-3 w-3 text-blue-400" />
+                          )}
+                          {header.column.getIsSorted() === 'desc' && (
+                            <FiChevronDown className="h-3 w-3 text-blue-400" />
+                          )}
+                        </div>
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableHeader>
@@ -1203,7 +1286,7 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
           </Table>
           {/* Table footer with count */}
           <div
-            className="border-t border-slate-700/40 bg-slate-800/30 px-4 py-2 text-xs text-slate-500"
+            className="border-t border-slate-700/40 bg-slate-800/30 px-4 py-2 text-xs text-slate-400"
             data-testid="agent-filter-count"
             data-filtered-count={filteredRows.length}
             data-total-count={sessions.length}
@@ -1293,9 +1376,9 @@ export function CommandCenterPage({ onSelectAgent }: CommandCenterPageProps) {
 
           {filteredRows.length === 0 && (
             <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-10 text-center">
-              <FiSearch className="h-8 w-8 text-slate-600 mx-auto mb-3" />
+              <FiSearch className="h-8 w-8 text-slate-400 mx-auto mb-3" />
               <p className="text-sm font-medium text-slate-300 mb-1">No agents match your filters</p>
-              <p className="text-xs text-slate-500">Try adjusting your search or capability filter</p>
+              <p className="text-xs text-slate-400">Try adjusting your search or capability filter</p>
             </div>
           )}
         </motion.div>

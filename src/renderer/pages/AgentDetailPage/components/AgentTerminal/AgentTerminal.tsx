@@ -147,6 +147,15 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
     const term = xtermRef.current;
     if (!term) return;
 
+    // Safe scrollToBottom that won't throw if terminal isn't fully rendered yet
+    const safeScrollToBottom = (t: typeof term) => {
+      try {
+        t.scrollToBottom();
+      } catch {
+        // Terminal renderer not ready yet — ignore
+      }
+    };
+
     // Load existing buffered output
     const loadExistingOutput = async () => {
       try {
@@ -155,9 +164,9 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
           for (const line of result.data) {
             term.write(line);
           }
-          // Scroll to bottom after loading history
+          // Delay scroll to let xterm renderer initialize dimensions
           if (autoScroll) {
-            term.scrollToBottom();
+            requestAnimationFrame(() => safeScrollToBottom(term));
           }
         }
       } catch (err) {
@@ -172,7 +181,7 @@ export function AgentTerminal({ agentId, isRunning }: AgentTerminalProps) {
       if (data.agentId === agentId && xtermRef.current) {
         xtermRef.current.write(data.data);
         if (autoScroll) {
-          xtermRef.current.scrollToBottom();
+          safeScrollToBottom(xtermRef.current);
         }
       }
     };

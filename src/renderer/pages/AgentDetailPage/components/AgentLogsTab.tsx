@@ -99,7 +99,7 @@ export function AgentLogsTab({ agentName }: { agentName: string }) {
                     <p className="text-xs text-slate-400 mt-0.5 truncate max-w-lg">{event.data}</p>
                   )}
                 </div>
-                <span className="text-xs text-slate-500 whitespace-nowrap flex-shrink-0">
+                <span className="text-xs text-slate-400 whitespace-nowrap flex-shrink-0">
                   {formatTimeOnly(event.created_at)}
                 </span>
               </div>

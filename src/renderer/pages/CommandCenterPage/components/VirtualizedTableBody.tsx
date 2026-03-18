@@ -74,11 +74,19 @@ export function VirtualizedTableBody({
                 onContextMenu={(e) => handleAgentContextMenu(e, row.original)}
                 tabIndex={0}
               >
-                {row.getVisibleCells().map((cell) => (
-                  <div key={cell.id} className="px-4 py-3 flex-1 min-w-0 overflow-hidden">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </div>
-                ))}
+                {row.getVisibleCells().map((cell) => {
+                  const size = cell.column.getSize();
+                  const hasExplicitSize = size !== 150; // 150 is tanstack default
+                  return (
+                    <div
+                      key={cell.id}
+                      className="px-4 py-3 min-w-0 overflow-hidden"
+                      style={hasExplicitSize ? { width: size, flexShrink: 0 } : { flex: 1, minWidth: 0 }}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </div>
+                  );
+                })}
               </div>
             );
           })}

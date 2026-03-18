@@ -13,6 +13,7 @@ import {
   FiShield,
   FiSquare,
   FiTerminal,
+  FiTrash2,
   FiUser,
   FiZap,
 } from 'react-icons/fi';
@@ -45,6 +46,14 @@ import {
 import { formatUptime as formatUptimeFn } from '../../lib/dateFormatting';
 import { handleIpcError } from '../../lib/ipcErrorHandler';
 import './AgentDetailPage.css';
+
+/** Normalize SQLite UTC timestamps for correct local time display */
+function normalizeTimestamp(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dateStr) && !dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('T')) {
+    return new Date(`${dateStr.replace(' ', 'T')}Z`);
+  }
+  return new Date(dateStr);
+}
 
 type DetailTab = 'terminal' | 'logs' | 'identity' | 'files' | 'mail' | 'performance' | 'gates';
 
@@ -179,27 +188,24 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     }
   };
 
-  const [mailCheckResult, setMailCheckResult] = useState<string | null>(null);
-
   const handleCheckMail = async () => {
     if (!session) return;
     try {
       const result = await window.electronAPI.mailCheck(agentId, session.agent_name);
       if (result.error) {
-        setMailCheckResult(`Error: ${result.error}`);
+        toast.error(`Mail check failed: ${result.error}`, { duration: 5000 });
       } else if (result.data) {
         if (result.data.injected === 0) {
-          setMailCheckResult('No unread messages');
+          toast('No unread messages', { description: `${session.agent_name} has no pending mail`, duration: 5000 });
         } else {
-          setMailCheckResult(`${result.data.injected} message(s) injected into context`);
+          toast.success(`${result.data.injected} message(s) injected`, {
+            description: `Mail delivered to ${session.agent_name}'s context`,
+            duration: 5000,
+          });
         }
       }
-      // Clear the status after 3 seconds
-      setTimeout(() => setMailCheckResult(null), 3000);
     } catch (err) {
-      const msg = handleIpcError(err, { context: 'checking mail', showToast: false });
-      setMailCheckResult(`Error: ${msg}`);
-      setTimeout(() => setMailCheckResult(null), 3000);
+      handleIpcError(err, { context: 'checking mail' });
     }
   };
 
@@ -273,7 +279,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
           </p>
           <Button
             onClick={onBack}
-            className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             data-testid="agent-not-found-back-button"
           >
             Go to Agents
@@ -306,7 +312,8 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
     );
   }
 
-  const isRunning = session.state !== 'completed' && (processInfo?.isRunning ?? false);
+  const isRunning = session.state !== 'completed';
+  const hasProcess = processInfo?.isRunning ?? false;
 
   return (
     <div
@@ -334,11 +341,11 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
           Back to Agents
         </Button>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             {/* State indicator with icon */}
             <div
-              className={`flex items-center ${STATE_ICONS[session.state]?.className || 'text-slate-400'}`}
+              className={`flex items-center shrink-0 ${STATE_ICONS[session.state]?.className || 'text-slate-400'}`}
               title={STATE_TOOLTIPS[session.state] || session.state}
             >
               {STATE_ICONS[session.state]?.icon || (
@@ -350,7 +357,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
 
             {/* Agent name */}
             <h1
-              className="text-xl font-bold text-slate-50 truncate max-w-[400px]"
+              className="text-xl font-bold text-slate-50 truncate max-w-[300px]"
               title={session.agent_name}
             >
               {session.agent_name}
@@ -359,7 +366,7 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             {/* Capability badge */}
             <Badge
               variant="outline"
-              className={CAPABILITY_COLORS[session.capability] || 'bg-slate-500/20 text-slate-400'}
+              className={`shrink-0 ${CAPABILITY_COLORS[session.capability] || 'bg-slate-500/20 text-slate-400'}`}
               title={CAPABILITY_TOOLTIPS[session.capability] || session.capability}
             >
               {session.capability}
@@ -368,18 +375,31 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
             {/* State badge with icon */}
             <Badge
               variant="outline"
-              className={`gap-1 ${STATE_COLORS[session.state] || ''}`}
+              className={`shrink-0 gap-1 ${STATE_COLORS[session.state] || ''}`}
               title={STATE_TOOLTIPS[session.state] || session.state}
             >
               {STATE_ICONS[session.state]?.icon}
               {session.state}
             </Badge>
 
+            {/* Active / Stopped indicator */}
+            <Badge
+              variant="outline"
+              className={`shrink-0 gap-1.5 px-2.5 py-0.5 font-semibold ${
+                isRunning
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
+                  : 'bg-red-500/15 text-red-400 border-red-500/25'
+              }`}
+            >
+              <span className={`h-2.5 w-2.5 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+              {isRunning ? 'Active' : 'Stopped'}
+            </Badge>
+
             {/* Stalled warning indicator */}
             {session.state === 'stalled' && (
               <Badge
                 variant="outline"
-                className="gap-1.5 bg-amber-500/15 text-amber-400 border-amber-500/30 font-semibold"
+                className="shrink-0 gap-1.5 bg-amber-500/15 text-amber-400 border-amber-500/30 font-semibold"
                 title={`Agent is stalled and unresponsive. Escalation level: ${session.escalation_level || 0}. Try nudging or stopping the agent.`}
                 data-testid="agent-stalled-warning"
               >
@@ -387,55 +407,71 @@ export function AgentDetailPage({ agentId, onBack }: AgentDetailPageProps) {
                 Stalled
                 {session.stalled_at && (
                   <span className="text-amber-500/70">
-                    {`${Math.floor((Date.now() - new Date(session.stalled_at).getTime()) / 60000)}m`}
+                    {`${Math.floor((Date.now() - normalizeTimestamp(session.stalled_at).getTime()) / 60000)}m`}
                   </span>
                 )}
               </Badge>
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
+          {/* Actions — always visible */}
+          <div className="flex items-center gap-2 shrink-0">
             {session.state === 'stalled' && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleNudge}
-                className="bg-slate-800/90 border border-amber-500/30 text-amber-300 hover:bg-slate-700/90 hover:border-amber-400/40 shadow-sm"
+                className="bg-amber-600/15 text-amber-400 border border-amber-500/25 hover:bg-amber-600/25 hover:text-amber-300"
               >
                 <FiZap className="h-3.5 w-3.5" />
                 Nudge
               </Button>
             )}
-            {isRunning && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCheckMail}
-                  className="bg-slate-800/90 border border-cyan-500/30 text-cyan-300 hover:bg-slate-700/90 hover:border-cyan-400/40 shadow-sm"
-                >
-                  <FiMail className="h-3.5 w-3.5" />
-                  Check Mail
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleStop}
-                  className="bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
-                >
-                  <FiSquare className="h-3.5 w-3.5" />
-                  Stop
-                </Button>
-              </>
-            )}
-            {mailCheckResult && (
-              <span
-                className={`text-xs ${mailCheckResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}
+            {hasProcess && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckMail}
+                className="bg-cyan-600/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-600/25 hover:text-cyan-300"
               >
-                {mailCheckResult}
-              </span>
+                <FiMail className="h-3.5 w-3.5" />
+                Check Mail
+              </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleStop}
+              disabled={!isRunning}
+              className={isRunning
+                ? 'bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300'
+                : 'bg-[#1e1e1e] text-slate-500 border border-white/5 cursor-not-allowed'
+              }
+            >
+              <FiSquare className="h-3.5 w-3.5" />
+              Stop Agent
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const result = await window.electronAPI.agentDelete(agentId);
+                  if (result.error) {
+                    toast.error(`Failed to delete: ${result.error}`);
+                    return;
+                  }
+                  toast.success('Agent deleted');
+                  onBack();
+                } catch (err) {
+                  handleIpcError(err, { context: 'deleting agent' });
+                }
+              }}
+              className="bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
+            >
+              <FiTrash2 className="h-3.5 w-3.5" />
+              Delete
+            </Button>
           </div>
         </div>
 

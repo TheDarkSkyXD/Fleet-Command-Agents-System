@@ -120,6 +120,20 @@ export function CoordinatorPanel() {
     }>
   >([]);
 
+  // Exit triggers state
+  const [exitTriggers, setExitTriggers] = useState<{
+    complete: boolean;
+    triggers: { all_agents_done: boolean; task_tracker_empty: boolean; shutdown_signal: boolean };
+    summary: { active_agents: number; pending_issues: number; pending_merges: number };
+  } | null>(null);
+  const [isCheckingComplete, setIsCheckingComplete] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [completionResult, setCompletionResult] = useState<{
+    agents_stopped: number;
+    worktrees_cleaned: number;
+    run_completed: string | null;
+  } | null>(null);
+
   // Activity log state
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [activityLog, setActivityLog] = useState<
@@ -336,6 +350,39 @@ export function CoordinatorPanel() {
       setError(msg);
     } finally {
       setIsAsking(false);
+    }
+  };
+
+  const handleCheckComplete = async () => {
+    setIsCheckingComplete(true);
+    try {
+      const result = await window.electronAPI.coordinatorCheckComplete();
+      if (result.data) {
+        setExitTriggers(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to check completion:', err);
+    } finally {
+      setIsCheckingComplete(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setIsCompleting(true);
+    setError(null);
+    try {
+      const result = await window.electronAPI.coordinatorComplete();
+      if (result.error) {
+        setError(result.error);
+      } else if (result.data) {
+        setCompletionResult(result.data);
+        await loadStatus();
+      }
+    } catch (err) {
+      const msg = handleIpcError(err, { context: 'completing coordinator', showToast: false });
+      setError(msg);
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -745,7 +792,7 @@ export function CoordinatorPanel() {
                   setAskResult(null);
                 }}
                 data-testid="operator-ask-btn"
-                className="flex-1 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                className="flex-1 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
               >
                 <FiMail className="size-4" />
                 Ask
@@ -755,7 +802,7 @@ export function CoordinatorPanel() {
                 size="sm"
                 onClick={() => setShowOperatorMessage(!showOperatorMessage)}
                 data-testid="operator-message-btn"
-                className="flex-1 bg-slate-800/90 border border-cyan-500/30 text-cyan-300 hover:bg-slate-700/90 hover:border-cyan-400/40 shadow-sm"
+                className="flex-1 bg-cyan-600/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-600/25 hover:text-cyan-300"
               >
                 <FiMail className="size-4" />
                 Message
@@ -765,7 +812,7 @@ export function CoordinatorPanel() {
                 size="sm"
                 onClick={() => setShowStopConfirm(true)}
                 disabled={isStopping}
-                className="flex-1 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                className="flex-1 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
               >
                 {isStopping ? (
                   <>
@@ -780,6 +827,85 @@ export function CoordinatorPanel() {
                 )}
               </Button>
             </div>
+
+            {/* Exit Triggers Panel */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckComplete}
+                disabled={isCheckingComplete}
+                className="bg-slate-800/90 border border-amber-500/30 text-amber-300 hover:bg-slate-700/90 hover:border-amber-400/40 shadow-sm"
+              >
+                {isCheckingComplete ? (
+                  <FiActivity className="size-4 animate-spin" />
+                ) : (
+                  <FiCheckCircle className="size-4" />
+                )}
+                Check Complete
+              </Button>
+            </div>
+
+            {exitTriggers && (
+              <div className={`rounded-lg border p-3 space-y-2 ${exitTriggers.complete ? 'border-green-500/30 bg-green-900/10' : 'border-amber-500/30 bg-amber-900/10'}`}>
+                <div className="flex items-center gap-2">
+                  {exitTriggers.complete ? (
+                    <FiCheckCircle className="size-4 text-green-400" />
+                  ) : (
+                    <FiClock className="size-4 text-amber-400" />
+                  )}
+                  <span className={`text-xs font-semibold ${exitTriggers.complete ? 'text-green-300' : 'text-amber-300'}`}>
+                    {exitTriggers.complete ? 'All Exit Triggers Met — Ready to Complete' : 'Exit Triggers Not Yet Met'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className={`rounded px-2 py-1 ${exitTriggers.triggers.all_agents_done ? 'bg-green-500/10 text-green-300' : 'bg-slate-700/50 text-slate-400'}`}>
+                    {exitTriggers.triggers.all_agents_done ? <FiCheckCircle className="inline size-3 mr-1" /> : <FiClock className="inline size-3 mr-1" />}
+                    Agents Done ({exitTriggers.summary.active_agents} active)
+                  </div>
+                  <div className={`rounded px-2 py-1 ${exitTriggers.triggers.task_tracker_empty ? 'bg-green-500/10 text-green-300' : 'bg-slate-700/50 text-slate-400'}`}>
+                    {exitTriggers.triggers.task_tracker_empty ? <FiCheckCircle className="inline size-3 mr-1" /> : <FiClock className="inline size-3 mr-1" />}
+                    Tasks Empty ({exitTriggers.summary.pending_issues} pending)
+                  </div>
+                  <div className={`rounded px-2 py-1 ${exitTriggers.triggers.shutdown_signal ? 'bg-green-500/10 text-green-300' : 'bg-slate-700/50 text-slate-400'}`}>
+                    {exitTriggers.triggers.shutdown_signal ? <FiCheckCircle className="inline size-3 mr-1" /> : <FiClock className="inline size-3 mr-1" />}
+                    Shutdown Signal
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-slate-500">
+                    Pending merges: {exitTriggers.summary.pending_merges}
+                  </span>
+                  {exitTriggers.complete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleComplete}
+                      disabled={isCompleting}
+                      className="bg-green-600/15 text-green-300 border border-green-500/25 hover:bg-green-600/25"
+                    >
+                      {isCompleting ? (
+                        <><FiActivity className="size-3 animate-spin mr-1" />Completing...</>
+                      ) : (
+                        <><FiCheckCircle className="size-3 mr-1" />Complete &amp; Cleanup</>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {completionResult && (
+              <div className="rounded-lg border border-green-500/30 bg-green-900/10 p-3 text-xs text-green-300 space-y-1">
+                <div className="flex items-center gap-1 font-semibold">
+                  <FiCheckCircle className="size-3" /> Coordinator completed
+                </div>
+                <div className="text-slate-400">
+                  Agents stopped: {completionResult.agents_stopped} | Worktrees cleaned: {completionResult.worktrees_cleaned}
+                  {completionResult.run_completed && <> | Run: {completionResult.run_completed}</>}
+                </div>
+              </div>
+            )}
 
             {/* Dispatch form */}
             {showDispatch && (
@@ -875,7 +1001,7 @@ export function CoordinatorPanel() {
                     onClick={handleAsk}
                     disabled={isAsking || !askSubject.trim() || !askBody.trim()}
                     data-testid="ask-send-btn"
-                    className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm text-xs"
+                    className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 text-xs"
                   >
                     {isAsking ? (
                       <>
@@ -974,7 +1100,7 @@ export function CoordinatorPanel() {
                     onClick={handleOperatorDispatch}
                     disabled={isSendingOperator || !operatorMessage.trim()}
                     data-testid="operator-message-send"
-                    className="bg-slate-800/90 border border-cyan-500/30 text-cyan-300 hover:bg-slate-700/90 hover:border-cyan-400/40 shadow-sm text-xs"
+                    className="bg-cyan-600/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-600/25 hover:text-cyan-300 text-xs"
                   >
                     {isSendingOperator ? (
                       <>
@@ -1036,7 +1162,7 @@ export function CoordinatorPanel() {
             <Button
               onClick={handleStart}
               disabled={isStarting}
-              className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+              className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
             >
               {isStarting ? (
                 <>

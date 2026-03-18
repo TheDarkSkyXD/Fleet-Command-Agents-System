@@ -11,12 +11,18 @@ export function generateName(capability: AgentCapability): string {
 }
 
 export function formatUptime(createdAt: string): string {
-  const uptime = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
+  // Normalize SQLite UTC timestamps (no TZ suffix) so Date() treats them as UTC
+  let normalized = createdAt;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(normalized) && !normalized.includes('Z') && !normalized.includes('+') && !normalized.includes('T')) {
+    normalized = `${normalized.replace(' ', 'T')}Z`;
+  }
+  const uptime = Math.max(0, Math.floor((Date.now() - new Date(normalized).getTime()) / 1000));
   const hours = Math.floor(uptime / 3600);
   const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = uptime % 60;
   if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
 /**

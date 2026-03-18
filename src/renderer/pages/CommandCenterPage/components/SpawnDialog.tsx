@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiAlertTriangle,
   FiLoader,
@@ -83,6 +83,8 @@ export function SpawnDialog({
   onTreePathsChange,
   onSpawn,
   onClose,
+  onForceOverlapChange,
+  onDispatchOverridesChange,
 }: {
   capability: AgentCapability;
   model: string;
@@ -109,6 +111,8 @@ export function SpawnDialog({
   onTreePathsChange: (paths: string[]) => void;
   onSpawn: () => void;
   onClose: () => void;
+  onForceOverlapChange?: (force: boolean) => void;
+  onDispatchOverridesChange?: (overrides: { skip_scout?: boolean; skip_review?: boolean; max_agents?: number } | undefined) => void;
 }) {
   const capabilityInfo = CAPABILITY_DEFAULTS[capability];
   const { settings: spawnSettings } = useSettingsStore();
@@ -121,6 +125,59 @@ export function SpawnDialog({
   const [checkingOverlaps, setCheckingOverlaps] = useState(false);
   const [formErrors, setFormErrors] = useState<SpawnFormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [forceOverlap, setForceOverlap] = useState(false);
+  const [skipScout, setSkipScout] = useState(false);
+  const [skipReview, setSkipReview] = useState(false);
+  const [maxAgents, setMaxAgents] = useState('');
+
+  // Filter capabilities based on parent agent's capability
+  const allowedCapabilities = useMemo((): AgentCapability[] => {
+    if (!parentAgent) {
+      return ['lead', 'coordinator'];
+    }
+    const parent = availableParents.find((s) => s.agent_name === parentAgent);
+    if (!parent) {
+      return Object.keys(CAPABILITY_DEFAULTS) as AgentCapability[];
+    }
+    if (parent.capability === 'coordinator') {
+      return ['lead'];
+    }
+    if (parent.capability === 'lead') {
+      return ['scout', 'builder', 'reviewer', 'merger'];
+    }
+    return Object.keys(CAPABILITY_DEFAULTS) as AgentCapability[];
+  }, [parentAgent, availableParents]);
+
+  // Auto-select first allowed capability when parent changes and current is not allowed
+  useEffect(() => {
+    if (allowedCapabilities.length > 0 && !allowedCapabilities.includes(capability)) {
+      onCapabilityChange(allowedCapabilities[0]);
+    }
+  }, [allowedCapabilities, capability, onCapabilityChange]);
+
+  // Reset forceOverlap when scope overlaps change
+  useEffect(() => {
+    setForceOverlap(false);
+  }, [scopeOverlaps]);
+
+  // Notify parent of forceOverlap changes
+  useEffect(() => {
+    onForceOverlapChange?.(forceOverlap);
+  }, [forceOverlap, onForceOverlapChange]);
+
+  // Notify parent of dispatch override changes
+  useEffect(() => {
+    if (capability === 'lead') {
+      const overrides: { skip_scout?: boolean; skip_review?: boolean; max_agents?: number } = {};
+      if (skipScout) overrides.skip_scout = true;
+      if (skipReview) overrides.skip_review = true;
+      const parsed = parseInt(maxAgents, 10);
+      if (!isNaN(parsed) && parsed > 0) overrides.max_agents = parsed;
+      onDispatchOverridesChange?.(Object.keys(overrides).length > 0 ? overrides : undefined);
+    } else {
+      onDispatchOverridesChange?.(undefined);
+    }
+  }, [capability, skipScout, skipReview, maxAgents, onDispatchOverridesChange]);
 
   // Validate a single field with Zod
   const validateField = useCallback(
@@ -220,7 +277,7 @@ export function SpawnDialog({
           <div>
             <span className="block text-sm font-medium text-slate-300 mb-2">Capability</span>
             <div className="grid grid-cols-4 gap-2" data-testid="spawn-capability-selector">
-              {(Object.keys(CAPABILITY_DEFAULTS) as AgentCapability[]).map((cap) => (
+              {(Object.keys(CAPABILITY_DEFAULTS) as AgentCapability[]).filter((cap) => allowedCapabilities.includes(cap)).map((cap) => (
                 <Button
                   key={cap}
                   type="button"
@@ -232,7 +289,7 @@ export function SpawnDialog({
                   className={`text-center text-xs font-medium transition-colors ${
                     capability === cap
                       ? `${CAPABILITY_COLORS[cap]} border-current`
-                      : 'border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                      : 'border-white/10 bg-[#1e1e1e] text-slate-400 hover:bg-[#252525] hover:text-slate-300'
                   }`}
                 >
                   {cap}
@@ -248,26 +305,27 @@ export function SpawnDialog({
               <span className="block text-sm font-medium text-slate-300 mb-2">Runtime</span>
               <div className="flex gap-2">
                 {availableRuntimes.map((rt) => (
-                  <Button
+                  <div
                     key={rt.id}
-                    type="button"
-                    variant="outline"
                     onClick={() => onRuntimeChange(rt.id)}
-                    className={`flex-1 transition-colors ${
-                      runtime === rt.id
-                        ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400'
-                        : 'border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                    className={`flex-1 rounded-md py-2.5 px-3 ${
+                      rt.detected
+                        ? 'border border-emerald-500/30 bg-emerald-500/8 text-emerald-400'
+                        : 'border border-red-500/30 bg-red-500/8 text-red-400'
                     }`}
                   >
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span>{rt.displayName}</span>
-                      {rt.detected ? (
-                        <span className="text-[10px] text-emerald-500">{'\u25CF'} detected</span>
-                      ) : (
-                        <span className="text-[10px] text-red-400">{'\u25CF'} not found</span>
-                      )}
+                    <div className="flex items-center gap-2.5">
+                      <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                        rt.detected ? 'bg-emerald-400' : 'bg-red-400'
+                      }`} />
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-sm font-medium">{rt.displayName}</span>
+                        <span className={`text-[10px] ${rt.detected ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+                          {rt.detected ? 'Installed & ready' : 'Not installed'}
+                        </span>
+                      </div>
                     </div>
-                  </Button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -281,21 +339,34 @@ export function SpawnDialog({
               data-testid="spawn-model-picker"
               data-default-model={configuredDefault}
             >
-              {MODELS.map((m) => (
+              {[
+                { id: 'haiku', label: 'Haiku', version: '4.5', desc: 'Fast & light', color: 'emerald' },
+                { id: 'sonnet', label: 'Sonnet', version: '4.6', desc: 'Balanced', color: 'blue' },
+                { id: 'opus', label: 'Opus', version: '4.6', desc: 'Most capable', color: 'orange' },
+              ].map((m) => (
                 <Button
-                  key={m}
+                  key={m.id}
                   type="button"
                   variant="outline"
-                  onClick={() => onModelChange(m)}
-                  data-testid={`spawn-model-${m}`}
-                  aria-selected={model === m}
-                  className={`flex-1 text-sm font-medium transition-colors ${
-                    model === m
-                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
-                      : 'border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                  onClick={() => onModelChange(m.id)}
+                  data-testid={`spawn-model-${m.id}`}
+                  aria-selected={model === m.id}
+                  className={`flex-1 h-auto py-2.5 transition-colors ${
+                    model === m.id
+                      ? m.color === 'emerald'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                        : m.color === 'orange'
+                          ? 'border-orange-500/40 bg-orange-500/10 text-orange-400'
+                          : 'border-blue-500/40 bg-blue-500/10 text-blue-400'
+                      : 'border-white/10 bg-[#1e1e1e] text-slate-400 hover:bg-[#252525] hover:text-slate-300'
                   }`}
                 >
-                  {m}
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-sm font-semibold">{m.label}</span>
+                    <span className={`text-[10px] ${model === m.id ? 'opacity-70' : 'text-slate-500'}`}>
+                      v{m.version} · {m.desc}
+                    </span>
+                  </div>
                 </Button>
               ))}
             </div>
@@ -328,7 +399,7 @@ export function SpawnDialog({
               }}
               placeholder={`e.g. swift-${capability}-001`}
               data-testid="spawn-name-input"
-              className={`bg-slate-700 border-slate-600 text-slate-200 placeholder-slate-500 ${touched.name && formErrors.name ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
+              className={`bg-[#1e1e1e] border-white/10 text-slate-200 placeholder-slate-500 ${touched.name && formErrors.name ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
             />
             {touched.name && formErrors.name && (
               <p className="mt-1 text-xs text-red-400" data-testid="spawn-name-error">
@@ -356,7 +427,7 @@ export function SpawnDialog({
               }}
               placeholder="e.g. TASK-42"
               data-testid="spawn-task-id-input"
-              className={`bg-slate-700 border-slate-600 text-slate-200 placeholder-slate-500 ${touched.taskId && formErrors.taskId ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
+              className={`bg-[#1e1e1e] border-white/10 text-slate-200 placeholder-slate-500 ${touched.taskId && formErrors.taskId ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
             />
             {touched.taskId && formErrors.taskId && (
               <p className="mt-1 text-xs text-red-400" data-testid="spawn-task-id-error">
@@ -438,7 +509,7 @@ export function SpawnDialog({
                   onChange={(e) => onFileScopeChange(e.target.value)}
                   placeholder="e.g. src/components/**, src/utils/*.ts"
                   data-testid="spawn-file-scope"
-                  className="bg-slate-700 border-slate-600 text-slate-200 placeholder-slate-500 focus-visible:ring-blue-500"
+                  className="bg-[#1e1e1e] border-white/10 text-slate-200 placeholder-slate-500 focus-visible:ring-blue-500"
                 />
                 <p className="mt-1 text-xs text-slate-400">
                   Glob patterns restricting which files this agent can modify
@@ -462,19 +533,19 @@ export function SpawnDialog({
             )}
             {scopeOverlaps.length > 0 && (
               <div
-                className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"
+                className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3"
                 data-testid="scope-overlap-warning"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <FiAlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0" />
-                  <span className="text-sm font-medium text-amber-400">Scope Overlap Detected</span>
+                  <FiAlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                  <span className="text-sm font-medium text-red-400">Scope Overlap Detected</span>
                 </div>
                 <div className="space-y-2">
                   {scopeOverlaps.map((overlap) => (
-                    <div key={overlap.sessionId} className="text-xs text-amber-300/80">
-                      <span className="font-medium text-amber-300">{overlap.agentName}</span>{' '}
+                    <div key={overlap.sessionId} className="text-xs text-red-300/80">
+                      <span className="font-medium text-red-300">{overlap.agentName}</span>{' '}
                       already owns:{' '}
-                      <span className="text-amber-200/70 font-mono">
+                      <span className="text-red-200/70 font-mono">
                         {overlap.overlappingPaths.slice(0, 3).join(', ')}
                         {overlap.overlappingPaths.length > 3 &&
                           ` +${overlap.overlappingPaths.length - 3} more`}
@@ -482,10 +553,20 @@ export function SpawnDialog({
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-amber-400/60">
-                  Assigning overlapping files to multiple builders may cause merge conflicts. You
-                  can continue anyway or adjust the file scope.
+                <p className="mt-2 text-xs text-red-400/60">
+                  Assigning overlapping files to multiple builders may cause merge conflicts.
+                  Adjust the file scope or force spawn to override.
                 </p>
+                <label className="flex items-center gap-2 mt-2 text-sm text-red-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={forceOverlap}
+                    onChange={(e) => setForceOverlap(e.target.checked)}
+                    className="rounded border-red-600"
+                    data-testid="force-overlap-checkbox"
+                  />
+                  Force spawn (override conflicts)
+                </label>
               </div>
             )}
           </div>
@@ -501,9 +582,55 @@ export function SpawnDialog({
               onChange={(e) => onPromptChange(e.target.value)}
               placeholder="What should this agent work on?"
               rows={3}
-              className="bg-slate-700 border-slate-600 text-slate-200 placeholder-slate-500 focus-visible:ring-blue-500 resize-none"
+              className="bg-[#1e1e1e] border-white/10 text-slate-200 placeholder-slate-500 focus-visible:ring-blue-500 resize-none"
             />
           </div>
+
+          {/* Dispatch Overrides (lead only) */}
+          {capability === 'lead' && (
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-300">Dispatch Overrides</span>
+                <span className="text-xs text-slate-500">(optional)</span>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={skipScout}
+                    onChange={(e) => setSkipScout(e.target.checked)}
+                    className="rounded border-slate-600"
+                    data-testid="dispatch-skip-scout"
+                  />
+                  Skip Scout phase
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={skipReview}
+                    onChange={(e) => setSkipReview(e.target.checked)}
+                    className="rounded border-slate-600"
+                    data-testid="dispatch-skip-review"
+                  />
+                  Skip Review phase
+                </label>
+                <div>
+                  <Label htmlFor="max-agents" className="text-slate-400 text-sm">Max Agents</Label>
+                  <Input
+                    id="max-agents"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={maxAgents}
+                    onChange={(e) => setMaxAgents(e.target.value)}
+                    placeholder="Default (no limit)"
+                    data-testid="dispatch-max-agents"
+                    className="mt-1 bg-[#1e1e1e] border-white/10 text-slate-200 placeholder-slate-500 w-32"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Validation errors summary */}
           {Object.keys(formErrors).length > 0 && Object.keys(touched).length > 0 && (
@@ -534,9 +661,9 @@ export function SpawnDialog({
           </Button>
           <Button
             onClick={handleValidatedSpawn}
-            disabled={isSpawning || Object.keys(formErrors).length > 0}
+            disabled={isSpawning || Object.keys(formErrors).length > 0 || (scopeOverlaps.length > 0 && !forceOverlap)}
             data-testid="spawn-confirm-button"
-            className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             {isSpawning ? (
               <>

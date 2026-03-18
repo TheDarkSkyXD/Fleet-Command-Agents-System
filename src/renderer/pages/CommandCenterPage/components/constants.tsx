@@ -20,22 +20,22 @@ export const CAPABILITY_DEFAULTS: Record<
   builder: {
     model: 'sonnet',
     description: 'Code implementation agent',
-    color: 'blue',
+    color: 'green',
   },
   reviewer: {
     model: 'sonnet',
     description: 'Code review agent',
-    color: 'cyan',
+    color: 'amber',
   },
   lead: {
     model: 'opus',
     description: 'Team lead / orchestrator',
-    color: 'amber',
+    color: 'orange',
   },
   merger: {
     model: 'opus',
     description: 'Merge conflict resolution',
-    color: 'emerald',
+    color: 'blue',
   },
   coordinator: {
     model: 'opus',
@@ -51,40 +51,40 @@ export const CAPABILITY_DEFAULTS: Record<
 
 export const CAPABILITY_COLORS: Record<string, string> = {
   scout: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  builder: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  reviewer: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  lead: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  merger: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  builder: 'bg-green-500/20 text-green-400 border-green-500/30',
+  reviewer: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  lead: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  merger: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   coordinator: 'bg-red-500/20 text-red-400 border-red-500/30',
   monitor: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
 };
 
 export const STATE_COLORS: Record<string, string> = {
   booting: 'bg-blue-500/20 text-blue-400',
-  working: 'bg-green-500/20 text-green-400',
-  completed: 'bg-slate-500/20 text-slate-400',
+  working: 'bg-cyan-500/20 text-cyan-400',
+  completed: 'bg-green-500/20 text-green-400',
   stalled: 'bg-amber-500/20 text-amber-400',
   zombie: 'bg-red-500/20 text-red-400',
 };
 
 export const STATE_DOT_COLORS: Record<string, string> = {
   booting: 'bg-blue-400 animate-pulse',
-  working: 'bg-green-400 animate-activity-pulse',
-  completed: 'bg-slate-400',
+  working: 'bg-cyan-400 animate-activity-pulse',
+  completed: 'bg-green-400',
   stalled: 'bg-amber-400',
   zombie: 'bg-red-400',
 };
 
 /** State-specific icons for visual distinction */
 export const STATE_ICONS: Record<string, { icon: React.ReactNode; className: string }> = {
-  booting: { icon: <FiLoader className="h-3.5 w-3.5 animate-spin" />, className: 'text-blue-400' },
+  booting: { icon: <FiLoader className="h-5 w-5 animate-spin" />, className: 'text-blue-400' },
   working: {
-    icon: <FiActivity className="h-3.5 w-3.5" />,
-    className: 'text-green-400 animate-pulse',
+    icon: <FiActivity className="h-5 w-5" />,
+    className: 'text-cyan-400 animate-pulse',
   },
-  completed: { icon: <FiCheckCircle className="h-3.5 w-3.5" />, className: 'text-slate-400' },
-  stalled: { icon: <FiAlertTriangle className="h-3.5 w-3.5" />, className: 'text-amber-400' },
-  zombie: { icon: <FiXCircle className="h-3.5 w-3.5" />, className: 'text-red-400 animate-pulse' },
+  completed: { icon: <FiCheckCircle className="h-5 w-5" />, className: 'text-green-400' },
+  stalled: { icon: <FiAlertTriangle className="h-5 w-5" />, className: 'text-amber-400' },
+  zombie: { icon: <FiXCircle className="h-5 w-5" />, className: 'text-red-400 animate-pulse' },
 };
 
 /** Human-readable state descriptions for hover tooltips */
@@ -123,10 +123,10 @@ export const ALL_CAPABILITIES: AgentCapability[] = [
 /** Border accent colors per capability for left-border styling */
 export const CAPABILITY_BORDER_ACCENT: Record<string, string> = {
   scout: 'border-l-cyan-500',
-  builder: 'border-l-blue-500',
-  reviewer: 'border-l-cyan-500',
-  lead: 'border-l-amber-500',
-  merger: 'border-l-emerald-500',
+  builder: 'border-l-green-500',
+  reviewer: 'border-l-amber-500',
+  lead: 'border-l-orange-500',
+  merger: 'border-l-blue-500',
   coordinator: 'border-l-red-500',
   monitor: 'border-l-teal-500',
 };

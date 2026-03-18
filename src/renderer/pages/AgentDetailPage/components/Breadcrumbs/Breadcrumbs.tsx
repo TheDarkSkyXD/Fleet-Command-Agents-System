@@ -35,7 +35,7 @@ export function Breadcrumbs({ items, onNavigate }: BreadcrumbsProps) {
         const isLast = index === items.length - 1;
         return (
           <span key={item.label} className="flex items-center gap-1.5">
-            <FiChevronRight size={12} className="text-slate-500" />
+            <FiChevronRight size={12} className="text-slate-400" />
             {isLast ? (
               <span
                 className="text-slate-200 font-medium truncate max-w-[200px]"

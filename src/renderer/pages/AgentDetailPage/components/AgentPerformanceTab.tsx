@@ -226,16 +226,17 @@ export function AgentPerformanceTab({ agentName }: { agentName: string }) {
                   <TableCell className="px-4 py-2 text-slate-400">{s.model || '\u2014'}</TableCell>
                   <TableCell className="px-4 py-2 text-slate-400 font-mono">{s.task_id || '\u2014'}</TableCell>
                   <TableCell className="px-4 py-2">
-                    <span className="flex items-center gap-1.5">
+                    <Badge
+                      variant="outline"
+                      className={`gap-1.5 ${STATE_COLORS[s.state] || 'bg-slate-500/20 text-slate-400'} border-transparent`}
+                    >
                       <span
-                        className={`h-2 w-2 rounded-full ${
+                        className={`h-2.5 w-2.5 rounded-full ${
                           STATE_DOT_COLORS[s.state] || 'bg-slate-400'
                         }`}
                       />
-                      <span className={STATE_COLORS[s.state] ? 'text-slate-300' : 'text-slate-400'}>
-                        {s.state}
-                      </span>
-                    </span>
+                      {s.state}
+                    </Badge>
                   </TableCell>
                   <TableCell className="px-4 py-2 text-slate-400 tabular-nums">
                     {formatSessionDuration(s.created_at, s.completed_at)}

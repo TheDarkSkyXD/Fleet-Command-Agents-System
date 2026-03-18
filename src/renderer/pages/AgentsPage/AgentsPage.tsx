@@ -14,6 +14,7 @@ import {
   FiZap,
 } from 'react-icons/fi';
 import type { AgentCapability, AgentIdentity, AgentProcessInfo, AgentState, Session } from '../../../shared/types';
+import { formatRelativeTime } from '../../lib/dateFormatting';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -65,17 +66,12 @@ interface AgentSummary {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  if (diff < 0) return 'just now';
-  const secs = Math.floor(diff / 1000);
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+/** Normalize SQLite UTC timestamps for correct local time display */
+function normalizeTimestamp(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dateStr) && !dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('T')) {
+    return new Date(`${dateStr.replace(' ', 'T')}Z`);
+  }
+  return new Date(dateStr);
 }
 
 // ── Component ──────────────────────────────────────────────────────
@@ -131,7 +127,7 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
     const result: AgentSummary[] = [];
     for (const [name, agentSessions] of grouped) {
       // Sort by updated_at descending to get latest session first
-      agentSessions.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      agentSessions.sort((a, b) => normalizeTimestamp(b.updated_at).getTime() - normalizeTimestamp(a.updated_at).getTime());
       const latest = agentSessions[0];
       const completed = agentSessions.filter(s => s.state === 'completed').length;
 
@@ -161,7 +157,7 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
       const aActive = activeStates.includes(a.latestState);
       const bActive = activeStates.includes(b.latestState);
       if (aActive !== bActive) return aActive ? -1 : 1;
-      return new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime();
+      return normalizeTimestamp(b.lastActive).getTime() - normalizeTimestamp(a.lastActive).getTime();
     });
 
     return result;
@@ -231,12 +227,12 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
       {/* Search + Filters */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input
             placeholder="Search agents by name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-500"
+            className="pl-9 bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-400"
           />
         </div>
         <Tooltip content="Toggle filters">
@@ -255,7 +251,7 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
       {showFilters && (
         <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-500 font-medium">Role:</span>
+            <span className="text-slate-400 font-medium">Role:</span>
             <button
               onClick={() => setCapFilter('')}
               className={`px-2 py-0.5 rounded-full transition-colors ${!capFilter ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
@@ -277,7 +273,7 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
           </div>
           <div className="w-px h-4 bg-slate-700" />
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-500 font-medium">State:</span>
+            <span className="text-slate-400 font-medium">State:</span>
             <button
               onClick={() => setStateFilter('')}
               className={`px-2 py-0.5 rounded-full transition-colors ${!stateFilter ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}
@@ -309,11 +305,11 @@ export function AgentsPage({ onSelectAgent }: { onSelectAgent?: (agentId: string
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <FiUsers className="h-12 w-12 text-slate-600 mb-4" />
+          <FiUsers className="h-12 w-12 text-slate-400 mb-4" />
           <h2 className="text-lg font-medium text-slate-300 mb-2">
             {agents.length === 0 ? 'No Agents Yet' : 'No Matching Agents'}
           </h2>
-          <p className="text-slate-500 max-w-md text-sm">
+          <p className="text-slate-400 max-w-md text-sm">
             {agents.length === 0
               ? 'Start a run from the Command Center to spawn agents. They will appear here as a roster.'
               : 'Try adjusting your search or filters to find agents.'}
@@ -346,7 +342,7 @@ function StatCard({ label, value, icon, color, bg }: {
       </div>
       <div>
         <div className={`text-lg font-bold ${color}`}>{value}</div>
-        <div className="text-xs text-slate-500">{label}</div>
+        <div className="text-xs text-slate-400">{label}</div>
       </div>
     </div>
   );
@@ -392,14 +388,14 @@ function AgentCard({ agent, onSelect }: { agent: AgentSummary; onSelect?: (id: s
           </Badge>
         )}
         {agent.parentAgent && (
-          <span className="text-[10px] text-slate-500 truncate" title={`Parent: ${agent.parentAgent}`}>
+          <span className="text-[10px] text-slate-400 truncate" title={`Parent: ${agent.parentAgent}`}>
             &larr; {agent.parentAgent}
           </span>
         )}
       </div>
 
       {/* Stats row */}
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-xs text-slate-400">
         <div className="flex items-center gap-3">
           <span title="Total sessions">
             {agent.totalSessions} session{agent.totalSessions !== 1 ? 's' : ''}
@@ -410,15 +406,15 @@ function AgentCard({ agent, onSelect }: { agent: AgentSummary; onSelect?: (id: s
             </span>
           )}
         </div>
-        <span className="text-slate-600" title={new Date(agent.lastActive).toLocaleString()}>
+        <span className="text-slate-400" title={normalizeTimestamp(agent.lastActive).toLocaleString()}>
           {formatRelativeTime(agent.lastActive)}
         </span>
       </div>
 
       {/* Branch info */}
       {agent.branchName && (
-        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500 truncate">
-          <span className="text-slate-600">&rarr;</span>
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400 truncate">
+          <span className="text-slate-400">&rarr;</span>
           <span className="font-mono truncate">{agent.branchName}</span>
         </div>
       )}

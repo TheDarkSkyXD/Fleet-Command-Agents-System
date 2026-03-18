@@ -53,10 +53,10 @@ const statePulse: Record<AgentState, string> = {
 
 const capabilityColors: Record<string, string> = {
   scout: 'bg-cyan-600/20 text-cyan-300 border-cyan-600/40',
-  builder: 'bg-blue-600/20 text-blue-300 border-blue-600/40',
-  reviewer: 'bg-cyan-600/20 text-cyan-300 border-cyan-600/40',
-  lead: 'bg-amber-600/20 text-amber-300 border-amber-600/40',
-  merger: 'bg-emerald-600/20 text-emerald-300 border-emerald-600/40',
+  builder: 'bg-green-600/20 text-green-300 border-green-600/40',
+  reviewer: 'bg-amber-600/20 text-amber-300 border-amber-600/40',
+  lead: 'bg-orange-600/20 text-orange-300 border-orange-600/40',
+  merger: 'bg-blue-600/20 text-blue-300 border-blue-600/40',
   coordinator: 'bg-red-600/20 text-red-300 border-red-600/40',
   monitor: 'bg-teal-600/20 text-teal-300 border-teal-600/40',
 };
@@ -277,7 +277,7 @@ export function AgentHierarchyTree({ sessions, onSelectAgent }: AgentHierarchyTr
   if (tree.length === 0) {
     return (
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
-        <FiUsers className="h-12 w-12 mx-auto mb-3 text-slate-500" />
+        <FiUsers className="h-12 w-12 mx-auto mb-3 text-slate-400" />
         <p className="text-lg mb-2">No agents to display</p>
         <p className="text-sm text-slate-400">
           Spawn agents to see the hierarchy tree.
