@@ -3,11 +3,12 @@ import {
   FiActivity,
   FiClock,
   FiCpu,
+  FiDollarSign,
   FiLayers,
   FiRefreshCw,
   FiZap,
 } from 'react-icons/fi';
-import type { Session, AgentState, AgentCapability, Checkpoint, SessionHandoff } from '../../../shared/types';
+import type { Session, AgentState, AgentCapability, Checkpoint, SessionHandoff, MetricsSummary } from '../../../shared/types';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Separator } from '../../components/ui/separator';
@@ -19,6 +20,7 @@ export function SessionsPage() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<Checkpoint | null>(null);
   const [selectedHandoffs, setSelectedHandoffs] = useState<SessionHandoff[]>([]);
+  const [metricsSummary, setMetricsSummary] = useState<MetricsSummary | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -28,9 +30,15 @@ export function SessionsPage() {
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await window.electronAPI.agentList();
-      if (result.data) {
-        setSessions(result.data);
+      const [sessionsResult, metricsResult] = await Promise.all([
+        window.electronAPI.agentList(),
+        window.electronAPI.metricsSummary(),
+      ]);
+      if (sessionsResult.data) {
+        setSessions(sessionsResult.data);
+      }
+      if (metricsResult.data) {
+        setMetricsSummary(metricsResult.data);
       }
     } finally {
       setIsLoading(false);
@@ -142,12 +150,18 @@ export function SessionsPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 gap-3 lg:grid-cols-6">
         <SummaryCard label="Total Sessions" value={stats.total} icon={FiLayers} color="text-slate-300" />
         <SummaryCard label="Active" value={stats.active} icon={FiZap} color="text-emerald-400" />
         <SummaryCard label="Completed" value={stats.completed} icon={FiActivity} color="text-blue-400" />
         <SummaryCard label="Stalled / Zombie" value={stats.stalled} icon={FiClock} color="text-amber-400" />
         <SummaryCard label="Unique Runs" value={stats.uniqueRuns} icon={FiCpu} color="text-purple-400" />
+        <SummaryCard
+          label="Total Cost"
+          value={metricsSummary ? `$${metricsSummary.total_cost.toFixed(2)}` : '$0.00'}
+          icon={FiDollarSign}
+          color="text-green-400"
+        />
       </div>
 
       <Separator className="bg-slate-800" />
@@ -218,7 +232,7 @@ function SummaryCard({
   color,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   color: string;
 }) {

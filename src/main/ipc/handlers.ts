@@ -877,22 +877,7 @@ export function registerIpcHandlers(): void {
               }
             } catch { /* ignore */ }
 
-            // Load base definition file (Phase 6.1: Two-Layer Instruction System)
-            if (agentDef?.definition_file) {
-              try {
-                const defFilePath = path.resolve(String(agentDef.definition_file));
-                if (fs.existsSync(defFilePath)) {
-                  const baseDefinition = fs.readFileSync(defFilePath, 'utf-8');
-                  overlayLines.push('', baseDefinition);
-                  log.info(`[Overlay] Loaded base definition from ${defFilePath}`);
-                } else {
-                  log.warn(`[Overlay] Base definition file not found: ${defFilePath}`);
-                }
-              } catch (defErr) {
-                log.warn(`[Overlay] Failed to read base definition: ${defErr}`);
-              }
-            }
-            if (!agentDef?.definition_file && agentDef) {
+            if (agentDef) {
               overlayLines.push('', '## Role Definition');
               overlayLines.push(`**${agentDef.display_name}**: ${agentDef.description}`);
               if (agentDef.bash_restrictions) overlayLines.push(`Bash restrictions: ${agentDef.bash_restrictions}`);
@@ -926,6 +911,10 @@ export function registerIpcHandlers(): void {
             const envGuard = 'if [ -z "$FC_AGENT_NAME" ]; then exit 0; fi; ';
             const hooksConfig: Record<string, unknown[]> = {};
 
+            // Resolve fc-mulch CLI script path for hook commands
+            const fcMulchPath = path.join(__dirname, '..', '..', '..', 'scripts', 'fc-mulch.js').replace(/\\/g, '/');
+            const fcMulchCmd = `node "${fcMulchPath}"`;
+
             // UserPromptSubmit: inject unread mail before every prompt (like overstory's ov mail check --inject)
             hooksConfig.UserPromptSubmit = [{
               matcher: '',
@@ -935,21 +924,21 @@ export function registerIpcHandlers(): void {
               }],
             }];
 
-            // Stop: record session-end marker for expertise synthesis
+            // Stop: record session-end expertise via fc-mulch learn
             hooksConfig.Stop = [{
               matcher: '',
               hooks: [{
                 type: 'command',
-                command: `${envGuard}echo "[FC:session-end] Agent ${options.agent_name} (${capability}) session completed. Expertise synthesis pending."`,
+                command: `${envGuard}${fcMulchCmd} learn general --title "session-end:${options.agent_name}" --content "Agent ${options.agent_name} (${capability}) session completed." --agent-name "${options.agent_name}" 2>/dev/null; echo "[FC:session-end] Agent ${options.agent_name} (${capability}) session completed."`,
               }],
             }];
 
-            // PostToolUse: detect git commits and log expertise event markers
+            // PostToolUse: detect git commits and record expertise via fc-mulch record
             hooksConfig.PostToolUse = [{
               matcher: 'Bash',
               hooks: [{
                 type: 'command',
-                command: `${envGuard}bash -c 'TOOL_INPUT=$(cat); if echo "$TOOL_INPUT" | grep -qE "git\\s+commit"; then DOMAIN=$(echo "$TOOL_INPUT" | grep -oE "[a-zA-Z0-9_-]+/" | head -1 | tr -d "/"); echo "[FC:expertise] commit detected: domain=\${DOMAIN:-general} agent=$FC_AGENT_NAME"; fi'`,
+                command: `${envGuard}bash -c 'TOOL_INPUT=$(cat); if echo "$TOOL_INPUT" | grep -qE "git\\s+commit"; then DOMAIN=$(echo "$TOOL_INPUT" | grep -oE "[a-zA-Z0-9_-]+/" | head -1 | tr -d "/"); ${fcMulchCmd} record "\${DOMAIN:-general}" --type convention --classification tactical --title "commit:\${DOMAIN:-general}" --content "Agent $FC_AGENT_NAME committed changes in \${DOMAIN:-general}" --agent-name "$FC_AGENT_NAME" 2>/dev/null; echo "[FC:expertise] commit detected: domain=\${DOMAIN:-general} agent=$FC_AGENT_NAME"; fi'`,
               }],
             }];
 
@@ -6859,36 +6848,6 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  // Capability Index: reverse lookup of capabilities to roles (Phase 6.3)
-  ipcMain.handle('agentDef:capability-index', () => {
-    try {
-      const allDefs = loggedPrepare(
-        'SELECT role, capabilities FROM agent_definitions ORDER BY role ASC',
-      ).all() as Array<{ role: string; capabilities: string }>;
-
-      const index: Record<string, string[]> = {};
-      for (const def of allDefs) {
-        try {
-          const caps = JSON.parse(def.capabilities) as string[];
-          for (const cap of caps) {
-            if (!index[cap]) index[cap] = [];
-            index[cap].push(def.role);
-          }
-        } catch {
-          // skip unparseable capabilities
-        }
-      }
-
-      log.info(
-        `[IPC] agentDef:capability-index - Built index with ${Object.keys(index).length} capabilities across ${allDefs.length} roles`,
-      );
-      return { data: index, error: null };
-    } catch (error) {
-      log.error('agentDef:capability-index failed:', error);
-      return { data: null, error: String(error) };
-    }
-  });
-
   // Project channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle('project:list', () => {
     try {
@@ -12666,22 +12625,8 @@ export function registerIpcHandlers(): void {
           // ignore
         }
 
-        // Load base definition file (Phase 6.1: Two-Layer Instruction System)
-        if (agentDef?.definition_file) {
-          try {
-            const defFilePath = path.resolve(String(agentDef.definition_file));
-            if (fs.existsSync(defFilePath)) {
-              const baseDefinition = fs.readFileSync(defFilePath, 'utf-8');
-              overlayLines.push('', baseDefinition);
-              log.info(`[Overlay] Loaded base definition from ${defFilePath}`);
-            } else {
-              log.warn(`[Overlay] Base definition file not found: ${defFilePath}`);
-            }
-          } catch (defErr) {
-            log.warn(`[Overlay] Failed to read base definition: ${defErr}`);
-          }
-        }
-        if (!agentDef?.definition_file && agentDef) {
+        // Add agent base definition
+        if (agentDef) {
           overlayLines.push('');
           overlayLines.push('## Role Definition');
           overlayLines.push(`**${agentDef.display_name}**: ${agentDef.description}`);
@@ -12807,6 +12752,36 @@ export function registerIpcHandlers(): void {
             },
           ],
         });
+
+        // Resolve fc-mulch CLI script path for hook commands
+        const fcMulchPath = path.join(__dirname, '..', '..', '..', 'scripts', 'fc-mulch.js').replace(/\\/g, '/');
+        const fcMulchCmd = `node "${fcMulchPath}"`;
+
+        // PostToolUse: detect git commits and record expertise via fc-mulch
+        hooks.PostToolUse = [
+          {
+            matcher: 'Bash',
+            hooks: [
+              {
+                type: 'command',
+                command: `bash -c 'TOOL_INPUT=$(cat); if echo "$TOOL_INPUT" | grep -qE "git\\s+commit"; then DOMAIN=$(echo "$TOOL_INPUT" | grep -oE "[a-zA-Z0-9_-]+/" | head -1 | tr -d "/"); ${fcMulchCmd} record "\${DOMAIN:-general}" --type convention --classification tactical --title "commit:\${DOMAIN:-general}" --content "Agent ${options.agent_name} committed changes in \${DOMAIN:-general}" --agent-name "${options.agent_name}" 2>/dev/null; echo "[FC:expertise] commit detected: domain=\${DOMAIN:-general} agent=${options.agent_name}"; fi'`,
+              },
+            ],
+          },
+        ];
+
+        // Stop: record session-end expertise via fc-mulch learn
+        hooks.Stop = [
+          {
+            matcher: '',
+            hooks: [
+              {
+                type: 'command',
+                command: `${fcMulchCmd} learn general --title "session-end:${options.agent_name}" --content "Agent ${options.agent_name} (${options.capability}) session completed." --agent-name "${options.agent_name}" 2>/dev/null; echo "[FC:session-end] Agent ${options.agent_name} (${options.capability}) session completed."`,
+              },
+            ],
+          },
+        ];
 
         // Build settings.local.json
         const settingsPath = path.join(claudeDir, 'settings.local.json');

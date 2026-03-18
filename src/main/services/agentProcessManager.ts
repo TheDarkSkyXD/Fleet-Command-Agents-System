@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import log from 'electron-log';
 import * as nodePty from 'node-pty';
-import { getDatabase } from '../db/database';
+import { getDatabase, getDatabasePath } from '../db/database';
 import { detectClaudeCli } from './claudeCliService';
 import { guardEnforcementService } from './guardEnforcementService';
 import { notificationService } from './notificationService';
@@ -105,10 +105,17 @@ export interface AgentProcess {
  * AgentProcessManager manages node-pty processes for Claude Code CLI agents.
  * It spawns, tracks, and provides terminal output streaming for each agent.
  */
+/** Expertise injection interval: 60 seconds (rate-limited, not every mail poll cycle) */
+const EXPERTISE_INJECTION_INTERVAL_MS = 60000;
+
 class AgentProcessManager {
   private processes: Map<string, AgentProcess> = new Map();
   private maxOutputBufferLines = 1000;
   private mailIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  /** Per-agent timestamp of last expertise injection check (ISO string) */
+  private lastExpertiseCheck: Map<string, string> = new Map();
+  /** Per-agent monotonic timestamp (ms) of last expertise injection to enforce rate-limiting */
+  private lastExpertiseCheckTime: Map<string, number> = new Map();
 
   /**
    * Spawn a new Claude Code CLI agent via node-pty.
@@ -207,6 +214,8 @@ class AgentProcessManager {
     if (options.worktreePath) env.FC_WORKTREE = options.worktreePath;
     if (options.runId) env.FC_RUN_ID = options.runId;
     if (options.fileScope) env.FC_FILE_SCOPE = options.fileScope.join(',');
+    // Provide database path so fc-mulch CLI can find it
+    try { env.FC_DB_PATH = getDatabasePath(); } catch { /* ignore if db not init */ }
 
     // Use CLI path from adapter detection
     const shell = cliPath;
@@ -850,9 +859,13 @@ class AgentProcessManager {
   }
 
   /**
-   * Start polling for unread mail and injecting it into an agent's PTY stdin.
+   * Start polling for unread mail and new expertise records, injecting them into an agent's PTY stdin.
    * Works for ALL agent capabilities (coordinators, leads, builders, scouts, etc.).
    * Uses different polling intervals per capability for responsiveness tuning.
+   *
+   * Mail is checked every poll cycle. Expertise injection is rate-limited to every 60s
+   * and only injects records from the agent's domains that were created by OTHER agents
+   * since the last check (Phase 7.1).
    */
   startMailInjection(
     agentId: string,
@@ -877,6 +890,12 @@ class AgentProcessManager {
         }
       })();
 
+    // Initialize expertise check tracking for this agent
+    const agentProcess = this.get(agentId);
+    const agentCreatedAt = agentProcess?.createdAt?.toISOString() ?? new Date().toISOString();
+    this.lastExpertiseCheck.set(agentId, agentCreatedAt);
+    this.lastExpertiseCheckTime.set(agentId, Date.now());
+
     const timer = setInterval(() => {
       try {
         // Auto-stop if agent is no longer running
@@ -888,57 +907,169 @@ class AgentProcessManager {
           return;
         }
 
-        // Query unread mail for this agent
         const db = getDatabase();
-        const unread = db
-          .prepare(
-            'SELECT * FROM messages WHERE to_agent = ? AND read = 0 ORDER BY created_at ASC',
-          )
-          .all(agentName) as Record<string, unknown>[];
 
-        if (unread.length === 0) return;
+        // --- Mail Injection ---
+        try {
+          const unread = db
+            .prepare(
+              'SELECT * FROM messages WHERE to_agent = ? AND read = 0 ORDER BY created_at ASC',
+            )
+            .all(agentName) as Record<string, unknown>[];
 
-        // Format messages for injection (same format as coordinator mail injection)
-        const lines = [`\n[MAIL] ${unread.length} new message(s):`];
-        for (const msg of unread) {
-          const priority = msg.priority as string;
-          const prefix = priority === 'urgent' || priority === 'high' ? '!!' : ' ';
-          lines.push(
-            `  ${prefix}[${msg.type}] from ${msg.from_agent}: ${(msg.subject as string) || ''}`,
-          );
-          if (msg.body) {
-            const body = (msg.body as string).substring(0, 200);
-            lines.push(`    ${body}`);
+          if (unread.length > 0) {
+            // Format messages for injection (same format as coordinator mail injection)
+            const lines = [`\n[MAIL] ${unread.length} new message(s):`];
+            for (const msg of unread) {
+              const priority = msg.priority as string;
+              const prefix = priority === 'urgent' || priority === 'high' ? '!!' : ' ';
+              lines.push(
+                `  ${prefix}[${msg.type}] from ${msg.from_agent}: ${(msg.subject as string) || ''}`,
+              );
+              if (msg.body) {
+                const body = (msg.body as string).substring(0, 200);
+                lines.push(`    ${body}`);
+              }
+              if (msg.payload) {
+                lines.push(`    payload: ${(msg.payload as string).substring(0, 150)}`);
+              }
+
+              // Mark as read after formatting
+              db.prepare('UPDATE messages SET read = 1 WHERE id = ?').run(msg.id);
+            }
+            lines.push('');
+
+            // Write formatted mail into the agent's PTY stdin
+            this.write(agentId, lines.join('\n'));
+
+            // Record mail_received event for each batch
+            this.recordEvent({
+              eventType: 'mail_received',
+              agentName,
+              sessionId: agentId,
+              data: JSON.stringify({
+                count: unread.length,
+                from: unread.map((m) => m.from_agent),
+                types: unread.map((m) => m.type),
+              }),
+            });
+
+            log.debug(
+              `[MailInject] Injected ${unread.length} message(s) into ${agentName} (${capability})`,
+            );
           }
-          if (msg.payload) {
-            lines.push(`    payload: ${(msg.payload as string).substring(0, 150)}`);
-          }
-
-          // Mark as read after formatting
-          db.prepare('UPDATE messages SET read = 1 WHERE id = ?').run(msg.id);
+        } catch (mailErr) {
+          log.warn(`[MailInject] Failed to inject mail for ${agentName}:`, mailErr);
         }
-        lines.push('');
 
-        // Write formatted mail into the agent's PTY stdin
-        this.write(agentId, lines.join('\n'));
+        // --- Expertise Auto-Injection (rate-limited to every 60s) ---
+        try {
+          const now = Date.now();
+          const lastCheckTime = this.lastExpertiseCheckTime.get(agentId) ?? 0;
 
-        // Record mail_received event for each batch
-        this.recordEvent({
-          eventType: 'mail_received',
-          agentName,
-          sessionId: agentId,
-          data: JSON.stringify({
-            count: unread.length,
-            from: unread.map((m) => m.from_agent),
-            types: unread.map((m) => m.type),
-          }),
-        });
+          if (now - lastCheckTime < EXPERTISE_INJECTION_INTERVAL_MS) {
+            return; // Rate-limit: skip expertise check until interval elapses
+          }
 
-        log.debug(
-          `[MailInject] Injected ${unread.length} message(s) into ${agentName} (${capability})`,
-        );
+          const lastCheckTimestamp = this.lastExpertiseCheck.get(agentId) ?? agentCreatedAt;
+
+          // Find domains this agent has worked in (from its own expertise records)
+          const domainRows = db
+            .prepare('SELECT DISTINCT domain FROM expertise_records WHERE agent_name = ?')
+            .all(agentName) as { domain: string }[];
+
+          // Also check domains from the agent's identity record
+          const identityRow = db
+            .prepare('SELECT expertise_domains FROM agent_identities WHERE name = ?')
+            .get(agentName) as { expertise_domains: string | null } | undefined;
+
+          const domainSet = new Set(domainRows.map((r) => r.domain));
+          if (identityRow?.expertise_domains) {
+            try {
+              const identityDomains = JSON.parse(identityRow.expertise_domains);
+              if (Array.isArray(identityDomains)) {
+                for (const d of identityDomains) {
+                  if (typeof d === 'string') domainSet.add(d);
+                }
+              }
+            } catch {
+              // Invalid JSON in expertise_domains, skip
+            }
+          }
+
+          const domains = Array.from(domainSet);
+          if (domains.length === 0) {
+            // No domains to check - update timestamps and return
+            this.lastExpertiseCheck.set(agentId, new Date().toISOString());
+            this.lastExpertiseCheckTime.set(agentId, now);
+            return;
+          }
+
+          // Query for new expertise records in those domains:
+          // - Created AFTER the last check timestamp
+          // - NOT authored by this agent (exclude self-authored records)
+          // - Not expired
+          const placeholders = domains.map(() => '?').join(',');
+          const newRecords = db
+            .prepare(
+              `SELECT domain, title, content, type, classification, agent_name FROM expertise_records
+               WHERE domain IN (${placeholders})
+                 AND created_at > ?
+                 AND (agent_name IS NULL OR agent_name != ?)
+                 AND (expires_at IS NULL OR expires_at > datetime('now'))
+               ORDER BY CASE classification WHEN 'foundational' THEN 1 WHEN 'tactical' THEN 2 ELSE 3 END, created_at ASC
+               LIMIT 20`,
+            )
+            .all(...domains, lastCheckTimestamp, agentName) as Array<{
+              domain: string;
+              title: string;
+              content: string;
+              type: string;
+              classification: string;
+              agent_name: string | null;
+            }>;
+
+          // Update timestamps regardless of whether records were found
+          this.lastExpertiseCheck.set(agentId, new Date().toISOString());
+          this.lastExpertiseCheckTime.set(agentId, now);
+
+          if (newRecords.length === 0) return;
+
+          // Format expertise records for injection
+          const expertiseLines = [
+            `\n[EXPERTISE UPDATE] ${newRecords.length} new expertise record(s) discovered by other agents:`,
+          ];
+          for (const rec of newRecords) {
+            const author = rec.agent_name ? ` (from ${rec.agent_name})` : '';
+            expertiseLines.push(
+              `  [${rec.classification}/${rec.type}] [${rec.domain}] ${rec.title}${author}: ${rec.content.substring(0, 300)}`,
+            );
+          }
+          expertiseLines.push('');
+
+          // Write formatted expertise into the agent's PTY stdin
+          this.write(agentId, expertiseLines.join('\n'));
+
+          // Record expertise_injected event
+          this.recordEvent({
+            eventType: 'expertise_injected',
+            agentName,
+            sessionId: agentId,
+            data: JSON.stringify({
+              count: newRecords.length,
+              domains: [...new Set(newRecords.map((r) => r.domain))],
+              sources: newRecords.map((r) => r.agent_name).filter(Boolean),
+            }),
+          });
+
+          log.info(
+            `[ExpertiseInject] Injected ${newRecords.length} new expertise record(s) into ${agentName} (${capability}) from domains: ${domains.join(', ')}`,
+          );
+        } catch (expertiseErr) {
+          log.warn(`[ExpertiseInject] Failed to inject expertise for ${agentName}:`, expertiseErr);
+        }
       } catch (err) {
-        log.warn(`[MailInject] Failed to inject mail for ${agentName}:`, err);
+        log.warn(`[MailInject] Failed in injection loop for ${agentName}:`, err);
       }
     }, interval);
 
@@ -949,7 +1080,7 @@ class AgentProcessManager {
   }
 
   /**
-   * Stop mail injection polling for a specific agent.
+   * Stop mail injection polling and expertise injection tracking for a specific agent.
    */
   stopMailInjection(agentId: string): void {
     const timer = this.mailIntervals.get(agentId);
@@ -958,10 +1089,13 @@ class AgentProcessManager {
       this.mailIntervals.delete(agentId);
       log.info(`[MailInject] Stopped mail injection for agent ${agentId}`);
     }
+    // Clean up expertise injection tracking
+    this.lastExpertiseCheck.delete(agentId);
+    this.lastExpertiseCheckTime.delete(agentId);
   }
 
   /**
-   * Stop all mail injection intervals across all agents.
+   * Stop all mail injection intervals and expertise tracking across all agents.
    */
   stopAllMailInjection(): void {
     for (const [agentId, timer] of this.mailIntervals) {
@@ -969,7 +1103,9 @@ class AgentProcessManager {
       log.info(`[MailInject] Stopped mail injection for agent ${agentId}`);
     }
     this.mailIntervals.clear();
-    log.info(`[MailInject] All mail injection intervals cleared`);
+    this.lastExpertiseCheck.clear();
+    this.lastExpertiseCheckTime.clear();
+    log.info(`[MailInject] All mail injection intervals and expertise tracking cleared`);
   }
 }
 

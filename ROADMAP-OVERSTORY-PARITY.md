@@ -791,9 +791,9 @@ recorded DURING a run isn't injected into already-running agents.
 | `src/main/services/agentProcessManager.ts` | In the mail injection interval (for all agents per 4.1), also check for new expertise records in the agent's domains. If new records found since last injection, format and inject alongside mail. |
 
 **Acceptance criteria:**
-- [ ] Agent receives new expertise records discovered during its run
-- [ ] Only records from agent's domains are injected
-- [ ] Injection is rate-limited (not every 5s, maybe every 60s)
+- [x] Agent receives new expertise records discovered during its run
+- [x] Only records from agent's domains are injected
+- [x] Injection is rate-limited (not every 5s, maybe every 60s)
 
 ---
 
@@ -810,9 +810,9 @@ usage, cost). The data exists in the metrics table.
 | `src/renderer/pages/SessionsPage/SessionsPage.tsx` | In summary cards, add total cost across all sessions. |
 
 **Acceptance criteria:**
-- [ ] Session detail panel shows token usage and cost
-- [ ] Summary card shows aggregate cost
-- [ ] Metrics link to the Metrics page for deep dive
+- [x] Session detail panel shows token usage and cost
+- [x] Summary card shows aggregate cost
+- [x] Metrics link to the Metrics page for deep dive
 
 ---
 
@@ -830,10 +830,10 @@ to use from their hooks/scripts.
 | `src/main/ipc/handlers.ts` (hook deployment) | Update PostToolUse and Stop hooks to call `fc-mulch record` and `fc-mulch learn` respectively. |
 
 **Acceptance criteria:**
-- [ ] `fc-mulch prime architecture` outputs formatted expertise
-- [ ] `fc-mulch record` creates a new expertise record
-- [ ] Hooks can invoke fc-mulch from shell scripts
-- [ ] DB path is auto-detected from environment
+- [x] `fc-mulch prime architecture` outputs formatted expertise
+- [x] `fc-mulch record` creates a new expertise record
+- [x] Hooks can invoke fc-mulch from shell scripts
+- [x] DB path is auto-detected from environment
 
 ---
 
@@ -884,12 +884,12 @@ Phase 6: Two-Layer Instruction System             ✅ COMPLETE
   6.2  Three-phase lead workflow                     ✅
   6.3  Capability index                              ✅
 
-Phase 7: Observability & Telemetry                ← NEXT
-  7.1  Expertise auto-injection
-  7.2  Session metrics integration
-  7.3  Mulch CLI wrapper
+Phase 7: Observability & Telemetry                ✅ COMPLETE
+  7.1  Expertise auto-injection                    ✅
+  7.2  Session metrics integration                 ✅
+  7.3  Mulch CLI wrapper                           ✅
 ```
 
-**Total tasks: 31 (29 complete, 2 remaining)**
+**Total tasks: 32 (32 complete, 0 remaining)**
 **Total estimated new code: ~3,000 lines**
 **Files primarily affected: `handlers.ts`, `watchdogService.ts`, `mergeService.ts`, `agentProcessManager.ts`, `database.ts`, `shared/types/index.ts`**

@@ -1,13 +1,41 @@
+import { useEffect, useState } from 'react';
 import {
   FiActivity,
+  FiBarChart2,
   FiX,
 } from 'react-icons/fi';
-import type { Session, Checkpoint, SessionHandoff } from '../../../../shared/types';
+import type { Session, Checkpoint, SessionHandoff, Metric } from '../../../../shared/types';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Separator } from '../../../components/ui/separator';
 import { STATE_COLORS, CAPABILITY_COLORS } from './constants';
+
+/** Format a token count into a human-readable string (e.g. 1234567 -> "1.2M") */
+function formatTokens(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(count);
+}
+
+/** Format milliseconds into a human-readable duration */
+function formatDuration(ms: number): string {
+  if (ms < 1_000) return `${ms}ms`;
+  const seconds = Math.floor(ms / 1_000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSec = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSec}s`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMin = minutes % 60;
+  return `${hours}h ${remainingMin}m`;
+}
+
+/** Format cost as currency */
+function formatCost(cost: number): string {
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
+}
 
 interface SessionDetailProps {
   session: Session;
@@ -30,6 +58,39 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
 export function SessionDetail({ session, checkpoint, handoffs, onClose }: SessionDetailProps) {
   const stateColor = STATE_COLORS[session.state] || 'bg-slate-600/20 text-slate-300';
   const capColor = CAPABILITY_COLORS[session.capability] || 'bg-slate-600/20 text-slate-300';
+
+  // Load metrics for the selected session
+  const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMetricsLoading(true);
+    setMetrics([]);
+    (async () => {
+      try {
+        const result = await window.electronAPI.metricsBySession(session.agent_name);
+        if (!cancelled && result.data) {
+          setMetrics(result.data);
+        }
+      } catch {
+        // Metrics load failure is non-critical
+      } finally {
+        if (!cancelled) setMetricsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session.agent_name]);
+
+  // Aggregate metrics for this session
+  const aggregatedMetrics = metrics.length > 0 ? {
+    inputTokens: metrics.reduce((sum, m) => sum + m.input_tokens, 0),
+    outputTokens: metrics.reduce((sum, m) => sum + m.output_tokens, 0),
+    cacheReadTokens: metrics.reduce((sum, m) => sum + m.cache_read_tokens, 0),
+    cacheCreationTokens: metrics.reduce((sum, m) => sum + m.cache_creation_tokens, 0),
+    estimatedCost: metrics.reduce((sum, m) => sum + m.estimated_cost, 0),
+    totalDuration: metrics.reduce((sum, m) => sum + m.duration_ms, 0),
+  } : null;
 
   return (
     <Card className="w-96 border-slate-700 bg-slate-800/60 h-fit sticky top-6 shrink-0">
@@ -120,6 +181,36 @@ export function SessionDetail({ session, checkpoint, handoffs, onClose }: Sessio
               {session.completed_at && <DetailRow label="Completed" value={session.completed_at} />}
               {session.stalled_at && <DetailRow label="Stalled" value={session.stalled_at} />}
             </div>
+          </div>
+
+          <Separator className="bg-slate-700" />
+
+          {/* Metrics */}
+          <div>
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Metrics</h4>
+            {metricsLoading ? (
+              <p className="text-xs text-slate-500">Loading metrics...</p>
+            ) : aggregatedMetrics ? (
+              <div className="space-y-2">
+                <DetailRow label="Input Tokens" value={formatTokens(aggregatedMetrics.inputTokens)} />
+                <DetailRow label="Output Tokens" value={formatTokens(aggregatedMetrics.outputTokens)} />
+                <DetailRow label="Cache Read" value={formatTokens(aggregatedMetrics.cacheReadTokens)} />
+                <DetailRow label="Cache Creation" value={formatTokens(aggregatedMetrics.cacheCreationTokens)} />
+                <DetailRow label="Est. Cost" value={formatCost(aggregatedMetrics.estimatedCost)} />
+                <DetailRow label="Duration" value={formatDuration(aggregatedMetrics.totalDuration)} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-1 h-7 text-[11px] text-blue-400 hover:text-blue-300 hover:bg-blue-600/10 gap-1.5"
+                  onClick={() => { window.location.hash = '#/metrics'; }}
+                >
+                  <FiBarChart2 size={12} />
+                  View in Metrics
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">No metrics recorded</p>
+            )}
           </div>
 
           <Separator className="bg-slate-700" />
