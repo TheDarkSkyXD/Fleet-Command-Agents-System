@@ -41,7 +41,7 @@ import {
   getUpdateStatus,
   installUpdate,
 } from '../services/updateService';
-import { watchdogService } from '../services/watchdogService';
+import { watchdogService, validateStateTransition } from '../services/watchdogService';
 
 /**
  * Logged database prepare - wraps db.prepare() with SQL query logging.
@@ -54,6 +54,44 @@ function loggedPrepare(sql: string) {
   const normalized = sql.replace(/\s+/g, ' ').trim();
   log.debug(`[SQL] Executing: ${normalized}`);
   return db.prepare(sql);
+}
+
+/**
+ * Validate and update a session's state, enforcing the forward-only state machine.
+ * Returns true if the update was applied, false if rejected.
+ */
+function validateAndUpdateSessionState(
+  sessionId: string,
+  newState: string,
+  additionalSql?: string,
+  additionalParams?: unknown[],
+): boolean {
+  const db = getDatabase();
+  const currentSession = db.prepare('SELECT state FROM sessions WHERE id = ?').get(sessionId) as
+    | { state: string }
+    | undefined;
+
+  if (currentSession && currentSession.state !== newState) {
+    if (!validateStateTransition(currentSession.state, newState)) {
+      log.error(
+        `[IPC] Invalid state transition: ${currentSession.state} → ${newState} for session ${sessionId}`,
+      );
+      return false;
+    }
+  }
+
+  const setClauses = [`state = '${newState}'`, "updated_at = datetime('now')"];
+  if (newState === 'completed') {
+    setClauses.push("completed_at = datetime('now')");
+  }
+  if (additionalSql) {
+    setClauses.push(additionalSql);
+  }
+
+  const sql = `UPDATE sessions SET ${setClauses.join(', ')} WHERE id = ?`;
+  const params = [...(additionalParams ?? []), sessionId];
+  loggedPrepare(sql).run(...params);
+  return true;
 }
 
 /**
@@ -522,9 +560,7 @@ export function registerIpcHandlers(): void {
           );
 
           // Transition to 'working' state after successful spawn
-          loggedPrepare(
-            `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
-          ).run(options.id);
+          validateAndUpdateSessionState(options.id, 'working');
 
           // Upsert agent identity for persistent identity across sessions
           const existingIdentity = loggedPrepare(
@@ -599,10 +635,7 @@ export function registerIpcHandlers(): void {
       // Kill the node-pty process
       await agentProcessManager.stop(agentId);
 
-      loggedPrepare(
-        `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
-        WHERE id = ? AND state NOT IN ('completed')`,
-      ).run(agentId);
+      validateAndUpdateSessionState(agentId, 'completed');
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(agentId) as
         | Record<string, unknown>
         | undefined;
@@ -800,6 +833,8 @@ export function registerIpcHandlers(): void {
       // Kill all node-pty processes first
       const processesKilled = await agentProcessManager.stopAll();
 
+      // All states (booting, working, stalled, zombie) allow transition to 'completed'
+      // in the forward-only state machine, so this bulk update is always valid.
       const result = loggedPrepare(
         `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
         WHERE state NOT IN ('completed')`,
@@ -860,11 +895,8 @@ export function registerIpcHandlers(): void {
         'You appear to be stalled. Please continue with your current task or report your status.\n';
       const written = agentProcessManager.write(agentId, nudgePrompt);
 
-      // Update session state from stalled back to working
-      loggedPrepare(
-        `UPDATE sessions SET state = 'working', stalled_at = NULL, escalation_level = 0, updated_at = datetime('now')
-        WHERE id = ? AND state = 'stalled'`,
-      ).run(agentId);
+      // Update session state from stalled back to working (validated by state machine)
+      validateAndUpdateSessionState(agentId, 'working', 'stalled_at = NULL, escalation_level = 0');
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(agentId);
       log.info(`[IPC] agent:nudge - nudge sent (written=${written}), updated session: ${agentId}`);
       return { data: session, error: null };
@@ -937,10 +969,8 @@ export function registerIpcHandlers(): void {
           resumeActiveProject?.id ?? null,
         );
 
-        // Transition to 'working' state
-        loggedPrepare(
-          `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
-        ).run(options.id);
+        // Transition to 'working' state (validated by state machine: booting->working)
+        validateAndUpdateSessionState(options.id, 'working');
 
         const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(options.id);
         log.info(
@@ -1066,9 +1096,7 @@ export function registerIpcHandlers(): void {
           return { data: existing, error: 'Coordinator is already running' };
         }
         // Process died but session not updated - mark it completed
-        loggedPrepare(
-          `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-        ).run(existing.id);
+        validateAndUpdateSessionState(existing.id as string, 'completed');
       }
 
       const id = `coordinator-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -1117,9 +1145,7 @@ export function registerIpcHandlers(): void {
       // Update state to working after brief boot and auto-decompose tasks
       setTimeout(() => {
         try {
-          loggedPrepare(
-            `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ? AND state = 'booting'`,
-          ).run(id);
+          validateAndUpdateSessionState(id, 'working');
 
           // Auto-decompose work into streams for this coordinator session
           // Check if work streams already exist to avoid duplicates
@@ -1264,10 +1290,8 @@ export function registerIpcHandlers(): void {
       // Graceful shutdown: send SIGTERM via tree-kill
       await agentProcessManager.stop(coordinatorId);
 
-      // Update session state in database
-      loggedPrepare(
-        `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-      ).run(coordinatorId);
+      // Update session state in database (validated by state machine)
+      validateAndUpdateSessionState(coordinatorId, 'completed');
 
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(coordinatorId);
       log.info(`[IPC] coordinator:stop - gracefully stopped coordinator: ${coordinatorId}`);
@@ -1297,9 +1321,7 @@ export function registerIpcHandlers(): void {
 
       // If process died but session not updated, clean up
       if (!processAlive && coordinator.state !== 'completed') {
-        loggedPrepare(
-          `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-        ).run(coordinator.id);
+        validateAndUpdateSessionState(coordinator.id as string, 'completed');
         return {
           data: { active: false, session: null, processAlive: false },
           error: null,
@@ -1408,9 +1430,7 @@ export function registerIpcHandlers(): void {
           leadActiveProject?.id ?? null,
         );
 
-        loggedPrepare(
-          `UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?`,
-        ).run(leadId);
+        validateAndUpdateSessionState(leadId, 'working');
 
         const existingIdentity = loggedPrepare('SELECT * FROM agent_identities WHERE name = ?').get(
           leadName,
@@ -1678,9 +1698,7 @@ export function registerIpcHandlers(): void {
             ).get(fromAgent) as Record<string, unknown> | undefined;
 
             if (workerSession) {
-              loggedPrepare(
-                `UPDATE sessions SET state = 'completed', updated_at = datetime('now') WHERE id = ?`,
-              ).run(workerSession.id);
+              validateAndUpdateSessionState(workerSession.id as string, 'completed');
             }
 
             // Record structured completion event
@@ -1769,10 +1787,13 @@ export function registerIpcHandlers(): void {
             if (escalatedSession) {
               const currentLevel = (escalatedSession.escalation_level as number) || 0;
               if (currentLevel >= 2) {
-                loggedPrepare(
-                  `UPDATE sessions SET state = 'stalled', stalled_at = datetime('now'), escalation_level = ?, updated_at = datetime('now') WHERE id = ?`,
-                ).run(currentLevel + 1, escalatedSession.id);
-                actionTaken = 'agent_marked_stalled';
+                const updated = validateAndUpdateSessionState(
+                  escalatedSession.id as string,
+                  'stalled',
+                  "stalled_at = datetime('now'), escalation_level = ?",
+                  [currentLevel + 1],
+                );
+                actionTaken = updated ? 'agent_marked_stalled' : 'invalid_transition';
               } else {
                 loggedPrepare(
                   `UPDATE sessions SET escalation_level = ?, updated_at = datetime('now') WHERE id = ?`,
@@ -3131,9 +3152,7 @@ export function registerIpcHandlers(): void {
           "SELECT id FROM sessions WHERE agent_name = ? AND state = 'active' ORDER BY rowid DESC LIMIT 1",
         ).get(agentName) as { id: string } | undefined;
         if (agentSession) {
-          loggedPrepare(
-            "UPDATE sessions SET state = 'completed' WHERE id = ?",
-          ).run(agentSession.id);
+          validateAndUpdateSessionState(agentSession.id, 'completed');
           log.info(
             `[IPC] merge:complete - Updated agent session ${agentSession.id} (${agentName}) to completed after merge`,
           );
@@ -9607,10 +9626,8 @@ export function registerIpcHandlers(): void {
         }
       }
 
-      // Update session state in database
-      loggedPrepare(
-        "UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
-      ).run(sessionId);
+      // Update session state in database (validated by state machine)
+      validateAndUpdateSessionState(sessionId, 'completed');
 
       log.info(`[IPC] orphan:kill - process killed=${killed}, session state updated to completed`);
       return { data: { killed, sessionId }, error: null };
@@ -9649,19 +9666,15 @@ export function registerIpcHandlers(): void {
       }
 
       if (!processAlive) {
-        loggedPrepare(
-          "UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
-        ).run(sessionId);
+        validateAndUpdateSessionState(sessionId, 'completed');
         return {
           data: { reconnected: false, reason: 'Process is no longer alive' },
           error: null,
         };
       }
 
-      // Update session state to working
-      loggedPrepare(
-        "UPDATE sessions SET state = 'working', updated_at = datetime('now') WHERE id = ?",
-      ).run(sessionId);
+      // Update session state to working (validated by state machine)
+      validateAndUpdateSessionState(sessionId, 'working');
 
       log.info(
         `[IPC] orphan:reconnect - session ${sessionId} reconnected, state updated to working`,
@@ -9683,9 +9696,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('orphan:dismiss', (_event, sessionId: string) => {
     try {
-      loggedPrepare(
-        "UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
-      ).run(sessionId);
+      validateAndUpdateSessionState(sessionId, 'completed');
       log.info(`[IPC] orphan:dismiss - session ${sessionId} dismissed (marked completed)`);
       return { data: { dismissed: true, sessionId }, error: null };
     } catch (error) {
