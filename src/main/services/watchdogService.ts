@@ -42,6 +42,8 @@ export interface WatchdogConfig {
   zombieThresholdMs: number;
   /** Whether the watchdog daemon is enabled */
   enabled: boolean;
+  /** Minimum interval in ms between nudges to the same agent (default 60000 = 1min) */
+  nudgeDebounceMs: number;
 }
 
 /**
@@ -55,6 +57,8 @@ interface AgentEscalationState {
   levelTimestamps: Record<number, number>;
   /** Last time we saw activity from this agent */
   lastActivityAt: number;
+  /** Last time a nudge was sent to this agent (for debounce) */
+  lastNudgeAt?: number;
 }
 
 /**
@@ -112,6 +116,7 @@ const DEFAULT_CONFIG: WatchdogConfig = {
   staleThresholdMs: 300000, // 5 minutes
   zombieThresholdMs: 900000, // 15 minutes
   enabled: true,
+  nudgeDebounceMs: 60000, // 1 minute
 };
 
 /**
@@ -402,8 +407,11 @@ class WatchdogService {
   }
 
   /**
-   * Detect if an agent has had recent activity based on output buffer changes.
-   * We track output buffer length changes between checks.
+   * Detect if an agent has had recent activity using multiple signals:
+   * 1. Output buffer changes (existing)
+   * 2. Recent events in the events table
+   * 3. Recent mail sent by the agent
+   * All signals are OR'd together - any activity signal means the agent is active.
    */
   private detectActivity(agent: AgentProcess, state: AgentEscalationState, now: number): boolean {
     // If the agent just started (within the stale threshold), consider it active
@@ -412,8 +420,8 @@ class WatchdogService {
       return true;
     }
 
-    // Check if the output buffer has grown since last check
-    // We use a simple heuristic: if the buffer length or content has changed
+    // Signal 1: Check if the output buffer has grown since last check
+    let hasOutputActivity = false;
     const bufferKey = `_bufLen_${agent.id}`;
     const prevLen = (state as unknown as Record<string, number>)[bufferKey] ?? 0;
     const curLen = agent.outputBuffer.length;
@@ -421,21 +429,73 @@ class WatchdogService {
 
     // If buffer wrapped (hit max), consider active if it changed at all
     if (curLen !== prevLen) {
-      return true;
+      hasOutputActivity = true;
     }
 
     // Check last line content for changes
-    if (curLen > 0) {
+    if (!hasOutputActivity && curLen > 0) {
       const contentKey = `_lastLine_${agent.id}`;
       const lastLine = agent.outputBuffer[curLen - 1];
       const prevLine = (state as unknown as Record<string, string>)[contentKey] ?? '';
       (state as unknown as Record<string, string>)[contentKey] = lastLine;
       if (lastLine !== prevLine) {
-        return true;
+        hasOutputActivity = true;
       }
     }
 
+    if (hasOutputActivity) {
+      return true;
+    }
+
+    // Signal 2: Check for recent events from this agent in the events table
+    const hasEventActivity = this.checkRecentEvents(agent.agentName);
+    if (hasEventActivity) {
+      return true;
+    }
+
+    // Signal 3: Check for recent mail sent by this agent
+    const hasMailActivity = this.checkRecentMail(agent.agentName);
+    if (hasMailActivity) {
+      return true;
+    }
+
     return false;
+  }
+
+  /**
+   * Check if the agent has emitted events in the last 5 minutes.
+   */
+  private checkRecentEvents(agentName: string): boolean {
+    try {
+      const db = getDatabase();
+      const row = db
+        .prepare(
+          "SELECT COUNT(*) as count FROM events WHERE agent_name = ? AND created_at > datetime('now', '-5 minutes')",
+        )
+        .get(agentName) as { count: number } | undefined;
+      return (row?.count ?? 0) > 0;
+    } catch (error) {
+      log.debug(`[Watchdog] Failed to check recent events for ${agentName}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if the agent has sent mail in the last 5 minutes.
+   */
+  private checkRecentMail(agentName: string): boolean {
+    try {
+      const db = getDatabase();
+      const row = db
+        .prepare(
+          "SELECT COUNT(*) as count FROM messages WHERE from_agent = ? AND created_at > datetime('now', '-5 minutes')",
+        )
+        .get(agentName) as { count: number } | undefined;
+      return (row?.count ?? 0) > 0;
+    } catch (error) {
+      log.debug(`[Watchdog] Failed to check recent mail for ${agentName}:`, error);
+      return false;
+    }
   }
 
   /**
@@ -520,8 +580,15 @@ class WatchdogService {
 
   /**
    * Level 2: Send a nudge prompt to the agent's terminal.
+   * Applies debounce to prevent rapid successive nudges.
    */
   private handleNudge(agent: AgentProcess, state: AgentEscalationState, now: number): void {
+    // Debounce: skip if a nudge was sent too recently
+    if (state.lastNudgeAt && now - state.lastNudgeAt < this.config.nudgeDebounceMs) {
+      log.info(`[Watchdog] Nudge debounced for agent ${agent.agentName}`);
+      return;
+    }
+
     const stalledMs = state.stalledSince ? now - state.stalledSince : 0;
     const stalledSec = Math.round(stalledMs / 1000);
 
@@ -533,6 +600,9 @@ class WatchdogService {
     const nudgePrompt =
       'You appear to be stalled. Please continue with your current task or report your status.\n';
     agentProcessManager.write(agent.id, nudgePrompt);
+
+    // Record the nudge timestamp for debounce
+    state.lastNudgeAt = now;
 
     this.updateSessionState(agent.id, 'stalled', 2);
 
