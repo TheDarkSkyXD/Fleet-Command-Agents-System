@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agentSpawn: (options: Record<string, unknown>) => ipcRenderer.invoke('agent:spawn', options),
   agentStop: (name: string) => ipcRenderer.invoke('agent:stop', name),
   agentStopAll: () => ipcRenderer.invoke('agent:stop-all'),
+  agentDelete: (id: string) => ipcRenderer.invoke('agent:delete', id),
   agentNudge: (name: string) => ipcRenderer.invoke('agent:nudge', name),
   agentResume: (options: Record<string, unknown>) => ipcRenderer.invoke('agent:resume', options),
 
@@ -56,6 +57,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mergeRemove: (id: number) => ipcRenderer.invoke('merge:remove', id),
   mergeGetTargetBranch: () => ipcRenderer.invoke('merge:get-target-branch'),
   mergeSetTargetBranch: (branch: string) => ipcRenderer.invoke('merge:set-target-branch', branch),
+  gitListBranches: (repoPath: string) => ipcRenderer.invoke('git:list-branches', repoPath),
   mergeAutoResolve: (id: number, repoPath?: string, targetBranch?: string) =>
     ipcRenderer.invoke('merge:auto-resolve', id, repoPath, targetBranch),
   mergeAiResolve: (id: number, repoPath?: string, targetBranch?: string) =>
@@ -64,6 +66,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('merge:reimagine', id, repoPath, targetBranch),
   mergeRollback: (id: number, repoPath?: string) =>
     ipcRenderer.invoke('merge:rollback', id, repoPath),
+  mergeAutoEscalate: (id: number, repoPath?: string) =>
+    ipcRenderer.invoke('merge:auto-escalate', id, repoPath),
 
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) =>
@@ -147,6 +151,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       tool_allowlist?: string;
       bash_restrictions?: string;
       file_scope?: string;
+      can_spawn?: number;
+      constraints?: string;
     }>,
   ) => ipcRenderer.invoke('agentDef:import', definitions),
   agentDefExport: (roles?: string[]) => ipcRenderer.invoke('agentDef:export', roles),
@@ -159,6 +165,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     tool_allowlist?: string;
     bash_restrictions?: string;
     file_scope?: string;
+    can_spawn?: number;
+    constraints?: string;
   }) => ipcRenderer.invoke('agentDef:create', definition),
   agentDefDelete: (role: string) => ipcRenderer.invoke('agentDef:delete', role),
   agentDefResetDefaults: () => ipcRenderer.invoke('agentDef:reset-defaults'),
@@ -172,6 +180,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       tool_allowlist?: string;
       bash_restrictions?: string;
       file_scope?: string;
+      can_spawn?: number;
+      constraints?: string;
     },
   ) => ipcRenderer.invoke('agentDef:update', role, updates),
 
@@ -201,6 +211,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('coordinator:decompose', options),
   coordinatorWorkStreams: () => ipcRenderer.invoke('coordinator:workStreams'),
   coordinatorActivityLog: (limit?: number) => ipcRenderer.invoke('coordinator:activity-log', limit),
+  coordinatorCheckComplete: () => ipcRenderer.invoke('coordinator:check-complete'),
+  coordinatorComplete: () => ipcRenderer.invoke('coordinator:complete'),
+  coordinatorCreateIssue: (options: {
+    title: string;
+    description?: string;
+    type?: string;
+    priority?: string;
+    assigned_agent?: string;
+    group_id?: string;
+  }) => ipcRenderer.invoke('coordinator:create-issue', options),
 
   // Operator dispatch messages
   operatorDispatch: (message: string) => ipcRenderer.invoke('operator:dispatch', message),
@@ -363,6 +383,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: IpcRendererEvent, data: unknown) => callback(data);
     ipcRenderer.on('merge:update', handler);
     return () => { ipcRenderer.removeListener('merge:update', handler); };
+  },
+  onMergeStatusUpdate: (callback: (data: { id: number; tier: string; status: string; branch: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { id: number; tier: string; status: string; branch: string }) => callback(data);
+    ipcRenderer.on('merge:status-update', handler);
+    return () => { ipcRenderer.removeListener('merge:status-update', handler); };
   },
 
   // Update events (main -> renderer)
@@ -554,6 +579,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   guardViolationPurge: () => ipcRenderer.invoke('guardViolation:purge'),
   guardViolationStats: () => ipcRenderer.invoke('guardViolation:stats'),
 
+  // Specs (scout → spec → build pipeline)
+  specList: (filters?: { task_id?: string; status?: string; author_agent?: string }) =>
+    ipcRenderer.invoke('spec:list', filters),
+  specGet: (id: string) => ipcRenderer.invoke('spec:get', id),
+  specWrite: (spec: {
+    id: string;
+    task_id?: string;
+    title: string;
+    content: string;
+    author_agent?: string;
+    file_scope?: string;
+  }) => ipcRenderer.invoke('spec:write', spec),
+  specUpdate: (id: string, updates: Record<string, unknown>) =>
+    ipcRenderer.invoke('spec:update', id, updates),
+  specApprove: (id: string, approved_by: string) =>
+    ipcRenderer.invoke('spec:approve', id, approved_by),
+  specDelete: (id: string) => ipcRenderer.invoke('spec:delete', id),
+
+  // Overlay generation
+  overlayGenerate: (options: {
+    session_id: string;
+    agent_name: string;
+    capability: string;
+    worktree_path: string;
+    task_id?: string;
+    file_scope?: string;
+    parent_agent?: string;
+    branch_name?: string;
+    depth?: number;
+  }) => ipcRenderer.invoke('overlay:generate', options),
+
   // Discovery
   discoveryList: () => ipcRenderer.invoke('discovery:list'),
   discoveryGet: (id: string) => ipcRenderer.invoke('discovery:get', id),
@@ -605,6 +661,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
   expertiseDelete: (id: string) => ipcRenderer.invoke('expertise:delete', id),
   expertiseUpdate: (id: string, updates: Record<string, unknown>) =>
     ipcRenderer.invoke('expertise:update', id, updates),
+  expertisePrime: (options: {
+    domains?: string[];
+    agent_name?: string;
+    agent_capability?: string;
+    inject_session_id?: string;
+    limit_per_domain?: number;
+  }) => ipcRenderer.invoke('expertise:prime', options),
+  expertiseRecordSession: (options: {
+    agent_name: string;
+    session_id: string;
+    capability?: string;
+    records?: Array<{
+      domain: string;
+      title: string;
+      content: string;
+      type: string;
+      classification: string;
+      source_file?: string;
+      tags?: string;
+    }>;
+  }) => ipcRenderer.invoke('expertise:record-session', options),
+  expertisePruneExpired: () => ipcRenderer.invoke('expertise:prune-expired'),
+  expertiseSetShelfLife: (id: string, days: number) =>
+    ipcRenderer.invoke('expertise:set-shelf-life', id, days),
 
   // Checkpoints
   checkpointList: () => ipcRenderer.invoke('checkpoint:list'),

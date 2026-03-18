@@ -71,46 +71,10 @@ ipcMain.handle('store:set', (_event, key: string, value: unknown) => {
 });
 
 let mainWindow: BrowserWindow | null = null;
-let splashWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
 const isDev = !app.isPackaged;
-
-function createSplashWindow() {
-  splashWindow = new BrowserWindow({
-    width: 420,
-    height: 360,
-    frame: false,
-    transparent: false,
-    resizable: false,
-    movable: true,
-    center: true,
-    show: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    backgroundColor: '#0f172a',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  // Load the splash HTML
-  const splashPath = isDev
-    ? path.join(__dirname, '../../resources/splash.html')
-    : path.join(process.resourcesPath, 'resources/splash.html');
-
-  splashWindow.loadFile(splashPath);
-
-  splashWindow.once('ready-to-show', () => {
-    splashWindow?.show();
-  });
-
-  splashWindow.on('closed', () => {
-    splashWindow = null;
-  });
-}
 
 function createWindow() {
   // Load saved window state
@@ -129,7 +93,7 @@ function createWindow() {
     show: false,
     frame: true,
     title: 'Fleet Command',
-    backgroundColor: '#0f172a', // slate-900
+    backgroundColor: '#111111',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -150,11 +114,6 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => {
-    // Close splash screen and show main window
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.close();
-      splashWindow = null;
-    }
     mainWindow?.show();
   });
 
@@ -300,9 +259,6 @@ if (!gotTheLock) {
 app.whenReady().then(async () => {
   log.info('Fleet Command starting...');
 
-  // Show splash screen immediately
-  createSplashWindow();
-
   // Initialize database with graceful recovery for missing/corrupted files
   try {
     // Pre-check database health before attempting to open
@@ -400,7 +356,7 @@ app.whenReady().then(async () => {
   // Start watchdog daemon for agent liveness monitoring
   watchdogService.start();
 
-  // Create window and tray (splash closes when main window is ready)
+  // Create window and tray
   createWindow();
   createTray();
 

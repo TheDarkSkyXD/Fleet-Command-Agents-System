@@ -171,7 +171,7 @@ export async function initDatabase(): Promise<void> {
       to_agent TEXT NOT NULL,
       subject TEXT,
       body TEXT,
-      type TEXT NOT NULL CHECK(type IN ('status', 'question', 'result', 'error', 'worker_done', 'merge_ready', 'merged', 'merge_failed', 'escalation', 'health_check', 'dispatch', 'assign')),
+      type TEXT NOT NULL CHECK(type IN ('status', 'question', 'result', 'error', 'worker_done', 'merge_ready', 'merged', 'merge_failed', 'escalation', 'health_check', 'dispatch', 'assign', 'decision_gate')),
       priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low', 'normal', 'high', 'urgent')),
       payload TEXT,
       read INTEGER NOT NULL DEFAULT 0,
@@ -385,7 +385,7 @@ export async function initDatabase(): Promise<void> {
     CREATE TABLE IF NOT EXISTS hooks (
       id TEXT PRIMARY KEY,
       project_id TEXT,
-      hook_type TEXT NOT NULL CHECK(hook_type IN ('SessionStart', 'UserPromptSubmit', 'PreToolUse')),
+      hook_type TEXT NOT NULL CHECK(hook_type IN ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'PreCompact')),
       name TEXT NOT NULL,
       description TEXT,
       script_content TEXT NOT NULL DEFAULT '',
@@ -458,6 +458,20 @@ export async function initDatabase(): Promise<void> {
       agent_name TEXT,
       source_file TEXT,
       tags TEXT,
+      expires_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS specs (
+      id TEXT PRIMARY KEY,
+      task_id TEXT,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      author_agent TEXT,
+      status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'approved', 'implemented', 'rejected')),
+      approved_by TEXT,
+      file_scope TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -529,6 +543,10 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_expertise_classification ON expertise_records(classification);
     CREATE INDEX IF NOT EXISTS idx_expertise_agent ON expertise_records(agent_name);
     CREATE INDEX IF NOT EXISTS idx_expertise_source_file ON expertise_records(source_file);
+    CREATE INDEX IF NOT EXISTS idx_expertise_expires_at ON expertise_records(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_specs_task_id ON specs(task_id);
+    CREATE INDEX IF NOT EXISTS idx_specs_status ON specs(status);
+    CREATE INDEX IF NOT EXISTS idx_specs_author ON specs(author_agent);
     CREATE INDEX IF NOT EXISTS idx_notification_history_type ON notification_history(event_type);
     CREATE INDEX IF NOT EXISTS idx_notification_history_created ON notification_history(created_at);
     CREATE INDEX IF NOT EXISTS idx_notification_history_agent ON notification_history(agent_name);
@@ -653,6 +671,8 @@ export async function initDatabase(): Promise<void> {
         path_boundaries: JSON.stringify([
           { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
         ]),
+        can_spawn: 0,
+        constraints: JSON.stringify(['read-only']),
       },
       {
         role: 'builder',
@@ -678,6 +698,8 @@ export async function initDatabase(): Promise<void> {
         path_boundaries: JSON.stringify([
           { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
         ]),
+        can_spawn: 0,
+        constraints: JSON.stringify([]),
       },
       {
         role: 'reviewer',
@@ -705,6 +727,8 @@ export async function initDatabase(): Promise<void> {
         path_boundaries: JSON.stringify([
           { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
         ]),
+        can_spawn: 0,
+        constraints: JSON.stringify(['read-only']),
       },
       {
         role: 'lead',
@@ -735,6 +759,8 @@ export async function initDatabase(): Promise<void> {
         path_boundaries: JSON.stringify([
           { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
         ]),
+        can_spawn: 1,
+        constraints: JSON.stringify([]),
       },
       {
         role: 'merger',
@@ -755,6 +781,8 @@ export async function initDatabase(): Promise<void> {
         path_boundaries: JSON.stringify([
           { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
         ]),
+        can_spawn: 0,
+        constraints: JSON.stringify([]),
       },
       {
         role: 'coordinator',
@@ -784,6 +812,8 @@ export async function initDatabase(): Promise<void> {
         path_boundaries: JSON.stringify([
           { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
         ]),
+        can_spawn: 1,
+        constraints: JSON.stringify(['read-only', 'no-worktree']),
       },
       {
         role: 'monitor',
@@ -808,12 +838,14 @@ export async function initDatabase(): Promise<void> {
         path_boundaries: JSON.stringify([
           { pattern: '.', type: 'worktree', description: 'Confined to assigned worktree' },
         ]),
+        can_spawn: 0,
+        constraints: JSON.stringify(['read-only', 'no-worktree']),
       },
     ];
 
     const insertDef = db.prepare(`
-      INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope, path_boundaries)
-      VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope, @path_boundaries)
+      INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope, path_boundaries, can_spawn, constraints)
+      VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope, @path_boundaries, @can_spawn, @constraints)
     `);
 
     for (const def of seedDefs) {
@@ -821,6 +853,104 @@ export async function initDatabase(): Promise<void> {
     }
     log.info('Seeded 7 default agent definitions');
   }
+
+  // Migration: expand hooks table hook_type CHECK to include PostToolUse, Stop, PreCompact
+  try {
+    const hooksTableInfo = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='hooks'")
+      .get() as { sql: string } | undefined;
+    if (hooksTableInfo?.sql && !hooksTableInfo.sql.includes('PostToolUse')) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS hooks_new (
+          id TEXT PRIMARY KEY,
+          project_id TEXT,
+          hook_type TEXT NOT NULL CHECK(hook_type IN ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'PreCompact')),
+          name TEXT NOT NULL,
+          description TEXT,
+          script_content TEXT NOT NULL DEFAULT '',
+          is_installed INTEGER NOT NULL DEFAULT 0,
+          target_worktrees TEXT,
+          installed_at TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO hooks_new SELECT * FROM hooks;
+        DROP TABLE hooks;
+        ALTER TABLE hooks_new RENAME TO hooks;
+      `);
+      log.info('[Migration] Expanded hooks table hook_type CHECK constraint');
+    }
+  } catch {
+    // Table already migrated or doesn't exist yet
+  }
+
+  // Migration: expand messages table type CHECK to include decision_gate
+  try {
+    const messagesTableInfo = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='messages'")
+      .get() as { sql: string } | undefined;
+    if (messagesTableInfo?.sql && !messagesTableInfo.sql.includes('decision_gate')) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS messages_new (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT,
+          from_agent TEXT NOT NULL,
+          to_agent TEXT NOT NULL,
+          subject TEXT,
+          body TEXT,
+          type TEXT NOT NULL CHECK(type IN ('status', 'question', 'result', 'error', 'worker_done', 'merge_ready', 'merged', 'merge_failed', 'escalation', 'health_check', 'dispatch', 'assign', 'decision_gate')),
+          priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low', 'normal', 'high', 'urgent')),
+          payload TEXT,
+          read INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO messages_new SELECT * FROM messages;
+        DROP TABLE messages;
+        ALTER TABLE messages_new RENAME TO messages;
+      `);
+      log.info('[Migration] Expanded messages table type CHECK constraint');
+    }
+  } catch {
+    // Table already migrated or doesn't exist yet
+  }
+
+  // Migration: add expires_at column to expertise_records for shelf-life/decay
+  try {
+    db.prepare('SELECT expires_at FROM expertise_records LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE expertise_records ADD COLUMN expires_at TEXT');
+  }
+
+  // Migration: add dispatch_issue_id column to sessions for coordinator↔task board linking
+  try {
+    db.prepare('SELECT dispatch_issue_id FROM sessions LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE sessions ADD COLUMN dispatch_issue_id TEXT');
+  }
+
+  // Migration: add can_spawn and constraints columns to agent_definitions
+  try {
+    db.prepare('SELECT can_spawn FROM agent_definitions LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE agent_definitions ADD COLUMN can_spawn INTEGER NOT NULL DEFAULT 0');
+    db.exec('ALTER TABLE agent_definitions ADD COLUMN constraints TEXT');
+    // Update seed data with proper values
+    db.exec(`UPDATE agent_definitions SET can_spawn = 1, constraints = '["read-only","no-worktree"]' WHERE role = 'coordinator'`);
+    db.exec(`UPDATE agent_definitions SET can_spawn = 1, constraints = '[]' WHERE role = 'lead'`);
+    db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '["read-only"]' WHERE role = 'scout'`);
+    db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '[]' WHERE role = 'builder'`);
+    db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '["read-only"]' WHERE role = 'reviewer'`);
+    db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '[]' WHERE role = 'merger'`);
+    db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '["read-only","no-worktree"]' WHERE role = 'monitor'`);
+  }
+
+  // Seed default stagger delay if not present
+  try {
+    const staggerSetting = db.prepare("SELECT value FROM app_settings WHERE key = 'stagger_delay_ms'").get();
+    if (!staggerSetting) {
+      db.prepare("INSERT INTO app_settings (key, value) VALUES ('stagger_delay_ms', '2000')").run();
+    }
+  } catch { /* ignore */ }
 
   dbInitialized = true;
   log.info('Database schema applied successfully');

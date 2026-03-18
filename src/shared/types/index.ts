@@ -24,7 +24,8 @@ export type MessageType =
   | 'escalation'
   | 'health_check'
   | 'dispatch'
-  | 'assign';
+  | 'assign'
+  | 'decision_gate';
 
 export type MessagePriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -68,6 +69,14 @@ export interface AssignPayload {
   task_id: string;
   file_scope?: string[];
   instructions?: string;
+}
+
+export interface DecisionGatePayload {
+  gate_type: string;
+  gate_name: string;
+  passed: boolean;
+  exit_code?: number;
+  details?: string;
 }
 
 export interface HealthCheckPayload {
@@ -426,8 +435,25 @@ export interface AgentDefinition {
   bash_restrictions: string | null; // JSON array
   file_scope: string | null;
   path_boundaries: string | null; // JSON array of allowed path patterns
+  can_spawn: number; // 0 or 1, SQLite boolean
+  constraints: string | null; // JSON array of constraint strings
   created_at: string;
   updated_at: string;
+}
+
+export interface HierarchyError {
+  code: 'HIERARCHY_VIOLATION';
+  message: string;
+  parentCapability: string;
+  requestedCapability: string;
+}
+
+export interface TaskLockError {
+  code: 'TASK_LOCK';
+  message: string;
+  taskId: string;
+  existingAgent: string;
+  existingCapability: string;
 }
 
 export interface PathBoundaryRule {
@@ -481,8 +507,41 @@ export interface ExpertiseRecord {
   agent_name: string | null;
   source_file: string | null;
   tags: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Shelf-life defaults per classification (in days)
+export const EXPERTISE_SHELF_LIFE: Record<ExpertiseClassification, number> = {
+  foundational: 30,
+  tactical: 14,
+  observational: 7,
+};
+
+// Expertise prime result for multi-domain loading
+export interface ExpertisePrimeResult {
+  domains_loaded: string[];
+  total_records: number;
+  context: string;
+  injected: boolean;
+}
+
+// Coordinator exit trigger evaluation
+export interface CoordinatorExitTriggers {
+  all_agents_done: boolean;
+  task_tracker_empty: boolean;
+  shutdown_signal: boolean;
+}
+
+export interface CoordinatorCheckCompleteResult {
+  complete: boolean;
+  triggers: CoordinatorExitTriggers;
+  summary: {
+    active_agents: number;
+    pending_issues: number;
+    pending_merges: number;
+  };
 }
 
 export interface ExpertiseDomainSummary {
@@ -551,6 +610,31 @@ export type DiscoveryCategory =
 export type DiscoveryScanStatus = 'pending' | 'running' | 'completed' | 'failed';
 export type FindingSeverity = 'info' | 'warning' | 'important';
 
+// Spec types (scout → spec → build pipeline)
+export type SpecStatus = 'draft' | 'approved' | 'implemented' | 'rejected';
+
+export interface Spec {
+  id: string;
+  task_id: string | null;
+  title: string;
+  content: string;
+  author_agent: string | null;
+  status: SpecStatus;
+  approved_by: string | null;
+  file_scope: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Hook types (expanded for full lifecycle)
+export type HookType =
+  | 'SessionStart'
+  | 'UserPromptSubmit'
+  | 'PreToolUse'
+  | 'PostToolUse'
+  | 'Stop'
+  | 'PreCompact';
+
 export interface DiscoveryScan {
   id: string;
   project_id: string | null;
@@ -617,7 +701,7 @@ export interface QualityGateRunSummary {
 }
 
 // Hook types
-export type HookType = 'SessionStart' | 'UserPromptSubmit' | 'PreToolUse';
+// HookType defined above with expanded types (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop, PreCompact)
 
 export interface Hook {
   id: string;
@@ -770,6 +854,8 @@ export interface AgentSpawnRequest {
   depth?: number;
   prompt?: string;
   file_scope?: string;
+  dispatch_overrides?: { skip_scout?: boolean; skip_review?: boolean; max_agents?: number };
+  force_overlap?: boolean; // override task scope overlap check
 }
 
 export interface AgentResumeRequest {
@@ -811,6 +897,7 @@ export interface ElectronAPI {
   ) => Promise<{ data: (Session & { model: string; pid: number }) | null; error: string | null }>;
   agentStop: (name: string) => Promise<{ data: unknown; error: string | null }>;
   agentStopAll: () => Promise<{ data: unknown; error: string | null }>;
+  agentDelete: (id: string) => Promise<{ data: boolean | null; error: string | null }>;
   agentNudge: (name: string) => Promise<{ data: unknown; error: string | null }>;
   agentResume: (options: AgentResumeRequest) => Promise<{
     data: (Session & { model: string; pid: number; resumed_from: string }) | null;
@@ -925,6 +1012,29 @@ export interface ElectronAPI {
       in_progress_tasks: number;
       created_at: string;
     }> | null;
+    error: string | null;
+  }>;
+  coordinatorCheckComplete: () => Promise<{
+    data: CoordinatorCheckCompleteResult | null;
+    error: string | null;
+  }>;
+  coordinatorComplete: () => Promise<{
+    data: {
+      agents_stopped: number;
+      worktrees_cleaned: number;
+      run_completed: string | null;
+    } | null;
+    error: string | null;
+  }>;
+  coordinatorCreateIssue: (options: {
+    title: string;
+    description?: string;
+    type?: string;
+    priority?: string;
+    assigned_agent?: string;
+    group_id?: string;
+  }) => Promise<{
+    data: Issue | null;
     error: string | null;
   }>;
 
@@ -1044,8 +1154,19 @@ export interface ElectronAPI {
     id: number,
     repoPath?: string,
   ) => Promise<{ data: MergeQueueEntry | null; error: string | null }>;
+  mergeAutoEscalate: (
+    id: number,
+    repoPath?: string,
+  ) => Promise<{
+    data: unknown;
+    error: string | null;
+    resolvedTier?: string;
+    reimagineBranch?: string;
+    lastTierAttempted?: string;
+  }>;
   mergeGetTargetBranch: () => Promise<{ data: string | null; error: string | null }>;
   mergeSetTargetBranch: (branch: string) => Promise<{ data: boolean; error: string | null }>;
+  gitListBranches: (repoPath: string) => Promise<{ data: string[] | null; error: string | null }>;
   // Issues
   issueList: (filters?: { status?: string; priority?: string; type?: string }) => Promise<{
     data: Issue[] | null;
@@ -1128,6 +1249,8 @@ export interface ElectronAPI {
       tool_allowlist?: string;
       bash_restrictions?: string;
       file_scope?: string;
+      can_spawn?: number;
+      constraints?: string;
     }>,
   ) => Promise<{ data: AgentDefinition[] | null; error: string | null; imported?: number }>;
   agentDefExport: (
@@ -1142,6 +1265,8 @@ export interface ElectronAPI {
     tool_allowlist?: string;
     bash_restrictions?: string;
     file_scope?: string;
+    can_spawn?: number;
+    constraints?: string;
   }) => Promise<{ data: AgentDefinition | null; error: string | null }>;
   agentDefDelete: (role: string) => Promise<{ data: boolean; error: string | null }>;
   agentDefResetDefaults: () => Promise<{ data: AgentDefinition[] | null; error: string | null }>;
@@ -1155,6 +1280,8 @@ export interface ElectronAPI {
       tool_allowlist?: string;
       bash_restrictions?: string;
       file_scope?: string;
+      can_spawn?: number;
+      constraints?: string;
     },
   ) => Promise<{ data: AgentDefinition | null; error: string | null }>;
 
@@ -1441,6 +1568,79 @@ export interface ElectronAPI {
     id: string,
     updates: Record<string, unknown>,
   ) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
+  expertisePrime: (options: {
+    domains?: string[];
+    agent_name?: string;
+    agent_capability?: string;
+    inject_session_id?: string;
+    limit_per_domain?: number;
+  }) => Promise<{
+    data: ExpertisePrimeResult | null;
+    error: string | null;
+  }>;
+  expertiseRecordSession: (options: {
+    agent_name: string;
+    session_id: string;
+    capability?: string;
+    records?: Array<{
+      domain: string;
+      title: string;
+      content: string;
+      type: string;
+      classification: string;
+      source_file?: string;
+      tags?: string;
+    }>;
+  }) => Promise<{
+    data: { records_created: number; record_ids: string[] } | null;
+    error: string | null;
+  }>;
+  expertisePruneExpired: () => Promise<{
+    data: { pruned: number } | null;
+    error: string | null;
+  }>;
+  expertiseSetShelfLife: (
+    id: string,
+    days: number,
+  ) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
+
+  // Specs (scout → spec → build pipeline)
+  specList: (filters?: {
+    task_id?: string;
+    status?: string;
+    author_agent?: string;
+  }) => Promise<{ data: Spec[] | null; error: string | null }>;
+  specGet: (id: string) => Promise<{ data: Spec | null; error: string | null }>;
+  specWrite: (spec: {
+    id: string;
+    task_id?: string;
+    title: string;
+    content: string;
+    author_agent?: string;
+    file_scope?: string;
+  }) => Promise<{ data: Spec | null; error: string | null }>;
+  specUpdate: (
+    id: string,
+    updates: Record<string, unknown>,
+  ) => Promise<{ data: Spec | null; error: string | null }>;
+  specApprove: (
+    id: string,
+    approved_by: string,
+  ) => Promise<{ data: Spec | null; error: string | null }>;
+  specDelete: (id: string) => Promise<{ data: boolean; error: string | null }>;
+
+  // Overlay generation
+  overlayGenerate: (options: {
+    session_id: string;
+    agent_name: string;
+    capability: string;
+    worktree_path: string;
+    task_id?: string;
+    file_scope?: string;
+    parent_agent?: string;
+    branch_name?: string;
+    depth?: number;
+  }) => Promise<{ data: { path: string; content: string } | null; error: string | null }>;
 
   // Discovery
   discoveryList: () => Promise<{ data: DiscoveryScan[] | null; error: string | null }>;
@@ -1742,6 +1942,7 @@ export interface ElectronAPI {
   onMailReceived: (callback: (data: unknown) => void) => () => void;
   onMailPurged: (callback: (data: { deleted: number }) => void) => () => void;
   onMergeUpdate: (callback: (data: unknown) => void) => () => void;
+  onMergeStatusUpdate: (callback: (data: { id: number; tier: string; status: string; branch: string }) => void) => () => void;
   onUpdateStatus: (callback: (data: UpdateStatus) => void) => () => void;
   onUpdateDownloadProgress: (
     callback: (data: {

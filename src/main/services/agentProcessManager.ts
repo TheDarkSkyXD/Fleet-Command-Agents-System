@@ -195,6 +195,18 @@ class AgentProcessManager {
       }
     }
 
+    // Inject Fleet Command agent identity environment variables
+    env.FC_AGENT_NAME = options.agentName;
+    env.FC_AGENT_CAPABILITY = options.capability;
+    env.FC_SESSION_ID = options.id;
+    env.FC_DEPTH = String(options.depth ?? 0);
+    if (options.taskId) env.FC_TASK_ID = options.taskId;
+    if (options.parentAgent) env.FC_PARENT_AGENT = options.parentAgent;
+    if (options.branchName) env.FC_BRANCH = options.branchName;
+    if (options.worktreePath) env.FC_WORKTREE = options.worktreePath;
+    if (options.runId) env.FC_RUN_ID = options.runId;
+    if (options.fileScope) env.FC_FILE_SCOPE = options.fileScope.join(',');
+
     // Use CLI path from adapter detection
     const shell = cliPath;
 
@@ -278,6 +290,22 @@ class AgentProcessManager {
       // Save token usage metrics to database
       this.saveMetrics(agentProcess, options);
 
+      // Mark session as completed in database so it doesn't linger as 'working'
+      try {
+        const db = getDatabase();
+        db.prepare(
+          `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
+           WHERE id = ? AND state NOT IN ('completed')`,
+        ).run(options.id);
+
+        // Increment sessions_completed on agent identity
+        db.prepare(
+          `UPDATE agent_identities SET sessions_completed = sessions_completed + 1, updated_at = datetime('now') WHERE name = ?`,
+        ).run(options.agentName);
+      } catch (dbErr) {
+        log.warn(`[AgentProcessManager] Failed to mark session completed on exit for ${options.agentName}:`, dbErr);
+      }
+
       // Record session_end event
       this.recordEvent({
         eventType: 'session_end',
@@ -292,6 +320,19 @@ class AgentProcessManager {
         exitCode,
         signal,
       });
+
+      // Broadcast state change so UI updates immediately
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('agent:update', {
+            agentId: options.id,
+            event: 'state_changed',
+            state: 'completed',
+            agentName: options.agentName,
+          });
+        }
+      }
     });
 
     return agentProcess;
@@ -541,9 +582,13 @@ class AgentProcessManager {
   }
 
   /**
-   * Parse stream-json output from Claude CLI to extract token usage and tool events.
+   * Parse stream-json output from Claude CLI to record tool events to the database.
+   *
+   * NOTE: Token accumulation is handled exclusively by handleParsedEvent() (via the
+   * StreamJsonParser callback) to avoid double-counting. This method only records
+   * tool_start/tool_end events to the events table.
+   *
    * Claude CLI stream-json format includes lines like:
-   * {"type":"result","usage":{"input_tokens":1234,"output_tokens":567,"cache_read_input_tokens":89,"cache_creation_input_tokens":12}}
    * {"type":"tool_use","name":"Read","input":{...}}
    * {"type":"tool_result","name":"Read","duration_ms":123}
    */
@@ -563,26 +608,9 @@ class AgentProcessManager {
       try {
         const parsed = JSON.parse(trimmed);
 
-        // Check for usage data in the parsed JSON
-        if (parsed.usage) {
-          const usage = parsed.usage;
-          if (typeof usage.input_tokens === 'number') {
-            agent.tokenUsage.inputTokens += usage.input_tokens;
-          }
-          if (typeof usage.output_tokens === 'number') {
-            agent.tokenUsage.outputTokens += usage.output_tokens;
-          }
-          if (typeof usage.cache_read_input_tokens === 'number') {
-            agent.tokenUsage.cacheReadTokens += usage.cache_read_input_tokens;
-          }
-          if (typeof usage.cache_creation_input_tokens === 'number') {
-            agent.tokenUsage.cacheCreationTokens += usage.cache_creation_input_tokens;
-          }
-
-          log.debug(
-            `[AgentProcessManager] Token usage update for ${agent.agentName}: in=${agent.tokenUsage.inputTokens}, out=${agent.tokenUsage.outputTokens}, cacheRead=${agent.tokenUsage.cacheReadTokens}, cacheCreate=${agent.tokenUsage.cacheCreationTokens}`,
-          );
-        }
+        // Token usage is NOT accumulated here — it is handled solely by
+        // handleParsedEvent() (called via StreamJsonParser.onEvent) to
+        // prevent double-counting from both code paths processing the same data.
 
         // Track tool_start events (tool_use messages from Claude CLI)
         if (parsed.type === 'tool_use' && parsed.name) {
@@ -676,10 +704,14 @@ class AgentProcessManager {
 
   /**
    * Handle a parsed stream-json event from the StreamJsonParser.
-   * Updates token usage, records events to database, and broadcasts to renderer.
+   * This is the SOLE path for token usage accumulation (to prevent double-counting).
+   * Also handles guard enforcement and broadcasts parsed events to the renderer.
+   * Tool event recording (tool_start/tool_end to DB) is handled by parseStreamJsonForTokens().
    */
   private handleParsedEvent(agent: AgentProcess, event: StreamJsonEvent): void {
     // Extract and accumulate token usage from any event that carries it
+    // (This is the only place tokens are accumulated — parseStreamJsonForTokens
+    // deliberately does NOT accumulate tokens to avoid double-counting.)
     const usage = StreamJsonParser.extractUsage(event);
     if (usage) {
       if (typeof usage.input_tokens === 'number') {

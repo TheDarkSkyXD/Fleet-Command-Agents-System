@@ -1,5 +1,6 @@
 import { exec, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
@@ -130,6 +131,123 @@ function recordEvent(params: {
   } catch (error) {
     log.error(`[Event] Failed to record event ${params.eventType}:`, error);
   }
+}
+
+/** Run all enabled quality gates for the active project and return results */
+async function runQualityGates(
+  repoPath: string,
+  options?: { agentName?: string; sessionId?: string },
+): Promise<{
+  passed: boolean;
+  results: Array<{
+    gateId: string;
+    gateName: string;
+    gateType: string;
+    status: 'passed' | 'failed' | 'error';
+    exitCode: number | null;
+    durationMs: number;
+  }>;
+}> {
+  const activeProject = loggedPrepare(
+    'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
+  ).get() as { id: string } | undefined;
+  if (!activeProject) return { passed: true, results: [] };
+
+  const gates = loggedPrepare(
+    'SELECT * FROM quality_gates WHERE project_id = ? AND enabled = 1 ORDER BY sort_order',
+  ).all(activeProject.id) as Array<{
+    id: string;
+    gate_type: string;
+    name: string;
+    command: string;
+  }>;
+
+  if (gates.length === 0) return { passed: true, results: [] };
+
+  let allPassed = true;
+  const results: Array<{
+    gateId: string;
+    gateName: string;
+    gateType: string;
+    status: 'passed' | 'failed' | 'error';
+    exitCode: number | null;
+    durationMs: number;
+  }> = [];
+
+  for (const gate of gates) {
+    const startTime = Date.now();
+    try {
+      const { exitCode, stdout, stderr } = await new Promise<{
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      }>((resolve) => {
+        exec(
+          gate.command,
+          { cwd: repoPath, timeout: 120000, maxBuffer: 5 * 1024 * 1024 },
+          (error, stdoutBuf, stderrBuf) => {
+            resolve({
+              exitCode: error ? (error as { code?: number }).code ?? 1 : 0,
+              stdout: (stdoutBuf || '').toString(),
+              stderr: (stderrBuf || error?.message || '').toString(),
+            });
+          },
+        );
+      });
+
+      const durationMs = Date.now() - startTime;
+      const status: 'passed' | 'failed' = exitCode === 0 ? 'passed' : 'failed';
+      if (status === 'failed') allPassed = false;
+
+      results.push({
+        gateId: gate.id,
+        gateName: gate.name,
+        gateType: gate.gate_type,
+        status,
+        exitCode,
+        durationMs,
+      });
+
+      // Record in quality_gate_results table
+      const { nanoid } = await import('nanoid');
+      loggedPrepare(
+        `INSERT INTO quality_gate_results (id, gate_id, agent_name, session_id, project_id, gate_type, gate_name, command, status, exit_code, stdout, stderr, duration_ms, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      ).run(
+        nanoid(),
+        gate.id,
+        options?.agentName ?? null,
+        options?.sessionId ?? null,
+        activeProject.id,
+        gate.gate_type,
+        gate.name,
+        gate.command,
+        status,
+        exitCode,
+        stdout.slice(0, 10000),
+        stderr.slice(0, 10000),
+        durationMs,
+      );
+
+      log.info(
+        `[QualityGate] ${gate.name}: ${status} (exit ${exitCode}, ${durationMs}ms)`,
+      );
+    } catch (err) {
+      const durationMs = Date.now() - startTime;
+      allPassed = false;
+      results.push({
+        gateId: gate.id,
+        gateName: gate.name,
+        gateType: gate.gate_type,
+        status: 'error',
+        exitCode: null,
+        durationMs,
+      });
+      log.error(`[QualityGate] ${gate.name}: error - ${err}`);
+    }
+  }
+
+  return { passed: allPassed, results };
 }
 
 /**
@@ -385,6 +503,64 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  /** Validate spawn hierarchy: coordinator→lead, lead→workers, workers cannot spawn */
+  function validateHierarchy(
+    parentAgent: string | undefined,
+    requestedCapability: string,
+  ): { valid: boolean; error?: string } {
+    // No parent = top-level spawn from UI (treated as coordinator-level)
+    if (!parentAgent) {
+      if (!['lead', 'coordinator'].includes(requestedCapability)) {
+        return {
+          valid: false,
+          error: `Root-level spawn can only create leads or coordinators, not ${requestedCapability}`,
+        };
+      }
+      return { valid: true };
+    }
+
+    // Look up parent's session to get capability and can_spawn
+    const parentSession = loggedPrepare(
+      "SELECT capability FROM sessions WHERE agent_name = ? AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1",
+    ).get(parentAgent) as { capability: string } | undefined;
+
+    if (!parentSession) {
+      // Parent not found or not active — allow (may be a manual spawn referencing a name)
+      return { valid: true };
+    }
+
+    // Check if parent's role can spawn children
+    const parentDef = loggedPrepare(
+      'SELECT can_spawn FROM agent_definitions WHERE role = ?',
+    ).get(parentSession.capability) as { can_spawn: number } | undefined;
+
+    if (parentDef && !parentDef.can_spawn) {
+      return {
+        valid: false,
+        error: `${parentSession.capability} agents cannot spawn children (can_spawn=false)`,
+      };
+    }
+
+    // Enforce hierarchy rules
+    if (parentSession.capability === 'coordinator') {
+      if (requestedCapability !== 'lead') {
+        return {
+          valid: false,
+          error: `Coordinators can only spawn leads, not ${requestedCapability}`,
+        };
+      }
+    } else if (parentSession.capability === 'lead') {
+      if (!['scout', 'builder', 'reviewer', 'merger'].includes(requestedCapability)) {
+        return {
+          valid: false,
+          error: `Leads can only spawn scouts, builders, reviewers, or mergers, not ${requestedCapability}`,
+        };
+      }
+    }
+
+    return { valid: true };
+  }
+
   ipcMain.handle(
     'agent:spawn',
     async (
@@ -403,6 +579,8 @@ export function registerIpcHandlers(): void {
         depth?: number;
         prompt?: string;
         file_scope?: string;
+        dispatch_overrides?: { skip_scout?: boolean; skip_review?: boolean; max_agents?: number };
+        force_overlap?: boolean;
       },
     ) => {
       const validation = validateIpcParams('agent:spawn', options ?? {}, [
@@ -499,6 +677,290 @@ export function registerIpcHandlers(): void {
           return { data: null, error: msg };
         }
 
+        // ── Hierarchy Validation (Task 1.2) ──
+        const hierarchyResult = validateHierarchy(options.parent_agent, capability);
+        if (!hierarchyResult.valid) {
+          log.warn(`[IPC] agent:spawn - hierarchy violation: ${hierarchyResult.error}`);
+          return { data: null, error: hierarchyResult.error };
+        }
+
+        // ── Task Lock Check (Task 1.3) ──
+        if (options.task_id) {
+          const existingOnTask = loggedPrepare(
+            "SELECT agent_name, capability FROM sessions WHERE task_id = ? AND state IN ('booting', 'working')",
+          ).all(options.task_id) as Array<{ agent_name: string; capability: string }>;
+
+          // Block duplicate leads on the same task
+          if (capability === 'lead') {
+            const existingLead = existingOnTask.find((s) => s.capability === 'lead');
+            if (existingLead) {
+              const msg = `Duplicate lead on task ${options.task_id}: ${existingLead.agent_name} already assigned`;
+              log.warn(`[IPC] agent:spawn - task lock: ${msg}`);
+              return { data: null, error: msg };
+            }
+          }
+
+          // Check for overlapping file scope with agents on the same task
+          if (options.file_scope && existingOnTask.length > 0) {
+            const incomingPaths = options.file_scope.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
+            for (const existing of existingOnTask) {
+              const existingSession = loggedPrepare(
+                "SELECT file_scope FROM sessions WHERE agent_name = ? AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1",
+              ).get(existing.agent_name) as { file_scope: string | null } | undefined;
+              if (!existingSession?.file_scope) continue;
+              const existingPaths = existingSession.file_scope.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
+              const overlapping = incomingPaths.filter((ip) =>
+                existingPaths.some((ep) => ep === ip || ip.startsWith(`${ep}/`) || ep.startsWith(`${ip}/`)),
+              );
+              if (overlapping.length > 0) {
+                const msg = `Task ${options.task_id}: file scope overlaps with ${existing.agent_name} (${existing.capability}) on paths: ${overlapping.join(', ')}`;
+                log.warn(`[IPC] agent:spawn - task lock: ${msg}`);
+                return { data: null, error: msg };
+              }
+            }
+          }
+        }
+
+        // ── Scope Overlap Blocking (Task 1.4) ──
+        if (options.file_scope && !options.force_overlap) {
+          const filePaths = options.file_scope.split(',').map((p) => p.trim()).filter(Boolean);
+          if (filePaths.length > 0) {
+            const activeBuilders = loggedPrepare(
+              "SELECT id, agent_name, capability, file_scope FROM sessions WHERE state NOT IN ('completed') AND file_scope IS NOT NULL AND file_scope != ''",
+            ).all() as Array<{ id: string; agent_name: string; capability: string; file_scope: string }>;
+
+            const incomingPaths = new Set(filePaths.map((p) => p.toLowerCase()));
+            const conflicts: Array<{ agentName: string; overlappingPaths: string[] }> = [];
+
+            for (const builder of activeBuilders) {
+              const builderPaths = builder.file_scope.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
+              const overlapping: string[] = [];
+              for (const bp of builderPaths) {
+                for (const ip of incomingPaths) {
+                  if (bp === ip || ip.startsWith(`${bp}/`) || bp.startsWith(`${ip}/`)) {
+                    overlapping.push(ip);
+                  }
+                }
+              }
+              if (overlapping.length > 0) {
+                conflicts.push({ agentName: builder.agent_name, overlappingPaths: [...new Set(overlapping)] });
+              }
+            }
+
+            if (conflicts.length > 0) {
+              const details = conflicts.map((c) => `${c.agentName}: ${c.overlappingPaths.join(', ')}`).join('; ');
+              const msg = `Scope overlap blocked — active agents conflict: ${details}. Set force_overlap=true to override.`;
+              log.warn(`[IPC] agent:spawn - scope overlap: ${msg}`);
+              return { data: null, error: msg };
+            }
+          }
+        }
+
+        // ── Spawn Stagger Delay (Task 1.5) ──
+        try {
+          let staggerDelayMs = 2000; // default
+          try {
+            const staggerSetting = loggedPrepare(
+              "SELECT value FROM app_settings WHERE key = 'stagger_delay_ms'",
+            ).get() as { value: string } | undefined;
+            if (staggerSetting) {
+              const parsed = parseInt(staggerSetting.value, 10);
+              if (!isNaN(parsed) && parsed >= 0) staggerDelayMs = parsed;
+            }
+          } catch { /* use default */ }
+
+          if (staggerDelayMs > 0) {
+            const lastSpawn = loggedPrepare(
+              "SELECT MAX(created_at) as last_spawn FROM sessions WHERE state IN ('booting', 'working')",
+            ).get() as { last_spawn: string | null } | undefined;
+
+            if (lastSpawn?.last_spawn) {
+              const lastSpawnTime = new Date(lastSpawn.last_spawn + 'Z').getTime();
+              const elapsed = Date.now() - lastSpawnTime;
+              if (elapsed < staggerDelayMs) {
+                const remaining = staggerDelayMs - elapsed;
+                log.info(`[IPC] agent:spawn - stagger delay: waiting ${remaining}ms before spawning ${options.agent_name}`);
+                await new Promise((resolve) => setTimeout(resolve, remaining));
+              }
+            }
+          }
+        } catch (staggerErr) {
+          log.warn('[IPC] agent:spawn - stagger delay check failed, continuing:', staggerErr);
+        }
+
+        // ── Auto-Worktree Creation (Gap 5) ──
+        // If no worktree_path specified and capability needs isolation, auto-create one
+        let effectiveWorktreePath = options.worktree_path;
+        let autoBranchName = options.branch_name;
+
+        if (!effectiveWorktreePath && ['builder', 'lead', 'merger', 'reviewer'].includes(capability)) {
+          try {
+            const activeProject = loggedPrepare(
+              'SELECT path FROM projects WHERE is_active = 1 LIMIT 1',
+            ).get() as { path: string } | undefined;
+            const projectRoot = activeProject?.path || process.cwd();
+            const worktreeBase = path.join(projectRoot, '.fleetcommand', 'worktrees');
+            const worktreeDir = path.join(worktreeBase, options.agent_name);
+            autoBranchName = autoBranchName || `agent-${options.agent_name}-${Date.now()}`;
+
+            if (!fs.existsSync(worktreeBase)) {
+              fs.mkdirSync(worktreeBase, { recursive: true });
+            }
+
+            if (!fs.existsSync(worktreeDir)) {
+              execSync(`git worktree add "${worktreeDir}" -b "${autoBranchName}"`, {
+                cwd: projectRoot,
+                timeout: 30000,
+              });
+              effectiveWorktreePath = worktreeDir;
+              log.info(`[Worktree] Auto-created worktree for ${options.agent_name} at ${worktreeDir} on branch ${autoBranchName}`);
+            } else {
+              effectiveWorktreePath = worktreeDir;
+              log.info(`[Worktree] Reusing existing worktree for ${options.agent_name} at ${worktreeDir}`);
+            }
+          } catch (wtErr) {
+            log.warn(`[Worktree] Auto-creation failed for ${options.agent_name}, using project root:`, wtErr);
+            // Fall through — agent will use project root
+          }
+        }
+
+        // ── Overlay & Hook Deployment (Gaps 1 & 3) ──
+        // Generate CLAUDE.md overlay and deploy hooks BEFORE spawning the agent
+        const overlayWorktree = effectiveWorktreePath || options.worktree_path;
+        if (overlayWorktree) {
+          try {
+            // Generate CLAUDE.md overlay
+            const agentDef = loggedPrepare(
+              'SELECT * FROM agent_definitions WHERE role = ?',
+            ).get(capability) as Record<string, unknown> | undefined;
+
+            // Load spec for task
+            let specContent = '';
+            if (options.task_id) {
+              const spec = loggedPrepare(
+                `SELECT title, content FROM specs WHERE task_id = ? AND status IN ('draft', 'approved') ORDER BY updated_at DESC LIMIT 1`,
+              ).get(options.task_id) as { title: string; content: string } | undefined;
+              if (spec) {
+                specContent = `\n## Task Specification\n### ${spec.title}\n${spec.content}\n`;
+              }
+            }
+
+            const overlayLines = [
+              '# Fleet Command Agent Overlay',
+              '',
+              '## Agent Metadata',
+              `- FC_AGENT_NAME: ${options.agent_name}`,
+              `- FC_SESSION_ID: ${options.id}`,
+              `- FC_CAPABILITY: ${capability}`,
+              `- FC_DEPTH: ${options.depth ?? 0}`,
+            ];
+            if (options.task_id) overlayLines.push(`- FC_TASK_ID: ${options.task_id}`);
+            if (options.parent_agent) overlayLines.push(`- FC_PARENT_AGENT: ${options.parent_agent}`);
+            if (autoBranchName) overlayLines.push(`- FC_BRANCH: ${autoBranchName}`);
+            if (options.file_scope) {
+              overlayLines.push(`- FC_FILE_SCOPE: ${options.file_scope}`);
+              overlayLines.push('');
+              overlayLines.push('**IMPORTANT:** You may ONLY modify files within your file scope.');
+            }
+
+            // Quality gates
+            try {
+              const ap = loggedPrepare('SELECT id FROM projects WHERE is_active = 1 LIMIT 1').get() as { id: string } | undefined;
+              if (ap) {
+                const gates = loggedPrepare(
+                  'SELECT name, command FROM quality_gates WHERE project_id = ? AND enabled = 1 ORDER BY sort_order',
+                ).all(ap.id) as Array<{ name: string; command: string }>;
+                if (gates.length > 0) {
+                  overlayLines.push('', '## Quality Gates', 'Run these before completing your task:');
+                  for (const gate of gates) overlayLines.push(`- ${gate.name}: \`${gate.command}\``);
+                }
+              }
+            } catch { /* ignore */ }
+
+            if (agentDef) {
+              overlayLines.push('', '## Role Definition');
+              overlayLines.push(`**${agentDef.display_name}**: ${agentDef.description}`);
+              if (agentDef.bash_restrictions) overlayLines.push(`Bash restrictions: ${agentDef.bash_restrictions}`);
+            }
+            if (specContent) overlayLines.push(specContent);
+
+            overlayLines.push('', '## Communication Protocol');
+            overlayLines.push('- Send `worker_done` mail to your parent agent when complete');
+            overlayLines.push('- Send `error` mail if you encounter unresolvable blockers');
+            overlayLines.push('- Send `merge_ready` mail when your branch is ready for merge');
+
+            // Inject dispatch overrides for leads (Task 1.6)
+            if (capability === 'lead' && options.dispatch_overrides) {
+              const overrides = options.dispatch_overrides;
+              overlayLines.push('', '## Dispatch Overrides');
+              overlayLines.push(`- SKIP SCOUT: ${overrides.skip_scout ? 'yes' : 'no'}`);
+              overlayLines.push(`- SKIP REVIEW: ${overrides.skip_review ? 'yes' : 'no'}`);
+              if (overrides.max_agents !== undefined) {
+                overlayLines.push(`- MAX AGENTS: ${overrides.max_agents}`);
+              }
+            }
+
+            // Write overlay
+            const claudeDir = path.join(overlayWorktree, '.claude');
+            if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
+            fs.writeFileSync(path.join(claudeDir, 'CLAUDE.md'), overlayLines.join('\n'), 'utf-8');
+            log.info(`[Overlay] Generated CLAUDE.md for ${options.agent_name} in ${overlayWorktree}`);
+
+            // Deploy Claude Code hooks to .claude/settings.local.json
+            const hooksConfig: Record<string, unknown[]> = {};
+
+            // UserPromptSubmit: inject unread mail before every prompt (like overstory's ov mail check --inject)
+            hooksConfig.UserPromptSubmit = [{
+              matcher: '',
+              hooks: [{
+                type: 'command',
+                command: `echo "[FC:mail] Checking mail for ${options.agent_name}..."`,
+              }],
+            }];
+
+            // Stop: mulch learn — prompt agent to record expertise before session ends
+            hooksConfig.Stop = [{
+              matcher: '',
+              hooks: [{
+                type: 'command',
+                command: `echo "[FC:stop] Session ended for ${options.agent_name} (${capability}). Expertise and metrics saved."`,
+              }],
+            }];
+
+            // PreToolUse: Block Write/Edit for read-only agents (coordinator/scout/reviewer/monitor)
+            const readOnlyCapabilities = ['coordinator', 'scout', 'reviewer', 'monitor'];
+            if (readOnlyCapabilities.includes(capability)) {
+              hooksConfig.PreToolUse = [];
+              for (const tool of ['Write', 'Edit', 'NotebookEdit']) {
+                (hooksConfig.PreToolUse as unknown[]).push({
+                  matcher: tool,
+                  hooks: [{
+                    type: 'command',
+                    command: `echo '{"decision":"block","reason":"${capability} agents are read-only. ${tool} is not permitted."}' && exit 2`,
+                  }],
+                });
+              }
+            }
+
+            // PreToolUse: Block git push for all agents
+            if (!hooksConfig.PreToolUse) hooksConfig.PreToolUse = [];
+            (hooksConfig.PreToolUse as unknown[]).push({
+              matcher: 'Bash',
+              hooks: [{
+                type: 'command',
+                command: `bash -c 'if echo "$TOOL_INPUT" | grep -qE "git\\s+push"; then echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"git push blocked. Use merge queue.\\"}"; exit 2; fi'`,
+              }],
+            });
+
+            const settingsPath = path.join(claudeDir, 'settings.local.json');
+            fs.writeFileSync(settingsPath, JSON.stringify({ hooks: hooksConfig }, null, 2), 'utf-8');
+            log.info(`[Hooks] Deployed hooks for ${options.agent_name} (${capability}) to ${settingsPath}`);
+
+          } catch (overlayErr) {
+            log.warn(`[Overlay] Failed to generate overlay for ${options.agent_name}:`, overlayErr);
+          }
+        }
+
         // Spawn the actual node-pty process via AgentProcessManager
         const agentProcess = agentProcessManager.spawn({
           id: options.id,
@@ -507,8 +969,8 @@ export function registerIpcHandlers(): void {
           model,
           runtime: runtimeId,
           capabilityConfigModel,
-          worktreePath: options.worktree_path,
-          branchName: options.branch_name,
+          worktreePath: effectiveWorktreePath || options.worktree_path,
+          branchName: autoBranchName || options.branch_name,
           taskId: options.task_id,
           parentAgent: options.parent_agent,
           runId: options.run_id,
@@ -550,8 +1012,8 @@ export function registerIpcHandlers(): void {
             options.run_id ?? null,
             options.task_id ?? null,
             options.parent_agent ?? null,
-            options.worktree_path ?? null,
-            options.branch_name ?? null,
+            effectiveWorktreePath ?? options.worktree_path ?? null,
+            autoBranchName ?? options.branch_name ?? null,
             options.depth ?? 0,
             agentProcess.pid,
             options.file_scope ?? null,
@@ -583,6 +1045,30 @@ export function registerIpcHandlers(): void {
         });
         spawnTransaction();
 
+        // ── Auto-Dispatch Mail (Task 1.7) ──
+        // Write a dispatch message BEFORE the agent starts reading, so its first mail check has the task
+        try {
+          const { nanoid } = await import('nanoid');
+          loggedPrepare(
+            `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+             VALUES (?, ?, ?, ?, ?, 'dispatch', 'normal', ?, 0, datetime('now'))`,
+          ).run(
+            nanoid(),
+            options.parent_agent ?? 'system',
+            options.agent_name,
+            `Dispatch: ${options.task_id || 'general'}`,
+            `You have been assigned ${options.task_id ? `task ${options.task_id}` : 'work'} as a ${capability}. Read your overlay and begin immediately.`,
+            JSON.stringify({
+              taskId: options.task_id || null,
+              fileScope: options.file_scope || null,
+              parentAgent: options.parent_agent || null,
+            }),
+          );
+          log.info(`[IPC] agent:spawn - dispatched pre-spawn mail for ${options.agent_name}`);
+        } catch (mailErr) {
+          log.warn(`[IPC] agent:spawn - failed to send dispatch mail for ${options.agent_name}:`, mailErr);
+        }
+
         const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(options.id);
         log.info(
           `[IPC] agent:spawn - spawned node-pty process: ${options.agent_name} (${options.capability}), model=${model}, PID=${agentProcess.pid}`,
@@ -596,6 +1082,82 @@ export function registerIpcHandlers(): void {
           runId: options.run_id,
           data: JSON.stringify({ capability: options.capability, model, pid: agentProcess.pid }),
         });
+
+        // ── Mulch Auto-Prime: inject expertise context on spawn ──
+        // Delay slightly to allow the agent process to fully initialize
+        setTimeout(() => {
+          try {
+            if (!agentProcessManager.isRunning(options.id)) return;
+
+            // Determine domains to prime from agent identity
+            let primeDomains: string[] = [];
+            const agentIdentity = loggedPrepare(
+              'SELECT expertise_domains FROM agent_identities WHERE name = ?',
+            ).get(options.agent_name) as { expertise_domains: string | null } | undefined;
+            if (agentIdentity?.expertise_domains) {
+              try {
+                const parsed = JSON.parse(agentIdentity.expertise_domains);
+                if (Array.isArray(parsed) && parsed.length > 0) primeDomains = parsed;
+              } catch {
+                // ignore
+              }
+            }
+
+            // If no identity domains, check if any expertise exists at all
+            if (primeDomains.length === 0) {
+              const domainCount = loggedPrepare(
+                'SELECT COUNT(DISTINCT domain) as cnt FROM expertise_records WHERE expires_at IS NULL OR expires_at > datetime(\'now\')',
+              ).get() as { cnt: number };
+              if (domainCount.cnt > 0 && domainCount.cnt <= 5) {
+                const allDomains = loggedPrepare(
+                  'SELECT DISTINCT domain FROM expertise_records WHERE expires_at IS NULL OR expires_at > datetime(\'now\')',
+                ).all() as Array<{ domain: string }>;
+                primeDomains = allDomains.map((d) => d.domain);
+              }
+            }
+
+            if (primeDomains.length > 0) {
+              // Load foundational records only for auto-prime (keep it concise)
+              const primeRecords = loggedPrepare(
+                `SELECT domain, title, content, type, classification FROM expertise_records
+                 WHERE domain IN (${primeDomains.map(() => '?').join(',')})
+                   AND classification IN ('foundational', 'tactical')
+                   AND (expires_at IS NULL OR expires_at > datetime('now'))
+                 ORDER BY CASE classification WHEN 'foundational' THEN 1 WHEN 'tactical' THEN 2 ELSE 3 END, updated_at DESC
+                 LIMIT 30`,
+              ).all(...primeDomains) as Array<{
+                domain: string;
+                title: string;
+                content: string;
+                type: string;
+                classification: string;
+              }>;
+
+              if (primeRecords.length > 0) {
+                const lines = [`[EXPERTISE PRIME] ${primeRecords.length} records loaded for domains: ${primeDomains.join(', ')}`];
+                for (const rec of primeRecords) {
+                  lines.push(`  [${rec.classification}/${rec.type}] ${rec.title}: ${rec.content.substring(0, 200)}`);
+                }
+                const primePayload = lines.join('\n') + '\n';
+                agentProcessManager.write(options.id, primePayload);
+                log.info(`[Mulch] Auto-primed agent ${options.agent_name} with ${primeRecords.length} expertise records`);
+
+                recordEvent({
+                  eventType: 'custom',
+                  agentName: options.agent_name,
+                  sessionId: options.id,
+                  data: JSON.stringify({
+                    action: 'mulch_auto_prime',
+                    domains: primeDomains,
+                    records_loaded: primeRecords.length,
+                  }),
+                });
+              }
+            }
+          } catch (primeErr) {
+            log.warn(`[Mulch] Auto-prime failed for ${options.agent_name}:`, primeErr);
+          }
+        }, 3000);
 
         // Broadcast agent spawned event for cascading UI updates
         const spawnWindows = BrowserWindow.getAllWindows();
@@ -632,7 +1194,8 @@ export function registerIpcHandlers(): void {
     // Acquire operation lock to prevent concurrent spawn/stop race conditions
     await agentOpLock.acquire();
     try {
-      // Kill the node-pty process
+      // Kill the node-pty process — Stop hook in .claude/settings.local.json
+      // handles mulch learn and session-end logging before Claude Code exits
       await agentProcessManager.stop(agentId);
 
       validateAndUpdateSessionState(agentId, 'completed');
@@ -815,6 +1378,85 @@ export function registerIpcHandlers(): void {
         } catch (identityErr) {
           log.warn(`[IPC] agent:stop - failed to update identity for ${agentName}:`, identityErr);
         }
+
+        // ── Mulch Auto-Record: save checkpoint with mulch_domains on session end ──
+        try {
+          // Gather domains this agent has contributed to
+          const agentRecords = loggedPrepare(
+            'SELECT DISTINCT domain FROM expertise_records WHERE agent_name = ?',
+          ).all(agentName) as Array<{ domain: string }>;
+          const mulchDomains = agentRecords.map((r) => r.domain);
+
+          if (mulchDomains.length > 0) {
+            // Upsert checkpoint with mulch_domains
+            const existingCheckpoint = loggedPrepare(
+              'SELECT * FROM checkpoints WHERE agent_name = ?',
+            ).get(agentName);
+
+            if (existingCheckpoint) {
+              loggedPrepare(
+                `UPDATE checkpoints SET mulch_domains = ?, session_id = ?, timestamp = datetime('now') WHERE agent_name = ?`,
+              ).run(JSON.stringify(mulchDomains), agentId, agentName);
+            } else {
+              loggedPrepare(
+                `INSERT INTO checkpoints (agent_name, session_id, mulch_domains, task_id, timestamp)
+                 VALUES (?, ?, ?, ?, datetime('now'))`,
+              ).run(agentName, agentId, JSON.stringify(mulchDomains), taskId);
+            }
+
+            log.info(`[Mulch] Saved checkpoint mulch_domains for ${agentName}: ${mulchDomains.join(', ')}`);
+          }
+
+          // Record session_end mulch event
+          recordEvent({
+            eventType: 'custom',
+            agentName,
+            sessionId: agentId,
+            data: JSON.stringify({
+              action: 'mulch_session_end',
+              domains: mulchDomains,
+              records_contributed: agentRecords.length,
+            }),
+          });
+        } catch (mulchErr) {
+          log.warn(`[Mulch] Failed to save checkpoint for ${agentName}:`, mulchErr);
+        }
+
+        // ── Auto-close linked issues when agent completes ──
+        try {
+          const agentIssues = loggedPrepare(
+            `SELECT id, title FROM issues WHERE assigned_agent = ? AND status = 'in_progress'`,
+          ).all(agentName) as Array<{ id: string; title: string }>;
+
+          for (const issue of agentIssues) {
+            loggedPrepare(
+              `UPDATE issues SET status = 'closed', close_summary = ?, closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+            ).run(`Completed by agent ${agentName} (session ${agentId})`, issue.id);
+
+            // Check task group auto-close
+            try {
+              const issueRow = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(issue.id) as { group_id: string | null } | undefined;
+              if (issueRow?.group_id) {
+                const groupIssues = loggedPrepare(
+                  `SELECT id, status FROM issues WHERE group_id = ?`,
+                ).all(issueRow.group_id) as Array<{ id: string; status: string }>;
+                const allClosed = groupIssues.every((i) => i.status === 'closed');
+                if (allClosed) {
+                  loggedPrepare(
+                    `UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?`,
+                  ).run(issueRow.group_id);
+                  log.info(`[TaskBoard] Auto-closed task group ${issueRow.group_id} - all issues completed`);
+                }
+              }
+            } catch {
+              // ignore group auto-close errors
+            }
+
+            log.info(`[TaskBoard] Auto-closed issue ${issue.id} (${issue.title}) on agent ${agentName} completion`);
+          }
+        } catch (issueErr) {
+          log.warn(`[TaskBoard] Failed to auto-close issues for ${agentName}:`, issueErr);
+        }
       }
 
       return { data: session, error: null };
@@ -857,6 +1499,56 @@ export function registerIpcHandlers(): void {
       return { data: { stopped: result.changes, processesKilled }, error: null };
     } catch (error) {
       log.error('agent:stop-all failed:', error);
+      return { data: null, error: String(error) };
+    } finally {
+      agentOpLock.release();
+    }
+  });
+
+  // Delete agent session and related data
+  ipcMain.handle('agent:delete', async (_event, agentId: string) => {
+    const validation = validateIpcParams('agent:delete', { agentId }, [
+      { name: 'agentId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
+
+    await agentOpLock.acquire();
+    try {
+      // Stop if still running
+      const session = loggedPrepare('SELECT state, agent_name FROM sessions WHERE id = ?').get(agentId) as
+        | { state: string; agent_name: string }
+        | undefined;
+      if (!session) {
+        return { data: null, error: 'Session not found' };
+      }
+      if (session.state !== 'completed') {
+        try {
+          await agentProcessManager.stop(agentId);
+        } catch {
+          // Process may already be gone — safe to continue with deletion
+        }
+      }
+
+      // Delete related data
+      loggedPrepare('DELETE FROM events WHERE session_id = ?').run(agentId);
+      loggedPrepare('DELETE FROM metrics WHERE agent_name = ?').run(session.agent_name);
+      loggedPrepare('DELETE FROM quality_gate_results WHERE session_id = ?').run(agentId);
+      loggedPrepare('DELETE FROM hook_events WHERE agent_name = ?').run(session.agent_name);
+      loggedPrepare('DELETE FROM sessions WHERE id = ?').run(agentId);
+
+      log.info(`[IPC] agent:delete - deleted session ${agentId} (${session.agent_name})`);
+
+      // Notify renderer
+      const allWindows = BrowserWindow.getAllWindows();
+      for (const win of allWindows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('agent:update', { event: 'deleted', agentId });
+        }
+      }
+
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('agent:delete failed:', error);
       return { data: null, error: String(error) };
     } finally {
       agentOpLock.release();
@@ -1081,6 +1773,65 @@ export function registerIpcHandlers(): void {
   });
 
   // Coordinator channels - specialized coordinator agent management
+  // Mail injection interval — injects unread mail into the coordinator's terminal
+  // so the Claude Code session can read and act on messages (like overstory's UserPromptSubmit hook)
+  let coordinatorMailInterval: ReturnType<typeof setInterval> | null = null;
+
+  function startCoordinatorMailInjection(coordinatorId: string, coordinatorName: string) {
+    if (coordinatorMailInterval) clearInterval(coordinatorMailInterval);
+
+    coordinatorMailInterval = setInterval(() => {
+      try {
+        if (!agentProcessManager.isRunning(coordinatorId)) {
+          if (coordinatorMailInterval) {
+            clearInterval(coordinatorMailInterval);
+            coordinatorMailInterval = null;
+          }
+          return;
+        }
+
+        // Query unread mail for the coordinator
+        const unread = loggedPrepare(
+          'SELECT * FROM messages WHERE to_agent = ? AND read = 0 ORDER BY created_at ASC',
+        ).all(coordinatorName) as Record<string, unknown>[];
+
+        if (unread.length === 0) return;
+
+        // Format and inject into the coordinator's terminal context
+        const lines = [`\n[MAIL] ${unread.length} new message(s):`];
+        for (const msg of unread) {
+          const priority = msg.priority as string;
+          const prefix = priority === 'urgent' || priority === 'high' ? '!!' : ' ';
+          lines.push(`  ${prefix}[${msg.type}] from ${msg.from_agent}: ${(msg.subject as string) || ''}`);
+          if (msg.body) {
+            const body = (msg.body as string).substring(0, 200);
+            lines.push(`    ${body}`);
+          }
+          if (msg.payload) {
+            lines.push(`    payload: ${(msg.payload as string).substring(0, 150)}`);
+          }
+          // Mark as read after injection
+          loggedPrepare('UPDATE messages SET read = 1 WHERE id = ?').run(msg.id);
+        }
+        lines.push('');
+
+        agentProcessManager.write(coordinatorId, lines.join('\n'));
+        log.debug(`[MailInject] Injected ${unread.length} messages into coordinator ${coordinatorName}`);
+      } catch (err) {
+        log.warn('[MailInject] Failed to inject mail:', err);
+      }
+    }, 5000);
+
+    log.info(`[MailInject] Started mail injection for coordinator ${coordinatorName}`);
+  }
+
+  function stopCoordinatorMailInjection() {
+    if (coordinatorMailInterval) {
+      clearInterval(coordinatorMailInterval);
+      coordinatorMailInterval = null;
+    }
+  }
+
   ipcMain.handle('coordinator:start', (_event, options?: { prompt?: string; run_id?: string }) => {
     try {
       // Check if coordinator is already running
@@ -1089,7 +1840,6 @@ export function registerIpcHandlers(): void {
       ).get() as Record<string, unknown> | undefined;
 
       if (existing) {
-        // Check if the process is still alive
         const proc = agentProcessManager.get(existing.id as string);
         if (proc?.isRunning) {
           log.warn('[IPC] coordinator:start - coordinator already running');
@@ -1103,14 +1853,55 @@ export function registerIpcHandlers(): void {
       const agentName = `coordinator-${Date.now().toString(36)}`;
       const model = getDefaultModel('coordinator');
 
-      // Get the active project path for working directory
       const activeProject = loggedPrepare(
         'SELECT * FROM projects WHERE is_active = 1 LIMIT 1',
-      ).get() as { path: string } | undefined;
+      ).get() as { path: string; name: string } | undefined;
 
       const worktreePath = activeProject?.path || process.cwd();
 
-      // Spawn via node-pty
+      // Build the coordinator's autonomous prompt — the coordinator IS the intelligent agent
+      // It uses tools (Bash, Read, Grep, Glob) to analyze code, dispatch agents, and manage the fleet
+      const userObjective = options?.prompt || '';
+      const coordinatorPrompt = [
+        'You are the Fleet Command coordinator — a fully autonomous orchestration agent.',
+        'You make ALL decisions. No backend system acts on your behalf.',
+        '',
+        userObjective ? `# USER OBJECTIVE\n${userObjective}` : '',
+        '',
+        '# YOUR WORKFLOW',
+        '1. Read and analyze the codebase to understand scope',
+        '2. Decompose the objective into 2-5 independent work streams',
+        '3. For each stream, dispatch a lead agent (leads spawn their own builders/scouts)',
+        '4. Monitor progress — unread mail is injected into your context automatically',
+        '5. When a lead sends merge_ready, verify and authorize the merge',
+        '6. When all work is merged, clean up worktrees and signal completion',
+        '',
+        '# AVAILABLE TOOLS',
+        'You have access to Read, Grep, Glob, and Bash. Use Bash to run these commands:',
+        '',
+        '## Dispatching Agents',
+        'Agents are dispatched via the Fleet Command GUI IPC system.',
+        'Send a mail message to request dispatch, or describe what agents you need.',
+        '',
+        '## Mail System (messages appear in your context automatically)',
+        'Your incoming mail is injected every 5 seconds. You will see [MAIL] blocks.',
+        'To send mail, describe what you want to communicate and to whom.',
+        '',
+        '## Merge Authorization',
+        'When a lead sends merge_ready, review the work before authorizing.',
+        'Only authorize merges after confirming quality gates pass.',
+        '',
+        '# RULES',
+        '- You are READ-ONLY. Never use Write or Edit. Dispatch agents for implementation.',
+        '- Never merge before receiving explicit merge_ready from the owning lead.',
+        '- If an agent sends error/escalation, help resolve or reassign.',
+        '- Record expertise insights for future sessions.',
+        '- When all dispatched work is complete, merged, and issues closed — signal done.',
+        '',
+        '# BEGIN',
+        'Start by analyzing the codebase structure to plan your work decomposition.',
+      ].filter(Boolean).join('\n');
+
       const agentProcess = agentProcessManager.spawn({
         id,
         agentName,
@@ -1118,9 +1909,7 @@ export function registerIpcHandlers(): void {
         model,
         worktreePath,
         runId: options?.run_id,
-        prompt:
-          options?.prompt ||
-          'You are the coordinator agent. Monitor the fleet, decompose tasks, dispatch lead agents, and authorize merges. Poll mail regularly for status updates from workers.',
+        prompt: coordinatorPrompt,
         depth: 0,
       });
 
@@ -1142,7 +1931,7 @@ export function registerIpcHandlers(): void {
         coordActiveProject?.id ?? null,
       );
 
-      // Update state to working after brief boot and auto-decompose tasks
+      // Transition to working state after brief boot
       setTimeout(() => {
         try {
           validateAndUpdateSessionState(id, 'working');
@@ -1262,9 +2051,12 @@ export function registerIpcHandlers(): void {
         }
       }, 3000);
 
+      // Start backend auto-poll — coordinator is now fully autonomous
+      startCoordinatorMailInjection(id, agentName);
+
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(id);
       log.info(
-        `[IPC] coordinator:start - spawned coordinator: ${agentName}, PID=${agentProcess.pid}, cwd=${worktreePath}`,
+        `[IPC] coordinator:start - spawned autonomous coordinator: ${agentName}, PID=${agentProcess.pid}, cwd=${worktreePath}`,
       );
       return { data: session, error: null };
     } catch (error) {
@@ -1275,7 +2067,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('coordinator:stop', async () => {
     try {
-      // Find the active coordinator session
+      stopCoordinatorMailInjection();
+
       const coordinator = loggedPrepare(
         `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
       ).get() as Record<string, unknown> | undefined;
@@ -1287,14 +2080,23 @@ export function registerIpcHandlers(): void {
 
       const coordinatorId = coordinator.id as string;
 
-      // Graceful shutdown: send SIGTERM via tree-kill
       await agentProcessManager.stop(coordinatorId);
 
       // Update session state in database (validated by state machine)
       validateAndUpdateSessionState(coordinatorId, 'completed');
 
+      // Auto-complete the active run
+      const activeRun = loggedPrepare(
+        `SELECT id FROM runs WHERE status = 'active' ORDER BY started_at DESC LIMIT 1`,
+      ).get() as { id: string } | undefined;
+      if (activeRun) {
+        loggedPrepare(
+          `UPDATE runs SET status = 'completed', completed_at = datetime('now') WHERE id = ?`,
+        ).run(activeRun.id);
+      }
+
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(coordinatorId);
-      log.info(`[IPC] coordinator:stop - gracefully stopped coordinator: ${coordinatorId}`);
+      log.info(`[IPC] coordinator:stop - stopped coordinator and auto-poll: ${coordinatorId}`);
       return { data: session, error: null };
     } catch (error) {
       log.error('coordinator:stop failed:', error);
@@ -1464,6 +2266,31 @@ export function registerIpcHandlers(): void {
           }),
         );
 
+        // ── Coordinator ↔ Task Board: create linked issue for dispatch ──
+        let dispatchIssueId: string | null = null;
+        try {
+          dispatchIssueId = `issue-dispatch-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+          loggedPrepare(
+            `INSERT INTO issues (id, title, description, type, priority, status, assigned_agent)
+             VALUES (?, ?, ?, 'task', 'high', 'in_progress', ?)`,
+          ).run(
+            dispatchIssueId,
+            `[Lead] ${options.objective.substring(0, 80)}`,
+            `Dispatched by coordinator to lead agent ${leadName}.\n\nObjective: ${options.objective}`,
+            leadName,
+          );
+
+          // Link the session to the issue
+          loggedPrepare(
+            `UPDATE sessions SET dispatch_issue_id = ? WHERE id = ?`,
+          ).run(dispatchIssueId, leadId);
+
+          log.info(`[TaskBoard] Created dispatch issue ${dispatchIssueId} linked to lead ${leadName}`);
+        } catch (issueErr) {
+          log.warn(`[TaskBoard] Failed to create dispatch issue:`, issueErr);
+          dispatchIssueId = null;
+        }
+
         // Record dispatch event in event log
         recordEvent({
           eventType: 'spawn',
@@ -1477,6 +2304,7 @@ export function registerIpcHandlers(): void {
             objective: options.objective,
             model,
             worktree_path: worktreePath,
+            dispatch_issue_id: dispatchIssueId,
           }),
         });
 
@@ -1699,6 +2527,43 @@ export function registerIpcHandlers(): void {
 
             if (workerSession) {
               validateAndUpdateSessionState(workerSession.id as string, 'completed');
+            }
+
+            // ── Close linked issues when worker signals done ──
+            try {
+              const workerIssues = loggedPrepare(
+                `SELECT id, title FROM issues WHERE assigned_agent = ? AND status IN ('open', 'in_progress')`,
+              ).all(fromAgent) as Array<{ id: string; title: string }>;
+
+              for (const issue of workerIssues) {
+                loggedPrepare(
+                  `UPDATE issues SET status = 'closed', close_summary = ?, closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+                ).run(
+                  workerSummary ?? `Completed by ${fromAgent}`,
+                  issue.id,
+                );
+                log.info(
+                  `[TaskBoard] Auto-closed issue ${issue.id} on worker_done from ${fromAgent}`,
+                );
+
+                // Check task group auto-close
+                const issueRow = loggedPrepare('SELECT group_id FROM issues WHERE id = ?').get(
+                  issue.id,
+                ) as { group_id: string | null } | undefined;
+                if (issueRow?.group_id) {
+                  const groupIssues = loggedPrepare(
+                    `SELECT status FROM issues WHERE group_id = ?`,
+                  ).all(issueRow.group_id) as Array<{ status: string }>;
+                  if (groupIssues.every((i) => i.status === 'closed')) {
+                    loggedPrepare(
+                      `UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?`,
+                    ).run(issueRow.group_id);
+                    log.info(`[TaskBoard] Auto-closed task group ${issueRow.group_id}`);
+                  }
+                }
+              }
+            } catch (issueCloseErr) {
+              log.warn(`[TaskBoard] Failed to auto-close issues for ${fromAgent}:`, issueCloseErr);
             }
 
             // Record structured completion event
@@ -2073,7 +2938,7 @@ export function registerIpcHandlers(): void {
       // 2. Mail messages sent to or from coordinator
       const mail = loggedPrepare(
         `SELECT id, from_agent, to_agent, subject, type, priority, created_at as timestamp
-        FROM mail
+        FROM messages
         WHERE from_agent = ? OR to_agent = ?
         ORDER BY created_at DESC
         LIMIT ?`,
@@ -2187,16 +3052,12 @@ export function registerIpcHandlers(): void {
       }
 
       // Find the active coordinator session
-      const coordinatorSession = loggedPrepare(
+      const coordSession = (loggedPrepare(
+        `SELECT id, agent_name FROM sessions WHERE capability = 'coordinator' AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1`,
+      ).get() ||
+      loggedPrepare(
         `SELECT id, agent_name FROM sessions WHERE capability = 'lead' AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1`,
-      ).get() as { id: string; agent_name: string } | undefined;
-
-      // Also check for coordinator capability
-      const coordSession =
-        coordinatorSession ||
-        (loggedPrepare(
-          `SELECT id, agent_name FROM sessions WHERE agent_name LIKE '%coordinator%' AND state IN ('booting', 'working') ORDER BY created_at DESC LIMIT 1`,
-        ).get() as { id: string; agent_name: string } | undefined);
+      ).get()) as { id: string; agent_name: string } | undefined;
 
       if (!coordSession) {
         return { data: null, error: 'No active coordinator found. Start the coordinator first.' };
@@ -3135,8 +3996,141 @@ export function registerIpcHandlers(): void {
     },
   );
 
+  // ── Auto-Escalate: Run all 4 merge tiers sequentially (Task 2.1) ──
+  ipcMain.handle(
+    'merge:auto-escalate',
+    async (_event, id: number, repoPath?: string) => {
+      try {
+        const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as {
+          id: number;
+          branch_name: string;
+          task_id: string | null;
+          agent_name: string | null;
+          status: string;
+        } | null;
+        if (!entry) {
+          return { data: null, error: `Merge queue entry ${id} not found` };
+        }
+
+        const mergePath = repoPath || process.cwd();
+        const targetBranch = persistentStore.get('mergeTargetBranch', null) as string | null;
+
+        // Capture pre-merge commit SHA for rollback support
+        let preMergeCommit: string | null = null;
+        try {
+          const sgit = (await import('simple-git')).default(mergePath);
+          const headCommit = await sgit.revparse(['HEAD']);
+          preMergeCommit = headCommit.trim();
+          loggedPrepare('UPDATE merge_queue SET pre_merge_commit = ? WHERE id = ?').run(preMergeCommit, id);
+        } catch (commitErr) {
+          log.warn(`[IPC] merge:auto-escalate - could not capture pre-merge commit: ${commitErr}`);
+        }
+
+        // Update status to merging
+        loggedPrepare("UPDATE merge_queue SET status = 'merging' WHERE id = ?").run(id);
+
+        // Broadcast status update to renderer
+        const broadcastMergeStatus = (tier: string, status: string) => {
+          for (const win of BrowserWindow.getAllWindows()) {
+            if (!win.isDestroyed()) {
+              win.webContents.send('merge:status-update', { id, tier, status, branch: entry.branch_name });
+            }
+          }
+        };
+
+        // ── Tier 1: Clean Merge ──
+        log.info(`[IPC] merge:auto-escalate - Tier 1 (clean-merge) for id=${id}`);
+        broadcastMergeStatus('clean-merge', 'attempting');
+        const tier1 = await executeCleanMerge(mergePath, entry.branch_name, targetBranch || undefined);
+        if (tier1.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'clean-merge', completed_at = datetime('now') WHERE id = ?",
+          ).run(id);
+          broadcastMergeStatus('clean-merge', 'success');
+          log.info(`[IPC] merge:auto-escalate - Tier 1 succeeded for id=${id}`);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          return { data: updated, error: null, resolvedTier: 'clean-merge' };
+        }
+        log.info(`[IPC] merge:auto-escalate - Tier 1 failed, escalating to Tier 2 for id=${id}`);
+        broadcastMergeStatus('clean-merge', 'failed');
+
+        // ── Tier 2: Auto-Resolve ──
+        log.info(`[IPC] merge:auto-escalate - Tier 2 (auto-resolve) for id=${id}`);
+        broadcastMergeStatus('auto-resolve', 'attempting');
+        const tier2 = await autoResolveConflicts(mergePath, entry.branch_name, targetBranch || undefined);
+        if (tier2.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'auto-resolve', completed_at = datetime('now') WHERE id = ?",
+          ).run(id);
+          broadcastMergeStatus('auto-resolve', 'success');
+          log.info(`[IPC] merge:auto-escalate - Tier 2 succeeded for id=${id}`);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          return { data: updated, error: null, resolvedTier: 'auto-resolve' };
+        }
+        log.info(`[IPC] merge:auto-escalate - Tier 2 failed, escalating to Tier 3 for id=${id}`);
+        broadcastMergeStatus('auto-resolve', 'failed');
+
+        // ── Tier 3: AI-Resolve ──
+        log.info(`[IPC] merge:auto-escalate - Tier 3 (ai-resolve) for id=${id}`);
+        broadcastMergeStatus('ai-resolve', 'attempting');
+        const tier3 = await aiResolveConflicts(mergePath, entry.branch_name, targetBranch || undefined);
+        if (tier3.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'ai-resolve', completed_at = datetime('now') WHERE id = ?",
+          ).run(id);
+          broadcastMergeStatus('ai-resolve', 'success');
+          log.info(`[IPC] merge:auto-escalate - Tier 3 succeeded for id=${id}`);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          return { data: updated, error: null, resolvedTier: 'ai-resolve' };
+        }
+        log.info(`[IPC] merge:auto-escalate - Tier 3 failed, escalating to Tier 4 for id=${id}`);
+        broadcastMergeStatus('ai-resolve', 'failed');
+
+        // ── Tier 4: Reimagine ──
+        log.info(`[IPC] merge:auto-escalate - Tier 4 (reimagine) for id=${id}`);
+        broadcastMergeStatus('reimagine', 'attempting');
+        const tier4 = await reimagineFromScratch(
+          mergePath,
+          entry.branch_name,
+          targetBranch || undefined,
+          entry.task_id || undefined,
+        );
+        if (tier4.success) {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'reimagine', completed_at = datetime('now') WHERE id = ?",
+          ).run(id);
+          broadcastMergeStatus('reimagine', 'success');
+          log.info(`[IPC] merge:auto-escalate - Tier 4 succeeded for id=${id}`);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          return { data: updated, error: null, resolvedTier: 'reimagine', reimagineBranch: tier4.reimagineBranch };
+        }
+
+        // ── All Tiers Failed ──
+        loggedPrepare(
+          "UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?",
+        ).run(id);
+        broadcastMergeStatus('reimagine', 'failed');
+        log.error(`[IPC] merge:auto-escalate - all 4 tiers failed for id=${id}`);
+        const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+        return {
+          data: updated,
+          error: 'All 4 merge tiers failed',
+          lastTierAttempted: 'reimagine',
+        };
+      } catch (error) {
+        log.error('merge:auto-escalate failed:', error);
+        try {
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?",
+          ).run(id);
+        } catch { /* ignore */ }
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
   // Complete a merge with a resolution tier
-  ipcMain.handle('merge:complete', (_event, id: number, resolvedTier: string) => {
+  ipcMain.handle('merge:complete', async (_event, id: number, resolvedTier: string) => {
     try {
       loggedPrepare(
         "UPDATE merge_queue SET status = 'merged', resolved_tier = ?, completed_at = datetime('now') WHERE id = ?",
@@ -3145,19 +4139,248 @@ export function registerIpcHandlers(): void {
       log.info(
         `[IPC] merge:complete - UPDATE merge in real database: id=${id}, tier=${resolvedTier}`,
       );
+
+      // ── Quality Gate Execution (Phase 2.2) ──
+      const activeProjectForGates = loggedPrepare(
+        'SELECT path FROM projects WHERE is_active = 1 LIMIT 1',
+      ).get() as { path: string } | undefined;
+      if (activeProjectForGates) {
+        const gateResults = await runQualityGates(activeProjectForGates.path, {
+          agentName: entry?.agent_name as string | undefined,
+        });
+        if (!gateResults.passed) {
+          // Rollback merge if quality gates fail
+          const preMerge = loggedPrepare(
+            'SELECT pre_merge_commit FROM merge_queue WHERE id = ?',
+          ).get(id) as { pre_merge_commit: string | null } | undefined;
+          if (preMerge?.pre_merge_commit) {
+            log.warn(
+              `[IPC] merge:complete - quality gates FAILED, rolling back merge id=${id}`,
+            );
+            await rollbackMerge(activeProjectForGates.path, preMerge.pre_merge_commit);
+            loggedPrepare(
+              "UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?",
+            ).run(id);
+            const failedEntry = loggedPrepare(
+              'SELECT * FROM merge_queue WHERE id = ?',
+            ).get(id);
+            const failedGateNames = gateResults.results
+              .filter((r) => r.status !== 'passed')
+              .map((r) => r.gateName)
+              .join(', ');
+            return {
+              data: failedEntry,
+              error: `Quality gates failed: ${failedGateNames}`,
+            };
+          }
+        }
+        log.info(
+          `[IPC] merge:complete - quality gates passed: ${gateResults.results.length} gate(s)`,
+        );
+      }
+
+      // ── Mail Notifications (Phase 2.3) ──
+      try {
+        const { nanoid } = await import('nanoid');
+
+        // Notify the agent that requested the merge
+        if (entry?.agent_name) {
+          loggedPrepare(
+            `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+             VALUES (?, 'merge-system', ?, ?, ?, 'merged', 'normal', ?, 0, datetime('now'))`,
+          ).run(
+            nanoid(),
+            entry.agent_name as string,
+            `Merged: ${entry.branch_name}`,
+            `Branch ${entry.branch_name} merged successfully via ${resolvedTier}.`,
+            JSON.stringify({
+              branch: entry.branch_name,
+              tier: resolvedTier,
+              taskId: entry.task_id,
+            }),
+          );
+        }
+
+        // Notify coordinator(s)
+        const coordinators = loggedPrepare(
+          "SELECT DISTINCT agent_name FROM sessions WHERE capability = 'coordinator' AND state IN ('booting', 'working')",
+        ).all() as Array<{ agent_name: string }>;
+        for (const coord of coordinators) {
+          if (coord.agent_name !== entry?.agent_name) {
+            loggedPrepare(
+              `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+               VALUES (?, 'merge-system', ?, ?, ?, 'merged', 'normal', ?, 0, datetime('now'))`,
+            ).run(
+              nanoid(),
+              coord.agent_name,
+              `Merged: ${entry?.branch_name}`,
+              `Branch ${entry?.branch_name} merged via ${resolvedTier}.`,
+              JSON.stringify({
+                branch: entry?.branch_name,
+                tier: resolvedTier,
+                taskId: entry?.task_id,
+              }),
+            );
+          }
+        }
+      } catch (mailErr) {
+        log.warn(
+          `[IPC] merge:complete - failed to send merge notifications: ${mailErr}`,
+        );
+      }
       // Update associated agent session status if agent_name is set
       if (entry?.agent_name) {
         const agentName = entry.agent_name as string;
         const agentSession = loggedPrepare(
-          "SELECT id FROM sessions WHERE agent_name = ? AND state = 'active' ORDER BY rowid DESC LIMIT 1",
-        ).get(agentName) as { id: string } | undefined;
+          "SELECT id, worktree_path, branch_name FROM sessions WHERE agent_name = ? ORDER BY rowid DESC LIMIT 1",
+        ).get(agentName) as { id: string; worktree_path: string | null; branch_name: string | null } | undefined;
         if (agentSession) {
           validateAndUpdateSessionState(agentSession.id, 'completed');
           log.info(
             `[IPC] merge:complete - Updated agent session ${agentSession.id} (${agentName}) to completed after merge`,
           );
+
+          // ── Worktree cleanup after successful merge ──
+          // Now that the branch is merged, safe to remove the worktree
+          const wtPath = agentSession.worktree_path;
+          if (wtPath && wtPath.includes('.fleetcommand') && wtPath.includes('worktrees')) {
+            try {
+              const projectRoot = wtPath.split('.fleetcommand')[0].replace(/[/\\]$/, '');
+
+              execSync(`git worktree remove "${wtPath}" --force`, {
+                cwd: projectRoot,
+                timeout: 15000,
+              });
+              log.info(`[Worktree] Cleaned up worktree after merge for ${agentName}: ${wtPath}`);
+
+              // Delete the branch — it's been merged
+              if (agentSession.branch_name) {
+                try {
+                  execSync(`git branch -d "${agentSession.branch_name}"`, {
+                    cwd: projectRoot,
+                    timeout: 10000,
+                  });
+                  log.info(`[Worktree] Deleted merged branch ${agentSession.branch_name}`);
+                } catch {
+                  // Try force-delete if normal delete fails (branch might not be fully merged from git's perspective)
+                  try {
+                    execSync(`git branch -D "${agentSession.branch_name}"`, {
+                      cwd: projectRoot,
+                      timeout: 10000,
+                    });
+                  } catch {
+                    log.debug(`[Worktree] Branch ${agentSession.branch_name} already deleted`);
+                  }
+                }
+              }
+
+              recordEvent({
+                eventType: 'custom',
+                agentName,
+                sessionId: agentSession.id,
+                data: JSON.stringify({
+                  action: 'worktree_cleanup_after_merge',
+                  worktree_path: wtPath,
+                  branch: agentSession.branch_name,
+                  merge_queue_id: id,
+                  resolved_tier: resolvedTier,
+                }),
+              });
+            } catch (wtErr) {
+              log.warn(`[Worktree] Post-merge cleanup failed for ${agentName} (${wtPath}):`, wtErr);
+            }
+          }
         }
       }
+      // ── Auto-Advance Queue (Task 2.4) ──
+      try {
+        // Find next unblocked pending entry
+        const pendingEntries = loggedPrepare(
+          "SELECT * FROM merge_queue WHERE status = 'pending' ORDER BY enqueued_at ASC",
+        ).all() as Array<{ id: number; branch_name: string; depends_on: string | null }>;
+
+        let nextReady: (typeof pendingEntries)[0] | null = null;
+        for (const pending of pendingEntries) {
+          if (!pending.depends_on) {
+            nextReady = pending;
+            break;
+          }
+          try {
+            const depIds = JSON.parse(pending.depends_on) as number[];
+            if (depIds.length === 0) {
+              nextReady = pending;
+              break;
+            }
+            const placeholders = depIds.map(() => '?').join(',');
+            const nonMergedDeps = loggedPrepare(
+              `SELECT COUNT(*) as count FROM merge_queue WHERE id IN (${placeholders}) AND status != 'merged'`,
+            ).get(...depIds) as { count: number };
+            if (nonMergedDeps.count === 0) {
+              nextReady = pending;
+              break;
+            }
+          } catch {
+            nextReady = pending;
+            break;
+          }
+        }
+
+        if (nextReady) {
+          log.info(`[IPC] merge:complete - next merge ready: id=${nextReady.id}, branch=${nextReady.branch_name}`);
+          notificationService.notify({
+            title: 'Next Merge Ready',
+            body: `Branch "${nextReady.branch_name}" is ready for merge`,
+            eventType: 'merge_ready' as NotificationEventType,
+          });
+        }
+
+        // Broadcast merge:status-update to renderer so UI auto-refreshes
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('merge:status-update', {
+              id,
+              status: 'merged',
+              nextReady: nextReady ? { id: nextReady.id, branch: nextReady.branch_name } : null,
+            });
+          }
+        }
+      } catch (advanceErr) {
+        log.warn(`[IPC] merge:complete - auto-advance check failed: ${advanceErr}`);
+      }
+
+      // ── Issue Auto-Close After Merge (Task 2.5) ──
+      if (entry?.task_id) {
+        try {
+          const taskId = entry.task_id as string;
+          const issue = loggedPrepare(
+            "SELECT * FROM issues WHERE id = ? AND status != 'closed'",
+          ).get(taskId) as { id: string; group_id: string | null; status: string } | undefined;
+
+          if (issue) {
+            loggedPrepare(
+              "UPDATE issues SET status = 'closed', close_summary = ?, closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+            ).run(`Merged via ${resolvedTier}`, issue.id);
+            log.info(`[IPC] merge:complete - auto-closed issue ${issue.id} after merge`);
+
+            // Check if all issues in the same group are closed -> auto-close the group
+            if (issue.group_id) {
+              const openIssuesInGroup = loggedPrepare(
+                "SELECT COUNT(*) as count FROM issues WHERE group_id = ? AND status != 'closed'",
+              ).get(issue.group_id) as { count: number };
+
+              if (openIssuesInGroup.count === 0) {
+                loggedPrepare(
+                  "UPDATE task_groups SET status = 'completed', closed_at = datetime('now') WHERE id = ?",
+                ).run(issue.group_id);
+                log.info(`[IPC] merge:complete - auto-completed task group ${issue.group_id} (all issues closed)`);
+              }
+            }
+          }
+        } catch (autoCloseErr) {
+          log.warn(`[IPC] merge:complete - issue auto-close failed: ${autoCloseErr}`);
+        }
+      }
+
       return { data: entry, error: null };
     } catch (error) {
       log.error('merge:complete failed:', error);
@@ -3166,13 +4389,62 @@ export function registerIpcHandlers(): void {
   });
 
   // Mark a merge as failed
-  ipcMain.handle('merge:fail', (_event, id: number) => {
+  ipcMain.handle('merge:fail', async (_event, id: number) => {
     try {
       loggedPrepare(
         "UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?",
       ).run(id);
-      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+      const entry = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id) as
+        | Record<string, unknown>
+        | undefined;
       log.info(`[IPC] merge:fail - UPDATE merge in real database: id=${id}`);
+
+      // ── Mail Notification for merge failure (Phase 2.3) ──
+      try {
+        const { nanoid } = await import('nanoid');
+        if (entry?.agent_name) {
+          loggedPrepare(
+            `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+             VALUES (?, 'merge-system', ?, ?, ?, 'merge_failed', 'high', ?, 0, datetime('now'))`,
+          ).run(
+            nanoid(),
+            entry.agent_name as string,
+            `Merge failed: ${entry.branch_name}`,
+            `Branch ${entry.branch_name} failed to merge.`,
+            JSON.stringify({
+              branch: entry.branch_name,
+              reason: 'all tiers exhausted',
+            }),
+          );
+        }
+
+        // Notify coordinator(s) of the failure
+        const coordinators = loggedPrepare(
+          "SELECT DISTINCT agent_name FROM sessions WHERE capability = 'coordinator' AND state IN ('booting', 'working')",
+        ).all() as Array<{ agent_name: string }>;
+        for (const coord of coordinators) {
+          if (coord.agent_name !== entry?.agent_name) {
+            loggedPrepare(
+              `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+               VALUES (?, 'merge-system', ?, ?, ?, 'merge_failed', 'high', ?, 0, datetime('now'))`,
+            ).run(
+              nanoid(),
+              coord.agent_name,
+              `Merge failed: ${entry?.branch_name}`,
+              `Branch ${entry?.branch_name} failed to merge.`,
+              JSON.stringify({
+                branch: entry?.branch_name,
+                reason: 'all tiers exhausted',
+              }),
+            );
+          }
+        }
+      } catch (mailErr) {
+        log.warn(
+          `[IPC] merge:fail - failed to send failure notification: ${mailErr}`,
+        );
+      }
+
       return { data: entry, error: null };
     } catch (error) {
       log.error('merge:fail failed:', error);
@@ -3371,6 +4643,21 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // List git branches for a repo
+  ipcMain.handle('git:list-branches', async (_event, repoPath: string) => {
+    try {
+      const simpleGit = (await import('simple-git')).default;
+      const git = simpleGit(repoPath);
+      const result = await git.branchLocal();
+      const branches = result.all;
+      log.info(`[IPC] git:list-branches - found ${branches.length} branches in ${repoPath}`);
+      return { data: branches, error: null };
+    } catch (error) {
+      log.error('git:list-branches failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // Issue channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle(
     'issue:list',
@@ -3538,21 +4825,16 @@ export function registerIpcHandlers(): void {
 
         // Auto-unblock dependent issues when this issue is closed
         if (updates.status === 'closed') {
-          const allRows = loggedPrepare(
-            'SELECT id, dependencies, status FROM issues',
-          ).all() as Array<{
+          // Only fetch blocked issues whose dependencies mention this issue
+          const blockedRows = loggedPrepare(
+            "SELECT id, dependencies, status FROM issues WHERE dependencies LIKE '%' || ? || '%' AND status = 'blocked'",
+          ).all(id) as Array<{
             id: string;
             dependencies: string | null;
             status: string;
           }>;
-          const statusMap = new Map<string, string>();
-          for (const row of allRows) {
-            statusMap.set(row.id, row.status);
-          }
-          statusMap.set(id, 'closed');
 
-          for (const row of allRows) {
-            if (row.id === id || row.status !== 'blocked') continue;
+          for (const row of blockedRows) {
             let depIds: string[] = [];
             try {
               depIds = JSON.parse(row.dependencies || '[]');
@@ -3560,7 +4842,14 @@ export function registerIpcHandlers(): void {
               continue;
             }
             if (!depIds.includes(id)) continue;
-            const allResolved = depIds.every((depId) => statusMap.get(depId) === 'closed');
+            // Check if all dependencies are now closed
+            const allResolved = depIds.every((depId) => {
+              if (depId === id) return true; // The just-closed issue
+              const dep = loggedPrepare('SELECT status FROM issues WHERE id = ?').get(depId) as
+                | { status: string }
+                | undefined;
+              return dep?.status === 'closed';
+            });
             if (allResolved) {
               loggedPrepare(
                 "UPDATE issues SET status = 'open', updated_at = datetime('now') WHERE id = ?",
@@ -3634,6 +4923,11 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('issue:claim', (_event, id: string, agentName: string) => {
+    const validation = validateIpcParams('issue:claim', { id, agentName }, [
+      { name: 'id', type: 'string' },
+      { name: 'agentName', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       loggedPrepare(
         `UPDATE issues SET status = 'in_progress', assigned_agent = ?, updated_at = datetime('now')
@@ -3650,6 +4944,10 @@ export function registerIpcHandlers(): void {
 
   // Issues by agent name
   ipcMain.handle('issue:by-agent', (_event, agentName: string) => {
+    const validation = validateIpcParams('issue:by-agent', { agentName }, [
+      { name: 'agentName', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const issues = loggedPrepare(
         'SELECT * FROM issues WHERE assigned_agent = ? ORDER BY updated_at DESC',
@@ -3666,6 +4964,10 @@ export function registerIpcHandlers(): void {
 
   // Issue dependency management
   ipcMain.handle('issue:set-dependencies', (_event, id: string, dependencyIds: string[]) => {
+    const validation = validateIpcParams('issue:set-dependencies', { id }, [
+      { name: 'id', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const depsJson = JSON.stringify(dependencyIds);
       // Check if any dependencies are unresolved
@@ -3707,6 +5009,10 @@ export function registerIpcHandlers(): void {
 
   // Get issues that this issue is blocking (reverse dependency lookup)
   ipcMain.handle('issue:blocking', (_event, id: string) => {
+    const validation = validateIpcParams('issue:blocking', { id }, [
+      { name: 'id', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const allIssues = loggedPrepare(
         'SELECT id, title, status, dependencies FROM issues',
@@ -3736,23 +5042,24 @@ export function registerIpcHandlers(): void {
   // Ready queue: issues that are open/in_progress with no unresolved blocking dependencies
   ipcMain.handle('issue:ready-queue', (_event) => {
     try {
-      // Get all non-closed issues
-      const allIssues = loggedPrepare(
-        "SELECT * FROM issues WHERE status IN ('open', 'in_progress') ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, created_at ASC",
+      // Get all issues once to build status map and filter active ones
+      const allRows = loggedPrepare(
+        "SELECT * FROM issues ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, created_at ASC",
       ).all() as Array<Record<string, unknown>>;
 
-      // Get statuses of all issues for dependency resolution
-      const allIssueStatuses = loggedPrepare('SELECT id, status FROM issues').all() as Array<{
-        id: string;
-        status: string;
-      }>;
+      // Build status map from the same result set
       const statusMap = new Map<string, string>();
-      for (const issue of allIssueStatuses) {
-        statusMap.set(issue.id, issue.status);
+      for (const row of allRows) {
+        statusMap.set(row.id as string, row.status as string);
       }
 
+      // Filter to active issues first, then to only unblocked ones
+      const activeIssues = allRows.filter(
+        (row) => row.status === 'open' || row.status === 'in_progress',
+      );
+
       // Filter to only unblocked issues
-      const readyIssues = allIssues.filter((issue) => {
+      const readyIssues = activeIssues.filter((issue) => {
         const depsJson = issue.dependencies as string | null;
         if (!depsJson) return true; // No dependencies = ready
         try {
@@ -3766,7 +5073,7 @@ export function registerIpcHandlers(): void {
       });
 
       log.info(
-        `[IPC] issue:ready-queue - Found ${readyIssues.length} ready issues out of ${allIssues.length} active`,
+        `[IPC] issue:ready-queue - Found ${readyIssues.length} ready issues out of ${activeIssues.length} active`,
       );
       return { data: readyIssues, error: null };
     } catch (error) {
@@ -3838,14 +5145,16 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('taskGroup:delete', (_event, id: string) => {
+    const validation = validateIpcParams('taskGroup:delete', { id }, [
+      { name: 'id', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: false, error: validation.error };
     try {
       // Use a transaction to atomically remove group and unlink member issues
       const groupDb = getDatabase();
       const deleteGroupTransaction = groupDb.transaction(() => {
-        // Remove group_id from all member issues
-        loggedPrepare(
-          "UPDATE issues SET group_id = NULL, updated_at = datetime('now') WHERE group_id = ?",
-        ).run(id);
+        // Delete all issues belonging to this group
+        loggedPrepare('DELETE FROM issues WHERE group_id = ?').run(id);
         loggedPrepare('DELETE FROM task_groups WHERE id = ?').run(id);
       });
       deleteGroupTransaction();
@@ -3858,6 +5167,11 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('taskGroup:addIssue', (_event, groupId: string, issueId: string) => {
+    const validation = validateIpcParams('taskGroup:addIssue', { groupId, issueId }, [
+      { name: 'groupId', type: 'string' },
+      { name: 'issueId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
         | { id: string; member_issues: string | null }
@@ -3905,6 +5219,11 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('taskGroup:removeIssue', (_event, groupId: string, issueId: string) => {
+    const validation = validateIpcParams('taskGroup:removeIssue', { groupId, issueId }, [
+      { name: 'groupId', type: 'string' },
+      { name: 'issueId', type: 'string' },
+    ]);
+    if (!validation.valid) return { data: null, error: validation.error };
     try {
       const group = loggedPrepare('SELECT * FROM task_groups WHERE id = ?').get(groupId) as
         | { id: string; member_issues: string | null }
@@ -5700,6 +7019,8 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Clean worktrees whose branches have been merged (safe cleanup — like `ov worktree clean`)
+  // Only removes worktrees for completed agents whose branches are in merge_queue with status='merged'
   ipcMain.handle('worktree:clean-completed', async (_event, repoPath: string) => {
     try {
       const simpleGit = (await import('simple-git')).default;
@@ -5709,6 +7030,7 @@ export function registerIpcHandlers(): void {
       const result = await git.raw(['worktree', 'list', '--porcelain']);
       const blocks = result.trim().split('\n\n');
       const removed: string[] = [];
+      const skipped: Array<{ path: string; reason: string }> = [];
       const errors: Array<{ path: string; error: string }> = [];
 
       let isFirst = true;
@@ -5735,37 +7057,83 @@ export function registerIpcHandlers(): void {
         let hasActiveAgent = false;
         try {
           const session = loggedPrepare(
-            "SELECT agent_name FROM sessions WHERE worktree_path = ? AND state NOT IN ('completed', 'zombie', 'failed') LIMIT 1",
+            "SELECT agent_name FROM sessions WHERE worktree_path = ? AND state NOT IN ('completed', 'zombie') LIMIT 1",
           ).get(wtPath) as { agent_name: string } | undefined;
           if (session) hasActiveAgent = true;
         } catch {
           /* ignore */
         }
 
-        // Only remove worktrees that are NOT assigned to active agents
-        if (!hasActiveAgent) {
-          try {
-            await git.raw(['worktree', 'remove', wtPath, '--force']);
-            removed.push(wtPath);
+        if (hasActiveAgent) {
+          skipped.push({ path: wtPath, reason: 'agent still active' });
+          continue;
+        }
 
-            // Also try to delete the branch if it exists
-            if (branch) {
-              try {
-                await git.raw(['branch', '-D', branch]);
-              } catch {
-                /* branch may not exist or be checked out elsewhere */
-              }
-            }
-          } catch (err) {
-            errors.push({ path: wtPath, error: String(err) });
+        // Check if the branch has been merged (in merge_queue with status='merged')
+        let isMerged = false;
+        if (branch) {
+          try {
+            const mergeEntry = loggedPrepare(
+              "SELECT id FROM merge_queue WHERE branch_name = ? AND status = 'merged' LIMIT 1",
+            ).get(branch) as { id: number } | undefined;
+            if (mergeEntry) isMerged = true;
+          } catch {
+            /* ignore */
           }
+
+          // Also check if git considers the branch merged into the target
+          if (!isMerged) {
+            try {
+              const mergedBranches = await git.raw(['branch', '--merged']);
+              if (mergedBranches.includes(branch)) isMerged = true;
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+
+        if (!isMerged && branch) {
+          skipped.push({ path: wtPath, reason: `branch '${branch}' not yet merged — use force-remove if needed` });
+          continue;
+        }
+
+        // Safe to remove — agent is done and branch is merged (or no branch)
+        try {
+          await git.raw(['worktree', 'remove', wtPath, '--force']);
+          removed.push(wtPath);
+
+          // Delete the merged branch
+          if (branch) {
+            try {
+              await git.raw(['branch', '-d', branch]);
+            } catch {
+              try { await git.raw(['branch', '-D', branch]); } catch { /* already gone */ }
+            }
+          }
+
+          // Purge agent mail for this worktree
+          try {
+            const agentSession = loggedPrepare(
+              "SELECT agent_name FROM sessions WHERE worktree_path = ? ORDER BY created_at DESC LIMIT 1",
+            ).get(wtPath) as { agent_name: string } | undefined;
+            if (agentSession) {
+              loggedPrepare(
+                "DELETE FROM messages WHERE (from_agent = ? OR to_agent = ?) AND created_at < datetime('now', '-1 day')",
+              ).run(agentSession.agent_name, agentSession.agent_name);
+              log.info(`[Worktree] Purged old mail for ${agentSession.agent_name}`);
+            }
+          } catch {
+            /* non-fatal */
+          }
+        } catch (err) {
+          errors.push({ path: wtPath, error: String(err) });
         }
       }
 
       log.info(
-        `[IPC] worktree:clean-completed - removed ${removed.length} worktrees, ${errors.length} errors`,
+        `[IPC] worktree:clean-completed - removed ${removed.length}, skipped ${skipped.length}, errors ${errors.length}`,
       );
-      return { data: { removed, errors }, error: null };
+      return { data: { removed, skipped, errors }, error: null };
     } catch (error) {
       log.error('worktree:clean-completed failed:', error);
       return { data: null, error: String(error) };
@@ -6924,6 +8292,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('notification:set-preferences', (_event, prefs: Record<string, boolean>) => {
     try {
       notificationService.setPreferences(prefs);
+      // Persist preferences to the JSON file store so they survive restarts
+      const appSettings = (persistentStore.get('app_settings') as Record<string, unknown>) || {};
+      appSettings.notificationPreferences = notificationService.getPreferences();
+      persistentStore.set('app_settings', appSettings);
+      log.info('[IPC] Persisted notification preferences to electron-store');
       return { data: true, error: null };
     } catch (error) {
       log.error('notification:set-preferences failed:', error);
@@ -9947,6 +11320,1009 @@ export function registerIpcHandlers(): void {
       return { data: null, error: String(error) };
     }
   });
+
+  // ==========================================
+  // Expertise: Multi-Domain Prime (Mulch Prime)
+  // ==========================================
+
+  ipcMain.handle(
+    'expertise:prime',
+    (
+      _event,
+      options: {
+        domains?: string[];
+        agent_name?: string;
+        agent_capability?: string;
+        inject_session_id?: string;
+        limit_per_domain?: number;
+      },
+    ) => {
+      try {
+        let domains = options.domains ?? [];
+
+        // If no domains specified, auto-detect from agent identity or capability
+        if (domains.length === 0 && options.agent_name) {
+          const identity = loggedPrepare(
+            'SELECT expertise_domains FROM agent_identities WHERE name = ?',
+          ).get(options.agent_name) as { expertise_domains: string | null } | undefined;
+          if (identity?.expertise_domains) {
+            try {
+              const parsed = JSON.parse(identity.expertise_domains);
+              if (Array.isArray(parsed)) domains = parsed;
+            } catch {
+              // not valid JSON, try comma-separated
+              domains = identity.expertise_domains
+                .split(',')
+                .map((d: string) => d.trim())
+                .filter((d: string) => d.length > 0);
+            }
+          }
+        }
+
+        // If still no domains, load all available domains
+        if (domains.length === 0) {
+          const allDomains = loggedPrepare(
+            'SELECT DISTINCT domain FROM expertise_records',
+          ).all() as Array<{ domain: string }>;
+          domains = allDomains.map((d) => d.domain);
+        }
+
+        const limitPerDomain = options.limit_per_domain ?? 20;
+        const allContextLines: string[] = [];
+        let totalRecords = 0;
+
+        for (const domain of domains) {
+          const sanitizedDomain = domain.trim().slice(0, 200);
+          if (!sanitizedDomain) continue;
+
+          // Exclude expired records
+          const records = loggedPrepare(
+            `SELECT * FROM expertise_records
+             WHERE domain = ? AND (expires_at IS NULL OR expires_at > datetime('now'))
+             ORDER BY CASE classification WHEN 'foundational' THEN 1 WHEN 'tactical' THEN 2 WHEN 'observational' THEN 3 ELSE 4 END, updated_at DESC
+             LIMIT ?`,
+          ).all(sanitizedDomain, limitPerDomain) as Array<{
+            id: string;
+            domain: string;
+            title: string;
+            content: string;
+            type: string;
+            classification: string;
+            tags: string | null;
+            source_file: string | null;
+          }>;
+
+          if (records.length === 0) continue;
+          totalRecords += records.length;
+
+          allContextLines.push(`--- DOMAIN: ${sanitizedDomain} (${records.length} record(s)) ---`);
+          allContextLines.push('');
+
+          // Group by classification
+          const groups: Record<string, typeof records> = {};
+          for (const rec of records) {
+            const cls = rec.classification || 'uncategorized';
+            if (!groups[cls]) groups[cls] = [];
+            groups[cls].push(rec);
+          }
+
+          for (const [cls, recs] of Object.entries(groups)) {
+            allContextLines.push(`## ${cls.toUpperCase()} (${recs.length})`);
+            for (const rec of recs) {
+              allContextLines.push(`### [${rec.type}] ${rec.title}`);
+              if (rec.tags) allContextLines.push(`Tags: ${rec.tags}`);
+              if (rec.source_file) allContextLines.push(`Source: ${rec.source_file}`);
+              allContextLines.push('');
+              allContextLines.push(rec.content);
+              allContextLines.push('');
+            }
+          }
+        }
+
+        const contextPayload =
+          totalRecords > 0
+            ? `=== EXPERTISE CONTEXT (${totalRecords} records across ${domains.length} domain(s)) ===\n\n${allContextLines.join('\n')}\n=== END EXPERTISE CONTEXT ===`
+            : '';
+
+        // If inject_session_id provided, write the context into the agent's terminal
+        let injected = false;
+        if (options.inject_session_id && contextPayload.length > 0) {
+          const isRunning = agentProcessManager.isRunning(options.inject_session_id);
+          if (isRunning) {
+            // Format as a system message the agent can read
+            const primeMessage = `\n[MULCH PRIME] Loading expertise context for domains: ${domains.join(', ')}\n${contextPayload}\n`;
+            agentProcessManager.write(options.inject_session_id, primeMessage);
+            injected = true;
+            log.info(
+              `[IPC] expertise:prime - Injected ${totalRecords} records into session ${options.inject_session_id}`,
+            );
+          }
+        }
+
+        log.info(
+          `[IPC] expertise:prime - Loaded ${totalRecords} records across ${domains.length} domains for agent ${options.agent_name ?? 'unknown'}`,
+        );
+
+        return {
+          data: {
+            domains_loaded: domains,
+            total_records: totalRecords,
+            context: contextPayload,
+            injected,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('expertise:prime failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ==========================================
+  // Expertise: Record Session Learnings (Auto-Record on Stop)
+  // ==========================================
+
+  ipcMain.handle(
+    'expertise:record-session',
+    (
+      _event,
+      options: {
+        agent_name: string;
+        session_id: string;
+        capability?: string;
+        records?: Array<{
+          domain: string;
+          title: string;
+          content: string;
+          type: string;
+          classification: string;
+          source_file?: string;
+          tags?: string;
+        }>;
+      },
+    ) => {
+      try {
+        const createdRecords: string[] = [];
+
+        if (options.records && options.records.length > 0) {
+          for (const rec of options.records) {
+            const id = `exp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+            // Calculate expires_at based on classification
+            const shelfLifeDays: Record<string, number> = {
+              foundational: 30,
+              tactical: 14,
+              observational: 7,
+            };
+            const days = shelfLifeDays[rec.classification] ?? 14;
+            const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+            loggedPrepare(
+              `INSERT INTO expertise_records (id, domain, title, content, type, classification, agent_name, source_file, tags, expires_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ).run(
+              id,
+              rec.domain,
+              rec.title,
+              rec.content,
+              rec.type,
+              rec.classification,
+              options.agent_name,
+              rec.source_file ?? null,
+              rec.tags ?? null,
+              expiresAt,
+            );
+            createdRecords.push(id);
+          }
+        }
+
+        // Update agent identity with domains worked on
+        if (createdRecords.length > 0) {
+          const domains = [
+            ...new Set(options.records!.map((r) => r.domain)),
+          ];
+          const identity = loggedPrepare(
+            'SELECT expertise_domains FROM agent_identities WHERE name = ?',
+          ).get(options.agent_name) as { expertise_domains: string | null } | undefined;
+
+          let existingDomains: string[] = [];
+          if (identity?.expertise_domains) {
+            try {
+              existingDomains = JSON.parse(identity.expertise_domains);
+            } catch {
+              existingDomains = [];
+            }
+          }
+
+          const mergedDomains = [...new Set([...existingDomains, ...domains])];
+          loggedPrepare(
+            `UPDATE agent_identities SET expertise_domains = ?, updated_at = datetime('now') WHERE name = ?`,
+          ).run(JSON.stringify(mergedDomains), options.agent_name);
+        }
+
+        // Update checkpoint with mulch_domains
+        if (createdRecords.length > 0) {
+          const domains = [...new Set(options.records!.map((r) => r.domain))];
+          const existingCheckpoint = loggedPrepare(
+            'SELECT * FROM checkpoints WHERE agent_name = ?',
+          ).get(options.agent_name) as Record<string, unknown> | undefined;
+
+          if (existingCheckpoint) {
+            loggedPrepare(
+              `UPDATE checkpoints SET mulch_domains = ?, timestamp = datetime('now') WHERE agent_name = ?`,
+            ).run(JSON.stringify(domains), options.agent_name);
+          }
+        }
+
+        log.info(
+          `[IPC] expertise:record-session - Recorded ${createdRecords.length} expertise records from agent ${options.agent_name}`,
+        );
+
+        return {
+          data: {
+            records_created: createdRecords.length,
+            record_ids: createdRecords,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('expertise:record-session failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ==========================================
+  // Expertise: Prune Expired Records
+  // ==========================================
+
+  ipcMain.handle('expertise:prune-expired', () => {
+    try {
+      const expired = loggedPrepare(
+        `SELECT COUNT(*) as cnt FROM expertise_records WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')`,
+      ).get() as { cnt: number };
+
+      if (expired.cnt > 0) {
+        loggedPrepare(
+          `DELETE FROM expertise_records WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')`,
+        ).run();
+      }
+
+      log.info(`[IPC] expertise:prune-expired - Pruned ${expired.cnt} expired records`);
+      return { data: { pruned: expired.cnt }, error: null };
+    } catch (error) {
+      log.error('expertise:prune-expired failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ==========================================
+  // Expertise: Set Shelf-Life on Existing Records
+  // ==========================================
+
+  ipcMain.handle(
+    'expertise:set-shelf-life',
+    (_event, id: string, days: number) => {
+      try {
+        const expiresAt = days > 0
+          ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+          : null;
+
+        loggedPrepare(
+          `UPDATE expertise_records SET expires_at = ?, updated_at = datetime('now') WHERE id = ?`,
+        ).run(expiresAt, id);
+
+        const updated = loggedPrepare('SELECT * FROM expertise_records WHERE id = ?').get(id);
+        log.info(`[IPC] expertise:set-shelf-life - Set expires_at for record ${id} to ${expiresAt ?? 'never'}`);
+        return { data: updated, error: null };
+      } catch (error) {
+        log.error('expertise:set-shelf-life failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ==========================================
+  // Coordinator: Check Complete (Exit Triggers)
+  // ==========================================
+
+  ipcMain.handle('coordinator:check-complete', () => {
+    try {
+      const coordinator = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (!coordinator) {
+        return {
+          data: {
+            complete: true,
+            triggers: {
+              all_agents_done: true,
+              task_tracker_empty: true,
+              shutdown_signal: false,
+            },
+            summary: {
+              active_agents: 0,
+              pending_issues: 0,
+              pending_merges: 0,
+            },
+          },
+          error: null,
+        };
+      }
+
+      // Check trigger: all agents done
+      const activeAgents = loggedPrepare(
+        `SELECT COUNT(*) as count FROM sessions WHERE state IN ('booting', 'working', 'stalled') AND capability != 'coordinator' AND capability != 'monitor'`,
+      ).get() as { count: number };
+      const allAgentsDone = activeAgents.count === 0;
+
+      // Check trigger: task tracker empty (no unblocked open/in_progress issues)
+      const pendingIssues = loggedPrepare(
+        `SELECT COUNT(*) as count FROM issues WHERE status IN ('open', 'in_progress')`,
+      ).get() as { count: number };
+      const taskTrackerEmpty = pendingIssues.count === 0;
+
+      // Check trigger: shutdown signal (check for shutdown message in coordinator's inbox)
+      const shutdownMessage = loggedPrepare(
+        `SELECT * FROM messages WHERE to_agent = ? AND type = 'status' AND body LIKE '%shutdown%' AND read = 0 ORDER BY created_at DESC LIMIT 1`,
+      ).get(coordinator.agent_name) as Record<string, unknown> | undefined;
+      const shutdownSignal = !!shutdownMessage;
+
+      // Check pending merges
+      const pendingMerges = loggedPrepare(
+        `SELECT COUNT(*) as count FROM merge_queue WHERE status IN ('pending', 'merging', 'conflict')`,
+      ).get() as { count: number };
+
+      const complete = allAgentsDone && taskTrackerEmpty;
+
+      log.info(
+        `[IPC] coordinator:check-complete - complete=${complete}, agents=${activeAgents.count}, issues=${pendingIssues.count}, merges=${pendingMerges.count}`,
+      );
+
+      return {
+        data: {
+          complete,
+          triggers: {
+            all_agents_done: allAgentsDone,
+            task_tracker_empty: taskTrackerEmpty,
+            shutdown_signal: shutdownSignal,
+          },
+          summary: {
+            active_agents: activeAgents.count,
+            pending_issues: pendingIssues.count,
+            pending_merges: pendingMerges.count,
+          },
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('coordinator:check-complete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ==========================================
+  // Coordinator: Create Issue on Dispatch (Task Board Integration)
+  // ==========================================
+
+  ipcMain.handle(
+    'coordinator:create-issue',
+    (
+      _event,
+      options: {
+        title: string;
+        description?: string;
+        type?: string;
+        priority?: string;
+        assigned_agent?: string;
+        group_id?: string;
+      },
+    ) => {
+      try {
+        const coordinator = loggedPrepare(
+          `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+        ).get() as Record<string, unknown> | undefined;
+
+        if (!coordinator) {
+          return { data: null, error: 'No active coordinator' };
+        }
+
+        const issueId = `issue-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          `INSERT INTO issues (id, title, description, type, priority, status, assigned_agent, group_id)
+           VALUES (?, ?, ?, ?, ?, 'open', ?, ?)`,
+        ).run(
+          issueId,
+          options.title,
+          options.description ?? null,
+          options.type ?? 'task',
+          options.priority ?? 'medium',
+          options.assigned_agent ?? null,
+          options.group_id ?? null,
+        );
+
+        const created = loggedPrepare('SELECT * FROM issues WHERE id = ?').get(issueId);
+
+        recordEvent({
+          eventType: 'custom',
+          agentName: coordinator.agent_name as string,
+          sessionId: coordinator.id as string,
+          data: JSON.stringify({
+            action: 'coordinator_created_issue',
+            issue_id: issueId,
+            title: options.title,
+          }),
+        });
+
+        log.info(`[IPC] coordinator:create-issue - Created issue ${issueId}: ${options.title}`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('coordinator:create-issue failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ==========================================
+  // Coordinator: Complete — full cleanup flow
+  // ==========================================
+
+  ipcMain.handle('coordinator:complete', async () => {
+    try {
+      stopCoordinatorMailInjection();
+
+      const coordinator = loggedPrepare(
+        `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+      ).get() as Record<string, unknown> | undefined;
+
+      if (!coordinator) {
+        return { data: null, error: 'No active coordinator to complete' };
+      }
+
+      const coordinatorName = coordinator.agent_name as string;
+      const coordinatorId = coordinator.id as string;
+      const runId = (coordinator.run_id as string) ?? null;
+
+      // 1. Stop all child agents
+      const childSessions = loggedPrepare(
+        `SELECT id, agent_name, worktree_path, branch_name FROM sessions
+         WHERE parent_agent = ? AND state NOT IN ('completed') AND id != ?`,
+      ).all(coordinatorName, coordinatorId) as Array<{
+        id: string;
+        agent_name: string;
+        worktree_path: string | null;
+        branch_name: string | null;
+      }>;
+
+      let agentsStopped = 0;
+      for (const child of childSessions) {
+        try {
+          if (agentProcessManager.isRunning(child.id)) {
+            await agentProcessManager.stop(child.id);
+          }
+          loggedPrepare(
+            `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
+             WHERE id = ? AND state NOT IN ('completed')`,
+          ).run(child.id);
+          agentsStopped++;
+        } catch {
+          log.warn(`[Coordinator] Failed to stop child agent ${child.agent_name}`);
+        }
+      }
+      log.info(`[Coordinator] Stopped ${agentsStopped} child agents`);
+
+      // 2. Clean up merged worktrees
+      let worktreesCleaned = 0;
+      const allCompletedSessions = loggedPrepare(
+        `SELECT id, agent_name, worktree_path, branch_name FROM sessions
+         WHERE state = 'completed' AND worktree_path IS NOT NULL
+           AND worktree_path LIKE '%fleetcommand%worktrees%'`,
+      ).all() as Array<{
+        id: string;
+        agent_name: string;
+        worktree_path: string;
+        branch_name: string | null;
+      }>;
+
+      for (const s of allCompletedSessions) {
+        try {
+          // Check if branch was merged
+          let isMerged = false;
+          if (s.branch_name) {
+            const mergeEntry = loggedPrepare(
+              "SELECT id FROM merge_queue WHERE branch_name = ? AND status = 'merged' LIMIT 1",
+            ).get(s.branch_name);
+            if (mergeEntry) isMerged = true;
+          }
+
+          // Also check git
+          if (!isMerged && s.branch_name) {
+            try {
+              const projectRoot = s.worktree_path.split('.fleetcommand')[0].replace(/[/\\]$/, '');
+              const merged = execSync(`git branch --merged`, { cwd: projectRoot, timeout: 10000 }).toString();
+              if (merged.includes(s.branch_name)) isMerged = true;
+            } catch { /* ignore */ }
+          }
+
+          if (isMerged || !s.branch_name) {
+            const projectRoot = s.worktree_path.split('.fleetcommand')[0].replace(/[/\\]$/, '');
+            execSync(`git worktree remove "${s.worktree_path}" --force`, { cwd: projectRoot, timeout: 15000 });
+            if (s.branch_name) {
+              try { execSync(`git branch -d "${s.branch_name}"`, { cwd: projectRoot, timeout: 10000 }); } catch {
+                try { execSync(`git branch -D "${s.branch_name}"`, { cwd: projectRoot, timeout: 10000 }); } catch { /* gone */ }
+              }
+            }
+            worktreesCleaned++;
+            log.info(`[Coordinator] Cleaned worktree for ${s.agent_name}`);
+          }
+        } catch {
+          log.warn(`[Coordinator] Failed to clean worktree for ${s.agent_name}`);
+        }
+      }
+
+      // 3. Stop the coordinator itself
+      if (agentProcessManager.isRunning(coordinatorId)) {
+        await agentProcessManager.stop(coordinatorId);
+      }
+      loggedPrepare(
+        `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now')
+         WHERE id = ?`,
+      ).run(coordinatorId);
+
+      // 4. Complete the run
+      if (runId) {
+        loggedPrepare(
+          `UPDATE runs SET status = 'completed', completed_at = datetime('now') WHERE id = ?`,
+        ).run(runId);
+        log.info(`[Coordinator] Completed run ${runId}`);
+      }
+
+      // 5. Record completion event
+      recordEvent({
+        eventType: 'custom',
+        agentName: coordinatorName,
+        sessionId: coordinatorId,
+        runId: runId ?? undefined,
+        data: JSON.stringify({
+          action: 'coordinator_complete',
+          agents_stopped: agentsStopped,
+          worktrees_cleaned: worktreesCleaned,
+        }),
+      });
+
+      // 6. Broadcast to UI
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('agent:update', {
+            agentId: coordinatorId,
+            event: 'state_changed',
+            state: 'completed',
+            agentName: coordinatorName,
+          });
+        }
+      }
+
+      log.info(
+        `[Coordinator] Complete — stopped ${agentsStopped} agents, cleaned ${worktreesCleaned} worktrees, run ${runId ?? 'none'} marked complete`,
+      );
+
+      return {
+        data: {
+          agents_stopped: agentsStopped,
+          worktrees_cleaned: worktreesCleaned,
+          run_completed: runId,
+        },
+        error: null,
+      };
+    } catch (error) {
+      log.error('coordinator:complete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ==========================================
+  // Specs: Scout → Spec → Build Pipeline (Gap 2)
+  // ==========================================
+
+  ipcMain.handle(
+    'spec:list',
+    (_event, filters?: { task_id?: string; status?: string; author_agent?: string }) => {
+      try {
+        let sql = 'SELECT * FROM specs WHERE 1=1';
+        const params: unknown[] = [];
+        if (filters?.task_id) {
+          sql += ' AND task_id = ?';
+          params.push(filters.task_id);
+        }
+        if (filters?.status) {
+          sql += ' AND status = ?';
+          params.push(filters.status);
+        }
+        if (filters?.author_agent) {
+          sql += ' AND author_agent = ?';
+          params.push(filters.author_agent);
+        }
+        sql += ' ORDER BY updated_at DESC';
+        const specs = loggedPrepare(sql).all(...params);
+        log.info(`[IPC] spec:list - found ${(specs as unknown[]).length} specs`);
+        return { data: specs, error: null };
+      } catch (error) {
+        log.error('spec:list failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('spec:get', (_event, id: string) => {
+    try {
+      const spec = loggedPrepare('SELECT * FROM specs WHERE id = ?').get(id);
+      return { data: spec ?? null, error: null };
+    } catch (error) {
+      log.error('spec:get failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle(
+    'spec:write',
+    (
+      _event,
+      spec: {
+        id: string;
+        task_id?: string;
+        title: string;
+        content: string;
+        author_agent?: string;
+        file_scope?: string;
+      },
+    ) => {
+      try {
+        loggedPrepare(
+          `INSERT INTO specs (id, task_id, title, content, author_agent, file_scope, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'draft')`,
+        ).run(
+          spec.id,
+          spec.task_id ?? null,
+          spec.title,
+          spec.content,
+          spec.author_agent ?? null,
+          spec.file_scope ?? null,
+        );
+        const created = loggedPrepare('SELECT * FROM specs WHERE id = ?').get(spec.id);
+        log.info(`[IPC] spec:write - created spec ${spec.id}: ${spec.title}`);
+        return { data: created, error: null };
+      } catch (error) {
+        log.error('spec:write failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle('spec:update', (_event, id: string, updates: Record<string, unknown>) => {
+    try {
+      const allowedFields = ['title', 'content', 'status', 'file_scope', 'task_id'];
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+      for (const [key, value] of Object.entries(updates)) {
+        if (allowedFields.includes(key)) {
+          setClauses.push(`${key} = ?`);
+          values.push(value);
+        }
+      }
+      if (setClauses.length === 0) {
+        return { data: null, error: 'No valid fields to update' };
+      }
+      setClauses.push("updated_at = datetime('now')");
+      values.push(id);
+      loggedPrepare(`UPDATE specs SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+      const updated = loggedPrepare('SELECT * FROM specs WHERE id = ?').get(id);
+      log.info(`[IPC] spec:update - updated spec ${id}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('spec:update failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('spec:approve', (_event, id: string, approved_by: string) => {
+    try {
+      loggedPrepare(
+        `UPDATE specs SET status = 'approved', approved_by = ?, updated_at = datetime('now') WHERE id = ?`,
+      ).run(approved_by, id);
+      const updated = loggedPrepare('SELECT * FROM specs WHERE id = ?').get(id);
+      log.info(`[IPC] spec:approve - approved spec ${id} by ${approved_by}`);
+      return { data: updated, error: null };
+    } catch (error) {
+      log.error('spec:approve failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('spec:delete', (_event, id: string) => {
+    try {
+      loggedPrepare('DELETE FROM specs WHERE id = ?').run(id);
+      log.info(`[IPC] spec:delete - deleted spec ${id}`);
+      return { data: true, error: null };
+    } catch (error) {
+      log.error('spec:delete failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
+  // ==========================================
+  // Overlay: Dynamic CLAUDE.md Generation (Gap 1)
+  // ==========================================
+
+  ipcMain.handle(
+    'overlay:generate',
+    (
+      _event,
+      options: {
+        session_id: string;
+        agent_name: string;
+        capability: string;
+        worktree_path: string;
+        task_id?: string;
+        file_scope?: string;
+        parent_agent?: string;
+        branch_name?: string;
+        depth?: number;
+      },
+    ) => {
+      try {
+        const worktreePath = options.worktree_path;
+
+        // Get agent definition for this capability
+        const agentDef = loggedPrepare(
+          'SELECT * FROM agent_definitions WHERE role = ?',
+        ).get(options.capability) as Record<string, unknown> | undefined;
+
+        // Get spec for the task if one exists
+        let specContent = '';
+        if (options.task_id) {
+          const spec = loggedPrepare(
+            `SELECT * FROM specs WHERE task_id = ? AND status IN ('draft', 'approved') ORDER BY updated_at DESC LIMIT 1`,
+          ).get(options.task_id) as { title: string; content: string } | undefined;
+          if (spec) {
+            specContent = `\n## Task Specification\n### ${spec.title}\n${spec.content}\n`;
+          }
+        }
+
+        // Load expertise context for priming
+        let expertiseContext = '';
+        const identity = loggedPrepare(
+          'SELECT expertise_domains FROM agent_identities WHERE name = ?',
+        ).get(options.agent_name) as { expertise_domains: string | null } | undefined;
+        if (identity?.expertise_domains) {
+          try {
+            const domains = JSON.parse(identity.expertise_domains);
+            if (Array.isArray(domains) && domains.length > 0) {
+              const records = loggedPrepare(
+                `SELECT domain, title, content, type, classification FROM expertise_records
+                 WHERE domain IN (${domains.map(() => '?').join(',')})
+                   AND classification IN ('foundational', 'tactical')
+                   AND (expires_at IS NULL OR expires_at > datetime('now'))
+                 ORDER BY CASE classification WHEN 'foundational' THEN 1 WHEN 'tactical' THEN 2 ELSE 3 END
+                 LIMIT 20`,
+              ).all(...domains) as Array<{
+                domain: string;
+                title: string;
+                content: string;
+                type: string;
+                classification: string;
+              }>;
+              if (records.length > 0) {
+                const lines = ['## Pre-loaded Expertise', ''];
+                for (const rec of records) {
+                  lines.push(`### [${rec.classification}/${rec.type}] ${rec.title}`);
+                  lines.push(rec.content);
+                  lines.push('');
+                }
+                expertiseContext = lines.join('\n');
+              }
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+
+        // Build overlay content
+        const overlayLines = [
+          '# Fleet Command Agent Overlay',
+          '',
+          '## Agent Metadata',
+          `- FC_AGENT_NAME: ${options.agent_name}`,
+          `- FC_SESSION_ID: ${options.session_id}`,
+          `- FC_CAPABILITY: ${options.capability}`,
+          `- FC_DEPTH: ${options.depth ?? 0}`,
+        ];
+
+        if (options.task_id) overlayLines.push(`- FC_TASK_ID: ${options.task_id}`);
+        if (options.parent_agent) overlayLines.push(`- FC_PARENT_AGENT: ${options.parent_agent}`);
+        if (options.branch_name) overlayLines.push(`- FC_BRANCH: ${options.branch_name}`);
+        if (options.file_scope) {
+          overlayLines.push(`- FC_FILE_SCOPE: ${options.file_scope}`);
+          overlayLines.push('');
+          overlayLines.push('**IMPORTANT:** You may ONLY modify files within your file scope. Do not write to files outside this scope.');
+        }
+
+        // Add quality gates from active project
+        try {
+          const activeProject = loggedPrepare(
+            'SELECT id FROM projects WHERE is_active = 1 LIMIT 1',
+          ).get() as { id: string } | undefined;
+          if (activeProject) {
+            const gates = loggedPrepare(
+              'SELECT name, command FROM quality_gates WHERE project_id = ? AND enabled = 1 ORDER BY sort_order',
+            ).all(activeProject.id) as Array<{ name: string; command: string }>;
+            if (gates.length > 0) {
+              overlayLines.push('');
+              overlayLines.push('## Quality Gates');
+              overlayLines.push('Run these before completing your task:');
+              for (const gate of gates) {
+                overlayLines.push(`- ${gate.name}: \`${gate.command}\``);
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // Add agent base definition
+        if (agentDef) {
+          overlayLines.push('');
+          overlayLines.push('## Role Definition');
+          overlayLines.push(`**${agentDef.display_name}**: ${agentDef.description}`);
+          if (agentDef.tool_allowlist) {
+            overlayLines.push(`Allowed tools: ${agentDef.tool_allowlist}`);
+          }
+          if (agentDef.bash_restrictions) {
+            overlayLines.push(`Bash restrictions: ${agentDef.bash_restrictions}`);
+          }
+        }
+
+        // Add spec if available
+        if (specContent) {
+          overlayLines.push(specContent);
+        }
+
+        // Add expertise
+        if (expertiseContext) {
+          overlayLines.push('');
+          overlayLines.push(expertiseContext);
+        }
+
+        // Add communication protocol
+        overlayLines.push('');
+        overlayLines.push('## Communication Protocol');
+        overlayLines.push('- Send `worker_done` mail to your parent agent when your task is complete');
+        overlayLines.push('- Send `error` mail if you encounter blockers you cannot resolve');
+        overlayLines.push('- Send `merge_ready` mail when your branch is ready for integration');
+        overlayLines.push('- Check your mail regularly for instructions from your parent');
+
+        const overlayContent = overlayLines.join('\n');
+
+        // Write to worktree
+        const claudeDir = path.join(worktreePath, '.claude');
+        if (!fs.existsSync(claudeDir)) {
+          fs.mkdirSync(claudeDir, { recursive: true });
+        }
+        const overlayPath = path.join(claudeDir, 'CLAUDE.md');
+        fs.writeFileSync(overlayPath, overlayContent, 'utf-8');
+
+        log.info(
+          `[IPC] overlay:generate - wrote ${overlayContent.length} bytes to ${overlayPath}`,
+        );
+
+        return {
+          data: { path: overlayPath, content: overlayContent },
+          error: null,
+        };
+      } catch (error) {
+        log.error('overlay:generate failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ==========================================
+  // Hook Deployment Helper (Gap 3)
+  // ==========================================
+
+  ipcMain.handle(
+    'hooks:deploy-for-agent',
+    (
+      _event,
+      options: {
+        worktree_path: string;
+        agent_name: string;
+        capability: string;
+        session_id: string;
+      },
+    ) => {
+      try {
+        const worktreePath = options.worktree_path;
+        const claudeDir = path.join(worktreePath, '.claude');
+        if (!fs.existsSync(claudeDir)) {
+          fs.mkdirSync(claudeDir, { recursive: true });
+        }
+
+        // Build hooks configuration based on agent capability
+        const hooks: Record<string, Array<{ matcher: string; hooks: Array<{ type: string; command: string }> }>> = {};
+
+        // SessionStart: Load expertise context
+        hooks.SessionStart = [
+          {
+            matcher: '',
+            hooks: [
+              {
+                type: 'command',
+                command: `echo "[FC] Agent ${options.agent_name} (${options.capability}) session started"`,
+              },
+            ],
+          },
+        ];
+
+        // PreToolUse: Enforce guard rules
+        const blockedTools: string[] = [];
+        if (['coordinator', 'scout', 'reviewer', 'monitor'].includes(options.capability)) {
+          blockedTools.push('Write', 'Edit', 'NotebookEdit');
+        }
+
+        if (blockedTools.length > 0) {
+          for (const tool of blockedTools) {
+            if (!hooks.PreToolUse) hooks.PreToolUse = [];
+            hooks.PreToolUse.push({
+              matcher: tool,
+              hooks: [
+                {
+                  type: 'command',
+                  command: `echo '{"decision":"block","reason":"${options.capability} agents are read-only. ${tool} is not permitted."}' && exit 2`,
+                },
+              ],
+            });
+          }
+        }
+
+        // PreToolUse: Block git push for all agents
+        if (!hooks.PreToolUse) hooks.PreToolUse = [];
+        hooks.PreToolUse.push({
+          matcher: 'Bash',
+          hooks: [
+            {
+              type: 'command',
+              command: `bash -c 'if echo "$TOOL_INPUT" | grep -qE "git\\s+push"; then echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"git push is blocked. Use merge queue instead.\\"}"; exit 2; fi'`,
+            },
+          ],
+        });
+
+        // Build settings.local.json
+        const settingsPath = path.join(claudeDir, 'settings.local.json');
+        const settings: Record<string, unknown> = { hooks };
+
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+
+        log.info(
+          `[IPC] hooks:deploy-for-agent - deployed hooks for ${options.agent_name} (${options.capability}) to ${settingsPath}`,
+        );
+
+        return {
+          data: {
+            path: settingsPath,
+            hooks_deployed: Object.keys(hooks),
+            blocked_tools: blockedTools,
+          },
+          error: null,
+        };
+      } catch (error) {
+        log.error('hooks:deploy-for-agent failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
 
   log.info(
     'IPC handlers registered - all database handlers use real SQLite queries via loggedPrepare()',
