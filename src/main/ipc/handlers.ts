@@ -4038,71 +4038,159 @@ export function registerIpcHandlers(): void {
           }
         };
 
+        // Helper: finalize a successful tier — run quality gates, send mail, update status
+        const finalizeTier = async (tier: string, extra?: Record<string, unknown>) => {
+          // Run quality gates before marking as merged
+          const activeProject = loggedPrepare(
+            'SELECT path FROM projects WHERE is_active = 1 LIMIT 1',
+          ).get() as { path: string } | undefined;
+          if (activeProject) {
+            const gateResults = await runQualityGates(activeProject.path, {
+              agentName: entry.agent_name || undefined,
+            });
+            if (!gateResults.passed) {
+              // Quality gates failed — rollback
+              if (preMergeCommit) {
+                log.warn(`[IPC] merge:auto-escalate - quality gates FAILED after ${tier}, rolling back id=${id}`);
+                await rollbackMerge(activeProject.path, preMergeCommit);
+              }
+              loggedPrepare(
+                "UPDATE merge_queue SET status = 'failed', completed_at = datetime('now') WHERE id = ?",
+              ).run(id);
+              broadcastMergeStatus(tier, 'quality-gate-failed');
+              const failedGateNames = gateResults.results
+                .filter((r) => r.status !== 'passed')
+                .map((r) => r.gateName)
+                .join(', ');
+              return { data: loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id), error: `Quality gates failed after ${tier}: ${failedGateNames}` };
+            }
+            log.info(`[IPC] merge:auto-escalate - quality gates passed after ${tier}`);
+          }
+
+          // Mark as merged
+          loggedPrepare(
+            "UPDATE merge_queue SET status = 'merged', resolved_tier = ?, completed_at = datetime('now') WHERE id = ?",
+          ).run(tier, id);
+          broadcastMergeStatus(tier, 'success');
+
+          // Send mail notifications
+          try {
+            const { nanoid } = await import('nanoid');
+            if (entry.agent_name) {
+              loggedPrepare(
+                `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+                 VALUES (?, 'merge-system', ?, ?, ?, 'merged', 'normal', ?, 0, datetime('now'))`,
+              ).run(
+                nanoid(), entry.agent_name,
+                `Merged: ${entry.branch_name}`,
+                `Branch ${entry.branch_name} merged successfully via ${tier}.`,
+                JSON.stringify({ branch: entry.branch_name, tier, taskId: entry.task_id }),
+              );
+            }
+            const coordinators = loggedPrepare(
+              "SELECT DISTINCT agent_name FROM sessions WHERE capability = 'coordinator' AND state IN ('booting', 'working')",
+            ).all() as Array<{ agent_name: string }>;
+            for (const coord of coordinators) {
+              if (coord.agent_name !== entry.agent_name) {
+                loggedPrepare(
+                  `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+                   VALUES (?, 'merge-system', ?, ?, ?, 'merged', 'normal', ?, 0, datetime('now'))`,
+                ).run(
+                  nanoid(), coord.agent_name,
+                  `Merged: ${entry.branch_name}`,
+                  `Branch ${entry.branch_name} merged via ${tier}.`,
+                  JSON.stringify({ branch: entry.branch_name, tier, taskId: entry.task_id }),
+                );
+              }
+            }
+          } catch (mailErr) {
+            log.warn(`[IPC] merge:auto-escalate - failed to send merge notifications: ${mailErr}`);
+          }
+
+          log.info(`[IPC] merge:auto-escalate - ${tier} succeeded for id=${id}`);
+          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
+          return { data: updated, error: null, resolvedTier: tier, ...extra };
+        };
+
+        // Helper: send observability mail for each tier attempt
+        const sendTierAttemptMail = async (tier: string, succeeded: boolean) => {
+          try {
+            const { nanoid } = await import('nanoid');
+            if (entry.agent_name) {
+              loggedPrepare(
+                `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+                 VALUES (?, 'merge-system', ?, ?, ?, 'status', 'low', ?, 0, datetime('now'))`,
+              ).run(
+                nanoid(), entry.agent_name,
+                `Merge ${tier}: ${succeeded ? 'succeeded' : 'failed'}`,
+                `Auto-escalate tier ${tier} ${succeeded ? 'succeeded' : 'failed'} for branch ${entry.branch_name}.`,
+                JSON.stringify({ branch: entry.branch_name, tier, succeeded }),
+              );
+            }
+          } catch { /* best-effort observability */ }
+        };
+
         // ── Tier 1: Clean Merge ──
         log.info(`[IPC] merge:auto-escalate - Tier 1 (clean-merge) for id=${id}`);
         broadcastMergeStatus('clean-merge', 'attempting');
         const tier1 = await executeCleanMerge(mergePath, entry.branch_name, targetBranch || undefined);
         if (tier1.success) {
-          loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'clean-merge', completed_at = datetime('now') WHERE id = ?",
-          ).run(id);
-          broadcastMergeStatus('clean-merge', 'success');
-          log.info(`[IPC] merge:auto-escalate - Tier 1 succeeded for id=${id}`);
-          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
-          return { data: updated, error: null, resolvedTier: 'clean-merge' };
+          const result = await finalizeTier('clean-merge');
+          return result;
         }
-        log.info(`[IPC] merge:auto-escalate - Tier 1 failed, escalating to Tier 2 for id=${id}`);
-        broadcastMergeStatus('clean-merge', 'failed');
+        await sendTierAttemptMail('clean-merge', tier1.success);
+        if (!tier1.success) {
+          log.info(`[IPC] merge:auto-escalate - Tier 1 failed, escalating to Tier 2 for id=${id}`);
+          broadcastMergeStatus('clean-merge', 'failed');
+        }
 
         // ── Tier 2: Auto-Resolve ──
-        log.info(`[IPC] merge:auto-escalate - Tier 2 (auto-resolve) for id=${id}`);
-        broadcastMergeStatus('auto-resolve', 'attempting');
-        const tier2 = await autoResolveConflicts(mergePath, entry.branch_name, targetBranch || undefined);
-        if (tier2.success) {
-          loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'auto-resolve', completed_at = datetime('now') WHERE id = ?",
-          ).run(id);
-          broadcastMergeStatus('auto-resolve', 'success');
-          log.info(`[IPC] merge:auto-escalate - Tier 2 succeeded for id=${id}`);
-          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
-          return { data: updated, error: null, resolvedTier: 'auto-resolve' };
-        }
-        log.info(`[IPC] merge:auto-escalate - Tier 2 failed, escalating to Tier 3 for id=${id}`);
-        broadcastMergeStatus('auto-resolve', 'failed');
+        if (!tier1.success) {
+          log.info(`[IPC] merge:auto-escalate - Tier 2 (auto-resolve) for id=${id}`);
+          broadcastMergeStatus('auto-resolve', 'attempting');
+          const tier2 = await autoResolveConflicts(mergePath, entry.branch_name, targetBranch || undefined);
+          if (tier2.success) {
+            const result = await finalizeTier('auto-resolve');
+            return result;
+          }
+          await sendTierAttemptMail('auto-resolve', tier2.success);
+          if (!tier2.success) {
+            log.info(`[IPC] merge:auto-escalate - Tier 2 failed, escalating to Tier 3 for id=${id}`);
+            broadcastMergeStatus('auto-resolve', 'failed');
+          }
 
-        // ── Tier 3: AI-Resolve ──
-        log.info(`[IPC] merge:auto-escalate - Tier 3 (ai-resolve) for id=${id}`);
-        broadcastMergeStatus('ai-resolve', 'attempting');
-        const tier3 = await aiResolveConflicts(mergePath, entry.branch_name, targetBranch || undefined);
-        if (tier3.success) {
-          loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'ai-resolve', completed_at = datetime('now') WHERE id = ?",
-          ).run(id);
-          broadcastMergeStatus('ai-resolve', 'success');
-          log.info(`[IPC] merge:auto-escalate - Tier 3 succeeded for id=${id}`);
-          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
-          return { data: updated, error: null, resolvedTier: 'ai-resolve' };
-        }
-        log.info(`[IPC] merge:auto-escalate - Tier 3 failed, escalating to Tier 4 for id=${id}`);
-        broadcastMergeStatus('ai-resolve', 'failed');
+          // ── Tier 3: AI-Resolve ──
+          if (!tier2.success) {
+            log.info(`[IPC] merge:auto-escalate - Tier 3 (ai-resolve) for id=${id}`);
+            broadcastMergeStatus('ai-resolve', 'attempting');
+            const tier3 = await aiResolveConflicts(mergePath, entry.branch_name, targetBranch || undefined);
+            if (tier3.success) {
+              const result = await finalizeTier('ai-resolve');
+              return result;
+            }
+            await sendTierAttemptMail('ai-resolve', tier3.success);
+            if (!tier3.success) {
+              log.info(`[IPC] merge:auto-escalate - Tier 3 failed, escalating to Tier 4 for id=${id}`);
+              broadcastMergeStatus('ai-resolve', 'failed');
+            }
 
-        // ── Tier 4: Reimagine ──
-        log.info(`[IPC] merge:auto-escalate - Tier 4 (reimagine) for id=${id}`);
-        broadcastMergeStatus('reimagine', 'attempting');
-        const tier4 = await reimagineFromScratch(
-          mergePath,
-          entry.branch_name,
-          targetBranch || undefined,
-          entry.task_id || undefined,
-        );
-        if (tier4.success) {
-          loggedPrepare(
-            "UPDATE merge_queue SET status = 'merged', resolved_tier = 'reimagine', completed_at = datetime('now') WHERE id = ?",
-          ).run(id);
-          broadcastMergeStatus('reimagine', 'success');
-          log.info(`[IPC] merge:auto-escalate - Tier 4 succeeded for id=${id}`);
-          const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
-          return { data: updated, error: null, resolvedTier: 'reimagine', reimagineBranch: tier4.reimagineBranch };
+            // ── Tier 4: Reimagine ──
+            if (!tier3.success) {
+              log.info(`[IPC] merge:auto-escalate - Tier 4 (reimagine) for id=${id}`);
+              broadcastMergeStatus('reimagine', 'attempting');
+              const tier4 = await reimagineFromScratch(
+                mergePath,
+                entry.branch_name,
+                targetBranch || undefined,
+                entry.task_id || undefined,
+              );
+              if (tier4.success) {
+                const result = await finalizeTier('reimagine', { reimagineBranch: tier4.reimagineBranch });
+                return result;
+              }
+              await sendTierAttemptMail('reimagine', tier4.success);
+            }
+          }
         }
 
         // ── All Tiers Failed ──
@@ -4111,6 +4199,41 @@ export function registerIpcHandlers(): void {
         ).run(id);
         broadcastMergeStatus('reimagine', 'failed');
         log.error(`[IPC] merge:auto-escalate - all 4 tiers failed for id=${id}`);
+
+        // Send merge_failed mail
+        try {
+          const { nanoid } = await import('nanoid');
+          if (entry.agent_name) {
+            loggedPrepare(
+              `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+               VALUES (?, 'merge-system', ?, ?, ?, 'merge_failed', 'high', ?, 0, datetime('now'))`,
+            ).run(
+              nanoid(), entry.agent_name,
+              `Merge failed: ${entry.branch_name}`,
+              `All 4 merge tiers failed for branch ${entry.branch_name}.`,
+              JSON.stringify({ branch: entry.branch_name, reason: 'All tiers exhausted' }),
+            );
+          }
+          const coordinators = loggedPrepare(
+            "SELECT DISTINCT agent_name FROM sessions WHERE capability = 'coordinator' AND state IN ('booting', 'working')",
+          ).all() as Array<{ agent_name: string }>;
+          for (const coord of coordinators) {
+            if (coord.agent_name !== entry.agent_name) {
+              loggedPrepare(
+                `INSERT INTO messages (id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+                 VALUES (?, 'merge-system', ?, ?, ?, 'merge_failed', 'high', ?, 0, datetime('now'))`,
+              ).run(
+                nanoid(), coord.agent_name,
+                `Merge failed: ${entry.branch_name}`,
+                `All 4 merge tiers failed for branch ${entry.branch_name}.`,
+                JSON.stringify({ branch: entry.branch_name, reason: 'All tiers exhausted' }),
+              );
+            }
+          }
+        } catch (mailErr) {
+          log.warn(`[IPC] merge:auto-escalate - failed to send failure notifications: ${mailErr}`);
+        }
+
         const updated = loggedPrepare('SELECT * FROM merge_queue WHERE id = ?').get(id);
         return {
           data: updated,
