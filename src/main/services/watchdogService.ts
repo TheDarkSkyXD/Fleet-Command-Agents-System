@@ -115,6 +115,18 @@ const DEFAULT_CONFIG: WatchdogConfig = {
 };
 
 /**
+ * Capabilities that are expected to be long-running and idle (e.g., waiting for mail).
+ * These agents get a much higher stale threshold to avoid false positives.
+ */
+const PERSISTENT_CAPABILITIES = new Set(['coordinator', 'monitor']);
+
+/** Stale threshold for persistent-capability agents: 30 minutes */
+const PERSISTENT_STALE_THRESHOLD_MS = 1800000;
+
+/** Zombie threshold for persistent-capability agents: 90 minutes */
+const PERSISTENT_ZOMBIE_THRESHOLD_MS = 5400000;
+
+/**
  * WatchdogService implements Tier 0 process daemon monitoring.
  *
  * It runs at a configurable interval, checking:
@@ -374,7 +386,31 @@ class WatchdogService {
     }
 
     const stalledDuration = now - state.stalledSince;
-    const result = this.applyProgressiveNudging(agent, state, stalledDuration, now);
+
+    // Persistent-capability agents (coordinator, monitor) spend most of their time
+    // idle waiting for mail. Use a much higher stale threshold to avoid false positives.
+    const isPersistent = PERSISTENT_CAPABILITIES.has(agent.capability);
+    if (isPersistent) {
+      log.debug(
+        `[Watchdog] Agent ${agent.agentName} has persistent capability '${agent.capability}', using extended thresholds (stale=${PERSISTENT_STALE_THRESHOLD_MS / 1000}s, zombie=${PERSISTENT_ZOMBIE_THRESHOLD_MS / 1000}s)`,
+      );
+    }
+
+    const effectiveStaleThreshold = isPersistent
+      ? PERSISTENT_STALE_THRESHOLD_MS
+      : this.config.staleThresholdMs;
+    const effectiveZombieThreshold = isPersistent
+      ? PERSISTENT_ZOMBIE_THRESHOLD_MS
+      : this.config.zombieThresholdMs;
+
+    const result = this.applyProgressiveNudging(
+      agent,
+      state,
+      stalledDuration,
+      now,
+      effectiveStaleThreshold,
+      effectiveZombieThreshold,
+    );
 
     return {
       agentId: agent.id,
@@ -447,8 +483,11 @@ class WatchdogService {
     state: AgentEscalationState,
     stalledDurationMs: number,
     now: number,
+    staleThresholdOverride?: number,
+    zombieThresholdOverride?: number,
   ): 'none' | 'warn' | 'nudge' | 'escalate' | 'terminate' {
-    const { staleThresholdMs, zombieThresholdMs } = this.config;
+    const staleThresholdMs = staleThresholdOverride ?? this.config.staleThresholdMs;
+    const zombieThresholdMs = zombieThresholdOverride ?? this.config.zombieThresholdMs;
 
     // Calculate thresholds for each level
     // Level 1 (warn): At stale threshold (5 min default)
@@ -549,6 +588,22 @@ class WatchdogService {
   private handleEscalate(agent: AgentProcess, state: AgentEscalationState, now: number): void {
     const stalledMs = state.stalledSince ? now - state.stalledSince : 0;
     const stalledSec = Math.round(stalledMs / 1000);
+
+    // Check for pending decision gate before escalating
+    if (this.hasRecentDecisionGate(agent)) {
+      log.info(
+        `[Watchdog] Agent ${agent.agentName} is waiting on decision gate, skipping escalation`,
+      );
+
+      // Notify human about the pending decision instead of escalating
+      this.sendDecisionGateNotification(agent);
+
+      this.recordWatchdogEvent(agent, 'watchdog_escalate_skipped_decision_gate', 3, {
+        stalledDurationMs: stalledMs,
+        message: `Agent is waiting on decision gate, escalation skipped`,
+      });
+      return;
+    }
 
     log.warn(
       `[Watchdog] LEVEL 3 ESCALATION: Agent ${agent.agentName} (PID=${agent.pid}) escalated after ${stalledSec}s stall`,
@@ -676,6 +731,73 @@ class WatchdogService {
       log.info(`[Watchdog] Escalation mail sent to coordinator for agent ${agent.agentName}`);
     } catch (error) {
       log.error(`[Watchdog] Failed to send escalation mail for ${agent.agentName}:`, error);
+    }
+  }
+
+  /**
+   * Check if the agent has sent a decision_gate message within the last hour.
+   * If so, the agent is deliberately pausing for human input and should not be escalated.
+   */
+  private hasRecentDecisionGate(agent: AgentProcess): boolean {
+    try {
+      const db = getDatabase();
+      const row = db
+        .prepare(
+          `SELECT id FROM messages WHERE from_agent = ? AND type = 'decision_gate' AND created_at > datetime('now', '-1 hour') LIMIT 1`,
+        )
+        .get(agent.agentName) as { id: string } | undefined;
+
+      return !!row;
+    } catch (error) {
+      log.error(
+        `[Watchdog] Failed to check decision gate for ${agent.agentName}:`,
+        error,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Send a notification to the human that an agent is waiting on a decision gate.
+   * Uses the same mail pattern as escalation but with different content.
+   */
+  private sendDecisionGateNotification(agent: AgentProcess): void {
+    try {
+      const db = getDatabase();
+      const msgId = `msg-wd-dg-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const now = new Date().toISOString();
+
+      db.prepare(
+        `INSERT INTO messages (id, thread_id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        msgId,
+        null,
+        'watchdog',
+        'human',
+        `DECISION NEEDED: Agent ${agent.agentName} needs your decision`,
+        `Agent ${agent.agentName} (${agent.capability}, PID=${agent.pid}) is waiting on a decision gate. The agent has deliberately paused and requires human input to continue. Please review the pending decision and respond.`,
+        'decision_needed',
+        'high',
+        JSON.stringify({
+          agentId: agent.id,
+          agentName: agent.agentName,
+          capability: agent.capability,
+          pid: agent.pid,
+          reason: 'decision_gate_pending',
+        }),
+        0,
+        now,
+      );
+
+      log.info(
+        `[Watchdog] Decision gate notification sent to human for agent ${agent.agentName}`,
+      );
+    } catch (error) {
+      log.error(
+        `[Watchdog] Failed to send decision gate notification for ${agent.agentName}:`,
+        error,
+      );
     }
   }
 
