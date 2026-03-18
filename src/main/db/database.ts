@@ -673,6 +673,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         can_spawn: 0,
         constraints: JSON.stringify(['read-only']),
+        definition_file: '.fleetcommand/agent-defs/scout.md',
       },
       {
         role: 'builder',
@@ -700,6 +701,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         can_spawn: 0,
         constraints: JSON.stringify([]),
+        definition_file: '.fleetcommand/agent-defs/builder.md',
       },
       {
         role: 'reviewer',
@@ -729,6 +731,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         can_spawn: 0,
         constraints: JSON.stringify(['read-only']),
+        definition_file: '.fleetcommand/agent-defs/reviewer.md',
       },
       {
         role: 'lead',
@@ -761,6 +764,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         can_spawn: 1,
         constraints: JSON.stringify([]),
+        definition_file: '.fleetcommand/agent-defs/lead.md',
       },
       {
         role: 'merger',
@@ -783,6 +787,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         can_spawn: 0,
         constraints: JSON.stringify([]),
+        definition_file: '.fleetcommand/agent-defs/merger.md',
       },
       {
         role: 'coordinator',
@@ -814,6 +819,7 @@ export async function initDatabase(): Promise<void> {
         ]),
         can_spawn: 1,
         constraints: JSON.stringify(['read-only', 'no-worktree']),
+        definition_file: '.fleetcommand/agent-defs/coordinator.md',
       },
       {
         role: 'monitor',
@@ -840,12 +846,13 @@ export async function initDatabase(): Promise<void> {
         ]),
         can_spawn: 0,
         constraints: JSON.stringify(['read-only', 'no-worktree']),
+        definition_file: '.fleetcommand/agent-defs/monitor.md',
       },
     ];
 
     const insertDef = db.prepare(`
-      INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope, path_boundaries, can_spawn, constraints)
-      VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope, @path_boundaries, @can_spawn, @constraints)
+      INSERT INTO agent_definitions (role, display_name, description, capabilities, default_model, tool_allowlist, bash_restrictions, file_scope, path_boundaries, can_spawn, constraints, definition_file)
+      VALUES (@role, @display_name, @description, @capabilities, @default_model, @tool_allowlist, @bash_restrictions, @file_scope, @path_boundaries, @can_spawn, @constraints, @definition_file)
     `);
 
     for (const def of seedDefs) {
@@ -942,6 +949,21 @@ export async function initDatabase(): Promise<void> {
     db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '["read-only"]' WHERE role = 'reviewer'`);
     db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '[]' WHERE role = 'merger'`);
     db.exec(`UPDATE agent_definitions SET can_spawn = 0, constraints = '["read-only","no-worktree"]' WHERE role = 'monitor'`);
+  }
+
+  // Migration: add definition_file column to agent_definitions (Phase 6.1)
+  try {
+    db.prepare('SELECT definition_file FROM agent_definitions LIMIT 1').get();
+  } catch {
+    db.exec('ALTER TABLE agent_definitions ADD COLUMN definition_file TEXT');
+    // Set default definition file paths for all roles
+    db.exec(`UPDATE agent_definitions SET definition_file = '.fleetcommand/agent-defs/coordinator.md' WHERE role = 'coordinator'`);
+    db.exec(`UPDATE agent_definitions SET definition_file = '.fleetcommand/agent-defs/lead.md' WHERE role = 'lead'`);
+    db.exec(`UPDATE agent_definitions SET definition_file = '.fleetcommand/agent-defs/scout.md' WHERE role = 'scout'`);
+    db.exec(`UPDATE agent_definitions SET definition_file = '.fleetcommand/agent-defs/builder.md' WHERE role = 'builder'`);
+    db.exec(`UPDATE agent_definitions SET definition_file = '.fleetcommand/agent-defs/reviewer.md' WHERE role = 'reviewer'`);
+    db.exec(`UPDATE agent_definitions SET definition_file = '.fleetcommand/agent-defs/merger.md' WHERE role = 'merger'`);
+    db.exec(`UPDATE agent_definitions SET definition_file = '.fleetcommand/agent-defs/monitor.md' WHERE role = 'monitor'`);
   }
 
   // Seed default stagger delay if not present

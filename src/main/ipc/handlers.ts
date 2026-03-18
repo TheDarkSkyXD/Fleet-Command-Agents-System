@@ -877,7 +877,22 @@ export function registerIpcHandlers(): void {
               }
             } catch { /* ignore */ }
 
-            if (agentDef) {
+            // Load base definition file (Phase 6.1: Two-Layer Instruction System)
+            if (agentDef?.definition_file) {
+              try {
+                const defFilePath = path.resolve(String(agentDef.definition_file));
+                if (fs.existsSync(defFilePath)) {
+                  const baseDefinition = fs.readFileSync(defFilePath, 'utf-8');
+                  overlayLines.push('', baseDefinition);
+                  log.info(`[Overlay] Loaded base definition from ${defFilePath}`);
+                } else {
+                  log.warn(`[Overlay] Base definition file not found: ${defFilePath}`);
+                }
+              } catch (defErr) {
+                log.warn(`[Overlay] Failed to read base definition: ${defErr}`);
+              }
+            }
+            if (!agentDef?.definition_file && agentDef) {
               overlayLines.push('', '## Role Definition');
               overlayLines.push(`**${agentDef.display_name}**: ${agentDef.description}`);
               if (agentDef.bash_restrictions) overlayLines.push(`Bash restrictions: ${agentDef.bash_restrictions}`);
@@ -6844,6 +6859,36 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Capability Index: reverse lookup of capabilities to roles (Phase 6.3)
+  ipcMain.handle('agentDef:capability-index', () => {
+    try {
+      const allDefs = loggedPrepare(
+        'SELECT role, capabilities FROM agent_definitions ORDER BY role ASC',
+      ).all() as Array<{ role: string; capabilities: string }>;
+
+      const index: Record<string, string[]> = {};
+      for (const def of allDefs) {
+        try {
+          const caps = JSON.parse(def.capabilities) as string[];
+          for (const cap of caps) {
+            if (!index[cap]) index[cap] = [];
+            index[cap].push(def.role);
+          }
+        } catch {
+          // skip unparseable capabilities
+        }
+      }
+
+      log.info(
+        `[IPC] agentDef:capability-index - Built index with ${Object.keys(index).length} capabilities across ${allDefs.length} roles`,
+      );
+      return { data: index, error: null };
+    } catch (error) {
+      log.error('agentDef:capability-index failed:', error);
+      return { data: null, error: String(error) };
+    }
+  });
+
   // Project channels - all use real SQLite queries via loggedPrepare
   ipcMain.handle('project:list', () => {
     try {
@@ -12621,8 +12666,22 @@ export function registerIpcHandlers(): void {
           // ignore
         }
 
-        // Add agent base definition
-        if (agentDef) {
+        // Load base definition file (Phase 6.1: Two-Layer Instruction System)
+        if (agentDef?.definition_file) {
+          try {
+            const defFilePath = path.resolve(String(agentDef.definition_file));
+            if (fs.existsSync(defFilePath)) {
+              const baseDefinition = fs.readFileSync(defFilePath, 'utf-8');
+              overlayLines.push('', baseDefinition);
+              log.info(`[Overlay] Loaded base definition from ${defFilePath}`);
+            } else {
+              log.warn(`[Overlay] Base definition file not found: ${defFilePath}`);
+            }
+          } catch (defErr) {
+            log.warn(`[Overlay] Failed to read base definition: ${defErr}`);
+          }
+        }
+        if (!agentDef?.definition_file && agentDef) {
           overlayLines.push('');
           overlayLines.push('## Role Definition');
           overlayLines.push(`**${agentDef.display_name}**: ${agentDef.description}`);

@@ -685,7 +685,7 @@ Over time, tactical/observational records accumulate and become stale.
 
 ---
 
-## Phase 6: Two-Layer Instruction System
+## Phase 6: Two-Layer Instruction System ✅ COMPLETE
 
 **Goal:** Separate reusable agent role definitions (HOW) from per-task overlays (WHAT),
 matching Overstory's architecture for consistency and auditability.
@@ -693,6 +693,8 @@ matching Overstory's architecture for consistency and auditability.
 **Priority:** MEDIUM — Improves consistency but system works without it.
 
 **Estimated scope:** ~300 lines across 4-5 files.
+
+**Status:** All 3 tasks implemented.
 
 ---
 
@@ -722,10 +724,10 @@ Fleet Command stores definitions in the database as short text fields.
 | `src/main/db/database.ts` | Add `definition_file TEXT` column to agent_definitions table pointing to the .md file |
 
 **Acceptance criteria:**
-- [ ] Each capability has a base definition markdown file
-- [ ] Overlay CLAUDE.md includes base definition + per-task specifics
-- [ ] Base definitions are versioned in git (auditable)
-- [ ] Changing a base definition affects all future spawns of that capability
+- [x] Each capability has a base definition markdown file
+- [x] Overlay CLAUDE.md includes base definition + per-task specifics
+- [x] Base definitions are versioned in git (auditable)
+- [x] Changing a base definition affects all future spawns of that capability
 
 ---
 
@@ -741,9 +743,9 @@ Fleet Command leads get freeform instructions.
 | `.fleetcommand/agent-defs/lead.md` | Include explicit three-phase workflow: **Phase 1 (Scout):** Spawn scouts to explore codebase, gather findings. **Phase 2 (Build):** Write specs from findings, spawn builders with non-overlapping file scopes. **Phase 3 (Review):** For complex tasks, spawn reviewer. For simple tasks, self-verify. Send merge_ready when done. Include dispatch override handling (SKIP SCOUT, SKIP REVIEW, MAX AGENTS). |
 
 **Acceptance criteria:**
-- [ ] Lead agent overlay includes structured three-phase workflow
-- [ ] Dispatch overrides modify which phases are included
-- [ ] Lead definition includes failure modes (SPEC_WITHOUT_SCOUT, REVIEW_SKIP)
+- [x] Lead agent overlay includes structured three-phase workflow
+- [x] Dispatch overrides modify which phases are included
+- [x] Lead definition includes failure modes (SPEC_WITHOUT_SCOUT, REVIEW_SKIP)
 
 ---
 
@@ -761,8 +763,8 @@ agent types. Useful for coordinator to discover "which agents can explore?"
 | `src/shared/types/index.ts` | Add to ElectronAPI |
 
 **Acceptance criteria:**
-- [ ] Coordinator can query "which agents have 'implement' capability?"
-- [ ] Returns array of matching role names
+- [x] Coordinator can query "which agents have 'implement' capability?"
+- [x] Returns array of matching role names
 
 ---
 
@@ -877,12 +879,12 @@ Phase 5: Checkpoint & Recovery                    ✅ COMPLETE
   5.4  Coordinator recovery protocol                ✅
   5.5  Expertise decay automation                   ✅
 
-Phase 6: Two-Layer Instruction System             ← NEXT
-  6.1  Base agent definition files
-  6.2  Three-phase lead workflow
-  6.3  Capability index
+Phase 6: Two-Layer Instruction System             ✅ COMPLETE
+  6.1  Base agent definition files                   ✅
+  6.2  Three-phase lead workflow                     ✅
+  6.3  Capability index                              ✅
 
-Phase 7: Observability & Telemetry
+Phase 7: Observability & Telemetry                ← NEXT
   7.1  Expertise auto-injection
   7.2  Session metrics integration
   7.3  Mulch CLI wrapper

@@ -437,6 +437,7 @@ export interface AgentDefinition {
   path_boundaries: string | null; // JSON array of allowed path patterns
   can_spawn: number; // 0 or 1, SQLite boolean
   constraints: string | null; // JSON array of constraint strings
+  definition_file: string | null; // Path to base definition .md file
   created_at: string;
   updated_at: string;
 }
@@ -1284,6 +1285,11 @@ export interface ElectronAPI {
       constraints?: string;
     },
   ) => Promise<{ data: AgentDefinition | null; error: string | null }>;
+
+  agentDefCapabilityIndex: () => Promise<{
+    data: Record<string, string[]> | null;
+    error: string | null;
+  }>;
 
   // Projects
   projectList: () => Promise<{ data: Project[] | null; error: string | null }>;
