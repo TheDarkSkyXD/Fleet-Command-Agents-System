@@ -143,7 +143,7 @@ export function VersionDiffViewer({
                         ? 'text-emerald-400'
                         : line.type === 'removed'
                           ? 'text-red-400'
-                          : 'text-slate-500'
+                          : 'text-slate-400'
                     }`}
                   >
                     {line.type === 'added' ? '+' : line.type === 'removed' ? '\u2212' : ' '}

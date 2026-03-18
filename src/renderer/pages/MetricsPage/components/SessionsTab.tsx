@@ -103,7 +103,7 @@ export function SessionsTab({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-slate-500 hover:text-red-400"
+                      className="h-6 w-6 text-slate-400 hover:text-red-400"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDelete(m.id);

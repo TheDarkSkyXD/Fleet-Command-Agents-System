@@ -27,7 +27,7 @@ export function FeedView({
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
           <FiActivity size={40} className="mb-3 opacity-30" />
           <p className="text-sm">No events recorded yet</p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-400">
             Events will appear here as agents perform actions
           </p>
         </div>

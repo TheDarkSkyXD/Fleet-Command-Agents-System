@@ -47,7 +47,7 @@ export function ReplayView({
               </Badge>
             );
           })}
-          <span className="ml-auto text-[10px] text-slate-500">
+          <span className="ml-auto text-[10px] text-slate-400">
             {events.length} events, {agentNames.length} agent{agentNames.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -61,7 +61,7 @@ export function ReplayView({
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
           <FiClock size={40} className="mb-3 opacity-30" />
           <p className="text-sm">No events to replay</p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-400">
             Events from multiple agents will be interleaved chronologically
           </p>
         </div>
@@ -88,7 +88,7 @@ export function ReplayView({
                 {showTimeSep && (
                   <div className="my-1.5 flex items-center gap-2 px-2">
                     <Separator className="flex-1 bg-slate-700" />
-                    <span className="text-[10px] text-slate-500">
+                    <span className="text-[10px] text-slate-400">
                       {formatReplayTime(event.created_at)}
                     </span>
                     <Separator className="flex-1 bg-slate-700" />
@@ -102,7 +102,7 @@ export function ReplayView({
                 >
                   {/* Timestamp column */}
                   <span
-                    className="mt-0.5 w-16 flex-shrink-0 text-right font-mono text-[10px] text-slate-500"
+                    className="mt-0.5 w-16 flex-shrink-0 text-right font-mono text-[10px] text-slate-400"
                     title={formatFullTime(event.created_at)}
                   >
                     {formatReplayTime(event.created_at)}
@@ -140,13 +140,13 @@ export function ReplayView({
                         </Badge>
                       )}
                       {event.tool_duration_ms != null && event.tool_duration_ms > 0 && (
-                        <span className="text-[10px] text-slate-500">
+                        <span className="text-[10px] text-slate-400">
                           {formatDuration(event.tool_duration_ms)}
                         </span>
                       )}
                     </div>
                     {event.data && (
-                      <p className="mt-0.5 truncate text-[11px] text-slate-500" title={event.data}>
+                      <p className="mt-0.5 truncate text-[11px] text-slate-400" title={event.data}>
                         {event.data}
                       </p>
                     )}

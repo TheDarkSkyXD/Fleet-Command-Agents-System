@@ -106,8 +106,17 @@ export const AGENT_COLORS: AgentColor[] = [
   { text: 'text-teal-400', bg: 'bg-teal-900/40', border: 'border-l-teal-400' },
 ];
 
+/** Normalize SQLite UTC timestamps for correct local time display */
+function normalizeDate(dateStr: string): Date {
+  let normalized = dateStr;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(normalized) && !normalized.includes('Z') && !normalized.includes('+') && !normalized.includes('T')) {
+    normalized = `${normalized.replace(' ', 'T')}Z`;
+  }
+  return new Date(normalized);
+}
+
 export function formatEventTime(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = normalizeDate(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSecs = Math.floor(diffMs / 1000);
@@ -122,7 +131,7 @@ export function formatEventTime(dateStr: string): string {
 }
 
 export function formatFullTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString(undefined, {
+  return normalizeDate(dateStr).toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -134,7 +143,7 @@ export function formatFullTime(dateStr: string): string {
 }
 
 export function formatReplayTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString(undefined, {
+  return normalizeDate(dateStr).toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',

@@ -38,10 +38,10 @@ export function CorrelationView({
         </div>
         <Separator orientation="vertical" className="h-3 bg-slate-700" />
         <div className="flex items-center gap-1.5">
-          <FiAlertTriangle size={14} className={orphanedCount > 0 ? 'text-amber-400' : 'text-slate-500'} />
+          <FiAlertTriangle size={14} className={orphanedCount > 0 ? 'text-amber-400' : 'text-slate-400'} />
           <span className="text-xs text-slate-400">Orphaned starts:</span>
           <span
-            className={`text-xs font-medium ${orphanedCount > 0 ? 'text-amber-400' : 'text-slate-500'}`}
+            className={`text-xs font-medium ${orphanedCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}
             data-testid="orphaned-count"
           >
             {orphanedCount}
@@ -63,7 +63,7 @@ export function CorrelationView({
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
           <FiLink size={40} className="mb-3 opacity-30" />
           <p className="text-sm">No tool events to correlate</p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-400">
             tool_start and tool_end events will be matched here
           </p>
         </div>
@@ -140,7 +140,7 @@ export function CorrelationView({
               </div>
 
               {/* Timeline details */}
-              <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+              <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
                 <span title={formatFullTime(corr.startEvent.created_at)}>
                   Start: {formatReplayTime(corr.startEvent.created_at)}
                 </span>

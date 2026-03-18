@@ -160,7 +160,7 @@ export function HookEventLog() {
         </div>
       ) : events.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 py-16">
-          <FiList size={40} className="mb-4 text-slate-500" />
+          <FiList size={40} className="mb-4 text-slate-400" />
           <p className="text-lg font-medium text-slate-400">No hook events recorded</p>
           <p className="mt-1 text-sm text-slate-400">
             Events will appear here when hooks are deployed or executed

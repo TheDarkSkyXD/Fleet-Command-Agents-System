@@ -498,7 +498,7 @@ export function MailPage() {
               setShowCompose(true);
               setSelectedMessage(null);
             }}
-            className="flex items-center gap-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="flex items-center gap-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             <FiSend size={14} />
             Compose
@@ -599,7 +599,7 @@ export function MailPage() {
                 <Button
                   onClick={handlePurgeAll}
                   disabled={purging}
-                  className="w-full px-3 py-1.5 text-xs font-medium bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                  className="w-full px-3 py-1.5 text-xs font-medium bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
                 >
                   {purging ? <><FiLoader size={12} className="inline animate-spin mr-1" />Purging...</> : 'Purge All Messages'}
                 </Button>
@@ -921,7 +921,7 @@ export function MailPage() {
                   </p>
                   <p
                     data-testid="mail-empty-message"
-                    className="text-sm text-slate-500 max-w-sm text-center"
+                    className="text-sm text-slate-400 max-w-sm text-center"
                   >
                     {hasAnyFilter
                       ? 'Try adjusting your search or filters.'
@@ -1142,7 +1142,7 @@ export function MailPage() {
                                 <span className="text-xs font-medium text-cyan-400">
                                   {tmsg.from_agent}
                                 </span>
-                                <span className="text-[10px] text-slate-500">{'\u2192'}</span>
+                                <span className="text-[10px] text-slate-400">{'\u2192'}</span>
                                 <span className="text-xs font-medium text-green-400">
                                   {tmsg.to_agent}
                                 </span>
@@ -1227,7 +1227,7 @@ export function MailPage() {
                             setComposeForm((f) => ({ ...f, from_agent: e.target.value }))
                           }
                           placeholder="e.g. coordinator"
-                          className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500"
+                          className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-500"
                           data-testid="compose-from-agent"
                         />
                         <datalist id="known-agents-from">
@@ -1252,7 +1252,7 @@ export function MailPage() {
                             setComposeForm((f) => ({ ...f, to_agent: e.target.value }))
                           }
                           placeholder="e.g. builder-1 or @all"
-                          className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500"
+                          className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-500"
                         />
                         <datalist id="group-addresses">
                           {knownAgents.map((agent) => (
@@ -1286,7 +1286,7 @@ export function MailPage() {
                         value={composeForm.subject}
                         onChange={(e) => setComposeForm((f) => ({ ...f, subject: e.target.value }))}
                         placeholder="Message subject"
-                        className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500"
+                        className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-500"
                       />
                     </div>
 
@@ -1368,7 +1368,7 @@ export function MailPage() {
                         onChange={(e) => setComposeForm((f) => ({ ...f, body: e.target.value }))}
                         placeholder="Message body..."
                         rows={isProtocolType(composeForm.type) ? 4 : 8}
-                        className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 resize-none"
+                        className="border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-500 resize-none"
                       />
                     </div>
 
@@ -1403,7 +1403,7 @@ export function MailPage() {
                           }
                           placeholder={PAYLOAD_TEMPLATES[composeForm.type] || '{"key": "value"}'}
                           rows={5}
-                          className="border-slate-600 bg-slate-950 font-mono text-xs text-emerald-300 placeholder:text-slate-500 focus:border-blue-500 resize-none"
+                          className="border-slate-600 bg-slate-950 font-mono text-xs text-emerald-300 placeholder:text-slate-400 focus:border-blue-500 resize-none"
                         />
                         {composeForm.payload.trim() &&
                           (() => {
@@ -1434,7 +1434,7 @@ export function MailPage() {
                   <Button
                     onClick={handleSend}
                     disabled={sending}
-                    className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                    className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                   >
                     {sending ? <FiLoader size={14} className="animate-spin" /> : <FiSend size={14} />}
                     {sending ? 'Sending...' : 'Send'}

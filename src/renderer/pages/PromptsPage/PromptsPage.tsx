@@ -154,7 +154,7 @@ export function PromptsPage() {
             variant="outline"
             size="sm"
             onClick={handleShowGitLog}
-            className="flex items-center gap-1.5 bg-slate-800/90 border border-cyan-500/30 text-cyan-300 hover:bg-slate-700/90 hover:border-cyan-400/40 shadow-sm"
+            className="flex items-center gap-1.5 bg-cyan-600/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-600/25 hover:text-cyan-300"
             data-testid="prompt-git-log-btn"
           >
             <FiGitCommit size={16} />
@@ -165,7 +165,7 @@ export function PromptsPage() {
             size="sm"
             onClick={handleGitSync}
             disabled={syncing}
-            className="flex items-center gap-1.5 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="flex items-center gap-1.5 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             data-testid="prompt-git-sync-btn"
           >
             {syncing ? (
@@ -180,7 +180,7 @@ export function PromptsPage() {
               setCreateParentId(null);
               setShowCreate(true);
             }}
-            className="flex items-center gap-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="flex items-center gap-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             <FiFilePlus size={16} />
             New Prompt
@@ -270,7 +270,7 @@ export function PromptsPage() {
           <div className="flex-1 overflow-auto p-2">
             {tree.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <FiFile size={32} className="mb-2 text-slate-500" />
+                <FiFile size={32} className="mb-2 text-slate-400" />
                 <p className="text-sm text-slate-400">No prompts yet</p>
                 <Button
                   variant="link"
@@ -321,7 +321,7 @@ export function PromptsPage() {
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <FiFile size={48} className="mb-3 text-slate-500" />
+              <FiFile size={48} className="mb-3 text-slate-400" />
               <h3 className="text-lg font-medium text-slate-400">Select a prompt</h3>
               <p className="mt-1 text-sm text-slate-400">
                 Choose a prompt from the tree to view or edit its content

@@ -94,7 +94,7 @@ export function DiscoverySetupView({
             <Button
               onClick={onStartDiscovery}
               disabled={selectedCategories.size === 0}
-              className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+              className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             >
               <FiPlay size={14} />
               Start Discovery

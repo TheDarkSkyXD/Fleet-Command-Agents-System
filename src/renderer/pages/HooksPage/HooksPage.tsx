@@ -380,7 +380,7 @@ export function HooksPage() {
             <Button
               onClick={viewMode === 'create' ? handleCreate : handleUpdate}
               disabled={!formName.trim()}
-              className="gap-2 h-auto px-4 py-2 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+              className="gap-2 h-auto px-4 py-2 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
             >
               <FiCheck size={14} />
               {viewMode === 'create' ? 'Create Hook' : 'Save Changes'}
@@ -572,7 +572,7 @@ export function HooksPage() {
               resetForm();
               setViewMode('create');
             }}
-            className="gap-2 h-auto px-3 py-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="gap-2 h-auto px-3 py-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             <FiPlus size={14} />
             New Hook
@@ -628,7 +628,7 @@ export function HooksPage() {
         </div>
       ) : hooks.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 py-16">
-          <FiPlay size={40} className="mb-4 text-slate-500" />
+          <FiPlay size={40} className="mb-4 text-slate-400" />
           <p className="text-lg font-medium text-slate-400">No hooks configured</p>
           <p className="mt-1 text-sm text-slate-400">
             Create hooks to automate agent lifecycle events
@@ -638,7 +638,7 @@ export function HooksPage() {
               resetForm();
               setViewMode('create');
             }}
-            className="mt-4 gap-2 h-auto px-4 py-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="mt-4 gap-2 h-auto px-4 py-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             <FiPlus size={14} />
             Create First Hook

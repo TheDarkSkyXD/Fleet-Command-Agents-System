@@ -422,7 +422,7 @@ export function ExpertisePage() {
             setShowCreateForm(true);
           }}
           data-testid="create-expertise-button"
-          className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+          className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
         >
           <FiPlus size={16} />
           Record Expertise
@@ -877,7 +877,7 @@ export function ExpertisePage() {
               ) : (
                 <div className="space-y-4">
                   {/* Summary stats */}
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
                     <Card className="border-slate-700 bg-slate-800/50">
                       <CardContent className="p-4 pt-4">
                         <p className="text-xs text-slate-400 uppercase tracking-wide">Total Domains</p>
@@ -922,6 +922,49 @@ export function ExpertisePage() {
                         </p>
                       </CardContent>
                     </Card>
+                    <Card className="border-slate-700 bg-slate-800/50">
+                      <CardContent className="p-4 pt-4 flex flex-col items-center justify-center">
+                        <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Shelf-Life</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const result = await window.electronAPI.expertisePruneExpired();
+                              if (result.data) {
+                                toast.success(`Pruned ${result.data.pruned} expired records`);
+                                // Reload domains
+                                const domainsResult = await window.electronAPI.expertiseDomains();
+                                if (domainsResult.data) setDomains(domainsResult.data);
+                              }
+                            } catch (err) {
+                              toast.error('Failed to prune expired records');
+                            }
+                          }}
+                          className="bg-amber-600/15 text-amber-300 border border-amber-500/25 hover:bg-amber-600/25 text-xs"
+                        >
+                          <FiTrash2 className="size-3 mr-1" />
+                          Prune Expired
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Shelf-life legend */}
+                  <div className="rounded-lg border border-slate-700 bg-slate-800/30 px-4 py-2.5 flex items-center gap-4 text-xs text-slate-400">
+                    <span className="font-medium text-slate-300">Shelf-Life:</span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-orange-400" />
+                      Foundational: 30 days
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-sky-400" />
+                      Tactical: 14 days
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-slate-400" />
+                      Observational: 7 days
+                    </span>
                   </div>
 
                   {/* Per-domain health cards */}
@@ -1007,7 +1050,7 @@ export function ExpertisePage() {
                                       : 'bg-slate-700 text-slate-400 border-slate-600'
                                 }`}
                                 data-testid={`staleness-badge-${domain.domain}`}
-                                title={lastUpdated ? formatAbsoluteTime(lastUpdated) : undefined}
+                                title={lastUpdated ? formatAbsoluteTime(lastUpdated.toISOString()) : undefined}
                               >
                                 <FiClock size={11} />
                                 {timeAgo}
@@ -1163,6 +1206,26 @@ export function ExpertisePage() {
                         )}
                         <span>ID: {record.id}</span>
                         <span>Updated: {new Date(record.updated_at).toLocaleString()}</span>
+                        {record.expires_at && (
+                          <span className={`flex items-center gap-1 ${
+                            new Date(record.expires_at) <= new Date()
+                              ? 'text-red-400'
+                              : new Date(record.expires_at).getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000
+                                ? 'text-amber-400'
+                                : 'text-slate-400'
+                          }`}>
+                            <FiClock size={12} />
+                            {new Date(record.expires_at) <= new Date()
+                              ? 'Expired'
+                              : `Expires: ${new Date(record.expires_at).toLocaleDateString()}`}
+                          </span>
+                        )}
+                        {!record.expires_at && (
+                          <span className="flex items-center gap-1 text-green-400/70">
+                            <FiClock size={12} />
+                            No expiry
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1312,7 +1375,7 @@ export function ExpertisePage() {
             <Button
               onClick={handleCreate}
               data-testid="expertise-save-button"
-              className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+              className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
             >
               Save Record
             </Button>

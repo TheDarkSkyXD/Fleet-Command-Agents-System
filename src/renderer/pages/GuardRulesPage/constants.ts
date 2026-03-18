@@ -21,10 +21,10 @@ export const ALL_TOOLS = [
 
 export const capabilityColors: Record<string, string> = {
   scout: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
-  builder: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-  reviewer: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
-  lead: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
-  merger: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+  builder: 'text-green-400 bg-green-500/10 border-green-500/30',
+  reviewer: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+  lead: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+  merger: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
   coordinator: 'text-red-400 bg-red-500/10 border-red-500/30',
   monitor: 'text-teal-400 bg-teal-500/10 border-teal-500/30',
 };
@@ -32,10 +32,10 @@ export const capabilityColors: Record<string, string> = {
 // Default security posture labels per capability type
 export const defaultSecurityPosture: Record<string, { label: string; color: string }> = {
   scout: { label: 'Read-Only', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
-  builder: { label: 'Scoped Write', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-  reviewer: { label: 'Read + Test', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
-  lead: { label: 'Full Access', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
-  merger: { label: 'Merge Scoped', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+  builder: { label: 'Scoped Write', color: 'text-green-400 bg-green-500/10 border-green-500/30' },
+  reviewer: { label: 'Read + Test', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
+  lead: { label: 'Full Access', color: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
+  merger: { label: 'Merge Scoped', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
   coordinator: { label: 'Read + Spawn', color: 'text-red-400 bg-red-500/10 border-red-500/30' },
   monitor: { label: 'Monitor Only', color: 'text-teal-400 bg-teal-500/10 border-teal-500/30' },
 };

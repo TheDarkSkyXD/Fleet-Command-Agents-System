@@ -65,6 +65,15 @@ export function MergeQueuePage() {
     });
   }, [fetchQueue, fetchHistory]);
 
+  useEffect(() => {
+    const unsub = window.electronAPI.onMergeStatusUpdate?.((_data) => {
+      // Refresh the queue when merge status changes for real-time progress
+      fetchQueue();
+      fetchHistory();
+    });
+    return () => { unsub?.(); };
+  }, [fetchQueue, fetchHistory]);
+
   const allEntries = [...queue, ...history];
   const pendingCount = allEntries.filter((e) => e.status === 'pending').length;
   const mergingCount = allEntries.filter((e) => e.status === 'merging').length;
@@ -185,6 +194,29 @@ export function MergeQueuePage() {
     }
   };
 
+  const handleAutoEscalate = useCallback(async (id: number) => {
+    try {
+      // Get project path for merge operations
+      const projectResult = await window.electronAPI.projectGetActive();
+      const repoPath = projectResult?.data?.path || undefined;
+
+      toast.info('Starting auto-merge (4-tier escalation)...');
+      const result = await window.electronAPI.mergeAutoEscalate(id, repoPath);
+
+      if (result.error) {
+        toast.error(`Auto-merge failed: ${result.error}`);
+      } else {
+        const tier = (result as Record<string, unknown>).resolvedTier || 'unknown';
+        toast.success(`Auto-merge complete! Resolved via ${tier}`);
+      }
+
+      fetchQueue();
+      fetchHistory();
+    } catch (err) {
+      toast.error(`Auto-merge error: ${err}`);
+    }
+  }, [fetchQueue, fetchHistory]);
+
   const handleViewDiff = useCallback(
     async (id: number) => {
       setDiffLoading(true);
@@ -227,7 +259,7 @@ export function MergeQueuePage() {
         </div>
         <Button
           onClick={() => setShowEnqueue(true)}
-          className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+          className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
         >
           Enqueue Branch
         </Button>
@@ -282,7 +314,7 @@ export function MergeQueuePage() {
               variant="ghost"
               size="sm"
               onClick={fetchQueue}
-              className="bg-slate-800/90 border border-amber-500/30 text-amber-300 hover:bg-slate-700/90 hover:border-amber-400/40 shadow-sm"
+              className="bg-amber-600/15 text-amber-400 border border-amber-500/25 hover:bg-amber-600/25 hover:text-amber-300"
               data-testid="merge-queue-error-retry"
             >
               Retry
@@ -351,6 +383,7 @@ export function MergeQueuePage() {
                       onAutoResolve={handleAutoResolve}
                       onAiResolve={handleAiResolve}
                       onReimagine={handleReimagine}
+                      onAutoEscalate={handleAutoEscalate}
                       onPreview={handlePreview}
                       previewResult={previewResults[entry.id] || null}
                       previewLoading={previewLoadingId === entry.id}

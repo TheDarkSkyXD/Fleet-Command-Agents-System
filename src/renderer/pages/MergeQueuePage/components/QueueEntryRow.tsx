@@ -26,6 +26,7 @@ export function QueueEntryRow({
   onAutoResolve,
   onAiResolve,
   onReimagine,
+  onAutoEscalate,
   onPreview,
   previewResult,
   previewLoading,
@@ -41,6 +42,7 @@ export function QueueEntryRow({
   onAutoResolve?: (id: number) => void;
   onAiResolve?: (id: number) => void;
   onReimagine?: (id: number) => void;
+  onAutoEscalate?: (id: number) => void;
   onPreview?: (id: number) => void;
   previewResult?: PreviewResult | null;
   previewLoading?: boolean;
@@ -185,6 +187,17 @@ export function QueueEntryRow({
               title="Abandon branch and reimplement from scratch"
             >
               Reimagine
+            </Button>
+          )}
+          {(entry.status === 'pending' || entry.status === 'conflict') && !isBlocked && onAutoEscalate && (
+            <Button
+              size="sm"
+              onClick={() => onAutoEscalate(entry.id)}
+              data-testid={`auto-escalate-${entry.id}`}
+              className="bg-gradient-to-r from-blue-600 to-violet-600 text-white border-0 hover:from-blue-500 hover:to-violet-500 shadow-md shadow-blue-900/30"
+              title="Automatically merge using 4-tier escalation (clean merge → auto-resolve → AI-resolve → reimagine)"
+            >
+              &#9889; Auto Merge
             </Button>
           )}
           {entry.status === 'merging' && (

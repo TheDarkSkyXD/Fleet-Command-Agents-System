@@ -98,7 +98,7 @@ export function VirtualizedMailList({
                       >
                         <span className="text-slate-400">To:</span>{' '}
                         <span className="text-green-400">{msg.to_agent}</span>
-                        <span className="text-slate-500 ml-1.5 text-xs">from {msg.from_agent}</span>
+                        <span className="text-slate-400 ml-1.5 text-xs">from {msg.from_agent}</span>
                       </span>
                     ) : (
                       <span

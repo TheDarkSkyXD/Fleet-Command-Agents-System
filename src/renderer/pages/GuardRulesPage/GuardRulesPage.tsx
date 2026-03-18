@@ -642,7 +642,7 @@ export function GuardRulesPage() {
                       <Button
                         type="button"
                         onClick={saveChanges}
-                        className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+                        className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
                       >
                         <FiCheck size={14} />
                         Save
@@ -725,7 +725,7 @@ export function GuardRulesPage() {
                           }
                         }}
                         disabled={!newTool}
-                        className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                        className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                       >
                         <FiPlus size={14} />
                         Add
@@ -801,7 +801,7 @@ export function GuardRulesPage() {
                         size="sm"
                         onClick={() => addBashRestriction(newBashRestriction)}
                         disabled={!newBashRestriction.trim()}
-                        className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                        className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                       >
                         <FiPlus size={14} />
                         Add
@@ -935,7 +935,7 @@ export function GuardRulesPage() {
                       <Button
                         type="button"
                         onClick={saveBoundaryChanges}
-                        className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+                        className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
                       >
                         <FiCheck size={14} />
                         Save
@@ -1096,7 +1096,7 @@ export function GuardRulesPage() {
                         size="sm"
                         onClick={addBoundaryRule}
                         disabled={newBoundary.type !== 'worktree' && !newBoundary.pattern.trim()}
-                        className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                        className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                       >
                         <FiPlus size={14} />
                         Add Boundary
@@ -1145,7 +1145,7 @@ export function GuardRulesPage() {
                         type="button"
                         onClick={validateTestPath}
                         disabled={!testPath.trim()}
-                        className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                        className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                       >
                         Test
                       </Button>
@@ -1761,7 +1761,7 @@ export function GuardRulesPage() {
               onClick={handleAddRule}
               disabled={!addRuleForm.value.trim()}
               data-testid="add-rule-save-btn"
-              className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+              className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             >
               <FiPlus size={14} />
               Add Rule
