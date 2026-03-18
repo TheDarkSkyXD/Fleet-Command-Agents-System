@@ -39,7 +39,7 @@ function ProjectRow({
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
         isActive
           ? 'bg-blue-500/15 text-blue-400'
-          : 'bg-slate-700/30 text-slate-500 group-hover:bg-slate-700/50 group-hover:text-slate-400'
+          : 'bg-slate-700/30 text-slate-400 group-hover:bg-slate-700/50 group-hover:text-slate-300'
       }`}>
         <FiFolder size={16} />
       </div>
@@ -57,13 +57,13 @@ function ProjectRow({
             </Badge>
           )}
         </div>
-        <p className="mt-0.5 text-[12px] text-slate-500 font-mono truncate" title={project.path}>
+        <p className="mt-0.5 text-[12px] text-slate-400 font-mono truncate" title={project.path}>
           {project.path}
         </p>
       </div>
 
       {/* Timestamp */}
-      <div className="shrink-0 flex items-center gap-1.5 text-slate-600 group-hover:text-slate-500 transition-colors">
+      <div className="shrink-0 flex items-center gap-1.5 text-slate-400 group-hover:text-slate-300 transition-colors">
         <FiClock size={11} />
         <span
           className="text-[11px]"
@@ -75,7 +75,7 @@ function ProjectRow({
 
       {/* Hover arrow */}
       <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-150 -translate-x-1 group-hover:translate-x-0">
-        <FiArrowRight size={14} className="text-slate-500" />
+        <FiArrowRight size={14} className="text-slate-400" />
       </div>
     </Button>
   );
@@ -118,14 +118,14 @@ export function ProjectsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-50 tracking-[-0.02em]">Projects</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-400">
             Manage your project workspaces
           </p>
         </div>
         <Button
           onClick={handleBrowse}
           data-testid="add-project-button"
-          className="group gap-2.5 rounded-[12px] bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm px-5 py-2.5 font-semibold h-auto"
+          className="group gap-2.5 rounded-[12px] bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 px-5 py-2.5 font-semibold h-auto"
         >
           <FiPlus size={15} />
           New Project
@@ -170,15 +170,15 @@ export function ProjectsPage() {
               data-testid="no-projects-empty-state"
             >
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-lg bg-slate-700/20 border border-slate-700/30">
-                <FiFolder size={24} className="text-slate-600" />
+                <FiFolder size={24} className="text-slate-400" />
               </div>
               <p className="text-sm font-medium text-slate-300 mb-1.5">No projects yet</p>
-              <p className="text-[13px] text-slate-500 mb-6 max-w-xs mx-auto leading-relaxed">
+              <p className="text-[13px] text-slate-400 mb-6 max-w-xs mx-auto leading-relaxed">
                 Add a Git repository to start orchestrating AI coding agents.
               </p>
               <Button
                 onClick={handleBrowse}
-                className="gap-2 rounded-[12px] bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm px-6 py-2.5 font-semibold h-auto"
+                className="gap-2 rounded-[12px] bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 px-6 py-2.5 font-semibold h-auto"
                 data-testid="open-project-button"
               >
                 <FiFolderPlus size={15} />

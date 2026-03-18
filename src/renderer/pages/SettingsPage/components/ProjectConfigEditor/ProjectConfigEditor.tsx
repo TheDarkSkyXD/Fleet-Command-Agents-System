@@ -342,13 +342,13 @@ export function ProjectConfigEditor() {
                     style={{ paddingLeft: `${depth * 16}px` }}
                   >
                     {depth > 0 && (
-                      <span className="text-slate-500 mr-1">
+                      <span className="text-slate-400 mr-1">
                         {field.path.slice(0, -1).join('.')}.
                       </span>
                     )}
                     {field.key}
                   </span>
-                  <Badge variant="secondary" className="text-[10px] text-slate-500 bg-slate-700/50 px-1.5 py-0.5">
+                  <Badge variant="secondary" className="text-[10px] text-slate-400 bg-slate-700/50 px-1.5 py-0.5">
                     {field.type}
                   </Badge>
                 </div>

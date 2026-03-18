@@ -100,7 +100,7 @@ export function DoctorPage() {
         <Button
           onClick={runChecks}
           disabled={isLoading}
-          className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+          className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
         >
           <FiRefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           {isLoading ? 'Running...' : 'Run Health Check'}
@@ -151,7 +151,7 @@ export function DoctorPage() {
                 }
               }}
               disabled={fixingCheck !== null}
-              className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+              className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
             >
               <FiTool className="h-4 w-4" />
               Fix All
@@ -274,7 +274,7 @@ function DoctorCheckCard({
           size="sm"
           onClick={onFix}
           disabled={isFixing}
-          className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm text-xs"
+          className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300 text-xs"
         >
           {isFixing ? (
             <FiRefreshCw className="h-3.5 w-3.5 animate-spin" />

@@ -99,7 +99,7 @@ function ProjectRow({
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
         isActive
           ? 'bg-blue-500/15 text-blue-400'
-          : 'bg-slate-700/30 text-slate-500 group-hover:bg-slate-700/50 group-hover:text-slate-400'
+          : 'bg-slate-700/30 text-slate-400 group-hover:bg-slate-700/50 group-hover:text-slate-400'
       }`}>
         <FiFolder size={16} />
       </div>
@@ -116,13 +116,13 @@ function ProjectRow({
             </Badge>
           )}
         </div>
-        <p className="mt-0.5 text-[12px] text-slate-500 font-mono truncate" title={project.path}>
+        <p className="mt-0.5 text-[12px] text-slate-400 font-mono truncate" title={project.path}>
           {project.path}
         </p>
       </div>
 
       {/* Timestamp */}
-      <div className="shrink-0 flex items-center gap-1.5 text-slate-600 group-hover:text-slate-500 transition-colors">
+      <div className="shrink-0 flex items-center gap-1.5 text-slate-400 group-hover:text-slate-400 transition-colors">
         <FiClock size={11} />
         <span
           className="text-[11px]"
@@ -134,7 +134,7 @@ function ProjectRow({
 
       {/* Hover arrow */}
       <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-150 -translate-x-1 group-hover:translate-x-0">
-        <FiArrowRight size={14} className="text-slate-500" />
+        <FiArrowRight size={14} className="text-slate-400" />
       </div>
     </motion.button>
   );
@@ -186,12 +186,12 @@ function EmptyState({ onBrowse }: { onBrowse: () => void }) {
       data-testid="no-projects-empty-state"
     >
       <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-lg bg-slate-700/20 border border-slate-700/30">
-        <FiFolder size={24} className="text-slate-600" />
+        <FiFolder size={24} className="text-slate-400" />
       </div>
       <p className="text-sm font-medium text-slate-300 mb-1.5">
         No projects yet
       </p>
-      <p className="text-[13px] text-slate-500 mb-6 max-w-xs mx-auto leading-relaxed">
+      <p className="text-[13px] text-slate-400 mb-6 max-w-xs mx-auto leading-relaxed">
         Add a Git repository to start orchestrating AI coding agents.
       </p>
       <motion.button
@@ -199,7 +199,7 @@ function EmptyState({ onBrowse }: { onBrowse: () => void }) {
         onClick={onBrowse}
         whileHover={{ scale: 1.03 }}
         whileTap={{ scale: 0.97 }}
-        className="inline-flex items-center gap-2 rounded-xl bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm px-6 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
+        className="inline-flex items-center gap-2 rounded-xl bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 px-6 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
         data-testid="open-project-button"
       >
         <FiFolderPlus size={15} />
@@ -252,7 +252,7 @@ export function WelcomePage({ onProjectOpened }: { onProjectOpened: () => void }
           <h1 className="text-[2.25rem] font-bold text-slate-50 tracking-[-0.04em] leading-none">
             Fleet Command
           </h1>
-          <p className="mt-2.5 text-[13px] text-slate-500 tracking-[0.08em] uppercase font-medium">
+          <p className="mt-2.5 text-[13px] text-slate-400 tracking-[0.08em] uppercase font-medium">
             Multi-agent AI orchestration
           </p>
         </motion.div>
@@ -335,7 +335,7 @@ export function WelcomePage({ onProjectOpened }: { onProjectOpened: () => void }
                 onClick={onProjectOpened}
                 whileHover={{ scale: 1.02, y: -1 }}
                 whileTap={{ scale: 0.98 }}
-                className="group relative inline-flex items-center gap-3 rounded-[14px] bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm px-10 py-[14px] text-[14px] font-semibold transition-all duration-200 cursor-pointer"
+                className="group relative inline-flex items-center gap-3 rounded-[14px] bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 px-10 py-[14px] text-[14px] font-semibold transition-all duration-200 cursor-pointer"
               >
                 <span className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[14px] bg-gradient-to-r from-transparent via-white/25 to-transparent" />
                 Open {activeProject.name}

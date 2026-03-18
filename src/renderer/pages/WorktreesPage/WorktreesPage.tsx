@@ -338,7 +338,7 @@ export function WorktreesPage() {
               size="sm"
               onClick={handleInitFleetcommand}
               disabled={initializingFleetcommand}
-              className="gap-2 h-auto px-3 py-1.5 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+              className="gap-2 h-auto px-3 py-1.5 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
             >
               <FiFolderPlus size={14} className={initializingFleetcommand ? 'animate-pulse' : ''} />
               Initialize .fleetcommand
@@ -351,7 +351,7 @@ export function WorktreesPage() {
               size="sm"
               onClick={handleCleanAllCompleted}
               disabled={cleaningAll}
-              className="gap-2 h-auto px-3 py-1.5 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+              className="gap-2 h-auto px-3 py-1.5 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
             >
               <FiTrash2 size={14} className={cleaningAll ? 'animate-spin' : ''} />
               {cleaningAll ? 'Cleaning...' : `Clean All Completed (${completedWorktrees.length})`}
@@ -595,7 +595,7 @@ export function WorktreesPage() {
                       <span>{wt.agentName}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
                       <FiUser size={12} />
                       <span>Unassigned</span>
                     </div>
@@ -608,7 +608,7 @@ export function WorktreesPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleOpenExplorer(wt.path)}
-                      className="gap-1 h-auto px-2 py-0.5 text-xs bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                      className="gap-1 h-auto px-2 py-0.5 text-xs bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                       title="Open in file explorer"
                     >
                       <FiExternalLink size={11} />
@@ -620,7 +620,7 @@ export function WorktreesPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleOpenVSCode(wt.path)}
-                      className="gap-1 h-auto px-2 py-0.5 text-xs bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                      className="gap-1 h-auto px-2 py-0.5 text-xs bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                       title="Open in VS Code"
                     >
                       <FiCode size={11} />
@@ -638,7 +638,7 @@ export function WorktreesPage() {
                             : handleForceRemoveWorktree(wt)
                         }
                         disabled={removingPaths.has(wt.path)}
-                        className="gap-1 h-auto px-2 py-0.5 text-xs bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                        className="gap-1 h-auto px-2 py-0.5 text-xs bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
                         title={
                           !wt.isMerged ? 'Force remove (unmerged branch)' : 'Remove this worktree'
                         }
@@ -745,7 +745,7 @@ export function WorktreesPage() {
               <Button
                 onClick={confirmForceRemove}
                 disabled={forceRemoving}
-                className="gap-1.5 h-auto px-4 py-2 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                className="gap-1.5 h-auto px-4 py-2 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
               >
                 <FiTrash2 size={14} className={forceRemoving ? 'animate-spin' : ''} />
                 {forceRemoving ? 'Removing...' : 'Force Remove'}

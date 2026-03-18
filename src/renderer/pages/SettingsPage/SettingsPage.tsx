@@ -32,7 +32,6 @@ import type {
   UpdateStatus,
 } from '../../../shared/types';
 import { AuthDecisionTree } from './components/AuthDecisionTree';
-import { ProjectConfigEditor } from './components/ProjectConfigEditor';
 import { useProjectStore } from '../../stores/projectStore';
 import {
   DEFAULT_SHORTCUTS,
@@ -128,7 +127,6 @@ export function SettingsPage() {
     | 'keyboard-shortcuts'
     | 'profiles'
     | 'quality-gates'
-    | 'project-config'
     | 'notifications'
     | 'updates'
     | 'cleanup'
@@ -160,7 +158,6 @@ export function SettingsPage() {
     { id: 'profiles' as const, label: 'Profiles' },
     { id: 'quality-gates' as const, label: 'Quality Gates' },
     { id: 'notifications' as const, label: 'Notifications' },
-    { id: 'project-config' as const, label: 'Project Config' },
     { id: 'updates' as const, label: 'Updates' },
     { id: 'cleanup' as const, label: 'Cleanup' },
   ];
@@ -202,12 +199,6 @@ export function SettingsPage() {
         <TabsContent value="profiles"><ProfilesSettings /></TabsContent>
         <TabsContent value="quality-gates"><QualityGatesSettings /></TabsContent>
         <TabsContent value="notifications"><NotificationPreferencesSettings /></TabsContent>
-        <TabsContent value="project-config">
-          <DefaultProjectPathSetting />
-          <div className="mt-6">
-            <ProjectConfigEditor />
-          </div>
-        </TabsContent>
         <TabsContent value="updates"><UpdateSettings /></TabsContent>
         <TabsContent value="cleanup"><CleanupSettings /></TabsContent>
       </Tabs>
@@ -262,7 +253,7 @@ function DefaultProjectPathSetting() {
             if (e.key === 'Enter') handleSave();
           }}
           placeholder="e.g. /home/user/projects or C:\Users\user\projects"
-          className="flex-1 border-slate-700 bg-slate-900/80 text-slate-200 placeholder-slate-500 font-mono"
+          className="flex-1 border-white/10 bg-[#1e1e1e] text-slate-200 placeholder-slate-400 font-mono"
           data-testid="default-project-path-input"
           aria-label="Default project path"
         />
@@ -270,7 +261,7 @@ function DefaultProjectPathSetting() {
           type="button"
           onClick={handleSave}
           disabled={localPath.trim() === (settings.defaultProjectPath || '')}
-          className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+          className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
           data-testid="default-project-path-save"
         >
           {saved ? <FiCheck size={14} /> : <FiSave size={14} />}
@@ -431,7 +422,7 @@ function KeyboardShortcutsSettings() {
                       aria-label={`Enable ${shortcut.label} shortcut`}
                     />
                     <span
-                      className={`text-sm ${shortcut.enabled ? 'text-slate-200' : 'text-slate-500'}`}
+                      className={`text-sm ${shortcut.enabled ? 'text-slate-200' : 'text-slate-400'}`}
                     >
                       {shortcut.label}
                     </span>
@@ -447,7 +438,7 @@ function KeyboardShortcutsSettings() {
                           resetShortcut(shortcut.action);
                           toast.success(`Reset "${shortcut.label}" to default`);
                         }}
-                        className="h-7 w-7 text-slate-500 hover:text-slate-300"
+                        className="h-7 w-7 text-slate-400 hover:text-slate-300"
                         title="Reset to default"
                         data-testid={`shortcut-reset-${shortcut.action}`}
                       >
@@ -638,7 +629,7 @@ function ProfilesSettings() {
         <Button
           type="button"
           onClick={() => setShowCreateDialog(true)}
-          className="gap-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+          className="gap-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
         >
           <FiPlus size={16} />
           New Profile
@@ -738,10 +729,10 @@ function ProfileCard({
 
   const capabilityColors: Record<string, string> = {
     scout: 'text-cyan-400 bg-cyan-900/30',
-    builder: 'text-blue-400 bg-blue-900/30',
-    reviewer: 'text-cyan-400 bg-cyan-900/30',
-    lead: 'text-amber-400 bg-amber-900/30',
-    merger: 'text-emerald-400 bg-emerald-900/30',
+    builder: 'text-green-400 bg-green-900/30',
+    reviewer: 'text-amber-400 bg-amber-900/30',
+    lead: 'text-orange-400 bg-orange-900/30',
+    merger: 'text-blue-400 bg-blue-900/30',
     coordinator: 'text-red-400 bg-red-900/30',
     monitor: 'text-teal-400 bg-teal-900/30',
   };
@@ -778,12 +769,12 @@ function ProfileCard({
             </span>
             <span
               className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-                capabilityColors[profile.default_capability] || 'text-slate-400 bg-slate-700'
+                capabilityColors[profile.default_capability] || 'text-slate-400 bg-[#222]'
               }`}
             >
               {profile.default_capability}
             </span>
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium text-slate-300 bg-slate-700">
+            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium text-slate-300 bg-[#222]">
               {profile.default_model}
             </span>
           </div>
@@ -958,7 +949,7 @@ function ProfileCreateDialog({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-lg border-slate-700 bg-slate-800">
+      <DialogContent className="max-w-xl border-slate-700 bg-slate-800">
         <DialogHeader>
           <DialogTitle>Create Profile</DialogTitle>
           <DialogDescription>Create a new configuration profile for agent settings.</DialogDescription>
@@ -978,7 +969,7 @@ function ProfileCreateDialog({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="gap-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="gap-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             {submitting ? <FiRefreshCw className="animate-spin" size={14} /> : <FiPlus size={14} />}
             Create Profile
@@ -1081,7 +1072,7 @@ function ProfileEditForm({
           type="button"
           onClick={handleSave}
           disabled={submitting}
-          className="gap-2 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+          className="gap-2 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
         >
           {submitting ? <FiRefreshCw className="animate-spin" size={14} /> : <FiSave size={14} />}
           Save Changes
@@ -1114,7 +1105,7 @@ function ProfileFormFields({
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder='e.g., "Fast Build" or "Careful Review"'
-          className={`w-full bg-slate-700 text-slate-100 ${
+          className={`w-full bg-[#1e1e1e] text-slate-200 ${
             errors.name
               ? 'border-red-500 focus-visible:ring-red-500'
               : 'border-slate-600'
@@ -1131,7 +1122,7 @@ function ProfileFormFields({
           value={form.description || ''}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           placeholder="Brief description of this profile's purpose"
-          className={`w-full bg-slate-700 text-slate-100 ${
+          className={`w-full bg-[#1e1e1e] text-slate-200 ${
             errors.description
               ? 'border-red-500 focus-visible:ring-red-500'
               : 'border-slate-600'
@@ -1140,10 +1131,10 @@ function ProfileFormFields({
         {errors.description && <p className="mt-1 text-xs text-red-400">{errors.description}</p>}
       </div>
 
-      {/* Agent config row */}
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <Label className="text-xs font-medium text-slate-300 mb-1">
+      {/* Agent config */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <Label className="text-sm font-medium text-slate-200 shrink-0 w-44">
             Max Hierarchy Depth
           </Label>
           <NumberInput
@@ -1152,34 +1143,38 @@ function ProfileFormFields({
             max={10}
             onChange={(v) => setForm({ ...form, max_hierarchy_depth: v })}
           />
-          {errors.max_hierarchy_depth && (
-            <p className="mt-1 text-xs text-red-400">{errors.max_hierarchy_depth}</p>
-          )}
         </div>
-        <div>
-          <Label className="text-xs font-medium text-slate-300 mb-1">Max Concurrent</Label>
+        {errors.max_hierarchy_depth && (
+          <p className="text-xs text-red-400">{errors.max_hierarchy_depth}</p>
+        )}
+        <div className="flex items-center justify-between gap-4">
+          <Label className="text-sm font-medium text-slate-200 shrink-0 w-44">
+            Max Concurrent Agents
+          </Label>
           <NumberInput
             value={form.max_concurrent_agents}
             min={1}
             max={50}
             onChange={(v) => setForm({ ...form, max_concurrent_agents: v })}
           />
-          {errors.max_concurrent_agents && (
-            <p className="mt-1 text-xs text-red-400">{errors.max_concurrent_agents}</p>
-          )}
         </div>
-        <div>
-          <Label className="text-xs font-medium text-slate-300 mb-1">Per Lead</Label>
+        {errors.max_concurrent_agents && (
+          <p className="text-xs text-red-400">{errors.max_concurrent_agents}</p>
+        )}
+        <div className="flex items-center justify-between gap-4">
+          <Label className="text-sm font-medium text-slate-200 shrink-0 w-44">
+            Max Agents Per Lead
+          </Label>
           <NumberInput
             value={form.max_agents_per_lead}
             min={1}
             max={20}
             onChange={(v) => setForm({ ...form, max_agents_per_lead: v })}
           />
-          {errors.max_agents_per_lead && (
-            <p className="mt-1 text-xs text-red-400">{errors.max_agents_per_lead}</p>
-          )}
         </div>
+        {errors.max_agents_per_lead && (
+          <p className="text-xs text-red-400">{errors.max_agents_per_lead}</p>
+        )}
       </div>
 
       {/* Default Capability & Model row */}
@@ -1197,7 +1192,7 @@ function ProfileFormFields({
               })
             }
           >
-            <SelectTrigger className={`w-full bg-slate-700 text-slate-100 ${
+            <SelectTrigger className={`w-full bg-[#1e1e1e] text-slate-200 ${
               errors.default_capability
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-slate-600'
@@ -1227,7 +1222,7 @@ function ProfileFormFields({
               })
             }
           >
-            <SelectTrigger className={`w-full bg-slate-700 text-slate-100 ${
+            <SelectTrigger className={`w-full bg-[#1e1e1e] text-slate-200 ${
               errors.default_model
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-slate-600'
@@ -1374,7 +1369,7 @@ function WatchdogSettings() {
               max={300}
               onChange={(v) => updateSetting('watchdogIntervalMs', v * 1000)}
             />
-            <span className="text-xs text-slate-400">sec</span>
+            <span className="text-base font-bold text-slate-200">sec</span>
           </div>
         </SettingRow>
 
@@ -1390,7 +1385,7 @@ function WatchdogSettings() {
               max={60}
               onChange={(v) => updateSetting('watchdogStaleThresholdMs', v * 60000)}
             />
-            <span className="text-xs text-slate-400">min</span>
+            <span className="text-base font-bold text-slate-200">min</span>
           </div>
         </SettingRow>
 
@@ -1406,7 +1401,7 @@ function WatchdogSettings() {
               max={120}
               onChange={(v) => updateSetting('watchdogZombieThresholdMs', v * 60000)}
             />
-            <span className="text-xs text-slate-400">min</span>
+            <span className="text-base font-bold text-slate-200">min</span>
           </div>
         </SettingRow>
 
@@ -1462,7 +1457,7 @@ function WatchdogSettings() {
         <Button
           type="button"
           onClick={applyWatchdogConfig}
-          className="gap-2 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+          className="gap-2 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
         >
           <FiSave size={14} />
           Apply to Watchdog
@@ -1522,6 +1517,25 @@ function validateSettingField<T extends z.ZodRawShape>(
 function AgentSettings() {
   const { settings, updateSetting } = useSettingsStore();
   const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [staggerDelayMs, setStaggerDelayMs] = useState(2000);
+
+  // Load stagger delay from electron-store on mount
+  useEffect(() => {
+    window.electronAPI.settingsGet('stagger_delay_ms').then((result) => {
+      if (result.data != null && typeof result.data === 'number') {
+        setStaggerDelayMs(result.data);
+      } else if (result.data != null && typeof result.data === 'string') {
+        const parsed = parseInt(result.data, 10);
+        if (!isNaN(parsed)) setStaggerDelayMs(parsed);
+      }
+    });
+  }, []);
+
+  const handleStaggerDelayChange = (value: number) => {
+    const clamped = Math.max(0, Math.min(10000, value));
+    setStaggerDelayMs(clamped);
+    window.electronAPI.settingsSet('stagger_delay_ms', clamped);
+  };
 
   const handleChange = (
     key: 'maxHierarchyDepth' | 'maxConcurrentAgents' | 'maxAgentsPerLead',
@@ -1602,6 +1616,29 @@ function AgentSettings() {
             />
           </div>
         </SettingRow>
+
+        {/* Spawn Stagger Delay */}
+        <SettingRow
+          label="Spawn Stagger Delay"
+          description="Minimum delay (in milliseconds) between consecutive agent spawns to avoid resource contention. Range: 0–10000ms. Default is 2000ms."
+        >
+          <div data-testid="setting-stagger-delay" data-default-value="2000">
+            <div className="flex items-center gap-3 min-w-[180px]">
+              <input
+                type="range"
+                min={0}
+                max={10000}
+                step={100}
+                value={staggerDelayMs}
+                onChange={(e) => handleStaggerDelayChange(Number.parseInt(e.target.value, 10))}
+                className="flex-1 h-2 rounded-full appearance-none bg-[#404040] cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-400 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-blue-500/25 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:hover:bg-blue-400 [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-all"
+              />
+              <span className="min-w-[3.5rem] text-center text-sm font-medium text-slate-200 bg-[#1e1e1e] border border-white/10 rounded-md px-2 py-1 tabular-nums">
+                {staggerDelayMs}
+              </span>
+            </div>
+          </div>
+        </SettingRow>
       </div>
 
       {/* Model Defaults Per Capability */}
@@ -1615,10 +1652,10 @@ function AgentSettings() {
         {(
           [
             { cap: 'scout' as const, label: 'Scout', color: 'text-cyan-400' },
-            { cap: 'builder' as const, label: 'Builder', color: 'text-blue-400' },
-            { cap: 'reviewer' as const, label: 'Reviewer', color: 'text-cyan-400' },
-            { cap: 'lead' as const, label: 'Lead', color: 'text-amber-400' },
-            { cap: 'merger' as const, label: 'Merger', color: 'text-emerald-400' },
+            { cap: 'builder' as const, label: 'Builder', color: 'text-green-400' },
+            { cap: 'reviewer' as const, label: 'Reviewer', color: 'text-amber-400' },
+            { cap: 'lead' as const, label: 'Lead', color: 'text-orange-400' },
+            { cap: 'merger' as const, label: 'Merger', color: 'text-blue-400' },
             { cap: 'coordinator' as const, label: 'Coordinator', color: 'text-red-400' },
             { cap: 'monitor' as const, label: 'Monitor', color: 'text-teal-400' },
           ] as const
@@ -1640,7 +1677,7 @@ function AgentSettings() {
                 } as ModelDefaultsPerCapability);
               }}
             >
-              <SelectTrigger className="w-[180px] border-slate-600 bg-slate-700 text-slate-200">
+              <SelectTrigger className="w-[180px] border-white/10 bg-[#1e1e1e] text-slate-200">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1664,6 +1701,8 @@ function AgentSettings() {
             updateSetting('maxConcurrentAgents', DEFAULT_SETTINGS.maxConcurrentAgents);
             updateSetting('maxAgentsPerLead', DEFAULT_SETTINGS.maxAgentsPerLead);
             updateSetting('modelDefaultsPerCapability', { ...DEFAULT_MODEL_DEFAULTS });
+            setStaggerDelayMs(2000);
+            window.electronAPI.settingsSet('stagger_delay_ms', 2000);
           }}
         >
           Reset Agent Settings to Defaults
@@ -1702,8 +1741,8 @@ function ThemeSettings() {
               onClick={() => updateSetting('accentColor', key)}
               className={`relative flex h-auto flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all ${
                 currentAccent === key
-                  ? 'border-white bg-slate-700/50 shadow-lg'
-                  : 'border-slate-600 bg-slate-800 hover:border-slate-500 hover:bg-slate-700/30'
+                  ? 'border-white bg-white/10 shadow-lg'
+                  : 'border-white/10 bg-[#1a1a1a] hover:border-white/20 hover:bg-[#222]'
               }`}
               data-testid={`accent-color-${key}`}
             >
@@ -1768,7 +1807,7 @@ function ThemeSettings() {
               type="text"
               readOnly
               value="Input focus"
-              className="rounded-md border bg-slate-700 px-3 py-1.5 text-sm text-slate-100 focus:outline-none"
+              className="rounded-md border border-white/10 bg-[#1e1e1e] px-3 py-1.5 text-sm text-slate-200 focus:outline-none"
               style={{ borderColor: ACCENT_COLORS[currentAccent].primary }}
             />
           </div>
@@ -1816,7 +1855,7 @@ function TerminalSettings() {
             value={settings.terminalFontFamily}
             onValueChange={(value) => updateSetting('terminalFontFamily', value)}
           >
-            <SelectTrigger className="w-56 border-slate-600 bg-slate-700 text-slate-100">
+            <SelectTrigger className="w-56 border-white/10 bg-[#1e1e1e] text-slate-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1916,231 +1955,56 @@ function NumberInput({
   min,
   max,
   onChange,
-  onError,
 }: {
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
-  /** Called with error message or null to report validation state */
   onError?: (error: string | null) => void;
 }) {
-  const [rawValue, setRawValue] = useState(String(value));
-  const [inputError, setInputError] = useState<string | null>(null);
-
-  // Sync rawValue when value prop changes externally
-  useEffect(() => {
-    setRawValue(String(value));
-  }, [value]);
-
-  const handleChange = (text: string) => {
-    setRawValue(text);
-
-    if (text.trim() === '') {
-      const err = 'A number is required';
-      setInputError(err);
-      onError?.(err);
-      return;
-    }
-
-    const parsed = Number.parseInt(text, 10);
-
-    if (Number.isNaN(parsed) || String(parsed) !== text.trim()) {
-      const err = 'Must be a valid whole number';
-      setInputError(err);
-      onError?.(err);
-      return;
-    }
-
-    if (parsed < min) {
-      const err = `Minimum is ${min}`;
-      setInputError(err);
-      onError?.(err);
-      onChange(parsed);
-      return;
-    }
-
-    if (parsed > max) {
-      const err = `Maximum is ${max}`;
-      setInputError(err);
-      onError?.(err);
-      onChange(parsed);
-      return;
-    }
-
-    setInputError(null);
-    onError?.(null);
-    onChange(parsed);
-  };
-
-  const borderClass = inputError
-    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-    : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500';
-
   return (
-    <div>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            const next = Math.max(min, value - 1);
-            setRawValue(String(next));
-            setInputError(null);
-            onError?.(null);
-            onChange(next);
-          }}
-          disabled={value <= min}
-          className="h-8 w-8 border-slate-600 bg-slate-700 text-slate-300 hover:bg-slate-600"
-        >
-          -
-        </Button>
-        <Input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={rawValue}
-          onChange={(e) => handleChange(e.target.value)}
-          className={`w-16 text-center bg-slate-700 text-slate-100 ${borderClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-          data-testid="number-input"
-          aria-invalid={!!inputError}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            const next = Math.min(max, value + 1);
-            setRawValue(String(next));
-            setInputError(null);
-            onError?.(null);
-            onChange(next);
-          }}
-          disabled={value >= max}
-          className="h-8 w-8 border-slate-600 bg-slate-700 text-slate-300 hover:bg-slate-600"
-        >
-          +
-        </Button>
-      </div>
-      {inputError && (
-        <p className="mt-1 text-xs text-red-400" data-testid="number-input-error">
-          {inputError}
-        </p>
-      )}
+    <div className="flex items-center gap-3 min-w-[180px]" data-testid="number-input">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number.parseInt(e.target.value, 10))}
+        className="flex-1 h-2 rounded-full appearance-none bg-[#404040] cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-400 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-blue-500/25 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:hover:bg-blue-400 [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-all"
+      />
+      <span className="min-w-[2.5rem] text-center text-sm font-medium text-slate-200 bg-[#1e1e1e] border border-white/10 rounded-md px-2 py-1 tabular-nums">
+        {value}
+      </span>
     </div>
   );
 }
 
-/** Number input that allows typing raw values (including invalid ones) with visual error feedback */
 function ValidatedNumberInput({
   value,
   min,
   max,
   onChange,
-  hasError,
-  onNonNumericError,
 }: {
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
   hasError?: boolean;
-  /** Called when non-numeric text is entered; null clears the error */
   onNonNumericError?: (error: string | null) => void;
 }) {
-  const [rawValue, setRawValue] = useState(String(value));
-  const [localNonNumericError, setLocalNonNumericError] = useState(false);
-
-  // Sync rawValue when value prop changes (e.g., from reset)
-  useEffect(() => {
-    setRawValue(String(value));
-  }, [value]);
-
-  const handleRawChange = (text: string) => {
-    setRawValue(text);
-
-    // Empty field
-    if (text.trim() === '') {
-      setLocalNonNumericError(true);
-      onNonNumericError?.('A number is required');
-      return;
-    }
-
-    const parsed = Number.parseInt(text, 10);
-
-    // Non-numeric text (e.g., "abc", "1.2.3")
-    if (Number.isNaN(parsed) || String(parsed) !== text.trim()) {
-      setLocalNonNumericError(true);
-      onNonNumericError?.('Must be a valid whole number');
-      return;
-    }
-
-    // Valid number - clear non-numeric error and let Zod validate range
-    setLocalNonNumericError(false);
-    onNonNumericError?.(null);
-    onChange(parsed); // Let Zod validate - don't clamp
-  };
-
-  const showError = hasError || localNonNumericError;
-  const borderClass = showError
-    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-    : 'border-slate-600 focus:border-blue-500 focus:ring-blue-500';
-
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={() => {
-          const next = Math.max(min, value - 1);
-          setRawValue(String(next));
-          setLocalNonNumericError(false);
-          onNonNumericError?.(null);
-          onChange(next);
-        }}
-        disabled={value <= min}
-        className="h-8 w-8 border-slate-600 bg-slate-700 text-slate-300 hover:bg-slate-600"
-        data-testid="numeric-decrement"
-      >
-        -
-      </Button>
-      <Input
-        type="text"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        value={rawValue}
-        onChange={(e) => handleRawChange(e.target.value)}
-        onPaste={(e) => {
-          const pasted = e.clipboardData.getData('text');
-          if (!/^-?\d+$/.test(pasted.trim())) {
-            e.preventDefault();
-            setLocalNonNumericError(true);
-            onNonNumericError?.('Must be a valid whole number');
-          }
-        }}
-        className={`w-16 text-center bg-slate-700 text-slate-100 ${borderClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-        data-testid="validated-number-input"
-        aria-invalid={showError}
+    <div className="flex items-center gap-3 min-w-[180px]" data-testid="validated-number-input">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={Math.max(min, Math.min(max, value))}
+        onChange={(e) => onChange(Number.parseInt(e.target.value, 10))}
+        className="flex-1 h-2 rounded-full appearance-none bg-[#404040] cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-400 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-blue-500/25 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:hover:bg-blue-400 [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-all"
       />
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={() => {
-          const next = Math.min(max, value + 1);
-          setRawValue(String(next));
-          setLocalNonNumericError(false);
-          onNonNumericError?.(null);
-          onChange(next);
-        }}
-        disabled={value >= max}
-        className="h-8 w-8 border-slate-600 bg-slate-700 text-slate-300 hover:bg-slate-600"
-        data-testid="numeric-increment"
-      >
-        +
-      </Button>
+      <span className="min-w-[2.5rem] text-center text-sm font-medium text-slate-200 bg-[#1e1e1e] border border-white/10 rounded-md px-2 py-1 tabular-nums">
+        {value}
+      </span>
     </div>
   );
 }
@@ -2427,7 +2291,7 @@ function QualityGatesSettings() {
             setNewGateName('');
             setNewGateCommand(DEFAULT_COMMANDS.test);
           }}
-          className="gap-1.5 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+          className="gap-1.5 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           data-testid="add-quality-gate-btn"
         >
           <FiPlus size={14} />
@@ -2473,7 +2337,7 @@ function QualityGatesSettings() {
                 }}
               >
                 <SelectTrigger
-                  className="w-full border-slate-600 bg-slate-700 text-slate-100"
+                  className="w-full border-white/10 bg-[#1e1e1e] text-slate-200"
                   data-testid="gate-type-select"
                 >
                   <SelectValue />
@@ -2499,7 +2363,7 @@ function QualityGatesSettings() {
                 placeholder={
                   GATE_TYPE_OPTIONS.find((o) => o.value === newGateType)?.label || 'Gate name'
                 }
-                className="w-full border-slate-600 bg-slate-700 text-slate-100 placeholder:text-slate-400"
+                className="w-full border-white/10 bg-[#1e1e1e] text-slate-200 placeholder:text-slate-400"
                 data-testid="gate-name-input"
               />
             </div>
@@ -2514,7 +2378,7 @@ function QualityGatesSettings() {
               value={newGateCommand}
               onChange={(e) => setNewGateCommand(e.target.value)}
               placeholder="e.g., npm test"
-              className="w-full border-slate-600 bg-slate-700 text-slate-100 font-mono placeholder:text-slate-400"
+              className="w-full border-white/10 bg-[#1e1e1e] text-slate-200 font-mono placeholder:text-slate-400"
               data-testid="gate-command-input"
             />
           </div>
@@ -2531,7 +2395,7 @@ function QualityGatesSettings() {
               type="button"
               size="sm"
               onClick={handleCreate}
-              className="gap-1 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+              className="gap-1 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
               data-testid="save-quality-gate-btn"
             >
               <FiSave size={14} />
@@ -2572,7 +2436,7 @@ function QualityGatesSettings() {
                         value={editGateType}
                         onValueChange={(value) => setEditGateType(value)}
                       >
-                        <SelectTrigger className="w-full border-slate-600 bg-slate-700 text-slate-100">
+                        <SelectTrigger className="w-full border-white/10 bg-[#1e1e1e] text-slate-200">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2593,7 +2457,7 @@ function QualityGatesSettings() {
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="w-full border-slate-600 bg-slate-700 text-slate-100"
+                        className="w-full border-white/10 bg-[#1e1e1e] text-slate-200"
                       />
                     </div>
                   </div>
@@ -2606,7 +2470,7 @@ function QualityGatesSettings() {
                       type="text"
                       value={editCommand}
                       onChange={(e) => setEditCommand(e.target.value)}
-                      className="w-full border-slate-600 bg-slate-700 text-slate-100 font-mono"
+                      className="w-full border-white/10 bg-[#1e1e1e] text-slate-200 font-mono"
                     />
                   </div>
                   <div className="flex justify-end gap-2">
@@ -2622,7 +2486,7 @@ function QualityGatesSettings() {
                       type="button"
                       size="sm"
                       onClick={() => handleSaveEdit(gate.id)}
-                      className="gap-1 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+                      className="gap-1 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
                     >
                       <FiCheck size={14} />
                       Save
@@ -2725,7 +2589,7 @@ function QualityGatesSettings() {
             type="button"
             onClick={handleRunGates}
             disabled={runningGates}
-            className="gap-1.5 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="gap-1.5 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             data-testid="run-quality-gates-btn"
           >
             {runningGates ? (
@@ -2789,7 +2653,7 @@ function QualityGatesSettings() {
                         : `${result.duration_ms}ms`}
                     </span>
                   )}
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-400">
                     {new Date(result.created_at).toLocaleTimeString()}
                   </span>
                 </div>
@@ -2845,6 +2709,8 @@ function GeneralSettings() {
           />
         </SettingRow>
       </div>
+
+      <DefaultProjectPathSetting />
 
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-6">
         <h2 className="text-lg font-semibold text-slate-100 mb-2">Setup</h2>
@@ -3265,7 +3131,7 @@ function UpdateSettings() {
             type="button"
             onClick={handleCheckForUpdates}
             disabled={checking || status?.isDownloading}
-            className="gap-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="gap-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             data-testid="check-updates-btn"
           >
             <FiRefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
@@ -3301,7 +3167,7 @@ function UpdateSettings() {
                   <Button
                     type="button"
                     onClick={handleDownload}
-                    className="mt-3 gap-2 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                    className="mt-3 gap-2 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                   >
                     <FiDownload className="w-4 h-4" />
                     Download Update
@@ -3333,7 +3199,7 @@ function UpdateSettings() {
                         </span>
                       </span>
                     </div>
-                    <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-[#222] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-blue-500 rounded-full transition-all duration-300"
                         style={{ width: `${progressPercent}%` }}
@@ -3360,7 +3226,7 @@ function UpdateSettings() {
                     type="button"
                     onClick={handleInstall}
                     disabled={installing}
-                    className="mt-3 gap-2 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+                    className="mt-3 gap-2 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
                   >
                     <FiRefreshCw className={`w-4 h-4 ${installing ? 'animate-spin' : ''}`} />
                     {installing ? 'Installing...' : 'Restart & Install'}
@@ -3555,7 +3421,7 @@ function CleanupSettings() {
                 type="button"
                 onClick={() => setConfirmTarget(target.id)}
                 disabled={wiping}
-                className="gap-2 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                className="gap-2 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
                 data-testid={`cleanup-btn-${target.id}`}
               >
                 {target.icon}

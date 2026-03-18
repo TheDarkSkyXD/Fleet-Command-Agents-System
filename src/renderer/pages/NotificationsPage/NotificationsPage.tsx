@@ -208,7 +208,7 @@ export function NotificationsPage() {
             size="sm"
             onClick={() => setShowClearConfirm(true)}
             disabled={notifications.length === 0}
-            className="gap-1.5 h-auto px-3 py-1.5 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+            className="gap-1.5 h-auto px-3 py-1.5 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
             data-testid="notifications-clear"
           >
             <FiTrash2 className="h-3.5 w-3.5" />

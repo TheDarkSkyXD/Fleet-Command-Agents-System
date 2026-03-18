@@ -10,7 +10,6 @@ import {
   FiActivity,
   FiAlertTriangle,
   FiBarChart2,
-  FiCalendar,
   FiChevronDown,
   FiChevronRight,
   FiClock,
@@ -41,6 +40,14 @@ import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../components/ui/table';
 
+/** Normalize SQLite UTC timestamps for correct local time display */
+function normalizeTimestamp(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dateStr) && !dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('T')) {
+    return new Date(`${dateStr.replace(' ', 'T')}Z`);
+  }
+  return new Date(dateStr);
+}
+
 type DebugTab = 'terminal' | 'events' | 'tool-stats' | 'logs' | 'timeline' | 'errors' | 'preview';
 
 export function DebugPage() {
@@ -62,7 +69,7 @@ export function DebugPage() {
           size="sm"
           onClick={() => setActiveTab('terminal')}
           className={`gap-2 h-auto px-4 py-2 ${
-            activeTab === 'terminal' ? 'bg-slate-700 text-cyan-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'terminal' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <FiTerminal className="h-4 w-4" />
@@ -73,7 +80,7 @@ export function DebugPage() {
           size="sm"
           onClick={() => setActiveTab('logs')}
           className={`gap-2 h-auto px-4 py-2 ${
-            activeTab === 'logs' ? 'bg-slate-700 text-cyan-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'logs' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <FiFileText className="h-4 w-4" />
@@ -84,7 +91,7 @@ export function DebugPage() {
           size="sm"
           onClick={() => setActiveTab('tool-stats')}
           className={`gap-2 h-auto px-4 py-2 ${
-            activeTab === 'tool-stats' ? 'bg-slate-700 text-cyan-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'tool-stats' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <FiBarChart2 className="h-4 w-4" />
@@ -95,7 +102,7 @@ export function DebugPage() {
           size="sm"
           onClick={() => setActiveTab('events')}
           className={`gap-2 h-auto px-4 py-2 ${
-            activeTab === 'events' ? 'bg-slate-700 text-cyan-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'events' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <FiActivity className="h-4 w-4" />
@@ -106,7 +113,7 @@ export function DebugPage() {
           size="sm"
           onClick={() => setActiveTab('timeline')}
           className={`gap-2 h-auto px-4 py-2 ${
-            activeTab === 'timeline' ? 'bg-slate-700 text-cyan-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'timeline' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <FiClock className="h-4 w-4" />
@@ -117,7 +124,7 @@ export function DebugPage() {
           size="sm"
           onClick={() => setActiveTab('errors')}
           className={`gap-2 h-auto px-4 py-2 ${
-            activeTab === 'errors' ? 'bg-slate-700 text-red-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'errors' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <FiAlertTriangle className="h-4 w-4" />
@@ -129,7 +136,7 @@ export function DebugPage() {
           onClick={() => setActiveTab('preview')}
           data-testid="debug-tab-preview"
           className={`gap-2 h-auto px-4 py-2 ${
-            activeTab === 'preview' ? 'bg-slate-700 text-green-400' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'preview' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <FiEye className="h-4 w-4" />
@@ -634,26 +641,46 @@ function AppLogPanel() {
           </SelectContent>
         </Select>
 
-        {/* Time range */}
-        <div className="flex items-center gap-1.5">
-          <FiCalendar className="h-3.5 w-3.5 text-slate-400" />
-          <Input
-            type="datetime-local"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className="h-8 w-auto border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
-            title="Start time"
-            aria-label="Start time"
-          />
-          <span className="text-xs text-slate-400">to</span>
-          <Input
-            type="datetime-local"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="h-8 w-auto border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200"
-            title="End time"
-            aria-label="End time"
-          />
+        {/* Time range presets */}
+        <div className="flex items-center gap-1">
+          <FiClock className="h-3.5 w-3.5 text-slate-400 mr-0.5" />
+          {[
+            { label: '15m', ms: 15 * 60 * 1000 },
+            { label: '1h', ms: 60 * 60 * 1000 },
+            { label: '6h', ms: 6 * 60 * 60 * 1000 },
+            { label: '24h', ms: 24 * 60 * 60 * 1000 },
+          ].map(({ label, ms }) => {
+            const preset = new Date(Date.now() - ms).toISOString().slice(0, 16);
+            const isActive = startTime === preset && !endTime;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  setStartTime(preset);
+                  setEndTime('');
+                }}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => { setStartTime(''); setEndTime(''); }}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              !startTime && !endTime
+                ? 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            All
+          </button>
         </div>
 
         {hasFilters && (
@@ -708,7 +735,7 @@ function AppLogPanel() {
             variant="destructive"
             size="sm"
             onClick={handlePurge}
-            className="gap-2 h-auto px-3 py-1.5 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+            className="gap-2 h-auto px-3 py-1.5 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
           >
             <FiTrash2 className="h-3.5 w-3.5" />
             Purge All
@@ -1217,7 +1244,7 @@ function EventLogPanel() {
             variant="destructive"
             size="sm"
             onClick={handlePurge}
-            className="gap-2 h-auto px-3 py-1.5 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+            className="gap-2 h-auto px-3 py-1.5 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
           >
             <FiTrash2 className="h-3.5 w-3.5" />
             Purge All
@@ -1690,7 +1717,7 @@ function ErrorAggregationPanel() {
 
       // Sort by timestamp descending (newest first)
       errorEvents.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        (a, b) => normalizeTimestamp(b.created_at).getTime() - normalizeTimestamp(a.created_at).getTime(),
       );
 
       setErrors(errorEvents);
@@ -2171,7 +2198,7 @@ function AppPreviewPanel() {
                 onClick={handleOpenBrowser}
                 disabled={!previewUrl}
                 data-testid="preview-open-browser"
-                className="gap-1.5 h-auto px-3 py-1.5 text-xs bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                className="gap-1.5 h-auto px-3 py-1.5 text-xs bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                 title={previewUrl || 'Waiting for URL...'}
               >
                 <FiExternalLink className="h-3.5 w-3.5" />
@@ -2182,7 +2209,7 @@ function AppPreviewPanel() {
                 size="sm"
                 onClick={handleStop}
                 data-testid="preview-stop-btn"
-                className="gap-1.5 h-auto px-3 py-1.5 text-xs bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                className="gap-1.5 h-auto px-3 py-1.5 text-xs bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
               >
                 <FiStopCircle className="h-3.5 w-3.5" />
                 Stop Server
@@ -2194,7 +2221,7 @@ function AppPreviewPanel() {
               onClick={handleStart}
               disabled={isStarting}
               data-testid="preview-start-btn"
-              className="gap-1.5 h-auto px-3 py-1.5 text-xs bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+              className="gap-1.5 h-auto px-3 py-1.5 text-xs bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
             >
               <FiPlay className="h-3.5 w-3.5" />
               {isStarting ? 'Starting...' : 'Run Preview'}

@@ -248,7 +248,7 @@ export function NuclearCleanupPage() {
                 data-testid="wipe-sessions-btn"
                 onClick={handleWipeSessions}
                 disabled={wipingSessions}
-                className="ml-4 shrink-0 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                className="ml-4 shrink-0 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
               >
                 {wipingSessions ? (
                   <>
@@ -309,7 +309,7 @@ export function NuclearCleanupPage() {
                   data-testid="clean-worktrees-btn"
                   onClick={handleCleanAllWorktrees}
                   disabled={cleaningWorktrees || !activeProject}
-                  className="bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                  className="bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
                 >
                   {cleaningWorktrees ? (
                     <>
