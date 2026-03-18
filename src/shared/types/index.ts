@@ -1932,6 +1932,7 @@ export interface WatchdogConfig {
   staleThresholdMs: number;
   zombieThresholdMs: number;
   enabled: boolean;
+  nudgeDebounceMs: number;
 }
 
 export interface WatchdogStatus {
