@@ -7,12 +7,20 @@ import { format, formatDistanceToNow, differenceInSeconds } from 'date-fns';
 
 /**
  * Parse a date string into a Date object safely.
- * Returns null if the date is invalid.
+ * SQLite stores dates as UTC via datetime('now') but without a timezone suffix.
+ * We append 'Z' if no timezone indicator is present so JS correctly treats them as UTC
+ * and converts to the user's local timezone on display.
  */
 function parseDate(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
   try {
-    const d = new Date(dateStr);
+    let normalized = dateStr;
+    // SQLite datetime('now') format: "2026-03-16 04:39:00" — no TZ indicator
+    // Append Z so Date() parses as UTC, then displays in user's local timezone
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(normalized) && !normalized.includes('Z') && !normalized.includes('+') && !normalized.includes('T')) {
+      normalized = `${normalized.replace(' ', 'T')}Z`;
+    }
+    const d = new Date(normalized);
     if (Number.isNaN(d.getTime())) return null;
     return d;
   } catch {
@@ -80,13 +88,14 @@ export function formatRelativeTime(dateStr: string | null | undefined): string {
  */
 export function formatUptime(createdAt: string): string {
   const d = parseDate(createdAt);
-  if (!d) return '0m 0s';
-  const uptime = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (!d) return '0s';
+  const uptime = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
   const hours = Math.floor(uptime / 3600);
   const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = uptime % 60;
   if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
 /**

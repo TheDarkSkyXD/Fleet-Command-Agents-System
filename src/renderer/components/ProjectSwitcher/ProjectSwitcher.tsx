@@ -148,7 +148,7 @@ export function ProjectSwitcher({ collapsed, onNavigate }: ProjectSwitcherProps)
         <div className="max-h-56 overflow-y-auto scrollbar-thin">
           {projects.length === 0 && (
             <div className="px-3 py-5 text-center text-xs text-slate-400">
-              <FiFolder size={20} className="mx-auto mb-2 text-slate-500" />
+              <FiFolder size={20} className="mx-auto mb-2 text-slate-400" />
               No projects yet. Create one to get started.
             </div>
           )}
@@ -372,7 +372,7 @@ export function ProjectSwitcher({ collapsed, onNavigate }: ProjectSwitcherProps)
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Projects
               </span>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-slate-400">
                 {projects.length} project{projects.length !== 1 ? 's' : ''}
               </span>
             </div>

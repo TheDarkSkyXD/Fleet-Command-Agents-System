@@ -95,7 +95,7 @@ export function ContextMenu({
             }}
             className={`flex h-auto w-full items-center gap-2.5 px-3 py-2 text-sm rounded-none transition-colors ${
               item.disabled
-                ? 'text-slate-500 cursor-not-allowed'
+                ? 'text-slate-400 cursor-not-allowed'
                 : item.danger
                   ? 'text-red-400 hover:bg-red-500/10'
                   : 'text-slate-200 hover:bg-slate-700'

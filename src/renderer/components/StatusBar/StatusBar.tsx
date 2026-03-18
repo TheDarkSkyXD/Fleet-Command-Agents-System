@@ -51,8 +51,16 @@ function getCliIndicator(state: CliState): { color: string; label: string } {
   }
 }
 
+/** Normalize SQLite UTC timestamps for correct local time display */
+function normalizeTimestamp(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dateStr) && !dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('T')) {
+    return new Date(`${dateStr.replace(' ', 'T')}Z`);
+  }
+  return new Date(dateStr);
+}
+
 function formatDuration(startedAt: string): string {
-  const start = new Date(startedAt).getTime();
+  const start = normalizeTimestamp(startedAt).getTime();
   const now = Date.now();
   const diffMs = now - start;
 
@@ -89,6 +97,7 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
   const [showRunHistory, setShowRunHistory] = useState(false);
   const runHistoryRef = useRef<HTMLDivElement>(null);
   const { activeProject, loadActiveProject } = useProjectStore();
+  const [liveAgentCount, setLiveAgentCount] = useState(0);
   const [runProgress, setRunProgress] = useState<{
     total: number;
     completed: number;
@@ -137,6 +146,23 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
     });
     return () => { unsubAgentUpdate(); };
   }, [fetchActiveRun]);
+
+  // Live agent count — counts actual running agents regardless of runs
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const result = await window.electronAPI.agentRunningList();
+        if (result.data) {
+          setLiveAgentCount(result.data.filter((a) => a.isRunning).length);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchCount();
+    const unsub = window.electronAPI.onAgentUpdate(() => fetchCount());
+    return () => { unsub(); };
+  }, []);
 
   // Fetch run progress when active run changes (event-driven via onAgentUpdate above)
   useEffect(() => {
@@ -288,18 +314,18 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
           className="flex items-center gap-1.5"
           data-testid="status-bar-agent-count"
           title={
-            activeRun
-              ? `${activeRun.agent_count} agent(s) currently running\nRun started: ${formatDateTime(activeRun.started_at)}`
+            liveAgentCount > 0
+              ? `${liveAgentCount} agent(s) currently running`
               : 'No agents currently running'
           }
         >
-          {activeRun ? (
+          {liveAgentCount > 0 ? (
             <>
               <span
                 className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"
-                title="Run active — agents are working"
+                title={`${liveAgentCount} agent(s) currently running`}
               />
-              <span className="text-slate-300">Agents: {activeRun.agent_count}</span>
+              <span className="text-slate-300">Active Agents: {liveAgentCount}</span>
             </>
           ) : (
             <span>Active Agents: 0</span>
@@ -469,19 +495,19 @@ export function StatusBar({ onNavigate }: StatusBarProps) {
                 <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Run History
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-slate-400">
                   {runs.length} run{runs.length !== 1 ? 's' : ''}
                 </span>
               </div>
               {runs.length === 0 ? (
                 <div className="px-3 py-6 text-xs text-slate-400 text-center">
-                  <FiList className="h-5 w-5 mx-auto mb-2 text-slate-500" />
+                  <FiList className="h-5 w-5 mx-auto mb-2 text-slate-400" />
                   No runs yet. Start a run to see history.
                 </div>
               ) : (
                 runs.map((run) => {
-                  const startDate = new Date(run.started_at);
-                  const endDate = run.completed_at ? new Date(run.completed_at) : null;
+                  const startDate = normalizeTimestamp(run.started_at);
+                  const endDate = run.completed_at ? normalizeTimestamp(run.completed_at) : null;
                   const durationMs = endDate
                     ? endDate.getTime() - startDate.getTime()
                     : Date.now() - startDate.getTime();

@@ -52,7 +52,7 @@ function FileReviewHeader({
           size="sm"
           onClick={onApprove}
           className={decision === 'approved'
-            ? 'bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm'
+            ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300'
             : 'border-emerald-600/50 bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20'
           }
           title="Approve this file"
@@ -64,7 +64,7 @@ function FileReviewHeader({
           size="sm"
           onClick={onReject}
           className={decision === 'rejected'
-            ? 'bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm'
+            ? 'bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300'
             : 'border-red-600/50 bg-red-600/10 text-red-400 hover:bg-red-600/20'
           }
           title="Reject this file"
@@ -217,7 +217,7 @@ export function DiffViewer({
               onClick={() => setViewMode('side-by-side')}
               className={`rounded-r-none h-auto px-3 py-1.5 text-xs ${
                 viewMode === 'side-by-side'
-                  ? 'bg-slate-800/90 border border-cyan-500/30 text-cyan-300 hover:bg-slate-700/90 hover:border-cyan-400/40 shadow-sm'
+                  ? 'bg-cyan-600/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-600/25 hover:text-cyan-300'
                   : 'text-slate-300 hover:text-white'
               }`}
             >
@@ -229,7 +229,7 @@ export function DiffViewer({
               onClick={() => setViewMode('line-by-line')}
               className={`rounded-l-none h-auto px-3 py-1.5 text-xs ${
                 viewMode === 'line-by-line'
-                  ? 'bg-slate-800/90 border border-cyan-500/30 text-cyan-300 hover:bg-slate-700/90 hover:border-cyan-400/40 shadow-sm'
+                  ? 'bg-cyan-600/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-600/25 hover:text-cyan-300'
                   : 'text-slate-300 hover:text-white'
               }`}
             >
@@ -275,7 +275,7 @@ export function DiffViewer({
               <Button
                 size="sm"
                 onClick={handleProceedMerge}
-                className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+                className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
               >
                 Merge {approvedCount} Approved File{approvedCount !== 1 ? 's' : ''}
               </Button>

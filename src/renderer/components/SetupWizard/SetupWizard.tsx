@@ -83,7 +83,7 @@ function StepIndicator({
       return 'bg-amber-500/15 border-amber-500/40 text-amber-400';
     if (isActive)
       return 'bg-blue-500/15 border-blue-500/40 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.15)]';
-    return 'bg-slate-800/50 border-slate-700/40 text-slate-500';
+    return 'bg-slate-800/50 border-slate-700/40 text-slate-400';
   };
 
   return (
@@ -124,14 +124,14 @@ function StepIndicator({
       <div className="pt-1 min-w-0">
         <span
           className={`text-[13px] font-medium transition-colors duration-300 block leading-tight ${
-            isActive ? 'text-slate-100' : isPast ? 'text-slate-300' : 'text-slate-500'
+            isActive ? 'text-slate-100' : isPast ? 'text-slate-300' : 'text-slate-400'
           }`}
         >
           {step.label}
         </span>
         <p
           className={`text-[11px] mt-0.5 transition-colors duration-300 ${
-            isActive ? 'text-slate-500' : 'text-slate-600'
+            isActive ? 'text-slate-400' : 'text-slate-400'
           }`}
         >
           {step.description}
@@ -329,7 +329,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             transition={{ delay: 0.5 }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            className="group inline-flex items-center gap-3 rounded-xl bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm px-8 py-4 text-[15px] font-semibold transition-all cursor-pointer"
+            className="group inline-flex items-center gap-3 rounded-xl bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 px-8 py-4 text-[15px] font-semibold transition-all cursor-pointer"
             data-testid="setup-complete-btn"
           >
             <FiZap size={18} className="transition-transform group-hover:rotate-12" />
@@ -392,14 +392,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               </div>
               <div>
                 <div className="text-sm font-bold text-slate-100 tracking-[-0.01em]">Fleet Command</div>
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-500 font-medium">Setup Wizard</div>
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400 font-medium">Setup Wizard</div>
               </div>
             </div>
           </div>
 
           {/* Steps */}
           <div className="flex-1">
-            <div className="text-[10px] uppercase tracking-[0.15em] text-slate-600 font-medium mb-5">Configuration</div>
+            <div className="text-[10px] uppercase tracking-[0.15em] text-slate-400 font-medium mb-5">Configuration</div>
             <div className="flex flex-col gap-0.5">
               {STEPS.map((step, i) => (
                 <StepIndicator
@@ -415,7 +415,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
           {/* Progress bar */}
           <div className="pt-6 mt-6 border-t border-slate-700/20">
-            <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2.5">
               <span className="font-medium">Progress</span>
               <span className="tabular-nums font-medium">{currentStepIndex + 1} of {STEPS.length}</span>
             </div>
@@ -458,7 +458,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
           {/* Footer */}
           <div className="flex items-center justify-between border-t border-slate-700/20 px-10 py-8">
-            <div className="flex items-center gap-2.5 text-[13px] text-slate-500">
+            <div className="flex items-center gap-2.5 text-[13px] text-slate-400">
               <div className={`h-2 w-2 rounded-full transition-colors ${
                 stepStatuses[currentStep]?.status === 'loading' ? 'bg-blue-400 animate-pulse' :
                 stepStatuses[currentStep]?.status === 'success' ? 'bg-emerald-400' :
@@ -476,7 +476,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               disabled={!canProceed(currentStep)}
               whileHover={canProceed(currentStep) ? { scale: 1.03, y: -1 } : {}}
               whileTap={canProceed(currentStep) ? { scale: 0.97 } : {}}
-              className="group relative flex items-center gap-3 rounded-[14px] bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm px-10 py-[14px] text-[14px] font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none cursor-pointer"
+              className="group relative flex items-center gap-3 rounded-[14px] bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 px-10 py-[14px] text-[14px] font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none cursor-pointer"
               data-testid="setup-next-btn"
             >
               {/* Subtle top shine */}
@@ -566,7 +566,7 @@ function StepVersion({ status, cliResult }: { status: StepStatus; cliResult: Cli
             transition={{ delay: 0.15 }}
             className="rounded-xl bg-slate-800/50 border border-slate-700/40 px-5 py-4"
           >
-            <div className="text-[11px] uppercase tracking-[0.1em] text-slate-500 mb-1.5 font-medium">Installed Version</div>
+            <div className="text-[11px] uppercase tracking-[0.1em] text-slate-400 mb-1.5 font-medium">Installed Version</div>
             <div className="font-mono text-lg text-emerald-400 font-semibold tracking-wide">{cliResult.version}</div>
           </motion.div>
         )}

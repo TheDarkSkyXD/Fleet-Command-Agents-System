@@ -18,11 +18,13 @@ import { HooksPage } from '../../pages/HooksPage';
 import { MailPage } from '../../pages/MailPage';
 import { MergeQueuePage } from '../../pages/MergeQueuePage';
 import { MetricsPage } from '../../pages/MetricsPage';
+import { MulchPage } from '../../pages/MulchPage';
 import { NotificationsPage } from '../../pages/NotificationsPage';
 import { NuclearCleanupPage } from '../../pages/NuclearCleanupPage';
 import { PromptsPage } from '../../pages/PromptsPage';
+import { SessionsPage } from '../../pages/SessionsPage';
 import { SettingsPage } from '../../pages/SettingsPage';
-import { TasksPage } from '../../pages/TasksPage';
+import { TaskBoardPage } from '../../pages/TaskBoardPage';
 import { ProjectsPage } from '../../pages/ProjectsPage';
 import { WorktreesPage } from '../../pages/WorktreesPage';
 import { useProjectStore } from '../../stores/projectStore';
@@ -207,7 +209,7 @@ export function AppLayout() {
       () => ({
         'navigate-command-center': () => handleNavigate('command-center'),
         'navigate-agents': () => handleNavigate('agents'),
-        'navigate-tasks': () => handleNavigate('tasks'),
+        'navigate-tasks': () => handleNavigate('task-board'),
         'navigate-mail': () => handleNavigate('mail'),
         'navigate-merge': () => handleNavigate('merge'),
         'navigate-worktrees': () => handleNavigate('worktrees'),
@@ -508,10 +510,10 @@ function PageContent({
           <HooksPage />
         </ErrorBoundary>
       );
-    case 'tasks':
+    case 'task-board':
       return (
-        <ErrorBoundary sectionName="Tasks">
-          <TasksPage />
+        <ErrorBoundary sectionName="Task Board">
+          <TaskBoardPage />
         </ErrorBoundary>
       );
     case 'discovery':
@@ -530,6 +532,18 @@ function PageContent({
       return (
         <ErrorBoundary sectionName="Expertise">
           <ExpertisePage />
+        </ErrorBoundary>
+      );
+    case 'sessions':
+      return (
+        <ErrorBoundary sectionName="Sessions">
+          <SessionsPage />
+        </ErrorBoundary>
+      );
+    case 'mulch':
+      return (
+        <ErrorBoundary sectionName="Mulch">
+          <MulchPage />
         </ErrorBoundary>
       );
     case 'notifications':
@@ -593,7 +607,7 @@ function PageContent({
           <Button
             type="button"
             onClick={onNavigateHome}
-            className="rounded-lg bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm px-5 py-2.5 text-sm font-medium h-auto"
+            className="rounded-lg bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 px-5 py-2.5 text-sm font-medium h-auto"
             data-testid="not-found-home-button"
           >
             Go to Command Center

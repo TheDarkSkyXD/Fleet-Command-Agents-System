@@ -39,7 +39,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, KeyboardShortcut> = {
   },
   'navigate-tasks': {
     id: 'navigate-tasks',
-    label: 'Go to Tasks',
+    label: 'Go to Task Board',
     category: 'Navigation',
     keys: 'Ctrl+2',
     enabled: true,

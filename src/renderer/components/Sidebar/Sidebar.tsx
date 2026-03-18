@@ -10,6 +10,7 @@ import {
   FiCheckSquare,
   FiChevronDown,
   FiCpu,
+  FiDatabase,
   FiDownload,
   FiChevronsLeft,
   FiChevronsRight,
@@ -20,6 +21,7 @@ import {
   FiGitMerge,
   FiGrid,
   FiHeart,
+  FiLayers,
   FiLoader,
   FiMail,
   FiSearch,
@@ -77,7 +79,7 @@ const navSections: NavSection[] = [
   {
     label: 'Work',
     items: [
-      { id: 'tasks', label: 'Tasks', icon: FiCheckSquare },
+      { id: 'task-board', label: 'Task Board', icon: FiCheckSquare },
       { id: 'discovery', label: 'Discovery', icon: FiSearch },
       { id: 'prompts', label: 'Prompts', icon: FiFileText },
       { id: 'expertise', label: 'Expertise', icon: FiBook },
@@ -86,6 +88,8 @@ const navSections: NavSection[] = [
   {
     label: 'Observe',
     items: [
+      { id: 'sessions', label: 'Sessions', icon: FiLayers },
+      { id: 'mulch', label: 'Mulch', icon: FiDatabase },
       { id: 'notifications', label: 'Notifications', icon: FiBell },
       { id: 'events', label: 'Event Feed', icon: FiActivity },
       { id: 'metrics', label: 'Metrics', icon: FiBarChart2 },

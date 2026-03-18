@@ -163,9 +163,9 @@ const navigationItems: CommandItem[] = [
     group: 'Navigation',
   },
   {
-    id: 'tasks',
-    label: 'Go to Tasks',
-    keywords: ['tasks', 'task', 'todo', 'tracker'],
+    id: 'task-board',
+    label: 'Go to Task Board',
+    keywords: ['tasks', 'task', 'todo', 'tracker', 'board', 'kanban'],
     icon: FiCheckSquare,
     group: 'Navigation',
   },
@@ -544,7 +544,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
           </span>
           {activeProject && (
             <span
-              className="ml-auto text-[10px] text-slate-500 truncate max-w-[200px]"
+              className="ml-auto text-[10px] text-slate-400 truncate max-w-[200px]"
               title={activeProject.path}
             >
               {activeProject.path}
@@ -623,7 +623,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                       <FiClock size={14} className="shrink-0 text-slate-400" />
                       <Icon size={16} className="shrink-0 text-slate-400" />
                       <span>{matchedItem.label}</span>
-                      <span className="ml-auto text-[10px] text-slate-500">{recent.group}</span>
+                      <span className="ml-auto text-[10px] text-slate-400">{recent.group}</span>
                     </Command.Item>
                   );
                 })}
@@ -711,7 +711,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                   <FiUsers
                     size={12}
                     className={
-                      commandContext.hasRunningAgents ? 'text-emerald-400' : 'text-slate-500'
+                      commandContext.hasRunningAgents ? 'text-emerald-400' : 'text-slate-400'
                     }
                   />
                   {commandContext.runningAgentCount} agent
@@ -720,7 +720,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
                 <span className="inline-flex items-center gap-1.5">
                   <FiMail
                     size={12}
-                    className={unreadMailCount > 0 ? 'text-blue-400' : 'text-slate-500'}
+                    className={unreadMailCount > 0 ? 'text-blue-400' : 'text-slate-400'}
                   />
                   {unreadMailCount} unread
                 </span>

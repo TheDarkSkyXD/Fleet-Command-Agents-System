@@ -170,7 +170,7 @@ export function OrphanedProcessDialog() {
                           size="sm"
                           onClick={() => handleReconnect(orphan)}
                           disabled={!!action}
-                          className="inline-flex items-center gap-1.5 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                          className="inline-flex items-center gap-1.5 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                           title="Reconnect - track this process in the app"
                         >
                           {action === 'reconnecting' ? (
@@ -184,7 +184,7 @@ export function OrphanedProcessDialog() {
                           size="sm"
                           onClick={() => setKillConfirm(orphan)}
                           disabled={!!action}
-                          className="inline-flex items-center gap-1.5 bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                          className="inline-flex items-center gap-1.5 bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
                           title="Kill - terminate the process"
                           data-testid="orphan-kill-btn"
                         >
@@ -303,7 +303,7 @@ export function OrphanedProcessDialog() {
                     setKillConfirm(null);
                     handleKill(orphan);
                   }}
-                  className="bg-slate-800/90 border border-red-500/30 text-red-300 hover:bg-slate-700/90 hover:border-red-400/40 shadow-sm"
+                  className="bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
                   data-testid="orphan-kill-confirm"
                 >
                   Kill Process

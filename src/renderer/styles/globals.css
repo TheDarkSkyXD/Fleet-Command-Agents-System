@@ -197,6 +197,15 @@
     min-width: 0;
     overflow-x: hidden;
   }
+
+  /* Dark mode for native date/time picker icons */
+  ::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+  }
+  ::-webkit-calendar-picker-indicator:hover {
+    filter: invert(0.9);
+  }
 }
 
 /* Accent color utility classes */

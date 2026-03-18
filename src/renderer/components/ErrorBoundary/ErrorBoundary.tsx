@@ -141,7 +141,7 @@ function ErrorFallback({
           {/* Retry button */}
           <Button
             onClick={onRetry}
-            className="inline-flex items-center gap-2 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+            className="inline-flex items-center gap-2 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
             data-testid="error-boundary-retry"
           >
             <FiRefreshCw className="h-4 w-4" />

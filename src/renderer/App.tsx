@@ -21,6 +21,7 @@ export function App() {
         <Toaster
           theme="dark"
           position="bottom-right"
+          duration={5000}
           toastOptions={{
             style: {
               background: '#1a1a1a',

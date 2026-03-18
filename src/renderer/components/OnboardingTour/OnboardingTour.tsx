@@ -279,7 +279,7 @@ export function OnboardingTour() {
           <Button
             size="sm"
             onClick={handleNext}
-            className="flex items-center gap-1.5 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+            className="flex items-center gap-1.5 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
           >
             {currentStep < TOUR_STEPS.length - 1 ? (
               <>
