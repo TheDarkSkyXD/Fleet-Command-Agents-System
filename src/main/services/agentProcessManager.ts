@@ -108,6 +108,7 @@ export interface AgentProcess {
 class AgentProcessManager {
   private processes: Map<string, AgentProcess> = new Map();
   private maxOutputBufferLines = 1000;
+  private mailIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
 
   /**
    * Spawn a new Claude Code CLI agent via node-pty.
@@ -407,6 +408,7 @@ class AgentProcessManager {
    * Stop all running agents.
    */
   async stopAll(): Promise<number> {
+    this.stopAllMailInjection();
     const ids = Array.from(this.processes.keys());
     let stopped = 0;
     for (const id of ids) {
@@ -523,6 +525,12 @@ class AgentProcessManager {
           ? JSON.stringify({ prompt: opts.prompt ?? null, taskId: opts.taskId ?? null })
           : null;
 
+        // Query actual expertise domains for this agent from expertise_records
+        const domainRows = db
+          .prepare('SELECT DISTINCT domain FROM expertise_records WHERE agent_name = ?')
+          .all(agent.agentName) as { domain: string }[];
+        const mulchDomains = JSON.stringify(domainRows.map((r) => r.domain));
+
         upsertStmt.run(
           agent.agentName,
           opts.taskId ?? null,
@@ -531,13 +539,33 @@ class AgentProcessManager {
           filesModified,
           opts.branchName ?? null,
           pendingWork,
-          opts.worktreePath ? JSON.stringify([opts.worktreePath]) : null,
+          mulchDomains,
         );
         saved++;
         log.info(`[AgentProcessManager] Checkpoint saved for agent: ${agent.agentName}`);
       }
 
       log.info(`[AgentProcessManager] Saved ${saved} checkpoint(s) on app close`);
+
+      // Create handoff records for running agents (shutdown recovery)
+      for (const agent of this.processes.values()) {
+        if (agent.isRunning) {
+          try {
+            const handoffId = `handoff-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            db.prepare(
+              'INSERT INTO session_handoffs (id, from_session, to_session, reason) VALUES (?, ?, ?, ?)',
+            ).run(handoffId, agent.id, '', 'shutdown');
+            log.info(
+              `[AgentProcessManager] Handoff record created for ${agent.agentName} on shutdown`,
+            );
+          } catch (handoffErr) {
+            log.warn(
+              `[AgentProcessManager] Failed to create handoff for ${agent.agentName}:`,
+              handoffErr,
+            );
+          }
+        }
+      }
     } catch (error) {
       log.error('[AgentProcessManager] Failed to save checkpoints:', error);
     }
@@ -819,6 +847,129 @@ class AgentProcessManager {
         win.webContents.send('agent:update', { agentId, event, ...data });
       }
     }
+  }
+
+  /**
+   * Start polling for unread mail and injecting it into an agent's PTY stdin.
+   * Works for ALL agent capabilities (coordinators, leads, builders, scouts, etc.).
+   * Uses different polling intervals per capability for responsiveness tuning.
+   */
+  startMailInjection(
+    agentId: string,
+    agentName: string,
+    capability: string,
+    intervalMs?: number,
+  ): void {
+    // Stop any existing mail injection for this agent
+    this.stopMailInjection(agentId);
+
+    // Determine interval based on capability if not explicitly provided
+    const interval =
+      intervalMs ??
+      (() => {
+        switch (capability) {
+          case 'coordinator':
+            return 5000;
+          case 'lead':
+            return 8000;
+          default:
+            return 12000;
+        }
+      })();
+
+    const timer = setInterval(() => {
+      try {
+        // Auto-stop if agent is no longer running
+        if (!this.isRunning(agentId)) {
+          log.info(
+            `[MailInject] Agent ${agentName} (${agentId}) no longer running, stopping mail injection`,
+          );
+          this.stopMailInjection(agentId);
+          return;
+        }
+
+        // Query unread mail for this agent
+        const db = getDatabase();
+        const unread = db
+          .prepare(
+            'SELECT * FROM messages WHERE to_agent = ? AND read = 0 ORDER BY created_at ASC',
+          )
+          .all(agentName) as Record<string, unknown>[];
+
+        if (unread.length === 0) return;
+
+        // Format messages for injection (same format as coordinator mail injection)
+        const lines = [`\n[MAIL] ${unread.length} new message(s):`];
+        for (const msg of unread) {
+          const priority = msg.priority as string;
+          const prefix = priority === 'urgent' || priority === 'high' ? '!!' : ' ';
+          lines.push(
+            `  ${prefix}[${msg.type}] from ${msg.from_agent}: ${(msg.subject as string) || ''}`,
+          );
+          if (msg.body) {
+            const body = (msg.body as string).substring(0, 200);
+            lines.push(`    ${body}`);
+          }
+          if (msg.payload) {
+            lines.push(`    payload: ${(msg.payload as string).substring(0, 150)}`);
+          }
+
+          // Mark as read after formatting
+          db.prepare('UPDATE messages SET read = 1 WHERE id = ?').run(msg.id);
+        }
+        lines.push('');
+
+        // Write formatted mail into the agent's PTY stdin
+        this.write(agentId, lines.join('\n'));
+
+        // Record mail_received event for each batch
+        this.recordEvent({
+          eventType: 'mail_received',
+          agentName,
+          sessionId: agentId,
+          data: JSON.stringify({
+            count: unread.length,
+            from: unread.map((m) => m.from_agent),
+            types: unread.map((m) => m.type),
+          }),
+        });
+
+        log.debug(
+          `[MailInject] Injected ${unread.length} message(s) into ${agentName} (${capability})`,
+        );
+      } catch (err) {
+        log.warn(`[MailInject] Failed to inject mail for ${agentName}:`, err);
+      }
+    }, interval);
+
+    this.mailIntervals.set(agentId, timer);
+    log.info(
+      `[MailInject] Started mail injection for ${agentName} (${capability}) every ${interval}ms`,
+    );
+  }
+
+  /**
+   * Stop mail injection polling for a specific agent.
+   */
+  stopMailInjection(agentId: string): void {
+    const timer = this.mailIntervals.get(agentId);
+    if (timer) {
+      clearInterval(timer);
+      this.mailIntervals.delete(agentId);
+      log.info(`[MailInject] Stopped mail injection for agent ${agentId}`);
+    }
+  }
+
+  /**
+   * Stop all mail injection intervals across all agents.
+   */
+  stopAllMailInjection(): void {
+    for (const [agentId, timer] of this.mailIntervals) {
+      clearInterval(timer);
+      log.info(`[MailInject] Stopped mail injection for agent ${agentId}`);
+    }
+    this.mailIntervals.clear();
+    log.info(`[MailInject] All mail injection intervals cleared`);
   }
 }
 

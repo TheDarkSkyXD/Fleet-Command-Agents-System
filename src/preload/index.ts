@@ -685,6 +685,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   expertisePruneExpired: () => ipcRenderer.invoke('expertise:prune-expired'),
   expertiseSetShelfLife: (id: string, days: number) =>
     ipcRenderer.invoke('expertise:set-shelf-life', id, days),
+  expertiseAutoRecord: (record: {
+    agent_name: string;
+    domain: string;
+    title: string;
+    content: string;
+    type: string;
+    classification: string;
+    source_file?: string;
+    tags?: string;
+  }) => ipcRenderer.invoke('expertise:auto-record', record),
 
   // Checkpoints
   checkpointList: () => ipcRenderer.invoke('checkpoint:list'),
@@ -807,6 +817,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sessionHandoffGet: (id: string) => ipcRenderer.invoke('session:handoff-get', id),
   sessionHandoffBySession: (sessionId: string) =>
     ipcRenderer.invoke('session:handoff-by-session', sessionId),
+  sessionInitiateHandoff: (options: { agent_name: string; reason: string }) =>
+    ipcRenderer.invoke('session:initiate-handoff', options),
+  sessionCompleteHandoff: (options: { agent_name: string; new_session_id: string }) =>
+    ipcRenderer.invoke('session:complete-handoff', options),
 
   // Window management
   windowSetTitle: (title: string) => ipcRenderer.invoke('window:setTitle', title),

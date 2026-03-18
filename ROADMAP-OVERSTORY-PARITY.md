@@ -466,7 +466,7 @@ agent before it has time to respond.
 
 ---
 
-## Phase 4: Hooks & Context Injection Completeness
+## Phase 4: Hooks & Context Injection Completeness ✅ COMPLETE
 
 **Goal:** Wire all 6 lifecycle hook types into the agent runtime, and make mail injection
 work for ALL agents (not just coordinator).
@@ -474,6 +474,8 @@ work for ALL agents (not just coordinator).
 **Priority:** HIGH — Without this, agents lose context and can't receive messages.
 
 **Estimated scope:** ~400 lines across 3 files.
+
+**Status:** All 5 tasks implemented.
 
 ---
 
@@ -492,10 +494,10 @@ builders via mail.
 | `src/main/services/agentProcessManager.ts` | Add `startMailInjection(agentId, agentName, intervalMs)` that polls unread mail and writes to pty stdin. Generalize the existing coordinator-only implementation. |
 
 **Acceptance criteria:**
-- [ ] Lead agents receive mail from their builders
-- [ ] Builder agents receive dispatch/assign mail
-- [ ] Mail injection interval is configurable per capability
-- [ ] Messages are marked as read after injection
+- [x] Lead agents receive mail from their builders
+- [x] Builder agents receive dispatch/assign mail
+- [x] Mail injection interval is configurable per capability
+- [x] Messages are marked as read after injection
 
 ---
 
@@ -512,9 +514,9 @@ builders via mail.
 | `src/main/ipc/handlers.ts` | Add `expertise:auto-record` IPC handler that accepts `{agentName, domain, title, content, type, classification}` and inserts into expertise_records |
 
 **Acceptance criteria:**
-- [ ] Agent committing code triggers expertise auto-recording
-- [ ] Tool completion events logged to events table
-- [ ] Recorded expertise includes domain inference from file paths
+- [x] Agent committing code triggers expertise auto-recording
+- [x] Tool completion events logged to events table
+- [x] Recorded expertise includes domain inference from file paths
 
 ---
 
@@ -531,9 +533,9 @@ insights into expertise records before the agent exits.
 | Alternative simpler approach: | Instead of a shell hook, handle this in the `agent:stop` IPC handler and the onExit callback in agentProcessManager. When an agent exits: (1) Query its events. (2) Generate a session summary. (3) Insert expertise_records. |
 
 **Acceptance criteria:**
-- [ ] Agent session end triggers expertise synthesis
-- [ ] At least 1 expertise record created per non-trivial session
-- [ ] Records include agent name, domain, and classification
+- [x] Agent session end triggers expertise synthesis
+- [x] At least 1 expertise record created per non-trivial session
+- [x] Records include agent name, domain, and classification
 
 ---
 
@@ -549,9 +551,9 @@ expertise and guard context. PreCompact should re-prime the agent.
 | `src/main/ipc/handlers.ts` (hook deployment) | Deploy PreCompact hook that: (1) Re-reads the agent's overlay CLAUDE.md. (2) Re-injects key context: agent name, capability, file scope, active task, quality gates. (3) Re-injects recent unread mail. This ensures the agent doesn't lose its identity after compaction. |
 
 **Acceptance criteria:**
-- [ ] After context compaction, agent still knows its name, capability, and task
-- [ ] File scope restrictions are re-injected
-- [ ] Recent mail is re-surfaced
+- [x] After context compaction, agent still knows its name, capability, and task
+- [x] File scope restrictions are re-injected
+- [x] Recent mail is re-surfaced
 
 ---
 
@@ -568,13 +570,13 @@ Claude Code sessions on the machine.
 | `src/main/ipc/handlers.ts` (hook deployment) | Wrap all hook scripts with an environment check: `if [ -z "$FC_AGENT_NAME" ]; then exit 0; fi`. Since Fleet Command sets `FC_AGENT_NAME` as an environment variable for spawned agents, this ensures hooks only execute for managed agents. |
 
 **Acceptance criteria:**
-- [ ] Hooks only fire when `FC_AGENT_NAME` env var is set
-- [ ] Regular Claude Code sessions are unaffected
-- [ ] Guard is applied to all hook types
+- [x] Hooks only fire when `FC_AGENT_NAME` env var is set
+- [x] Regular Claude Code sessions are unaffected
+- [x] Guard is applied to all hook types
 
 ---
 
-## Phase 5: Checkpoint, Recovery & Session Persistence
+## Phase 5: Checkpoint, Recovery & Session Persistence ✅ COMPLETE
 
 **Goal:** Make the system resumable after crashes — coordinators recover state, handoffs
 work end-to-end, and checkpoints contain correct data.
@@ -582,6 +584,8 @@ work end-to-end, and checkpoints contain correct data.
 **Priority:** HIGH — Without this, any crash loses all orchestration progress.
 
 **Estimated scope:** ~400 lines across 3-4 files.
+
+**Status:** All 5 tasks implemented.
 
 ---
 
@@ -597,8 +601,8 @@ column instead of actual expertise domains worked on.
 | `src/main/services/agentProcessManager.ts` (line ~534) | Replace: `opts.worktreePath ? JSON.stringify([opts.worktreePath]) : null` with: Query expertise_records for this agent's domains: `SELECT DISTINCT domain FROM expertise_records WHERE agent_name = ?`. Save result as JSON array. |
 
 **Acceptance criteria:**
-- [ ] Checkpoint `mulch_domains` contains actual expertise domains
-- [ ] Empty array if no expertise recorded (not null, not worktree path)
+- [x] Checkpoint `mulch_domains` contains actual expertise domains
+- [x] Empty array if no expertise recorded (not null, not worktree path)
 
 ---
 
@@ -614,9 +618,9 @@ It doesn't inject checkpoint context (what was done, what's pending, files modif
 | `src/main/ipc/handlers.ts` (in agent:spawn, when `resumeSessionId` is set) | Before spawning: (1) Query checkpoints table for the agent_name. (2) If checkpoint found, prepend to the prompt: `## Session Recovery\nPrevious progress: {progressSummary}\nPending work: {pendingWork}\nFiles modified: {filesModified}\nBranch: {currentBranch}`. (3) Also re-inject relevant expertise via auto-prime. |
 
 **Acceptance criteria:**
-- [ ] Resumed agent receives checkpoint context in its prompt
-- [ ] Expertise from checkpoint domains is re-injected
-- [ ] Agent can continue from where it left off
+- [x] Resumed agent receives checkpoint context in its prompt
+- [x] Expertise from checkpoint domains is re-injected
+- [x] Agent can continue from where it left off
 
 ---
 
@@ -636,9 +640,9 @@ It doesn't inject checkpoint context (what was done, what's pending, files modif
 | `src/shared/types/index.ts` | Add to ElectronAPI |
 
 **Acceptance criteria:**
-- [ ] App shutdown creates handoff records for all running agents
-- [ ] App restart can find pending handoffs and resume agents
-- [ ] Handoff includes reason (shutdown, crash, manual, timeout)
+- [x] App shutdown creates handoff records for all running agents
+- [x] App restart can find pending handoffs and resume agents
+- [x] Handoff includes reason (shutdown, crash, manual, timeout)
 
 ---
 
@@ -655,9 +659,9 @@ mail, and loads expertise before resuming.
 | `src/main/ipc/handlers.ts` (in `coordinator:start`) | Before generating coordinator prompt: (1) Check for existing coordinator checkpoint. (2) If found, build recovery context: `## Recovery Context\nPrevious session: {sessionId}\nProgress: {progressSummary}\nActive agents: {list from sessions table}\nPending merges: {list from merge_queue}\nUnread mail: {count}\nPending work: {pendingWork}`. (3) Include this in the coordinator's prompt. (4) Also load expertise domains from checkpoint's mulch_domains. |
 
 **Acceptance criteria:**
-- [ ] Coordinator restart includes recovery context
-- [ ] Shows active child agents, pending merges, unread mail count
-- [ ] Previous progress summary is included
+- [x] Coordinator restart includes recovery context
+- [x] Shows active child agents, pending merges, unread mail count
+- [x] Previous progress summary is included
 
 ---
 
@@ -674,10 +678,10 @@ Over time, tactical/observational records accumulate and become stale.
 | `src/main/ipc/handlers.ts` (in expertise creation) | When creating expertise records, auto-set `expires_at` based on classification: `foundational` = null (never expires), `tactical` = 30 days, `observational` = 7 days. |
 
 **Acceptance criteria:**
-- [ ] New expertise records get auto-assigned expiry based on classification
-- [ ] Expired records are pruned on app startup
-- [ ] Foundational records never expire
-- [ ] Pruning runs daily in background
+- [x] New expertise records get auto-assigned expiry based on classification
+- [x] Expired records are pruned on app startup
+- [x] Foundational records never expire
+- [x] Pruning runs daily in background
 
 ---
 
@@ -859,21 +863,21 @@ Phase 3: Watchdog & Monitoring Hardening          ✅ COMPLETE
   3.5  Forward-only state machine                   ✅
   3.6  Nudge debounce                               ✅
 
-Phase 4: Hooks & Context Injection                ← NEXT
-  4.1  Real mail injection for all agents
-  4.2  PostToolUse hook implementation
-  4.3  Stop hook implementation
-  4.4  PreCompact hook implementation
-  4.5  Environment guard
+Phase 4: Hooks & Context Injection                ✅ COMPLETE
+  4.1  Real mail injection for all agents           ✅
+  4.2  PostToolUse hook implementation              ✅
+  4.3  Stop hook implementation                     ✅
+  4.4  PreCompact hook implementation               ✅
+  4.5  Environment guard                            ✅
 
-Phase 5: Checkpoint & Recovery
-  5.1  Fix mulch_domains bug
-  5.2  Checkpoint injection on resume
-  5.3  Complete handoff lifecycle
-  5.4  Coordinator recovery protocol
-  5.5  Expertise decay automation
+Phase 5: Checkpoint & Recovery                    ✅ COMPLETE
+  5.1  Fix mulch_domains bug                        ✅
+  5.2  Checkpoint injection on resume               ✅
+  5.3  Complete handoff lifecycle                    ✅
+  5.4  Coordinator recovery protocol                ✅
+  5.5  Expertise decay automation                   ✅
 
-Phase 6: Two-Layer Instruction System
+Phase 6: Two-Layer Instruction System             ← NEXT
   6.1  Base agent definition files
   6.2  Three-phase lead workflow
   6.3  Capability index
@@ -884,6 +888,6 @@ Phase 7: Observability & Telemetry
   7.3  Mulch CLI wrapper
 ```
 
-**Total tasks: 31 (19 complete, 12 remaining)**
+**Total tasks: 31 (29 complete, 2 remaining)**
 **Total estimated new code: ~3,000 lines**
 **Files primarily affected: `handlers.ts`, `watchdogService.ts`, `mergeService.ts`, `agentProcessManager.ts`, `database.ts`, `shared/types/index.ts`**

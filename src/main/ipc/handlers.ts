@@ -907,6 +907,8 @@ export function registerIpcHandlers(): void {
             log.info(`[Overlay] Generated CLAUDE.md for ${options.agent_name} in ${overlayWorktree}`);
 
             // Deploy Claude Code hooks to .claude/settings.local.json
+            // Environment guard prefix: ensures hooks only fire for Fleet Command managed agents
+            const envGuard = 'if [ -z "$FC_AGENT_NAME" ]; then exit 0; fi; ';
             const hooksConfig: Record<string, unknown[]> = {};
 
             // UserPromptSubmit: inject unread mail before every prompt (like overstory's ov mail check --inject)
@@ -914,16 +916,34 @@ export function registerIpcHandlers(): void {
               matcher: '',
               hooks: [{
                 type: 'command',
-                command: `echo "[FC:mail] Checking mail for ${options.agent_name}..."`,
+                command: `${envGuard}echo "[FC:mail] Checking mail for ${options.agent_name}..."`,
               }],
             }];
 
-            // Stop: mulch learn — prompt agent to record expertise before session ends
+            // Stop: record session-end marker for expertise synthesis
             hooksConfig.Stop = [{
               matcher: '',
               hooks: [{
                 type: 'command',
-                command: `echo "[FC:stop] Session ended for ${options.agent_name} (${capability}). Expertise and metrics saved."`,
+                command: `${envGuard}echo "[FC:session-end] Agent ${options.agent_name} (${capability}) session completed. Expertise synthesis pending."`,
+              }],
+            }];
+
+            // PostToolUse: detect git commits and log expertise event markers
+            hooksConfig.PostToolUse = [{
+              matcher: 'Bash',
+              hooks: [{
+                type: 'command',
+                command: `${envGuard}bash -c 'TOOL_INPUT=$(cat); if echo "$TOOL_INPUT" | grep -qE "git\\s+commit"; then DOMAIN=$(echo "$TOOL_INPUT" | grep -oE "[a-zA-Z0-9_-]+/" | head -1 | tr -d "/"); echo "[FC:expertise] commit detected: domain=\${DOMAIN:-general} agent=$FC_AGENT_NAME"; fi'`,
+              }],
+            }];
+
+            // PreCompact: re-inject key agent context before context compaction
+            hooksConfig.PreCompact = [{
+              matcher: '',
+              hooks: [{
+                type: 'command',
+                command: `${envGuard}echo "[FC:compact] Re-injecting context for ${options.agent_name} (${capability}).\\nAgent: ${options.agent_name}\\nCapability: ${capability}\\nTask: ${options.task_id || 'none'}\\nFile Scope: ${options.file_scope || 'unrestricted'}\\nBranch: ${autoBranchName || options.branch_name || 'default'}\\nRemember: Read your CLAUDE.md overlay for full context."`,
               }],
             }];
 
@@ -936,7 +956,7 @@ export function registerIpcHandlers(): void {
                   matcher: tool,
                   hooks: [{
                     type: 'command',
-                    command: `echo '{"decision":"block","reason":"${capability} agents are read-only. ${tool} is not permitted."}' && exit 2`,
+                    command: `${envGuard}echo '{"decision":"block","reason":"${capability} agents are read-only. ${tool} is not permitted."}' && exit 2`,
                   }],
                 });
               }
@@ -948,7 +968,7 @@ export function registerIpcHandlers(): void {
               matcher: 'Bash',
               hooks: [{
                 type: 'command',
-                command: `bash -c 'if echo "$TOOL_INPUT" | grep -qE "git\\s+push"; then echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"git push blocked. Use merge queue.\\"}"; exit 2; fi'`,
+                command: `${envGuard}bash -c 'if echo "$TOOL_INPUT" | grep -qE "git\\s+push"; then echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"git push blocked. Use merge queue.\\"}"; exit 2; fi'`,
               }],
             });
 
@@ -1083,6 +1103,9 @@ export function registerIpcHandlers(): void {
           data: JSON.stringify({ capability: options.capability, model, pid: agentProcess.pid }),
         });
 
+        // Start mail injection for all agents (not just coordinator)
+        agentProcessManager.startMailInjection(options.id, options.agent_name, capability);
+
         // ── Mulch Auto-Prime: inject expertise context on spawn ──
         // Delay slightly to allow the agent process to fully initialize
         setTimeout(() => {
@@ -1194,8 +1217,11 @@ export function registerIpcHandlers(): void {
     // Acquire operation lock to prevent concurrent spawn/stop race conditions
     await agentOpLock.acquire();
     try {
+      // Stop mail injection before killing the process
+      agentProcessManager.stopMailInjection(agentId);
+
       // Kill the node-pty process — Stop hook in .claude/settings.local.json
-      // handles mulch learn and session-end logging before Claude Code exits
+      // handles session-end logging before Claude Code exits
       await agentProcessManager.stop(agentId);
 
       validateAndUpdateSessionState(agentId, 'completed');
@@ -1683,6 +1709,123 @@ export function registerIpcHandlers(): void {
           }),
         });
 
+        // ── Checkpoint Injection on Resume: inject recovery context ──
+        // Delay to allow the resumed agent process to fully initialize
+        setTimeout(() => {
+          try {
+            if (!agentProcessManager.isRunning(options.id)) return;
+
+            // Query checkpoint for this agent
+            const checkpoint = loggedPrepare(
+              'SELECT * FROM checkpoints WHERE agent_name = ?',
+            ).get(options.agent_name) as {
+              agent_name: string;
+              task_id: string | null;
+              session_id: string | null;
+              progress_summary: string | null;
+              files_modified: string | null;
+              current_branch: string | null;
+              pending_work: string | null;
+              mulch_domains: string | null;
+              timestamp: string;
+            } | undefined;
+
+            if (checkpoint) {
+              // Build recovery context string
+              const recoveryLines: string[] = [
+                '[SESSION RECOVERY] Checkpoint context from previous session:',
+                '## Session Recovery',
+              ];
+              if (checkpoint.progress_summary) {
+                recoveryLines.push(`Previous progress: ${checkpoint.progress_summary}`);
+              }
+              if (checkpoint.pending_work) {
+                recoveryLines.push(`Pending work: ${checkpoint.pending_work}`);
+              }
+              if (checkpoint.files_modified) {
+                recoveryLines.push(`Files modified: ${checkpoint.files_modified}`);
+              }
+              if (checkpoint.current_branch) {
+                recoveryLines.push(`Branch: ${checkpoint.current_branch}`);
+              }
+              if (checkpoint.task_id) {
+                recoveryLines.push(`Task ID: ${checkpoint.task_id}`);
+              }
+
+              const recoveryPayload = recoveryLines.join('\n') + '\n';
+              agentProcessManager.write(options.id, recoveryPayload);
+              log.info(
+                `[Checkpoint] Injected recovery context for agent ${options.agent_name} (resumed from session ${options.resume_session_id})`,
+              );
+
+              // Inject expertise from checkpoint mulch_domains
+              if (checkpoint.mulch_domains) {
+                let domains: string[] = [];
+                try {
+                  const parsed = JSON.parse(checkpoint.mulch_domains);
+                  if (Array.isArray(parsed) && parsed.length > 0) domains = parsed;
+                } catch {
+                  // If not JSON array, treat as comma-separated string
+                  domains = checkpoint.mulch_domains.split(',').map((d) => d.trim()).filter(Boolean);
+                }
+
+                if (domains.length > 0) {
+                  const expertiseRecords = loggedPrepare(
+                    `SELECT domain, title, content, type, classification FROM expertise_records
+                     WHERE domain IN (${domains.map(() => '?').join(',')})
+                       AND classification IN ('foundational', 'tactical')
+                       AND (expires_at IS NULL OR expires_at > datetime('now'))
+                     ORDER BY CASE classification WHEN 'foundational' THEN 1 WHEN 'tactical' THEN 2 ELSE 3 END, updated_at DESC
+                     LIMIT 30`,
+                  ).all(...domains) as Array<{
+                    domain: string;
+                    title: string;
+                    content: string;
+                    type: string;
+                    classification: string;
+                  }>;
+
+                  if (expertiseRecords.length > 0) {
+                    const expertiseLines = [
+                      `[EXPERTISE PRIME] ${expertiseRecords.length} records loaded for checkpoint domains: ${domains.join(', ')}`,
+                    ];
+                    for (const rec of expertiseRecords) {
+                      expertiseLines.push(
+                        `  [${rec.classification}/${rec.type}] ${rec.title}: ${rec.content.substring(0, 200)}`,
+                      );
+                    }
+                    const expertisePayload = expertiseLines.join('\n') + '\n';
+                    agentProcessManager.write(options.id, expertisePayload);
+                    log.info(
+                      `[Mulch] Auto-primed resumed agent ${options.agent_name} with ${expertiseRecords.length} expertise records from checkpoint domains`,
+                    );
+                  }
+                }
+              }
+
+              recordEvent({
+                eventType: 'custom',
+                agentName: options.agent_name,
+                sessionId: options.id,
+                data: JSON.stringify({
+                  action: 'checkpoint_recovery_injected',
+                  checkpoint_agent: checkpoint.agent_name,
+                  has_progress: !!checkpoint.progress_summary,
+                  has_pending: !!checkpoint.pending_work,
+                  has_files: !!checkpoint.files_modified,
+                  domains: checkpoint.mulch_domains,
+                  resumed_from: options.resume_session_id,
+                }),
+              });
+            }
+          } catch (checkpointErr) {
+            log.warn(
+              `[Checkpoint] Recovery injection failed for ${options.agent_name}:`,
+              checkpointErr,
+            );
+          }
+        }, 3000);
+
         return {
           data: {
             ...(session as Record<string, unknown>),
@@ -1773,64 +1916,8 @@ export function registerIpcHandlers(): void {
   });
 
   // Coordinator channels - specialized coordinator agent management
-  // Mail injection interval — injects unread mail into the coordinator's terminal
-  // so the Claude Code session can read and act on messages (like overstory's UserPromptSubmit hook)
-  let coordinatorMailInterval: ReturnType<typeof setInterval> | null = null;
-
-  function startCoordinatorMailInjection(coordinatorId: string, coordinatorName: string) {
-    if (coordinatorMailInterval) clearInterval(coordinatorMailInterval);
-
-    coordinatorMailInterval = setInterval(() => {
-      try {
-        if (!agentProcessManager.isRunning(coordinatorId)) {
-          if (coordinatorMailInterval) {
-            clearInterval(coordinatorMailInterval);
-            coordinatorMailInterval = null;
-          }
-          return;
-        }
-
-        // Query unread mail for the coordinator
-        const unread = loggedPrepare(
-          'SELECT * FROM messages WHERE to_agent = ? AND read = 0 ORDER BY created_at ASC',
-        ).all(coordinatorName) as Record<string, unknown>[];
-
-        if (unread.length === 0) return;
-
-        // Format and inject into the coordinator's terminal context
-        const lines = [`\n[MAIL] ${unread.length} new message(s):`];
-        for (const msg of unread) {
-          const priority = msg.priority as string;
-          const prefix = priority === 'urgent' || priority === 'high' ? '!!' : ' ';
-          lines.push(`  ${prefix}[${msg.type}] from ${msg.from_agent}: ${(msg.subject as string) || ''}`);
-          if (msg.body) {
-            const body = (msg.body as string).substring(0, 200);
-            lines.push(`    ${body}`);
-          }
-          if (msg.payload) {
-            lines.push(`    payload: ${(msg.payload as string).substring(0, 150)}`);
-          }
-          // Mark as read after injection
-          loggedPrepare('UPDATE messages SET read = 1 WHERE id = ?').run(msg.id);
-        }
-        lines.push('');
-
-        agentProcessManager.write(coordinatorId, lines.join('\n'));
-        log.debug(`[MailInject] Injected ${unread.length} messages into coordinator ${coordinatorName}`);
-      } catch (err) {
-        log.warn('[MailInject] Failed to inject mail:', err);
-      }
-    }, 5000);
-
-    log.info(`[MailInject] Started mail injection for coordinator ${coordinatorName}`);
-  }
-
-  function stopCoordinatorMailInjection() {
-    if (coordinatorMailInterval) {
-      clearInterval(coordinatorMailInterval);
-      coordinatorMailInterval = null;
-    }
-  }
+  // Mail injection is now handled by agentProcessManager.startMailInjection/stopMailInjection
+  // for ALL agent capabilities (coordinators, leads, builders, scouts, etc.)
 
   ipcMain.handle('coordinator:start', (_event, options?: { prompt?: string; run_id?: string }) => {
     try {
@@ -1858,6 +1945,69 @@ export function registerIpcHandlers(): void {
       ).get() as { path: string; name: string } | undefined;
 
       const worktreePath = activeProject?.path || process.cwd();
+
+      // ===== Recovery Protocol: Check for existing coordinator checkpoint =====
+      let recoveryContext = '';
+      try {
+        const prevCheckpoint = loggedPrepare(
+          `SELECT * FROM checkpoints WHERE agent_name LIKE 'coordinator-%' ORDER BY timestamp DESC LIMIT 1`
+        ).get() as Record<string, unknown> | undefined;
+
+        if (prevCheckpoint) {
+          // Gather active child agents
+          const activeAgents = loggedPrepare(
+            `SELECT agent_name, capability, state, task_id FROM sessions WHERE state NOT IN ('completed') AND capability != 'coordinator' ORDER BY created_at DESC`
+          ).all() as Array<Record<string, unknown>>;
+
+          // Gather pending merges
+          const pendingMerges = loggedPrepare(
+            `SELECT branch_name, agent_name, status FROM merge_queue WHERE status IN ('pending', 'in_progress') ORDER BY created_at ASC`
+          ).all() as Array<Record<string, unknown>>;
+
+          // Count unread mail for coordinator
+          const unreadMail = loggedPrepare(
+            `SELECT COUNT(*) as cnt FROM messages WHERE to_agent LIKE 'coordinator-%' AND read = 0`
+          ).get() as { cnt: number };
+
+          // Build recovery context
+          const parts = ['## Recovery Context'];
+          parts.push(`Previous session: ${prevCheckpoint.session_id || 'unknown'}`);
+
+          if (prevCheckpoint.progress_summary) {
+            try {
+              const progress = JSON.parse(prevCheckpoint.progress_summary as string);
+              parts.push(`Progress: ${progress.state || 'unknown'} (ran ${progress.durationMinutes || 0} min)`);
+            } catch {
+              parts.push(`Progress: ${prevCheckpoint.progress_summary}`);
+            }
+          }
+
+          if (activeAgents.length > 0) {
+            parts.push(`Active agents (${activeAgents.length}):`);
+            for (const a of activeAgents) {
+              parts.push(`  - ${a.agent_name} (${a.capability}, ${a.state})${a.task_id ? ` task: ${a.task_id}` : ''}`);
+            }
+          }
+
+          if (pendingMerges.length > 0) {
+            parts.push(`Pending merges (${pendingMerges.length}):`);
+            for (const m of pendingMerges) {
+              parts.push(`  - ${m.branch_name} by ${m.agent_name || 'unknown'} [${m.status}]`);
+            }
+          }
+
+          parts.push(`Unread mail: ${unreadMail.cnt}`);
+
+          if (prevCheckpoint.pending_work) {
+            parts.push(`Pending work: ${prevCheckpoint.pending_work}`);
+          }
+
+          recoveryContext = parts.join('\n');
+          log.info(`[IPC] coordinator:start - Recovery context built from checkpoint (session: ${prevCheckpoint.session_id})`);
+        }
+      } catch (recoveryErr) {
+        log.warn('[IPC] coordinator:start - Failed to build recovery context:', recoveryErr);
+      }
 
       // Build the coordinator's autonomous prompt — the coordinator IS the intelligent agent
       // It uses tools (Bash, Read, Grep, Glob) to analyze code, dispatch agents, and manage the fleet
@@ -1898,8 +2048,11 @@ export function registerIpcHandlers(): void {
         '- Record expertise insights for future sessions.',
         '- When all dispatched work is complete, merged, and issues closed — signal done.',
         '',
+        recoveryContext ? `${recoveryContext}\n` : '',
         '# BEGIN',
-        'Start by analyzing the codebase structure to plan your work decomposition.',
+        recoveryContext
+          ? 'Review the recovery context above. Check which agents are still active, review pending merges, and continue from where the previous session left off.'
+          : 'Start by analyzing the codebase structure to plan your work decomposition.',
       ].filter(Boolean).join('\n');
 
       const agentProcess = agentProcessManager.spawn({
@@ -2052,7 +2205,7 @@ export function registerIpcHandlers(): void {
       }, 3000);
 
       // Start backend auto-poll — coordinator is now fully autonomous
-      startCoordinatorMailInjection(id, agentName);
+      agentProcessManager.startMailInjection(id, agentName, 'coordinator');
 
       const session = loggedPrepare('SELECT * FROM sessions WHERE id = ?').get(id);
       log.info(
@@ -2067,7 +2220,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('coordinator:stop', async () => {
     try {
-      stopCoordinatorMailInjection();
+      // Stop mail injection for the coordinator being stopped
+      const coordSession = loggedPrepare(
+        `SELECT id FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`
+      ).get() as { id: string } | undefined;
+      if (coordSession) agentProcessManager.stopMailInjection(coordSession.id);
 
       const coordinator = loggedPrepare(
         `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
@@ -9428,9 +9585,18 @@ export function registerIpcHandlers(): void {
       },
     ) => {
       try {
+        // Auto-set expires_at based on classification
+        let expiresAt: string | null = null;
+        if (record.classification === 'tactical') {
+          expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        } else if (record.classification === 'observational') {
+          expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        }
+        // foundational records: expiresAt stays null (never expires)
+
         loggedPrepare(
-          `INSERT INTO expertise_records (id, domain, title, content, type, classification, agent_name, source_file, tags)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO expertise_records (id, domain, title, content, type, classification, agent_name, source_file, tags, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           record.id,
           record.domain,
@@ -9441,6 +9607,7 @@ export function registerIpcHandlers(): void {
           record.agent_name ?? null,
           record.source_file ?? null,
           record.tags ?? null,
+          expiresAt,
         );
 
         const created = loggedPrepare('SELECT * FROM expertise_records WHERE id = ?').get(
@@ -11023,6 +11190,86 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle(
+    'session:initiate-handoff',
+    (_event, options: { agent_name: string; reason: string }) => {
+      try {
+        // 1. Find the active session for this agent
+        const session = loggedPrepare(
+          `SELECT id, agent_name FROM sessions WHERE agent_name = ? AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
+        ).get(options.agent_name) as { id: string; agent_name: string } | undefined;
+
+        if (!session) {
+          return { data: null, error: 'No active session found for agent' };
+        }
+
+        // 2. Save checkpoint for the agent
+        agentProcessManager.saveCheckpoints();
+
+        // 3. Create handoff record with to_session = '' (pending)
+        const id = `handoff-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        loggedPrepare(
+          'INSERT INTO session_handoffs (id, from_session, to_session, reason) VALUES (?, ?, ?, ?)',
+        ).run(id, session.id, '', options.reason || 'manual');
+
+        // 4. Mark current session as completed
+        loggedPrepare(
+          `UPDATE sessions SET state = 'completed', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+        ).run(session.id);
+
+        const handoff = loggedPrepare('SELECT * FROM session_handoffs WHERE id = ?').get(id);
+        log.info(
+          `[IPC] session:initiate-handoff - initiated handoff ${id} for agent ${options.agent_name}, reason: ${options.reason}`,
+        );
+        return { data: handoff, error: null };
+      } catch (error) {
+        log.error('session:initiate-handoff failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'session:complete-handoff',
+    (_event, options: { agent_name: string; new_session_id: string }) => {
+      try {
+        // 1. Find pending handoff (to_session is empty) for this agent
+        const handoff = loggedPrepare(
+          `SELECT sh.* FROM session_handoffs sh
+           JOIN sessions s ON sh.from_session = s.id
+           WHERE s.agent_name = ? AND sh.to_session = ''
+           ORDER BY sh.created_at DESC LIMIT 1`,
+        ).get(options.agent_name) as Record<string, unknown> | undefined;
+
+        if (!handoff) {
+          return { data: null, error: 'No pending handoff found for agent' };
+        }
+
+        // 2. Update to_session with new session ID
+        loggedPrepare('UPDATE session_handoffs SET to_session = ? WHERE id = ?').run(
+          options.new_session_id,
+          handoff.id,
+        );
+
+        // 3. Load checkpoint into new session context
+        const checkpoint = loggedPrepare(
+          'SELECT * FROM checkpoints WHERE agent_name = ?',
+        ).get(options.agent_name);
+
+        const updated = loggedPrepare('SELECT * FROM session_handoffs WHERE id = ?').get(
+          handoff.id,
+        );
+        log.info(
+          `[IPC] session:complete-handoff - completed handoff ${handoff.id}: ${handoff.from_session} -> ${options.new_session_id}`,
+        );
+        return { data: { handoff: updated, checkpoint }, error: null };
+      } catch (error) {
+        log.error('session:complete-handoff failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
   // ==========================================
   // Orphaned Agent Process Detection
   // ==========================================
@@ -11697,6 +11944,86 @@ export function registerIpcHandlers(): void {
   );
 
   // ==========================================
+  // Expertise: Auto-Record (called from hooks/exit flow)
+  // ==========================================
+
+  ipcMain.handle(
+    'expertise:auto-record',
+    (
+      _event,
+      options: {
+        agentName: string;
+        domain: string;
+        title: string;
+        content: string;
+        type: string;
+        classification: string;
+      },
+    ) => {
+      try {
+        const id = `exp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+        // Auto-set expires_at based on classification
+        // foundational = never expires, tactical = 30 days, observational = 7 days
+        let expiresAt: string | null = null;
+        if (options.classification === 'tactical') {
+          expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        } else if (options.classification === 'observational') {
+          expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        }
+        // foundational records: expiresAt stays null (never expires)
+
+        loggedPrepare(
+          `INSERT INTO expertise_records (id, domain, title, content, type, classification, agent_name, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          id,
+          options.domain,
+          options.title,
+          options.content,
+          options.type,
+          options.classification,
+          options.agentName,
+          expiresAt,
+        );
+
+        // Update agent identity with the domain
+        const identity = loggedPrepare(
+          'SELECT expertise_domains FROM agent_identities WHERE name = ?',
+        ).get(options.agentName) as { expertise_domains: string | null } | undefined;
+
+        let existingDomains: string[] = [];
+        if (identity?.expertise_domains) {
+          try {
+            existingDomains = JSON.parse(identity.expertise_domains);
+          } catch {
+            existingDomains = [];
+          }
+        }
+
+        if (!existingDomains.includes(options.domain)) {
+          const mergedDomains = [...existingDomains, options.domain];
+          loggedPrepare(
+            `UPDATE agent_identities SET expertise_domains = ?, updated_at = datetime('now') WHERE name = ?`,
+          ).run(JSON.stringify(mergedDomains), options.agentName);
+        }
+
+        log.info(
+          `[IPC] expertise:auto-record - Recorded expertise "${options.title}" for ${options.agentName} in domain ${options.domain}`,
+        );
+
+        return {
+          data: { id, domain: options.domain, title: options.title },
+          error: null,
+        };
+      } catch (error) {
+        log.error('expertise:auto-record failed:', error);
+        return { data: null, error: String(error) };
+      }
+    },
+  );
+
+  // ==========================================
   // Expertise: Prune Expired Records
   // ==========================================
 
@@ -11894,7 +12221,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('coordinator:complete', async () => {
     try {
-      stopCoordinatorMailInjection();
+      agentProcessManager.stopAllMailInjection();
 
       const coordinator = loggedPrepare(
         `SELECT * FROM sessions WHERE capability = 'coordinator' AND state NOT IN ('completed') ORDER BY created_at DESC LIMIT 1`,
@@ -12446,6 +12773,48 @@ export function registerIpcHandlers(): void {
       }
     },
   );
+
+  // ==========================================
+  // Expertise: Auto-prune expired records on startup and daily
+  // ==========================================
+
+  // Run prune on startup (after a short delay to let DB initialize)
+  setTimeout(() => {
+    try {
+      const expired = loggedPrepare(
+        `SELECT COUNT(*) as cnt FROM expertise_records WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')`,
+      ).get() as { cnt: number };
+
+      if (expired.cnt > 0) {
+        loggedPrepare(
+          `DELETE FROM expertise_records WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')`,
+        ).run();
+        log.info(`[ExpertiseDecay] Startup prune: removed ${expired.cnt} expired expertise records`);
+      } else {
+        log.info('[ExpertiseDecay] Startup prune: no expired records found');
+      }
+    } catch (pruneErr) {
+      log.warn('[ExpertiseDecay] Startup prune failed:', pruneErr);
+    }
+  }, 5000);
+
+  // Schedule daily prune (every 24 hours)
+  setInterval(() => {
+    try {
+      const expired = loggedPrepare(
+        `SELECT COUNT(*) as cnt FROM expertise_records WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')`,
+      ).get() as { cnt: number };
+
+      if (expired.cnt > 0) {
+        loggedPrepare(
+          `DELETE FROM expertise_records WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')`,
+        ).run();
+        log.info(`[ExpertiseDecay] Daily prune: removed ${expired.cnt} expired expertise records`);
+      }
+    } catch (pruneErr) {
+      log.warn('[ExpertiseDecay] Daily prune failed:', pruneErr);
+    }
+  }, 24 * 60 * 60 * 1000);
 
   log.info(
     'IPC handlers registered - all database handlers use real SQLite queries via loggedPrepare()',

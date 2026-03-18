@@ -1603,6 +1603,16 @@ export interface ElectronAPI {
     id: string,
     days: number,
   ) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
+  expertiseAutoRecord: (record: {
+    agent_name: string;
+    domain: string;
+    title: string;
+    content: string;
+    type: ExpertiseType;
+    classification: ExpertiseClassification;
+    source_file?: string;
+    tags?: string;
+  }) => Promise<{ data: ExpertiseRecord | null; error: string | null }>;
 
   // Specs (scout → spec → build pipeline)
   specList: (filters?: {
@@ -2024,6 +2034,17 @@ export interface ElectronAPI {
   sessionHandoffBySession: (
     sessionId: string,
   ) => Promise<{ data: SessionHandoff[] | null; error: string | null }>;
+  sessionInitiateHandoff: (options: {
+    agent_name: string;
+    reason: string;
+  }) => Promise<{ data: SessionHandoff | null; error: string | null }>;
+  sessionCompleteHandoff: (options: {
+    agent_name: string;
+    new_session_id: string;
+  }) => Promise<{
+    data: { handoff: SessionHandoff; checkpoint: unknown } | null;
+    error: string | null;
+  }>;
 
   // Window management
   windowSetTitle: (title: string) => Promise<{ data: boolean; error: string | null }>;
