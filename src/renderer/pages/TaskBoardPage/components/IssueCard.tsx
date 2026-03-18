@@ -66,6 +66,13 @@ export function IssueCard({
               {priorityInfo.label}
             </Badge>
 
+            {/* Human review tag for done tasks */}
+            {issue.status === 'closed' && (
+              <Badge variant="outline" className="gap-1 border-transparent bg-purple-500/10 text-purple-400">
+                Human Review
+              </Badge>
+            )}
+
             {/* Group badge */}
             {issue.group_id && (
               <Badge variant="outline" className="gap-1 border-transparent text-sky-400">

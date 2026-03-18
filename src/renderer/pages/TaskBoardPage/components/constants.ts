@@ -40,7 +40,7 @@ export const statusConfig: Record<
     color: 'text-amber-400',
     bg: 'bg-amber-400/10',
   },
-  closed: { label: 'Closed', icon: FiCheckCircle, color: 'text-green-400', bg: 'bg-green-400/10' },
+  closed: { label: 'Done', icon: FiCheckCircle, color: 'text-green-400', bg: 'bg-green-400/10' },
   blocked: { label: 'Blocked', icon: FiAlertTriangle, color: 'text-red-400', bg: 'bg-red-400/10' },
 };
 

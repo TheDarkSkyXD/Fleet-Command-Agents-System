@@ -55,9 +55,9 @@ import {
 } from './components';
 import type { ActiveTab, CreateIssueForm, GroupProgress, ViewMode } from './components';
 import { Tooltip } from '../../components/Tooltip';
-import './TasksPage.css';
+import './TaskBoardPage.css';
 
-export function TasksPage() {
+export function TaskBoardPage() {
   const { tasksFilters, setTasksFilters } = useFilterStore();
   const [activeTab, setActiveTab] = useState<ActiveTab>(tasksFilters.activeTab);
   const [viewMode, setViewMode] = useState<ViewMode>(tasksFilters.viewMode);
@@ -502,12 +502,41 @@ export function TasksPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-50">Tasks</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-50">Task Board</h1>
+          {issues.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!window.confirm(`Delete all ${issues.length} tasks and ${groups.length} groups? This cannot be undone.`)) return;
+                try {
+                  for (const issue of issues) {
+                    await window.electronAPI.issueDelete(issue.id);
+                  }
+                  for (const group of groups) {
+                    await window.electronAPI.taskGroupDelete(group.id);
+                  }
+                  setIssues([]);
+                  setGroups([]);
+                  setCompletedIssues([]);
+                  toast.success('All tasks cleared');
+                } catch {
+                  toast.error('Failed to clear tasks');
+                }
+              }}
+              className="bg-red-600/15 text-red-400 border border-red-500/25 hover:bg-red-600/25 hover:text-red-300"
+            >
+              <FiTrash2 size={14} />
+              Clear All
+            </Button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {activeTab === 'groups' && (
             <Button
               onClick={() => setShowCreateGroupForm(true)}
-              className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+              className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
               data-testid="create-group-btn"
             >
               <FiFolder size={16} />
@@ -552,7 +581,7 @@ export function TasksPage() {
               </div>
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
               >
                 <FiPlus size={16} />
                 Create Issue
@@ -577,7 +606,7 @@ export function TasksPage() {
           <TabsTrigger value="completed" data-testid="tab-completed">
             <span className="inline-flex items-center gap-1.5">
               <FiCheckCircle size={14} />
-              Completed ({completedIssues.length})
+              Done ({completedIssues.length})
             </span>
           </TabsTrigger>
         </TabsList>
@@ -598,7 +627,7 @@ export function TasksPage() {
                 { value: '', label: 'All Statuses' },
                 { value: 'open', label: 'Open' },
                 { value: 'in_progress', label: 'In Progress' },
-                { value: 'closed', label: 'Closed' },
+                { value: 'closed', label: 'Done' },
                 { value: 'blocked', label: 'Blocked' },
               ]}
             />
@@ -756,7 +785,7 @@ export function TasksPage() {
                 <Button
                   onClick={handleCreate}
                   disabled={!form.title.trim() || creating}
-                  className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                  className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                 >
                   {creating ? (
                     <>
@@ -832,6 +861,77 @@ export function TasksPage() {
               getTypeInfo={getTypeInfo}
               onClose={() => setSelectedIssueId(null)}
               onStatusChange={handleStatusChangeWithClose}
+              onDelete={async (id) => {
+                try {
+                  const result = await window.electronAPI.issueDelete(id);
+                  if (result.data) {
+                    setIssues((prev) => prev.filter((i) => i.id !== id));
+                    toast.success('Task deleted');
+                  } else if (result.error) {
+                    toast.error(`Failed to delete: ${result.error}`);
+                  }
+                } catch (err) {
+                  toast.error('Failed to delete task');
+                }
+              }}
+              onAssignAgent={async (issueId, agentName) => {
+                try {
+                  const issue = issues.find((i) => i.id === issueId);
+                  const result = await window.electronAPI.issueUpdate(issueId, {
+                    assigned_agent: agentName,
+                    ...(agentName ? { status: 'in_progress' } : {}),
+                  });
+                  if (result.data) {
+                    setIssues((prev) =>
+                      prev.map((i) => (i.id === issueId ? (result.data as Issue) : i)),
+                    );
+                    if (agentName && issue) {
+                      // 1. Send mail for audit trail and agent-to-agent communication
+                      await window.electronAPI.mailSend({
+                        from_agent: 'operator',
+                        to_agent: agentName,
+                        subject: `Task assigned: ${issue.title}`,
+                        body: `You have been assigned a new task.\n\nTask ID: ${issueId}\nTitle: ${issue.title}\nPriority: ${issue.priority}\nType: ${issue.type}\n\n${issue.description || 'No additional description.'}\n\nPlease begin working on this task.`,
+                        type: 'assign',
+                        priority: issue.priority === 'critical' ? 'high' : 'normal',
+                      });
+
+                      // 2. Write task directly to agent terminal for immediate action
+                      const agentSessions = await window.electronAPI.agentList();
+                      const agentSession = agentSessions.data?.find(
+                        (s: { agent_name: string; state: string }) =>
+                          s.agent_name === agentName && s.state !== 'completed'
+                      );
+                      if (agentSession) {
+                        const taskPrompt = [
+                          issue.title,
+                          '',
+                          issue.description || '',
+                          '',
+                          `Task ID: ${issueId}`,
+                          `Priority: ${issue.priority}`,
+                          `Type: ${issue.type}`,
+                        ]
+                          .filter(Boolean)
+                          .join('\n');
+
+                        await window.electronAPI.agentWrite(agentSession.id, taskPrompt + '\n');
+                        toast.success(`Assigned to ${agentName}`, {
+                          description: 'Task sent via mail and written to agent terminal',
+                        });
+                      } else {
+                        toast.success(`Assigned to ${agentName}`, {
+                          description: 'Task sent via mail — agent will pick it up when active',
+                        });
+                      }
+                    } else {
+                      toast.success('Agent unassigned');
+                    }
+                  }
+                } catch {
+                  toast.error('Failed to assign agent');
+                }
+              }}
               allIssues={issues}
               onDependenciesChange={async (id, depIds) => {
                 try {
@@ -899,7 +999,7 @@ export function TasksPage() {
                 <Button
                   onClick={handleCreateGroup}
                   disabled={!groupName.trim() || creatingGroup}
-                  className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                  className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                   data-testid="confirm-create-group"
                 >
                   {creatingGroup ? (
@@ -931,7 +1031,7 @@ export function TasksPage() {
               <p className="text-sm mb-4">Create a group to batch related issues together</p>
               <Button
                 onClick={() => setShowCreateGroupForm(true)}
-                className="bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm"
+                className="bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300"
                 data-testid="groups-empty-cta"
               >
                 <FiPlus size={14} />
@@ -1005,7 +1105,7 @@ export function TasksPage() {
                                   <Button
                                     size="sm"
                                     onClick={() => handleRenameGroup(group.id, renameGroupName)}
-                                    className="h-7 bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm text-xs"
+                                    className="h-7 bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300 text-xs"
                                     data-testid={`group-rename-save-${group.id}`}
                                   >
                                     Save
@@ -1197,7 +1297,7 @@ export function TasksPage() {
                               }
                             }}
                             disabled={!selectedIssueForGroup}
-                            className="h-8 bg-slate-800/90 border border-blue-500/30 text-blue-300 hover:bg-slate-700/90 hover:border-blue-400/40 shadow-sm text-xs"
+                            className="h-8 bg-blue-600/15 text-blue-400 border border-blue-500/25 hover:bg-blue-600/25 hover:text-blue-300 text-xs"
                           >
                             Add
                           </Button>
@@ -1389,7 +1489,7 @@ export function TasksPage() {
                           {issue.closed_at && (
                             <span className="inline-flex items-center gap-1 text-green-400">
                               <FiClock size={11} />
-                              Closed: {formatDateTime(issue.closed_at)}
+                              Done: {formatDateTime(issue.closed_at)}
                             </span>
                           )}
                         </div>
@@ -1451,7 +1551,7 @@ export function TasksPage() {
             <Button
               onClick={handleCloseWithSummary}
               disabled={closingInProgress}
-              className="bg-slate-800/90 border border-emerald-500/30 text-emerald-300 hover:bg-slate-700/90 hover:border-emerald-400/40 shadow-sm"
+              className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-600/25 hover:text-emerald-300"
               data-testid="confirm-close-btn"
             >
               {closingInProgress ? (
