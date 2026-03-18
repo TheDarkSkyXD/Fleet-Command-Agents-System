@@ -107,6 +107,24 @@ export interface PatrolResult {
   timestamp: string;
 }
 
+/** Valid state transitions for the forward-only state machine */
+export const VALID_STATE_TRANSITIONS: Record<string, string[]> = {
+  booting: ['working', 'stalled', 'completed'],
+  working: ['completed', 'stalled'],
+  stalled: ['working', 'zombie', 'completed'],
+  zombie: ['completed'],
+};
+
+/**
+ * Validate that a state transition is allowed by the forward-only state machine.
+ * Returns true if valid, false if invalid.
+ */
+export function validateStateTransition(fromState: string, toState: string): boolean {
+  const allowed = VALID_STATE_TRANSITIONS[fromState];
+  if (!allowed) return false;
+  return allowed.includes(toState);
+}
+
 const DEFAULT_CONFIG: WatchdogConfig = {
   intervalMs: 30000, // 30 seconds
   staleThresholdMs: 300000, // 5 minutes
@@ -134,6 +152,7 @@ class WatchdogService {
   private escalationStates: Map<string, AgentEscalationState> = new Map();
   private checkCount = 0;
   private lastCheckAt: string | null = null;
+  private notifiedRunCompletions: Set<string> = new Set();
 
   /**
    * Start the watchdog daemon.
@@ -251,6 +270,72 @@ class WatchdogService {
   }
 
   /**
+   * Detect runs where all workers have completed and notify the coordinator.
+   * Only sends one notification per run (tracked in notifiedRunCompletions set).
+   */
+  private detectRunCompletions(): void {
+    try {
+      const db = getDatabase();
+
+      // Find runs where all non-coordinator/monitor workers have finished
+      const runs = db.prepare(
+        `SELECT run_id,
+          SUM(CASE WHEN capability NOT IN ('coordinator', 'monitor') AND state IN ('booting', 'working', 'stalled') THEN 1 ELSE 0 END) as active_workers,
+          SUM(CASE WHEN capability NOT IN ('coordinator', 'monitor') THEN 1 ELSE 0 END) as total_workers
+        FROM sessions
+        WHERE run_id IS NOT NULL
+        GROUP BY run_id
+        HAVING total_workers > 0`,
+      ).all() as Array<{ run_id: string; active_workers: number; total_workers: number }>;
+
+      for (const run of runs) {
+        if (run.active_workers === 0 && run.total_workers > 0) {
+          if (this.notifiedRunCompletions.has(run.run_id)) {
+            continue;
+          }
+
+          // Find the coordinator for this run
+          const coordinator = db.prepare(
+            `SELECT agent_name FROM sessions WHERE run_id = ? AND capability = 'coordinator' AND state IN ('booting', 'working', 'stalled') LIMIT 1`,
+          ).get(run.run_id) as { agent_name: string } | undefined;
+
+          if (coordinator) {
+            const msgId = `msg-wd-run-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            const now = new Date().toISOString();
+
+            db.prepare(
+              `INSERT INTO messages (id, thread_id, from_agent, to_agent, subject, body, type, priority, payload, read, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ).run(
+              msgId,
+              null,
+              'watchdog',
+              coordinator.agent_name,
+              'All workers completed',
+              `Run ${run.run_id}: all ${run.total_workers} workers have finished.`,
+              'status',
+              'high',
+              JSON.stringify({
+                run_id: run.run_id,
+                total_workers: run.total_workers,
+              }),
+              0,
+              now,
+            );
+
+            this.notifiedRunCompletions.add(run.run_id);
+            log.info(
+              `[Watchdog] Run completion detected: run=${run.run_id}, workers=${run.total_workers}, notified coordinator=${coordinator.agent_name}`,
+            );
+          }
+        }
+      }
+    } catch (error) {
+      log.error('[Watchdog] Failed to detect run completions:', error);
+    }
+  }
+
+  /**
    * Run a single watchdog check cycle across all tracked agents.
    */
   runCheck(): WatchdogCheckResult[] {
@@ -265,6 +350,9 @@ class WatchdogService {
       const result = this.checkAgent(agent, now);
       results.push(result);
     }
+
+    // Run completion detection: notify coordinators when all workers in a run finish
+    this.detectRunCompletions();
 
     // Clean up escalation states for agents that no longer exist
     for (const agentId of this.escalationStates.keys()) {
@@ -594,14 +682,30 @@ class WatchdogService {
 
   /**
    * Update the session state and escalation level in the database.
+   * Validates state transitions against the forward-only state machine.
    */
-  private updateSessionState(sessionId: string, state: string, escalationLevel: number): void {
+  private updateSessionState(sessionId: string, newState: string, escalationLevel: number): void {
     try {
       const db = getDatabase();
       const now = new Date().toISOString();
+
+      // Validate state transition
+      const currentSession = db.prepare('SELECT state FROM sessions WHERE id = ?').get(sessionId) as
+        | { state: string }
+        | undefined;
+
+      if (currentSession && currentSession.state !== newState) {
+        if (!validateStateTransition(currentSession.state, newState)) {
+          log.error(
+            `[Watchdog] Invalid state transition: ${currentSession.state} → ${newState} for session ${sessionId}`,
+          );
+          return;
+        }
+      }
+
       db.prepare(
         'UPDATE sessions SET state = ?, escalation_level = ?, stalled_at = COALESCE(stalled_at, ?), updated_at = ? WHERE id = ?',
-      ).run(state, escalationLevel, now, now, sessionId);
+      ).run(newState, escalationLevel, now, now, sessionId);
     } catch (error) {
       log.error(`[Watchdog] Failed to update session state for ${sessionId}:`, error);
     }
