@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "project": {
+    "name": "Fleet-Command-Agents-System",
+    "path": "F:\\My Github Repos\\Open Source Repos\\Fleet-Command-Agents-System"
+  },
+  "settings": {
+    "maxConcurrentAgents": 5,
+    "defaultModel": "sonnet",
+    "autoMerge": false
+  },
+  "created_at": "2026-03-16T04:32:01.701Z"
+}
